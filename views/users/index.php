@@ -1,0 +1,322 @@
+<?php
+// ที่อยู่ไฟล์: views/users/index.php
+
+// ดักจับตัวแปรจาก Controller อย่างปลอดภัย ป้องกันการทับค่าจนข้อมูลหาย
+$users_list = $users_list ?? $users ?? [];
+$hospitals_list = $hospitals_list ?? $hospitals ?? []; 
+
+// คลีนข้อมูล Session Role ของผู้ใช้งานปัจจุบันเพื่อใช้กำหนดสิทธิ์
+$current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
+
+// ดึงกลุ่มสายงาน (pay_rates) อัตโนมัติ เพื่อใช้อุดรอยรั่วฟอร์มแก้ไขข้อมูล
+$pay_rates = $pay_rates ?? [];
+if (empty($pay_rates) && class_exists('Database')) {
+    try {
+        $db_tmp = (new Database())->getConnection();
+        $pay_rates = $db_tmp->query("SELECT * FROM pay_rates ORDER BY display_order ASC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {}
+}
+?>
+
+<!-- นำเข้า Flatpickr CSS และ JS สำหรับปฏิทินภาษาไทย -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/th.js"></script>
+
+<style>
+    .card-modern { border: none; border-radius: 1.25rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); background: #ffffff; }
+    .table-modern th { font-weight: 600; color: #475569; font-size: 13px; background-color: #f8fafc; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; padding: 1rem; }
+    .table-modern td { vertical-align: middle; font-size: 14px; border-bottom: 1px solid #f1f5f9; padding: 1rem; background-color: #ffffff; }
+    .table-modern tbody tr:hover td { background-color: #f8fafc; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+</style>
+
+<div class="container-fluid px-3 px-md-4 py-4">
+
+    <!-- Header & Filters -->
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4 gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width: 50px; height: 50px;">
+                <i class="bi bi-globe-americas fs-4"></i>
+            </div>
+            <div>
+                <h2 class="h4 text-dark mb-0 fw-bold">ฐานข้อมูลบุคลากร (ส่วนกลาง)</h2>
+                <p class="text-muted mb-0" style="font-size: 13px;">จัดการบุคลากรเครือข่ายทั้งหมด (<?= count($users_list) ?> คน)</p>
+            </div>
+        </div>
+        
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <!-- Dropdown กรองตาม รพ.สต. -->
+            <select id="filterHospital" class="form-select shadow-sm rounded-pill border-light" style="width: 200px;">
+                <option value="all">แสดงทุกหน่วยบริการ</option>
+                <option value="center">เฉพาะส่วนกลาง (ศูนย์ควบคุม)</option>
+                <?php foreach($hospitals_list as $h): ?>
+                    <option value="<?= htmlspecialchars($h['name']) ?>"><?= htmlspecialchars($h['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <div class="input-group shadow-sm rounded-pill overflow-hidden" style="width: 250px; border: 1px solid #e2e8f0;">
+                <span class="input-group-text bg-white border-0 text-muted ps-3"><i class="bi bi-search"></i></span>
+                <input type="text" id="userSearchInput" class="form-control border-0 bg-white" placeholder="ค้นหาชื่อ, ตำแหน่ง...">
+            </div>
+
+            <!-- 🌟 ปุ่มนำเข้าข้อมูลแบบหลายคน -->
+            <button class="btn btn-outline-success fw-bold rounded-pill shadow-sm px-3" data-bs-toggle="modal" data-bs-target="#importUserModal">
+                <i class="bi bi-file-earmark-excel-fill me-1"></i> นำเข้าข้อมูล
+            </button>
+
+            <button class="btn btn-primary fw-bold rounded-pill shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="bi bi-person-plus-fill me-2"></i> เพิ่มบุคลากร
+            </button>
+        </div>
+    </div>
+
+    <!-- Alerts แบบใหม่ รองรับการแจ้งเตือนหลายบรรทัดจากการ Import -->
+    <?php if (isset($_SESSION['success_msg'])): ?>
+        <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4 alert-dismissible fade show">
+            <i class="bi bi-check-circle-fill me-2"></i> <?= nl2br($_SESSION['success_msg']) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php unset($_SESSION['success_msg']); ?>
+    <?php endif; ?>
+    <?php if (isset($_SESSION['error_msg'])): ?>
+        <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4 alert-dismissible fade show">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= nl2br($_SESSION['error_msg']) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php unset($_SESSION['error_msg']); ?>
+    <?php endif; ?>
+
+    <!-- ตาราง -->
+    <div class="card card-modern overflow-hidden">
+        <div class="table-responsive custom-scrollbar">
+            <table class="table table-modern mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">ชื่อ-นามสกุล</th>
+                        <th>หน่วยบริการ (สังกัด)</th>
+                        <th>ประเภท/ตำแหน่ง</th>
+                        <th>สิทธิ์ (Role)</th>
+                        <th class="pe-4 text-center">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    <?php if (empty($users_list)): ?>
+                        <tr><td colspan="5" class="text-center py-5 text-muted">ไม่พบข้อมูล</td></tr>
+                    <?php else: foreach ($users_list as $user): ?>
+                        <tr class="user-row" data-hosp="<?= empty($user['hospital_id']) ? 'center' : htmlspecialchars($user['hospital_name']) ?>">
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle me-3" style="width: 10px; height: 10px; background-color: var(--bs-<?= htmlspecialchars($user['color_theme'] ?? 'primary') ?>);"></div>
+                                    <div>
+                                        <div class="fw-bold text-dark user-name"><?= htmlspecialchars($user['name']) ?></div>
+                                        <div class="text-muted small">@<?= htmlspecialchars($user['username']) ?></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <?php if(empty($user['hospital_id'])): ?>
+                                    <span class="badge bg-dark bg-opacity-10 text-dark border border-dark border-opacity-25 px-2 py-1 rounded-pill user-hospital">ส่วนกลาง (ศูนย์ควบคุม)</span>
+                                <?php else: ?>
+                                    <span class="text-dark fw-semibold user-hospital"><?= htmlspecialchars($user['hospital_name']) ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div class="user-position">
+                                    <span class="badge bg-info bg-opacity-10 text-dark border px-2 py-1 rounded-pill"><?= htmlspecialchars($user['employee_type'] ?? 'ข้าราชการ') ?></span>
+                                    <span class="badge bg-success bg-opacity-10 text-success border px-2 py-1 rounded-pill ms-1"><i class="bi bi-cash-coin"></i> <?= htmlspecialchars($user['pay_rate_name'] ?? 'ยังไม่จัดกลุ่ม') ?></span>
+                                    <div class="text-muted small mt-1"><?= htmlspecialchars($user['type'] ?? '-') ?></div>
+                                </div>
+                            </td>
+                            <td>
+                                <?php
+                                    $role = trim(strtoupper($user['role'] ?? 'STAFF'));
+                                    $bg = ['DIRECTOR'=>'danger','SCHEDULER'=>'warning text-dark','ADMIN'=>'primary','SUPERADMIN'=>'dark'][$role] ?? 'secondary';
+                                ?>
+                                <span class="badge bg-<?= $bg ?> shadow-sm"><?= $role ?></span>
+                            </td>
+                            <td class="pe-4 text-center text-nowrap">
+                                <button class="btn btn-sm btn-light border text-primary rounded-circle shadow-sm" title="แก้ไข"
+                                        data-bs-toggle="modal" data-bs-target="#editUserModal"
+                                        data-id="<?= $user['id'] ?>"
+                                        data-hospital="<?= empty($user['hospital_id']) ? '0' : $user['hospital_id'] ?>"
+                                        data-name="<?= htmlspecialchars($user['name']) ?>"
+                                        data-username="<?= htmlspecialchars($user['username']) ?>"
+                                        data-role="<?= $role ?>"
+                                        data-type="<?= htmlspecialchars($user['type'] ?? '') ?>"
+                                        data-emptype="<?= htmlspecialchars($user['employee_type'] ?? '') ?>"
+                                        data-payrate="<?= htmlspecialchars($user['pay_rate_id'] ?? '') ?>"
+                                        data-color="<?= htmlspecialchars($user['color_theme'] ?? 'primary') ?>"
+                                        data-phone="<?= htmlspecialchars($user['phone'] ?? '') ?>"
+                                        data-startdate="<?= htmlspecialchars($user['start_date'] ?? '') ?>"
+                                        data-idcard="<?= htmlspecialchars($user['id_card'] ?? '') ?>"
+                                        data-posnum="<?= htmlspecialchars($user['position_number'] ?? '') ?>">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                                <?php if($user['id'] != $_SESSION['user']['id']): ?>
+                                <a href="index.php?c=users&a=delete&id=<?= $user['id'] ?>" class="btn btn-sm btn-light border text-danger rounded-circle shadow-sm ms-1" onclick="return confirm('ยืนยันลบ?');"><i class="bi bi-trash-fill"></i></a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 🌟 Modal 1: นำเข้าข้อมูล (Bulk Import) ================= -->
+<div class="modal fade" id="importUserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <!-- สังเกต enctype="multipart/form-data" สำคัญมากสำหรับการอัปโหลดไฟล์ -->
+            <form action="index.php?c=users&a=import" method="POST" enctype="multipart/form-data">
+                <div class="modal-header border-bottom-0 bg-success bg-opacity-10 rounded-top-4 pb-3">
+                    <h5 class="modal-title fw-bold text-success"><i class="bi bi-file-earmark-excel-fill me-2"></i> นำเข้าบุคลากรจำนวนมาก (CSV)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    
+                    <div class="row g-4">
+                        <!-- ฝั่งซ้าย: คำแนะนำ -->
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-dark mb-3">1. เตรียมไฟล์ข้อมูล</h6>
+                            <p class="text-muted small mb-2">ดาวน์โหลดไฟล์ต้นแบบ (Template) เพื่อนำไปกรอกข้อมูลให้ตรงกับฟอร์มของระบบ</p>
+                            <a href="index.php?c=users&a=download_template" class="btn btn-sm btn-outline-success rounded-pill fw-bold mb-4">
+                                <i class="bi bi-download me-1"></i> ดาวน์โหลด Template .csv
+                            </a>
+
+                            <h6 class="fw-bold text-dark mb-3">2. อัปโหลดไฟล์</h6>
+                            <p class="text-muted small mb-2">บันทึกไฟล์เป็น <b class="text-danger">CSV UTF-8 (Comma delimited)</b> เท่านั้น ป้องกันสระภาษาไทยเพี้ยน</p>
+                            <input type="file" name="import_file" class="form-control mb-2" accept=".csv" required>
+                        </div>
+                        
+                        <!-- ฝั่งขวา: ตารางอ้างอิงรหัส รพ.สต. -->
+                        <div class="col-md-6">
+                            <div class="bg-light rounded-4 p-3 h-100 border">
+                                <h6 class="fw-bold text-dark mb-2" style="font-size:13px;"><i class="bi bi-info-circle text-primary"></i> รหัสอ้างอิงหน่วยบริการ (ใส่ในไฟล์)</h6>
+                                <div class="overflow-auto custom-scrollbar" style="max-height: 150px;">
+                                    <table class="table table-sm table-bordered bg-white mb-0" style="font-size: 12px;">
+                                        <thead class="table-light sticky-top">
+                                            <tr><th>รหัส (ID)</th><th>ชื่อหน่วยบริการ</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td class="text-center fw-bold text-danger">0</td><td>ส่วนกลาง (ศูนย์ควบคุม)</td></tr>
+                                            <?php foreach($hospitals_list as $h): ?>
+                                                <tr><td class="text-center fw-bold"><?= $h['id'] ?></td><td><?= htmlspecialchars($h['name']) ?></td></tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning bg-warning bg-opacity-10 border-0 mt-3 mb-0" style="font-size: 13px;">
+                        <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i> ระบบจะข้ามข้อมูลที่ Username ซ้ำโดยอัตโนมัติ
+                    </div>
+
+                </div>
+                <div class="modal-footer border-top-0 bg-light rounded-bottom-4">
+                    <button type="button" class="btn btn-secondary rounded-pill fw-bold px-4" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="btn btn-success rounded-pill fw-bold shadow-sm px-4"><i class="bi bi-upload me-1"></i> เริ่มนำเข้าข้อมูล</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ================= 🌟 Modal Add & Edit (ย่อโค้ดเพื่อความกระชับ) ================= -->
+<div class="modal fade" id="addUserModal"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content rounded-4"><form action="index.php?c=users&a=add" method="POST"><div class="modal-header"><h5 class="modal-title fw-bold">เพิ่มบุคลากร</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3">
+    <div class="col-md-12"><label class="form-label">หน่วยบริการ</label><select name="hospital_id" class="form-select" required><option value="0">ส่วนกลาง (ศูนย์ควบคุม)</option><?php foreach($hospitals_list as $h) echo "<option value='{$h['id']}'>{$h['name']}</option>"; ?></select></div>
+    <div class="col-md-6"><label class="form-label">ชื่อ-สกุล *</label><input type="text" name="name" class="form-control" required></div>
+    <div class="col-md-6"><label class="form-label">เลขบัตร ปชช.</label><input type="text" name="id_card" class="form-control" maxlength="13"></div>
+    <div class="col-md-6"><label class="form-label">กลุ่มเรทค่าเวร</label><select name="pay_rate_id" class="form-select"><option value="">-- เลือก --</option><?php foreach($pay_rates as $pr) echo "<option value='{$pr['id']}'>{$pr['name']}</option>"; ?></select></div>
+    <div class="col-md-6"><label class="form-label">ประเภทพนักงาน</label><select name="employee_type" class="form-select"><option value="ข้าราชการ/พนักงานท้องถิ่น">ข้าราชการ/พนักงานส่วนท้องถิ่น</option><option value="พนักงานจ้างตามภารกิจ">พนักงานจ้างตามภารกิจ</option><option value="พนักงานจ้างทั่วไป">พนักงานจ้างทั่วไป</option></select></div>
+    <div class="col-md-6"><label class="form-label">ตำแหน่ง/วิชาชีพ</label><input type="text" name="type" class="form-control"></div>
+    <div class="col-md-6"><label class="form-label">เลขประจำตำแหน่ง</label><input type="text" name="position_number" class="form-control"></div>
+    <div class="col-md-6"><label class="form-label">วันที่เริ่มงาน</label><input type="text" name="start_date" class="form-control thai-datepicker"></div>
+    <div class="col-md-6"><label class="form-label">เบอร์โทร</label><input type="text" name="phone" class="form-control"></div>
+    <div class="col-md-6"><label class="form-label">สีในตาราง</label><select name="color_theme" class="form-select"><option value="primary">น้ำเงิน</option><option value="success">เขียว</option><option value="danger">แดง</option><option value="warning">ส้มเหลือง</option><option value="info">ฟ้า</option><option value="secondary">เทา</option><option value="dark">ดำ</option></select></div>
+    <div class="col-12"><hr></div>
+    <div class="col-md-4"><label class="form-label">Username *</label><input type="text" name="username" class="form-control" required></div>
+    <div class="col-md-4"><label class="form-label">Password *</label><input type="password" name="password" class="form-control" required minlength="4"></div>
+    <div class="col-md-4"><label class="form-label">Role *</label><select name="role" class="form-select"><option value="STAFF">STAFF</option><option value="SCHEDULER">SCHEDULER</option><option value="DIRECTOR">DIRECTOR</option><option value="ADMIN">ADMIN</option><?php if($current_user_role==='SUPERADMIN') echo '<option value="SUPERADMIN">SUPERADMIN</option>'; ?></select></div>
+</div></div><div class="modal-footer"><button type="submit" class="btn btn-primary rounded-pill px-4">บันทึก</button></div></form></div></div></div>
+
+<div class="modal fade" id="editUserModal"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content rounded-4"><form action="index.php?c=users&a=edit" method="POST"><input type="hidden" name="id" id="edit_id"><div class="modal-header"><h5 class="modal-title fw-bold">แก้ไขข้อมูล</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="row g-3">
+    <div class="col-md-12"><label class="form-label">หน่วยบริการ</label><select name="hospital_id" id="edit_hospital" class="form-select" required><option value="0">ส่วนกลาง (ศูนย์ควบคุม)</option><?php foreach($hospitals_list as $h) echo "<option value='{$h['id']}'>{$h['name']}</option>"; ?></select></div>
+    <div class="col-md-6"><label class="form-label">ชื่อ-สกุล *</label><input type="text" name="name" id="edit_name" class="form-control" required></div>
+    <div class="col-md-6"><label class="form-label">เลขบัตร ปชช.</label><input type="text" name="id_card" id="edit_id_card" class="form-control" maxlength="13"></div>
+    <div class="col-md-6"><label class="form-label">กลุ่มเรทค่าเวร</label><select name="pay_rate_id" id="edit_pay_rate_id" class="form-select"><option value="">-- เลือก --</option><?php foreach($pay_rates as $pr) echo "<option value='{$pr['id']}'>{$pr['name']}</option>"; ?></select></div>
+    <div class="col-md-6"><label class="form-label">ประเภทพนักงาน</label><select name="employee_type" id="edit_employee_type" class="form-select"><option value="ข้าราชการ/พนักงานท้องถิ่น">ข้าราชการ/พนักงานส่วนท้องถิ่น</option><option value="พนักงานจ้างตามภารกิจ">พนักงานจ้างตามภารกิจ</option><option value="พนักงานจ้างทั่วไป">พนักงานจ้างทั่วไป</option></select></div>
+    <div class="col-md-6"><label class="form-label">ตำแหน่ง/วิชาชีพ</label><input type="text" name="type" id="edit_type" class="form-control"></div>
+    <div class="col-md-6"><label class="form-label">เลขประจำตำแหน่ง</label><input type="text" name="position_number" id="edit_position_number" class="form-control"></div>
+    <div class="col-md-6"><label class="form-label">วันที่เริ่มงาน</label><input type="text" name="start_date" id="edit_start_date" class="form-control thai-datepicker"></div>
+    <div class="col-md-6"><label class="form-label">เบอร์โทร</label><input type="text" name="phone" id="edit_phone" class="form-control"></div>
+    <div class="col-md-6"><label class="form-label">สีในตาราง</label><select name="color_theme" id="edit_color" class="form-select"><option value="primary">น้ำเงิน</option><option value="success">เขียว</option><option value="danger">แดง</option><option value="warning">ส้มเหลือง</option><option value="info">ฟ้า</option><option value="secondary">เทา</option><option value="dark">ดำ</option></select></div>
+    <div class="col-12"><hr></div>
+    <div class="col-md-4"><label class="form-label">Username</label><input type="text" id="edit_username" class="form-control" readonly disabled></div>
+    <div class="col-md-4"><label class="form-label">รหัสผ่านใหม่</label><input type="password" name="password" class="form-control" minlength="4"></div>
+    <div class="col-md-4"><label class="form-label">Role *</label><select name="role" id="edit_role" class="form-select"><option value="STAFF">STAFF</option><option value="SCHEDULER">SCHEDULER</option><option value="DIRECTOR">DIRECTOR</option><option value="ADMIN">ADMIN</option><?php if($current_user_role==='SUPERADMIN') echo '<option value="SUPERADMIN">SUPERADMIN</option>'; ?></select></div>
+</div></div><div class="modal-footer"><button type="submit" class="btn btn-warning rounded-pill px-4 text-dark">อัปเดตข้อมูล</button></div></form></div></div></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    flatpickr(".thai-datepicker", { locale: "th", altInput: true, altFormat: "j F Y", dateFormat: "Y-m-d" });
+
+    // JS กรองข้อมูลทั้ง Dropdown และ ช่องค้นหา
+    const searchInput = document.getElementById('userSearchInput');
+    const hospitalFilter = document.getElementById('filterHospital');
+    
+    function filterTable() {
+        const term = searchInput.value.toLowerCase().trim();
+        const hosp = hospitalFilter.value;
+        const rows = document.querySelectorAll('#users-table-body .user-row');
+        
+        rows.forEach(row => {
+            const name = row.querySelector('.user-name')?.textContent.toLowerCase() || '';
+            const pos = row.querySelector('.user-position')?.textContent.toLowerCase() || '';
+            const rowHosp = row.getAttribute('data-hosp');
+            
+            const matchSearch = name.includes(term) || pos.includes(term);
+            const matchHosp = (hosp === 'all') || (hosp === 'center' && rowHosp === 'center') || (rowHosp === hosp);
+            
+            row.style.display = (matchSearch && matchHosp) ? '' : 'none';
+        });
+    }
+
+    if (searchInput) searchInput.addEventListener('input', filterTable);
+    if (hospitalFilter) hospitalFilter.addEventListener('change', filterTable);
+
+    // ส่งค่าเข้า Modal Edit
+    const editModal = document.getElementById('editUserModal');
+    if (editModal) {
+        editModal.addEventListener('show.bs.modal', function (event) {
+            const btn = event.relatedTarget;
+            document.getElementById('edit_id').value = btn.dataset.id;
+            document.getElementById('edit_hospital').value = btn.dataset.hospital || '0';
+            document.getElementById('edit_name').value = btn.dataset.name;
+            document.getElementById('edit_username').value = btn.dataset.username;
+            document.getElementById('edit_type').value = btn.dataset.type;
+            document.getElementById('edit_employee_type').value = btn.dataset.emptype;
+            document.getElementById('edit_pay_rate_id').value = btn.dataset.payrate;
+            document.getElementById('edit_color').value = btn.dataset.color;
+            document.getElementById('edit_phone').value = btn.dataset.phone;
+            document.getElementById('edit_id_card').value = btn.dataset.idcard;
+            document.getElementById('edit_position_number').value = btn.dataset.posnum;
+            
+            let roleSel = document.getElementById('edit_role');
+            if(!Array.from(roleSel.options).some(opt => opt.value === btn.dataset.role)) {
+                roleSel.add(new Option(btn.dataset.role, btn.dataset.role));
+            }
+            roleSel.value = btn.dataset.role;
+
+            const fp = document.querySelector('#edit_start_date')._flatpickr;
+            if(fp) btn.dataset.startdate ? fp.setDate(btn.dataset.startdate) : fp.clear();
+        });
+    }
+});
+</script>
