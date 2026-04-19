@@ -29,6 +29,34 @@ $staffs = $staffs ?? [];
 $shifts = $shifts ?? [];
 $pay_rates_db = $pay_rates_db ?? [];
 
+// 🌟 ดึงข้อมูลวันเดือนปีสำหรับเช็ควันหยุด (ดึงจาก $selected_month ถ้ามี หรือสร้างจาก $month_text)
+$month_year = $selected_month ?? date('Y-m'); 
+if (isset($_GET['month'])) $month_year = $_GET['month'];
+$exp = explode('-', $month_year);
+$year_num = $exp[0] ?? date('Y');
+$month_num = $exp[1] ?? date('m');
+
+// 🌟 ดึงข้อมูลวันหยุดล่วงหน้า เพื่อทำไฮไลท์สีแดงอ่อน
+$holiday_cache = [];
+for ($i = 1; $i <= $days_in_month; $i++) {
+    $d_str = "$year_num-$month_num-" . str_pad($i, 2, '0', STR_PAD_LEFT);
+    $day_of_week = date('N', strtotime($d_str));
+    
+    $is_holiday = false;
+    // เช็คเสาร์-อาทิตย์ (6=เสาร์, 7=อาทิตย์)
+    if ($day_of_week == 6 || $day_of_week == 7) {
+        $is_holiday = true;
+    }
+    // เช็ควันหยุดนักขัตฤกษ์ (ถ้ามีการโหลด Model มาแล้ว หรือมี Array ส่งมา)
+    if (isset($holidayModel) && method_exists($holidayModel, 'isHoliday')) {
+        if ($holidayModel->isHoliday($d_str)) $is_holiday = true;
+    } elseif (isset($holidays) && is_array($holidays)) {
+        if (in_array($d_str, $holidays)) $is_holiday = true;
+    }
+    
+    $holiday_cache[$i] = $is_holiday;
+}
+
 // ตั้งค่า Header ให้เบราว์เซอร์รับรู้ว่าเป็นไฟล์ Microsoft Word (.doc)
 header("Content-Type: application/vnd.ms-word; charset=utf-8");
 header("Expires: 0");
@@ -54,16 +82,16 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
         @page Section1 { 
             size: 841.9pt 595.3pt; 
             mso-page-orientation: landscape; 
-            margin: 30.0pt 30.0pt 30.0pt 30.0pt; 
-            mso-header-margin: 30.0pt; 
-            mso-footer-margin: 30.0pt; 
+            margin: 20.0pt 20.0pt 20.0pt 20.0pt; /* ลดขอบกระดาษลงเพื่อให้พอดี 1 หน้า */
+            mso-header-margin: 20.0pt; 
+            mso-footer-margin: 20.0pt; 
             mso-paper-source: 0; 
         }
         div.Section1 { page: Section1; }
 
         body { 
             font-family: 'TH SarabunPSK', 'TH Sarabun New', sans-serif; 
-            font-size: 16pt; 
+            font-size: 14pt; /* ลดขนาดฟอนต์ภาพรวมลงเพื่อให้เนื้อหาพอดีหน้า */
         }
         .text-center { text-align: center; }
         .text-left { text-align: left; padding-left: 5px; }
@@ -74,11 +102,11 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
             border-collapse: collapse; 
             width: 100%; 
             margin-top: 10px;
-            font-size: 14pt;
+            font-size: 11pt; /* 🌟 ลดขนาดฟอนต์ในตารางเพื่อให้พอดีกับ A4 แนวนอน */
         }
         table.roster-table th, table.roster-table td { 
             border: 1px solid black; 
-            padding: 1px 2px; 
+            padding: 1px 1px; /* ลด Padding */
             text-align: center; 
             vertical-align: middle; 
             mso-border-alt: solid windowtext .5pt;
@@ -87,26 +115,31 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
         table.roster-table th { 
             background-color: #ffff99; /* สีเหลืองอ่อนตามต้นฉบับ */
             font-weight: bold;
-            padding: 5px 0px;
+            padding: 3px 0px;
         }
         .summary-col { background-color: #ffff99; font-weight: bold; }
         .money-col { background-color: #e2efda; font-weight: bold; } /* สีเขียวอ่อนช่องจำนวนเงิน */
         
+        /* 🌟 สีแดงอ่อนสำหรับวันหยุด */
+        .bg-holiday {
+            background-color: #ffe4e6;
+        }
+
         /* สไตล์ลายเซ็นท้ายตาราง */
         table.signature-table {
             width: 100%;
-            margin-top: 40px;
+            margin-top: 20px;
             border: none;
         }
         table.signature-table td {
             border: none;
             text-align: center;
             vertical-align: top;
-            font-size: 16pt;
+            font-size: 14pt;
             line-height: 1.5;
         }
         .note-text {
-            font-size: 14pt;
+            font-size: 12pt;
             margin-top: 10px;
             line-height: 1.2;
         }
@@ -116,7 +149,7 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
 <body>
 <div class="Section1">
 
-    <div class="text-center fw-bold" style="font-size: 18pt;">
+    <div class="text-center fw-bold" style="font-size: 16pt;">
         รายละเอียดแนบท้ายคำสั่ง องค์การบริหารส่วนจังหวัดศรีสะเกษ ที่......../........ ลงวันที่......................................<br>
         ตารางเวรเจ้าหน้าที่ปฏิบัติงานในหน่วยบริการ นอกเวลาราชการและวันหยุดราชการ ประจำเดือน <?= $month_text ?> พ.ศ. <?= $thai_year ?><br>
         <?= htmlspecialchars($hospital_name) ?>
@@ -125,16 +158,17 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
     <table class="roster-table">
         <thead>
             <tr>
-                <th width="30">ที่</th>
-                <th width="150">ชื่อ-สกุล</th>
+                <th width="20">ที่</th>
+                <th width="120">ชื่อ-สกุล</th>
                 <?php for ($i = 1; $i <= $days_in_month; $i++): ?>
-                    <th width="20" style="font-size: 12pt;"><?= $i ?></th>
+                    <!-- 🌟 ระบายสีแดงอ่อนที่หัวตารางสำหรับวันหยุด -->
+                    <th width="16" class="<?= $holiday_cache[$i] ? 'bg-holiday' : '' ?>"><?= $i ?></th>
                 <?php endfor; ?>
-                <th width="25">ร</th>
-                <th width="25">ย</th>
-                <th width="25">บ</th>
-                <th width="30">รวม</th>
-                <th width="60">ค่าเวร</th>
+                <th width="20">ร</th>
+                <th width="20">ย</th>
+                <th width="20">บ</th>
+                <th width="25">รวม</th>
+                <th width="45">ค่าเวร</th>
             </tr>
         </thead>
         <tbody>
@@ -165,7 +199,7 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
 
                 $total_shifts = $sum_r + $sum_y + $sum_b;
                 
-                // 🌟 คำนวณเงินค่าตอบแทนด้วยระบบใหม่ (โยนข้อมูล $staff ไปทั้งก้อน)
+                // คำนวณเงินค่าตอบแทน
                 $rates = calculatePayRatesPHP($staff, $pay_rates_db);
                 $pay = ($sum_r * $rates['ร']) + ($sum_y * $rates['ย']) + ($sum_b * $rates['บ']);
 
@@ -179,19 +213,21 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
             <tr>
                 <td class="text-center"><?= $no++ ?></td>
                 <td class="text-left">
-                    <span class="fw-bold"><?= htmlspecialchars($staff['name']) ?></span><br>
-                    <span style="font-size: 11pt; color: #555;">
+                    <span class="fw-bold" style="font-size: 11pt;"><?= htmlspecialchars($staff['name']) ?></span><br>
+                    <span style="font-size: 9pt; color: #555;">
                         <?= htmlspecialchars($staff['type']) ?>
-                        <?php if (empty($staff['pay_rate_id'])): ?>
-                            <span class="text-danger fw-bold"> (ยังไม่จัดกลุ่ม)</span>
-                        <?php endif; ?>
                     </span>
                 </td>
                 
                 <?php for ($i = 1; $i <= $days_in_month; $i++): 
                     $shift_val = isset($my_shifts[$i]) ? $my_shifts[$i] : '';
+                    $is_holiday = $holiday_cache[$i];
+                    
+                    // 🌟 เปลี่ยนสีตัวอักษรเป็นสีแดงหากเป็นกะ ร หรือ ย
+                    $text_style = ($shift_val == 'ร' || $shift_val == 'ย') ? 'color: red; font-weight: bold;' : '';
                 ?>
-                    <td style="font-size: 13pt;"><?= htmlspecialchars($shift_val) ?></td>
+                    <!-- 🌟 ระบายสีแดงอ่อนสำหรับวันหยุด -->
+                    <td class="<?= $is_holiday ? 'bg-holiday' : '' ?>" style="<?= $text_style ?>"><?= htmlspecialchars($shift_val) ?></td>
                 <?php endfor; ?>
                 
                 <td class="summary-col"><?= $sum_r ?></td>
@@ -216,9 +252,8 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
 
     <!-- หมายเหตุด้านล่างตาราง -->
     <div class="note-text">
-        <b>หมายเหตุ:</b> วงกลมสีแดง หมายถึง<br>
-        เบิกค่าตอบแทนนอกเวลาราชการและวันหยุดราชการ<br><br>
-        ปฏิบัติงานนอกเวลาราชการ ระหว่างเวลา 16.31 - 20.30 น. (บ)<br>
+        <b>หมายเหตุ:</b> วงกลมสีแดง หมายถึง เบิกค่าตอบแทนนอกเวลาราชการและวันหยุดราชการ<br>
+        ปฏิบัติงานนอกเวลาราชการ ระหว่างเวลา 16.31 - 20.30 น. (บ) | 
         เวรเรียกตาม On call เวลา 20.31 - 08.29 น. (ร) และวันหยุดราชการระหว่างเวลา 08.30-16.30 น. (ย)
     </div>
 
@@ -239,7 +274,7 @@ header("Content-disposition: attachment;filename=ตารางเวร_{$hosp
                 ลงชื่อ.......................................................ผู้ควบคุม<br>
                 (<?= htmlspecialchars($hospital_info['director_name'] ?? '.......................................................') ?>)<br>
                 <?= htmlspecialchars($hospital_info['director_position'] ?? 'ผู้อำนวยการ รพ.สต.') ?><br>
-                <span style="font-size: 14pt;">ปฏิบัติราชการแทน นายกองค์การบริหารส่วนจังหวัดศรีสะเกษ</span>
+                <span style="font-size: 12pt;">ปฏิบัติราชการแทน นายกองค์การบริหารส่วนจังหวัดศรีสะเกษ</span>
             </td>
         </tr>
     </table>

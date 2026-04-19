@@ -148,9 +148,63 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    flatpickr(".thai-datepicker", { locale: "th", altInput: true, altFormat: "j F Y", dateFormat: "Y-m-d" });
+    
+    // ==========================================
+    // 🌟 1. ตั้งค่า Flatpickr ให้รองรับปี พ.ศ. (+543) ใน UI อย่างสมบูรณ์
+    // ==========================================
+    const updateThaiYear = function(instance) {
+        if (!instance.currentYearElement) return;
+        // ใช้ setTimeout เพื่อให้แน่ใจว่า UI ของ Flatpickr อัปเดตเสร็จแล้วค่อยเปลี่ยนค่า
+        setTimeout(() => {
+            instance.currentYearElement.value = instance.currentYear + 543;
+        }, 10);
+    };
 
-    // Drag & Drop Sorting
+    flatpickr(".thai-datepicker", { 
+        locale: "th", 
+        altInput: true, 
+        altFormat: "j F Y", // รูปแบบที่จะนำไปแปลงเป็น พ.ศ. เพื่อแสดงผล
+        dateFormat: "Y-m-d", // บันทึกลงตารางยังคงเป็น ค.ศ. (สากล) เหมือนเดิม
+        onChange: function(selectedDates, dateStr, instance) {
+            updateThaiYear(instance);
+        },
+        onReady: function(selectedDates, dateStr, instance) {
+            updateThaiYear(instance);
+            // เมื่อผู้ใช้พิมพ์ปี พ.ศ. เอง ให้แปลงกลับเป็น ค.ศ. เพื่อให้ปฏิทินทำงานต่อได้ถูกต้อง
+            instance.currentYearElement.addEventListener('change', function() {
+                let thaiYear = parseInt(this.value);
+                if (thaiYear > 2400) {
+                    instance.changeYear(thaiYear - 543);
+                }
+            });
+        },
+        onYearChange: function(selectedDates, dateStr, instance) {
+            updateThaiYear(instance);
+        },
+        onMonthChange: function(selectedDates, dateStr, instance) {
+            updateThaiYear(instance);
+        },
+        onOpen: function(selectedDates, dateStr, instance) {
+            updateThaiYear(instance);
+        },
+        onValueUpdate: function(selectedDates, dateStr, instance) {
+            updateThaiYear(instance);
+        },
+        formatDate: function(date, format, locale) {
+            // ดักจับการ Format ค่า Alt Input (ช่องกรอกข้อมูลเสมือน) ให้ปี + 543
+            if (format === "j F Y") {
+                const d = date.getDate();
+                const m = locale.months.longhand[date.getMonth()];
+                const y = date.getFullYear() + 543; 
+                return `${d} ${m} ${y}`;
+            }
+            return flatpickr.formatDate(date, format);
+        }
+    });
+
+    // ==========================================
+    // 🌟 2. Drag & Drop Sorting
+    // ==========================================
     const tbody = document.getElementById('staff-table-body');
     if (tbody && typeof Sortable !== 'undefined') {
         new Sortable(tbody, {
@@ -167,7 +221,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Modal Edit
+    // ==========================================
+    // 🌟 3. Modal Edit Data Population
+    // ==========================================
     const editModal = document.getElementById('editStaffModal');
     if (editModal) {
         editModal.addEventListener('show.bs.modal', function (e) {
@@ -188,8 +244,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             roleSel.value = btn.dataset.role;
 
-            const fp = document.querySelector('#edit_start_date')._flatpickr;
-            if(fp) btn.dataset.startdate ? fp.setDate(btn.dataset.startdate) : fp.clear();
+            const fpInput = document.querySelector('#edit_start_date');
+            if (fpInput && fpInput._flatpickr) {
+                if (btn.dataset.startdate) {
+                    fpInput._flatpickr.setDate(btn.dataset.startdate);
+                } else {
+                    fpInput._flatpickr.clear();
+                }
+            }
         });
     }
 });

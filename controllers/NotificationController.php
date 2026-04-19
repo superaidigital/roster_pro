@@ -5,65 +5,78 @@ require_once 'config/database.php';
 require_once 'models/NotificationModel.php';
 
 class NotificationController {
-    
-    private function checkAuth() {
-        if (session_status() === PHP_SESSION_NONE) { session_start(); }
-        if(!isset($_SESSION['user'])) {
-            header("Location: index.php?c=auth&a=index");
+    private $db;
+    private $notifModel;
+
+    public function __construct() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน (ต้องล็อกอินก่อน)
+        if (!isset($_SESSION['user'])) {
+            $_SESSION['error_msg'] = "กรุณาเข้าสู่ระบบก่อนใช้งาน";
+            header("Location: index.php?c=auth&a=login");
             exit;
         }
+
+        // เชื่อมต่อฐานข้อมูลและเรียกใช้ Model
+        $this->db = (new Database())->getConnection();
+        $this->notifModel = new NotificationModel($this->db);
     }
 
-    // 🌟 1. แสดงหน้ารายการแจ้งเตือนทั้งหมด
+    // ==========================================
+    // 🌟 1. โหลดหน้าจอหลักการแจ้งเตือน (index)
+    // ==========================================
     public function index() {
-        $this->checkAuth();
-        $db = (new Database())->getConnection();
-        $notifModel = new NotificationModel($db);
-
-        $user_id = $_SESSION['user']['id'];
-        
-        // ดึงการแจ้งเตือนทั้งหมดของ User นี้
-        $notifications = $notifModel->getUserNotifications($user_id);
-
+        // ข้อมูลถูกดึงอยู่แล้วในไฟล์ View แต่เราโหลด Layout ให้ครบถ้วน
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
         require_once 'views/notification/index.php';
-        echo "</main></div></body></html>"; 
+        
+        // ปิด Tag โครงสร้าง HTML (ปรับให้ตรงกับโครงสร้างเทมเพลตของคุณ)
+        echo "</main></div></body></html>";
     }
 
-    // 🌟 2. อ่านแจ้งเตือน 1 รายการ แล้ว Redirect ไปยังลิงก์เป้าหมาย
+    // ==========================================
+    // 🌟 2. อ่านการแจ้งเตือน 1 รายการและเปลี่ยนหน้า (Redirect)
+    // ==========================================
     public function read() {
-        $this->checkAuth();
         if (isset($_GET['id'])) {
-            $db = (new Database())->getConnection();
-            $notifModel = new NotificationModel($db);
-            
-            $id = $_GET['id'];
+            $id = (int)$_GET['id'];
             $user_id = $_SESSION['user']['id'];
             
-            // อัปเดตสถานะเป็นอ่านแล้ว
-            $notifModel->markAsRead($id, $user_id);
-            
-            // ดึง URL เป้าหมายเพื่อเด้งไป
-            $link = isset($_GET['url']) ? urldecode($_GET['url']) : 'index.php?c=notification';
-            header("Location: " . $link);
-            exit;
+            // อัปเดตสถานะในฐานข้อมูลว่า "อ่านแล้ว"
+            $this->notifModel->markAsRead($id, $user_id);
         }
-        header("Location: index.php?c=notification");
+
+        // ตรวจสอบว่ามีลิงก์แนบมาด้วยหรือไม่ ถ้ามีให้วิ่งไปที่ลิงก์นั้น
+        if (!empty($_GET['url'])) {
+            $target_url = urldecode($_GET['url']);
+            header("Location: " . $target_url);
+        } else {
+            // ถ้าไม่มีลิงก์ ให้กลับไปที่หน้ารวมการแจ้งเตือน
+            header("Location: index.php?c=notification");
+        }
         exit;
     }
 
-    // 🌟 3. อ่านแจ้งเตือนทั้งหมด (Mark all as read)
+    // ==========================================
+    // 🌟 3. ทำเครื่องหมายว่าอ่านทั้งหมด (กรณีเรียกจาก Header Dropdown)
+    // ==========================================
     public function read_all() {
-        $this->checkAuth();
-        $db = (new Database())->getConnection();
-        $notifModel = new NotificationModel($db);
-        
         $user_id = $_SESSION['user']['id'];
-        $notifModel->markAllAsRead($user_id);
         
-        $_SESSION['success_msg'] = "ทำเครื่องหมายอ่านแล้วทั้งหมดเรียบร้อย";
-        header("Location: index.php?c=notification");
+        // สั่งเคลียร์ให้อ่านทั้งหมด
+        $this->notifModel->markAllAsRead($user_id);
+        
+        // พยายามพากลับไปหน้าเดิมที่ผู้ใช้กด (Referer) ถ้าไม่มีให้ไปหน้า Dashboard
+        $referer = $_SERVER['HTTP_REFERER'] ?? 'index.php?c=dashboard';
+        
+        // ใส่ Alert แจ้งเตือนความสำเร็จ (ถ้ามีระบบรองรับใน View)
+        $_SESSION['success_msg'] = "ทำเครื่องหมายว่าอ่านแล้วทั้งหมดเรียบร้อย";
+        
+        header("Location: " . $referer);
         exit;
     }
 }

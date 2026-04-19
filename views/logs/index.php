@@ -234,32 +234,44 @@ if (!function_exists('buildPaginationUrl')) {
     </div>
 </div>
 
-<!-- 🌟 Script สำหรับ ปฏิทิน Datepicker -->
+<!-- 🌟 Script สำหรับ ปฏิทิน Datepicker (รองรับปี พ.ศ.) -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ตั้งค่า Flatpickr สำหรับช่องค้นหาวันที่
-    flatpickr(".flatpickr-date", {
-        locale: "th",
-        dateFormat: "Y-m-d",
-        allowInput: true,
-        altInput: true,
-        altFormat: "j M Y", // เช่น 15 มี.ค. 2567
-        onReady: function(selectedDates, dateStr, instance) { updateYearInputToThai(instance); },
-        onMonthChange: function(selectedDates, dateStr, instance) { updateYearInputToThai(instance); },
-        onYearChange: function(selectedDates, dateStr, instance) { updateYearInputToThai(instance); },
-        onOpen: function(selectedDates, dateStr, instance) { updateYearInputToThai(instance); }
-    });
+    const updateThaiYear = function(instance) {
+        if (!instance.currentYearElement) return;
+        setTimeout(() => {
+            instance.currentYearElement.value = instance.currentYear + 543;
+        }, 10);
+    };
 
-    // ฟังก์ชันแปลงปี ค.ศ. เป็น พ.ศ. ในหน้าต่างปฏิทิน
-    function updateYearInputToThai(instance) {
-        if (!instance || !instance.calendarContainer) return;
-        const yearElements = instance.calendarContainer.querySelectorAll('.numInput.cur-year');
-        yearElements.forEach(el => {
-            const currentYear = parseInt(instance.currentYear);
-            if(!isNaN(currentYear)) {
-                el.value = currentYear + 543;
+    flatpickr(".flatpickr-date", { 
+        locale: "th", 
+        altInput: true, 
+        altFormat: "j M Y", // ตัวย่อเดือน (เช่น 15 มี.ค. 2569)
+        dateFormat: "Y-m-d", // ส่งค่าเป็น ค.ศ. ให้ระบบค้นหา
+        allowInput: true,
+        onChange: function(selectedDates, dateStr, instance) { updateThaiYear(instance); },
+        onReady: function(selectedDates, dateStr, instance) {
+            updateThaiYear(instance);
+            instance.currentYearElement.addEventListener('change', function() {
+                let thaiYear = parseInt(this.value);
+                if (thaiYear > 2400) instance.changeYear(thaiYear - 543);
+            });
+        },
+        onYearChange: function(selectedDates, dateStr, instance) { updateThaiYear(instance); },
+        onMonthChange: function(selectedDates, dateStr, instance) { updateThaiYear(instance); },
+        onOpen: function(selectedDates, dateStr, instance) { updateThaiYear(instance); },
+        onValueUpdate: function(selectedDates, dateStr, instance) { updateThaiYear(instance); },
+        formatDate: function(date, format, locale) {
+            // ดักจับการ Format ค่าหน้าบ้าน ให้ปี + 543 เสมอ
+            if (format === "j M Y") {
+                const d = date.getDate();
+                const m = locale.months.shorthand[date.getMonth()];
+                const y = date.getFullYear() + 543; 
+                return `${d} ${m} ${y}`;
             }
-        });
-    }
+            return flatpickr.formatDate(date, format);
+        }
+    });
 });
 </script>

@@ -32,7 +32,7 @@ function getBsColor($color_theme) {
     return 'primary';
 }
 
-// 🌟 อัปเดตฟังก์ชัน: ให้ดึงเรทค่าตอบแทนจาก pay_rate_id 
+// 🌟 ฟังก์ชัน: ให้ดึงเรทค่าตอบแทนจาก pay_rate_id 
 function calculatePayRatesPHP($staff, $pay_rates_db) {
     if (!empty($staff['pay_rate_id']) && !empty($pay_rates_db)) {
         foreach ($pay_rates_db as $group) {
@@ -58,6 +58,13 @@ if (isset($hospitals_list)) {
 }
 
 $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
+
+// 🌟 ดึงข้อมูลวันหยุดล่วงหน้า เพื่อลดการคิวรี่ซ้ำซ้อนในลูป
+$holiday_cache = [];
+for ($i = 1; $i <= $days_in_month; $i++) {
+    $d_str = "$year-$month-" . str_pad($i, 2, '0', STR_PAD_LEFT);
+    $holiday_cache[$i] = isset($holidayModel) ? $holidayModel->isHoliday($d_str) : false;
+}
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -96,6 +103,7 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
     .pay-cell-clickable:hover { background-color: #dcfce7 !important; transform: scale(1.05); border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
 
     .today-column { background-color: #f0fdf4 !important; border-left: 1px solid #bbf7d0 !important; border-right: 1px solid #bbf7d0 !important; }
+    .holiday-column { background-color: #fff1f2 !important; } /* 🌟 พื้นหลังสีแดงอ่อนๆ สำหรับวันหยุด */
 
     @media (min-width: 992px) { .sticky-sidebar { position: sticky; top: 15px; align-self: flex-start; height: calc(100vh - 110px); overflow: hidden; } }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -107,7 +115,7 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
 <div class="w-100 bg-light p-3 p-md-4 min-vh-100 d-flex flex-column">
     <div class="container-fluid max-w-7xl mx-auto flex-grow-1 d-flex flex-column">
         
-        <!-- 🌟 Header & Controls (จัดรูปแบบใหม่ให้สมส่วน ไม่ซ้อนทับกัน) -->
+        <!-- 🌟 Header & Controls -->
         <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center mb-4 gap-3 bg-white p-3 p-md-4 rounded-4 shadow-sm border-0">
             <div style="min-width: 0;" class="flex-shrink-0">
                 <h4 class="fw-bold text-dark mb-1 text-truncate">
@@ -218,7 +226,7 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
             </div>
         </div>
 
-        <!-- 🌟 แจ้งเตือน -->
+        <!-- 🌟 แจ้งเตือนข้อผิดพลาด/ความสำเร็จ -->
         <?php if (isset($_SESSION['success_msg'])): ?>
             <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 rounded-3" role="alert">
                 <i class="bi bi-check-circle-fill me-2"></i> <strong>สำเร็จ!</strong> <?= $_SESSION['success_msg'] ?>
@@ -291,17 +299,24 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
 
                     <!-- กำลังจัดทำ (Draft) -->
                     <?php if ($roster_status == 'DRAFT' && ($_SESSION['user']['role'] == 'SCHEDULER' || $_SESSION['user']['role'] == 'DIRECTOR')): ?>
+                        
+                        <!-- 🌟 ปุ่มจัดเวรอัตโนมัติ -->
+                        <button onclick="autoScheduleRoster()" class="btn btn-sm btn-outline-info fw-bold shadow-sm bg-white text-nowrap rounded-3" title="สุ่มรายชื่อบุคลากรทุกคน ครอบคลุมทุกตำแหน่งลงในตารางเวร">
+                            <i class="bi bi-robot me-1"></i> จัดการเวรอัตโนมัติ
+                        </button>
+                        
+                        <!-- 🌟 ปุ่มตรวจสอบตารางเวร -->
+                        <button onclick="validateRoster()" class="btn btn-sm btn-outline-warning text-dark fw-bold shadow-sm bg-white text-nowrap rounded-3" title="ตรวจสอบวันว่าง / วันที่มีแต่ผู้ช่วย">
+                            <i class="bi bi-shield-exclamation me-1"></i> ตรวจสอบตาราง
+                        </button>
+
                         <button onclick="checkFatigueRules()" class="btn btn-sm btn-outline-danger fw-bold shadow-sm bg-white text-nowrap rounded-3" title="ตรวจสอบเวรชน / พักผ่อนไม่พอ">
-                            <i class="bi bi-shield-exclamation me-1"></i> ตรวจสอบความล้า
+                            <i class="bi bi-heart-pulse me-1"></i> เช็คความล้า
                         </button>
 
                         <button onclick="copyPreviousMonth('<?= $selected_month ?>')" class="btn btn-sm btn-outline-success fw-bold shadow-sm bg-white text-nowrap rounded-3">
                             <i class="bi bi-copy me-1"></i> คัดลอกเดือนก่อน
                         </button>
-
-                        <a href="javascript:void(0)" onclick="confirmAction('index.php?c=roster&a=randomize_roster&month=<?= $selected_month ?>', 'ระบบจะทำการล้างเวรเก่าและสุ่มจัดเวรใหม่ทั้งหมดให้ทุกคน\nคุณต้องการดำเนินการต่อหรือไม่?', this)" class="btn btn-sm btn-outline-primary fw-bold shadow-sm bg-white text-nowrap rounded-3">
-                            <i class="bi bi-dice-5-fill me-1"></i> สุ่มเวร
-                        </a>
                         
                         <a href="javascript:void(0)" onclick="confirmAction('index.php?c=roster&a=clear_roster&month=<?= $selected_month ?>', 'ยืนยันการล้างตารางเวรทั้งหมดของเดือนนี้?', this)" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm bg-white text-nowrap rounded-3">
                             <i class="bi bi-eraser-fill me-1"></i> ล้างข้อมูล
@@ -309,7 +324,8 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
 
                         <div class="vr mx-1"></div>
 
-                        <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0" onsubmit="return confirm('ส่งตารางเวรขอพิจารณาอนุมัติ?');">
+                        <!-- 🌟 เปลี่ยนให้เรียกใช้ submitForApproval(event, this) แทน confirm ธรรมดา -->
+                        <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0" onsubmit="submitForApproval(event, this);">
                             <input type="hidden" name="month_year" value="<?= $selected_month ?>">
                             <input type="hidden" name="status" value="SUBMITTED">
                             <button type="submit" class="btn btn-sm btn-dark fw-bold shadow-sm px-4 text-nowrap rounded-3"><i class="bi bi-send-fill me-1"></i> ส่งอนุมัติ</button>
@@ -317,6 +333,8 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                     <?php endif; ?>
                 </div>
             </div>
+            <!-- 🌟 แสดงผลลัพธ์การตรวจสอบตารางเวรทั่วไป -->
+            <div id="rosterWarnings" class="px-3 pb-3" style="display: none;"></div>
         </div>
 
         <div class="row g-3 flex-grow-1">
@@ -340,7 +358,7 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                                             $is_current_day = ($current_date_str == date('Y-m-d'));
                                             
                                             // เช็ควันหยุดนักขัตฤกษ์
-                                            $holidayName = isset($holidayModel) ? $holidayModel->isHoliday($current_date_str) : false;
+                                            $holidayName = $holiday_cache[$i];
                                             $is_holiday_flag = $holidayName ? 'true' : 'false';
                                             $h_name = $holidayName ? htmlspecialchars($holidayName, ENT_QUOTES) : '';
                                         ?>
@@ -433,7 +451,6 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                                                 </div>
                                                 <div class="text-muted text-truncate <?= ($canEdit && !$is_external) ? 'ms-4' : '' ?>" style="font-size: 11px;">
                                                     <?= htmlspecialchars($staff['type']) ?>
-                                                    <!-- 🌟 แจ้งเตือนคนยังไม่จัดกลุ่มสายงาน -->
                                                     <?php if(empty($staff['pay_rate_id'])): ?>
                                                         <span class="text-danger fw-bold ms-1" title="ยังไม่จัดกลุ่ม"><i class="bi bi-exclamation-triangle-fill"></i></span>
                                                     <?php endif; ?>
@@ -450,9 +467,17 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                                                 $leave_txt = isset($my_leaves_on_days[$i]) ? $my_leaves_on_days[$i] : null;
                                                 $is_approved_leave = ($leave_txt && strpos($leave_txt, '..') === false);
                                                 
-                                                // ไฮไลท์คอลัมน์วันนี้
+                                                // ไฮไลท์คอลัมน์วันนี้ และ วันหยุด
                                                 $is_current_day = ($full_date == date('Y-m-d'));
-                                                $td_bg_class = $is_current_day ? 'today-column' : '';
+                                                $day_of_week = date('N', strtotime($full_date));
+                                                $is_weekend_or_holiday = ($day_of_week == 6 || $day_of_week == 7 || $holiday_cache[$i]);
+                                                
+                                                $td_bg_class = '';
+                                                if ($is_current_day) {
+                                                    $td_bg_class = 'today-column';
+                                                } elseif ($is_weekend_or_holiday) {
+                                                    $td_bg_class = 'holiday-column';
+                                                }
                                             ?>
                                                 <td class="p-0 text-center border-start-0 border-end-0 border-bottom <?= $td_bg_class ?>" style="height: 52px; position: relative; border-left: 1px solid #f1f5f9 !important;">
                                                     
@@ -568,7 +593,7 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                              <?= $canEdit ? 'ondragstart="drag(event)"' : '' ?>
                              style="<?= $is_external ? 'display: none;' : '' ?>"
                              data-userid="<?= $staff['id'] ?>" 
-                             data-username="<?= $staff['name'] ?>"
+                             data-username="<?= htmlspecialchars($staff['name']) ?>"
                              data-payrateid="<?= $staff['pay_rate_id'] ?? '' ?>"
                              data-is-external="<?= $is_external ? 'true' : 'false' ?>">
                             
@@ -694,7 +719,6 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                                 $totalShift = $sum_r + $sum_y + $sum_b;
 
                                 $pay = 0;
-                                // 🌟 ใช้งานฟังก์ชันใหม่โดยส่ง $staff เข้าไปเช็ค pay_rate_id ตรงๆ
                                 $rates = calculatePayRatesPHP($staff, $pay_rates_db ?? []);
                                 
                                 if (isset($pay_snapshot) && isset($pay_snapshot[$staff['id']])) {
@@ -714,7 +738,6 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                                 $is_visible = (!$is_external || $totalShift > 0);
                                 $total_r += $sum_r; $total_y += $sum_y; $total_b += $sum_b; $total_all += $totalShift;
 
-                                // 🌟 ค้นหาชื่อกลุ่มสายงานจาก $pay_rates_db เพื่อป้องกันกรณีที่ Controller ไม่ได้ JOIN ข้อมูลมาให้
                                 $group_name_val = 'ไม่มีกลุ่ม';
                                 if (!empty($staff['pay_rate_id']) && !empty($pay_rates_db)) {
                                     foreach ($pay_rates_db as $pr) {
@@ -729,7 +752,6 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                                 }
                                 $group_name_attr = htmlspecialchars($group_name_val);
                                 
-                                // 🌟 สร้าง Data Attributes ส่งไปแสดงผลใน Modal
                                 $data_attr = sprintf(
                                     'data-name="%s" data-group-name="%s" data-sum-r="%d" data-rate-r="%d" data-sum-y="%d" data-rate-y="%d" data-sum-b="%d" data-rate-b="%d" data-total="%d"',
                                     htmlspecialchars($staff['name']),
@@ -799,7 +821,6 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body pt-2 pb-4">
-                <!-- 🌟 เพิ่มการแสดงชื่อกลุ่มสายงานเพื่อให้ผู้ใช้มั่นใจว่าระบบคำนวณถูกต้อง -->
                 <div class="text-center mb-3">
                     <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill shadow-sm" id="calcStaffName" style="font-size: 13px;">ชื่อพนักงาน</span>
                     <div class="mt-2">
@@ -869,6 +890,12 @@ $all_staff_for_sidebar = $all_staff_for_sidebar ?? $staff_list ?? [];
 // 🌟 นำเข้าฐานข้อมูลเรทเงินจาก PHP ลง JavaScript
 const payRatesDB = <?php echo json_encode($pay_rates_db ?? []); ?>;
 const isApprovedSnapshot = <?= ($roster_status == 'APPROVED' && isset($pay_snapshot)) ? 'true' : 'false' ?>;
+
+// 💡 ใช้ JavaScript ล้วนคำนวณหาปี-เดือนปัจจุบัน ป้องกัน Syntax Error ของเบราว์เซอร์
+const _d = new Date();
+const _defaultMonth = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStart(2, '0');
+const currentMonthYear = new URLSearchParams(window.location.search).get('month') || _defaultMonth;
+const targetHospId = '<?= htmlspecialchars($hospital_id ?? $_SESSION['user']['hospital_id'] ?? '') ?>';
 
 let currentCellBtn = null;
 let shiftModal = null; 
@@ -1003,8 +1030,6 @@ function dropStaff(ev) {
 function showPayCalculation(el) {
     if (!payCalcModal) payCalcModal = new bootstrap.Modal(document.getElementById('payCalcModal'));
     document.getElementById('calcStaffName').innerText = el.getAttribute('data-name');
-    
-    // 🌟 แสดงชื่อกลุ่มสายงานใน Modal
     document.getElementById('calcGroupName').innerText = 'กลุ่ม: ' + (el.getAttribute('data-group-name') || 'ไม่ระบุ');
 
     ['R', 'Y', 'B'].forEach(type => {
@@ -1031,10 +1056,7 @@ function openShiftModal(btn) {
 function saveShift(shiftValue, colorClass) {
     if (!currentCellBtn) return;
     const staffId = currentCellBtn.getAttribute('data-staff-id');
-    
-    // 🌟 ดึง ID กลุ่มค่าตอบแทนมาจากปุ่ม (data attribute)
     const payRateId = currentCellBtn.getAttribute('data-staff-payrate');
-    
     const dateStr = currentCellBtn.getAttribute('data-date');
     
     currentCellBtn.innerText = shiftValue;
@@ -1048,7 +1070,7 @@ function saveShift(shiftValue, colorClass) {
     
     fetch('index.php?c=ajax&a=save_shift', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ user_id: staffId, date: dateStr, shift_type: shiftValue })
+        body: JSON.stringify({ user_id: staffId, date: dateStr, shift_type: shiftValue, hosp_id: targetHospId })
     })
     .then(res => res.json())
     .then(data => {
@@ -1072,7 +1094,7 @@ function removeStaffFromRoster(staffId, staffName) {
         if (cell.innerText.trim() !== '') {
             promises.push(fetch('index.php?c=ajax&a=save_shift', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: staffId, date: cell.getAttribute('data-date'), shift_type: '' })
+                body: JSON.stringify({ user_id: staffId, date: cell.getAttribute('data-date'), shift_type: '', hosp_id: targetHospId })
             }).then(res => res.json()));
         }
     });
@@ -1084,7 +1106,6 @@ function removeStaffFromRoster(staffId, staffName) {
                 cell.className = 'btn w-100 h-100 p-0 border-0 shadow-none hover-cell shift-cell text-dark';
             });
             
-            // 🌟 ดึง ID กลุ่มค่าตอบแทนเพื่อรีคำนวณหลังลบ
             const payRateId = row.querySelector('.shift-cell').getAttribute('data-staff-payrate');
             recalculateRowSummary(staffId, payRateId);
             
@@ -1115,10 +1136,9 @@ function checkFatigueRules() {
     alert(warningCount > 0 ? `ตรวจพบจุดเสี่ยงความเหนื่อยล้า ${warningCount} จุด! (กระพริบสีแดง)` : 'ตารางเวรนี้ผ่านเกณฑ์ความปลอดภัย!');
 }
 
-// 🌟 อัปเดตฟังก์ชันดึงเรทเงิน: ใช้ pay_rate_id ค้นหาตรงๆ ทันที
 function getPayRates(payRateId) {
     let r = { r: 0, y: 0, b: 0, name: 'ไม่มีกลุ่ม' };
-    if (!payRateId) return r; // ถ้ายังไม่จัดกลุ่มก็ให้เป็น 0
+    if (!payRateId) return r; 
     
     for (let group of payRatesDB) {
         if (group.id == payRateId) {
@@ -1133,7 +1153,6 @@ function getPayRates(payRateId) {
     return r;
 }
 
-// 🌟 อัปเดตฟังก์ชัน: รับค่า payRateId เข้ามาทำงาน
 function recalculateRowSummary(staffId, payRateId) {
     let sumR = 0, sumY = 0, sumB = 0;
     document.querySelectorAll(`.shift-cell[data-staff-id="${staffId}"]`).forEach(cell => {
@@ -1148,15 +1167,13 @@ function recalculateRowSummary(staffId, payRateId) {
     if(document.getElementById(`modal-sum-total-${staffId}`)) document.getElementById(`modal-sum-total-${staffId}`).innerText = sumR + sumY + sumB;
 
     if(!isApprovedSnapshot) {
-        // 🌟 เรียกใช้ฟังก์ชันหาเรทเงินใหม่
         const rates = getPayRates(payRateId);
-        
         const totalPay = (sumR * rates.r) + (sumY * rates.y) + (sumB * rates.b);
         const payCell = document.getElementById(`modal-sum-pay-${staffId}`);
         if(payCell) {
             payCell.setAttribute('data-sum-r', sumR); payCell.setAttribute('data-sum-y', sumY);
             payCell.setAttribute('data-sum-b', sumB); payCell.setAttribute('data-total', totalPay);
-            payCell.setAttribute('data-group-name', rates.name); // 🌟 อัปเดตชื่อกลุ่ม
+            payCell.setAttribute('data-group-name', rates.name);
             payCell.innerHTML = totalPay.toLocaleString() + ' <i class="bi bi-info-circle text-muted ms-1" style="font-size: 12px;"></i>';
         }
     }
@@ -1198,7 +1215,7 @@ function showToast(type, message) {
 
 function copyPreviousMonth(currentMonth) {
     if(confirm('ระบบจะดึงแพทเทิร์นตารางเวรจาก "เดือนก่อนหน้า" มาทับข้อมูลเดือนปัจจุบันทั้งหมด\n\nยืนยันการดำเนินการหรือไม่?')) {
-        fetch('index.php?c=ajax&a=copy_roster_previous', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ target_month: currentMonth }) })
+        fetch('index.php?c=ajax&a=copy_roster_previous', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ target_month: currentMonth, hosp_id: targetHospId }) })
         .then(res => res.json()).then(data => {
             if(data.status === 'success') { alert('คัดลอกตารางสำเร็จ!'); window.location.reload(); } else alert('Error: ' + data.message);
         });
@@ -1232,13 +1249,124 @@ function openHolidayInfoModal(dateStr, isHoliday, holidayName) {
 function submitHolidayRequest() {
     const hName = document.getElementById('hiRequestName').value.trim();
     if (!hName) return alert('กรุณาระบุชื่อวันหยุด');
-    fetch('index.php?c=ajax&a=request_holiday', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: selectedHolidayDate, name: hName }) })
+    fetch('index.php?c=ajax&a=request_holiday', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: selectedHolidayDate, name: hName, hosp_id: targetHospId }) })
     .then(r => r.json()).then(d => {
         if (d.status === 'success') { alert('ส่งคำขอสำเร็จ!'); holidayInfoModal.hide(); } else alert('Error: ' + d.message);
     });
 }
 
+// ==========================================
+// 🤖 ฟังก์ชันจัดการเวรอัตโนมัติ & ตรวจสอบความถูกต้องตาราง
+// ==========================================
+function autoScheduleRoster() {
+    Swal.fire({
+        title: 'จัดการเวรอัตโนมัติ?',
+        text: "ระบบจะทำการสุ่มจัดเวรอัตโนมัติให้กับบุคลากรทุกคน ครอบคลุมทุกตำแหน่งในสังกัด (ไม่บันทึกทับเวรเดิมที่มีอยู่)",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'ใช่, จัดการเลย',
+        cancelButtonText: 'ยกเลิก'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({ title: 'กำลังประมวลผล...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+            fetch('index.php?c=ajax&a=auto_schedule', {
+                method: 'POST',
+                body: JSON.stringify({ month_year: currentMonthYear, hosp_id: targetHospId }),
+                headers: { 'Content-Type': 'application/json' }
+            }).then(res => res.json()).then(data => {
+                if(data.status === 'success') {
+                    Swal.fire('สำเร็จ', data.message, 'success').then(() => window.location.reload());
+                } else {
+                    Swal.fire('ผิดพลาด', data.message, 'error');
+                }
+            });
+        }
+    });
+}
+
+function validateRoster() {
+    Swal.fire({ title: 'กำลังตรวจสอบ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+    fetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
+    .then(res => res.json())
+    .then(data => {
+        Swal.close();
+        const warningContainer = document.getElementById('rosterWarnings');
+        
+        if (data.status === 'success') {
+            if (data.warnings.length === 0) {
+                warningContainer.style.display = 'block';
+                warningContainer.innerHTML = `<div class="alert alert-success border-0 shadow-sm"><i class="bi bi-check-circle-fill me-2"></i> ตารางเวรสมบูรณ์ ไม่มีข้อผิดพลาดครับ</div>`;
+            } else {
+                let html = `<div class="alert alert-danger border-0 shadow-sm"><h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i> พบข้อควรระวัง ${data.warnings.length} รายการ:</h6><ul class="mb-0">`;
+                data.warnings.forEach(w => html += `<li>${w}</li>`);
+                html += `</ul></div>`;
+                warningContainer.style.display = 'block';
+                warningContainer.innerHTML = html;
+            }
+        }
+    });
+}
+
+// ==========================================
+// 🛡️ ฟังก์ชันตรวจสอบก่อนส่งอนุมัติ (Pre-submit Validation)
+// ==========================================
+function submitForApproval(e, formElement) {
+    e.preventDefault(); // ป้องกันการส่งฟอร์มทันที
+    
+    Swal.fire({ title: 'กำลังตรวจสอบตารางก่อนส่งอนุมัติ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+    
+    fetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
+    .then(res => res.json())
+    .then(data => {
+        Swal.close();
+        if (data.status === 'success') {
+            if (data.warnings.length === 0) {
+                // หากไม่มี Error ให้ถามยืนยันปกติ
+                Swal.fire({
+                    title: 'ยืนยันการส่งอนุมัติ?',
+                    text: "ตารางเวรสมบูรณ์ ไม่มีข้อผิดพลาด",
+                    icon: 'success',
+                    showCancelButton: true,
+                    confirmButtonText: 'ส่งอนุมัติเลย',
+                    cancelButtonText: 'ยกเลิก'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        formElement.submit();
+                    }
+                });
+            } else {
+                // หากพบ Error ให้แสดงรายการขึ้นมาก่อน
+                let html = `<div class="alert alert-danger border-0 shadow-sm text-start"><h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i> พบข้อควรระวัง ${data.warnings.length} รายการ:</h6><ul class="mb-0 small">`;
+                data.warnings.forEach(w => html += `<li>${w}</li>`);
+                html += `</ul></div><p class="mt-3 fs-6">คุณแน่ใจหรือไม่ว่าต้องการส่งตารางเวรนี้เพื่อพิจารณาอนุมัติ?</p>`;
+                
+                Swal.fire({
+                    title: 'พบข้อควรระวังในตารางเวร!',
+                    html: html,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'ยืนยันส่งอนุมัติ (ละเว้นคำเตือน)',
+                    cancelButtonText: 'กลับไปแก้ไข'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        formElement.submit();
+                    }
+                });
+            }
+        } else {
+            Swal.fire('ผิดพลาด', 'ไม่สามารถตรวจสอบตารางได้: ' + data.message, 'error');
+        }
+    })
+    .catch(err => {
+        Swal.fire('ผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
+    });
+}
+
+// ==========================================
 // 🌟 ฟังก์ชันส่งออกตารางเป็น Excel
+// ==========================================
 function exportTableToExcelClean(tableID, filename = ''){
     var downloadLink;
     var dataType = 'application/vnd.ms-excel;charset=utf-8';

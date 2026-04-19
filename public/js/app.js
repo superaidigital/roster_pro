@@ -1,198 +1,118 @@
-// ที่อยู่ไฟล์: public/js/app.js
-// ชื่อไฟล์: app.js
+// public/js/app.js
 
-function drag(ev) {
-    const userId = ev.currentTarget.getAttribute('data-userid');
-    const userName = ev.currentTarget.getAttribute('data-username');
-    const color = ev.currentTarget.getAttribute('data-color');
+document.addEventListener("DOMContentLoaded", function() {
     
-    ev.dataTransfer.setData("userId", userId);
-    ev.dataTransfer.setData("userName", userName);
-    ev.dataTransfer.setData("color", color);
-}
+    // โฟลเดอร์หลักของโปรเจกต์ (ปรับเปลี่ยนตามชื่อโฟลเดอร์จริงบน Server)
+    const BASE_URL = '/roster_pro';
 
-function allowDrop(ev) {
-    ev.preventDefault();
-}
-
-function drop(ev) {
-    ev.preventDefault();
-    let target = ev.target;
-    
-    // หาเป้าหมายที่แท้จริง (.shift-cell หรือ TD)
-    while(target && !target.classList.contains('shift-cell') && target.tagName !== 'TD') { 
-        target = target.parentElement; 
+    // ฟังก์ชันดึงการแจ้งเตือน (AJAX)
+    function fetchNotifications() {
+        fetch(`${BASE_URL}/ajax/getUnreadNotifications`)
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    updateNotificationUI(data.count, data.data);
+                }
+            })
+            .catch(error => console.error('Error fetching notifications:', error));
     }
 
-    if(!target) return;
+    // ฟังก์ชันอัปเดตหน้าจอ UI
+    function updateNotificationUI(count, notifications) {
+        const badge = document.getElementById('noti-count');
+        const headerCount = document.getElementById('noti-header-count');
+        const listContainer = document.getElementById('noti-list');
 
-    const date = target.getAttribute('data-date');
-    const shift = target.getAttribute('data-shift');
-    
-    const userId = ev.dataTransfer.getData("userId");
-    const userName = ev.dataTransfer.getData("userName");
-    const color = ev.dataTransfer.getData("color");
+        if (!badge || !headerCount || !listContainer) return; // ป้องกัน Error หากไม่มีอิลิเมนต์ในหน้านี้
 
-    if(!userId || !date || !shift) return;
+        // อัปเดตตัวเลขกระดิ่ง
+        if (count > 0) {
+            badge.style.display = 'inline-block';
+            badge.innerText = count > 99 ? '99+' : count;
+            headerCount.innerText = count;
+        } else {
+            badge.style.display = 'none';
+            headerCount.innerText = 0;
+        }
 
-    // 1. ดักจับการลงกะซ้ำ
-    const shiftCell = target.closest('.shift-cell');
-    if (shiftCell) {
-        const existingShift = shiftCell.querySelector(`.shift-badge[data-userid="${userId}"]`);
-        if (existingShift) {
-            alert(`ไม่สามารถจัดเวรได้!\n${userName} มีชื่อในเวรนี้อยู่แล้ว (ห้ามลงซ้ำกะเดียวกัน)`);
-            return; 
+        // ล้างรายการเดิมและอัปเดตใหม่
+        listContainer.innerHTML = ''; 
+        
+        if (notifications.length === 0) {
+            listContainer.innerHTML = '<a href="#" class="dropdown-item text-center text-muted">ไม่มีการแจ้งเตือนใหม่</a>';
+        } else {
+            notifications.forEach(noti => {
+                const item = document.createElement('a');
+                item.href = "#"; 
+                item.className = "dropdown-item noti-item";
+                item.dataset.id = noti.id;
+                
+                // โครงสร้าง HTML สำหรับแต่ละการแจ้งเตือน
+                item.innerHTML = `
+                    <i class="fas fa-envelope mr-2"></i> ${noti.title || 'การแจ้งเตือนใหม่'}
+                    <span class="float-right text-muted text-sm">${timeSince(new Date(noti.created_at))}</span>
+                `;
+                
+                // Event Click สำหรับคลิกอ่านข้อความ
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    markAsRead(this.dataset.id, this);
+                });
+
+                listContainer.appendChild(item);
+                
+                // เส้นคั่นระหว่างรายการ
+                const divider = document.createElement('div');
+                divider.className = "dropdown-divider";
+                listContainer.appendChild(divider);
+            });
         }
     }
 
-    // 2. ตรวจสอบเงื่อนไข "วันลา"
-    if (window.leaveData) {
-        const isLeave = window.leaveData.find(l => l.user_id === userId && l.leave_date === date);
-        if (isLeave) {
-            alert(`ข้อผิดพลาด!\nไม่สามารถจัดเวรให้ ${userName} ได้\nเนื่องจากติด "${isLeave.leave_type}" ในวันที่ ${date}`);
-            return;
-        }
-    }
+    // ฟังก์ชันส่งสถานะ "อ่านแล้ว" กลับไปยังเซิร์ฟเวอร์
+    function markAsRead(id, element) {
+        const formData = new FormData();
+        formData.append('noti_id', id);
 
-    // 3. หา Container สำหรับแปะป้ายชื่อ (แก้ไขให้รองรับทั้งมุมมองสัปดาห์ และ มุมมองเดือน)
-    let container = target.classList.contains('drop-container') ? target : target.querySelector('.drop-container');
-    if(!container) return;
-
-    fetch('index.php?c=ajax&a=save_shift', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-            user_id: userId,
-            date: date,
-            shift_type: shift
+        fetch(`${BASE_URL}/ajax/markNotificationAsRead`, {
+            method: 'POST',
+            body: formData
         })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if(data.status === 'success') {
-            const shiftId = data.shift_id;
-            
-            // ตรวจสอบว่าเป็นมุมมองเดือนหรือไม่ เพื่อสร้างป้ายชื่อขนาดให้เหมาะสม
-            const isMonthView = container.classList.contains('flex-wrap');
-            let badgeHTML = '';
-
-            if (isMonthView) {
-                // ป้ายชื่อแบบ "จิ๋ว" สำหรับตารางรายเดือน
-                const shortName = userName.split(' ')[0].substring(0, 10);
-                badgeHTML = `
-                    <div class="shift-badge badge bg-white text-dark border shadow-sm px-1 py-0 me-1 mb-1 d-flex align-items-center group-hover" id="shift-${shiftId}" data-userid="${userId}" style="font-size: 10px; font-weight: 500;">
-                        <span class="bg-${color} rounded-circle me-1" style="width: 4px; height: 4px;"></span>
-                        <span class="text-truncate" style="max-width: 45px;">${shortName}</span>
-                        <i class="bi bi-x text-danger ms-1 btn-delete d-none" style="cursor:pointer;" onclick="removeShift(${shiftId})"></i>
-                    </div>
-                `;
-            } else {
-                // ป้ายชื่อแบบ "ปกติ" สำหรับตารางรายสัปดาห์/วัน
-                badgeHTML = `
-                    <div class="shift-badge bg-white border rounded shadow-sm p-1 d-flex align-items-center position-relative group-hover" id="shift-${shiftId}" data-userid="${userId}">
-                        <div class="bg-${color} rounded-pill me-2" style="width: 4px; height: 16px;"></div>
-                        <span class="text-truncate fw-bold text-dark" style="font-size: 12px; flex-grow: 1;">${userName}</span>
-                        <button class="btn btn-sm btn-danger p-0 px-1 btn-delete position-absolute end-0 me-1 d-none" onclick="removeShift(${shiftId})">
-                            <i class="bi bi-trash" style="font-size:10px;"></i>
-                        </button>
-                    </div>
-                `;
+        .then(response => response.json())
+        .then(data => {
+            if(data.status === 'success') {
+                element.style.opacity = '0.5'; // ทำเอฟเฟกต์สีจางเมื่ออ่านแล้ว
+                setTimeout(() => fetchNotifications(), 500); // อัปเดตข้อมูลจำนวนทันที
             }
+        });
+    }
 
-            container.insertAdjacentHTML('beforeend', badgeHTML);
-        } else {
-            alert('ข้อผิดพลาดจากระบบ: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
-    });
-}
+    // ตัวช่วยแปลงเวลาให้เป็นรูปแบบ "เพิ่งผ่านมา ... นาที"
+    function timeSince(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + " ปีที่แล้ว";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + " เดือนที่แล้ว";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + " วันที่แล้ว";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + " ชั่วโมงที่แล้ว";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + " นาทีที่แล้ว";
+        return Math.floor(seconds) + " วินาทีที่แล้ว";
+    }
 
-function removeShift(shiftId) {
-    if(!confirm("คุณต้องการลบผู้ปฏิบัติงานออกจากเวรนี้ใช่หรือไม่?")) return;
+    // เริ่มการทำงานครั้งแรกและตั้งเวลาอัปเดตทุก 30 วินาที
+    fetchNotifications();
+    setInterval(fetchNotifications, 30000);
+});
 
-    fetch('index.php?c=ajax&a=delete_shift', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ shift_id: shiftId })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if(data.status === 'success') {
-            const elementToRemove = document.getElementById('shift-' + shiftId);
-            if(elementToRemove) {
-                elementToRemove.style.transition = "opacity 0.2s";
-                elementToRemove.style.opacity = "0";
-                setTimeout(() => elementToRemove.remove(), 200);
-            }
-        } else { alert('เกิดข้อผิดพลาด: ' + data.message); }
-    })
-    .catch(error => { console.error('Error:', error); alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์'); });
-}
-
-function randomizeShifts(startDate, endDate) {
-    if(!confirm("ระบบจะล้างตารางเวรเดิมที่อยู่ในช่วงวันที่หน้าจอ แล้วจัดเวรใหม่แบบสุ่มทั้งหมด\nคุณต้องการดำเนินการต่อหรือไม่?")) return;
-
-    const btn = document.getElementById('btn-randomize');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>กำลังประมวลผล...';
-    btn.disabled = true;
-
-    fetch('index.php?c=ajax&a=randomize_shifts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ start_date: startDate, end_date: endDate })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if(data.status === 'success') {
-            window.location.reload();
-        } else {
-            alert('ข้อผิดพลาดจากระบบ: ' + data.message);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
-    })
-    .catch(error => { 
-        console.error('Error:', error); 
-        alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    });
-}
-
-function clearShifts(startDate, endDate) {
-    if(!confirm("⚠️ คำเตือน: ระบบจะทำการ 'ลบเวรทั้งหมด' ในช่วงวันที่กำลังแสดงผลอยู่นี้ทิ้งทั้งหมด\n\nคุณแน่ใจหรือไม่ที่จะล้างตาราง? (การกระทำนี้ไม่สามารถกู้คืนได้)")) return;
-
-    const btn = document.getElementById('btn-clear');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>กำลังล้าง...';
-    btn.disabled = true;
-
-    fetch('index.php?c=ajax&a=clear_shifts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ start_date: startDate, end_date: endDate })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if(data.status === 'success') {
-            window.location.reload();
-        } else {
-            alert('ข้อผิดพลาดจากระบบ: ' + data.message);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
-    })
-    .catch(error => { 
-        console.error('Error:', error); 
-        alert('เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    });
-}
+// กำหนดค่าตั้งต้นของ SweetAlert2 (สามารถนำไปใช้กับหน้าอื่นๆ ได้ด้วย Toast.fire)
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+});
