@@ -11,7 +11,7 @@ class HospitalsController {
     private function requireAccess($allowed_roles = []) {
         if (session_status() === PHP_SESSION_NONE) { session_start(); }
         if (!isset($_SESSION['user'])) { header("Location: index.php?c=auth&a=index"); exit; }
-        if (!empty($allowed_roles) && !in_array($_SESSION['user']['role'], $allowed_roles)) {
+        if (!empty($allowed_roles) && !in_array(strtoupper($_SESSION['user']['role']), $allowed_roles)) {
             $_SESSION['error_msg'] = "ปฏิเสธการเข้าถึง: คุณไม่มีสิทธิ์ใช้งานเมนูนี้";
             header("Location: index.php?c=dashboard"); exit;
         }
@@ -21,7 +21,8 @@ class HospitalsController {
     // 🌟 โหลดหน้าตารางรายชื่อ รพ.สต. ทั้งหมด
     // ==========================================
     public function index() {
-        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+        // 🌟 อนุญาตให้ ผอ. (DIRECTOR) เข้ามาดูหน้ารวมได้
+        $this->requireAccess(['SUPERADMIN', 'ADMIN', 'DIRECTOR']);
         
         $db = (new Database())->getConnection();
         $hospitalModel = new HospitalModel($db);
@@ -35,7 +36,7 @@ class HospitalsController {
     }
 
     // ==========================================
-    // 🌟 เพิ่ม รพ.สต. ใหม่ (Add)
+    // 🌟 เพิ่ม รพ.สต. ใหม่ (Add) - ให้เฉพาะ Admin
     // ==========================================
     public function add() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') exit;
@@ -47,11 +48,10 @@ class HospitalsController {
         $name = $_POST['name'] ?? '';
         $hospital_code = $_POST['hospital_code'] ?? null; 
         
-        // 🌟 รองรับค่า ละติจูด ลองจิจูด จากฟอร์มถ้ามี
         $latitude = $_POST['latitude'] ?? null;
         $longitude = $_POST['longitude'] ?? null;
 
-        $hospitalModel->addHospital($name, $hospital_code, 1, $latitude, $longitude);
+        $hospitalModel->addHospital($name, $hospital_code, 'S', $latitude, $longitude);
         LogsController::addLog($db, $_SESSION['user']['id'], 'CREATE', "เพิ่ม รพ.สต. ใหม่ ({$name})");
         $_SESSION['success_msg'] = "เพิ่มหน่วยบริการใหม่เรียบร้อยแล้ว";
 
@@ -64,21 +64,29 @@ class HospitalsController {
     // ==========================================
     public function edit() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') exit;
-        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+        // 🌟 อนุญาตให้ ผอ. ใช้งานฟังก์ชันแก้ไขได้
+        $this->requireAccess(['SUPERADMIN', 'ADMIN', 'DIRECTOR']);
 
         $db = (new Database())->getConnection();
         $hospitalModel = new HospitalModel($db);
 
         $id = $_POST['id'] ?? null;
+        
+        // 🛡️ ดักจับความปลอดภัย: ผอ. แก้ไขได้เฉพาะ รพ. ของตัวเองเท่านั้น
+        if (strtoupper($_SESSION['user']['role']) === 'DIRECTOR' && $id != $_SESSION['user']['hospital_id']) {
+            $_SESSION['error_msg'] = "ปฏิเสธการเข้าถึง: คุณไม่มีสิทธิ์แก้ไขข้อมูลหน่วยบริการอื่น";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
+
         $name = $_POST['name'] ?? '';
         $hospital_code = $_POST['hospital_code'] ?? null; 
         
-        // 🌟 รองรับค่า ละติจูด ลองจิจูด จากฟอร์มถ้ามี
         $latitude = $_POST['latitude'] ?? null;
         $longitude = $_POST['longitude'] ?? null;
 
         if (!empty($id)) {
-            $hospitalModel->updateHospital($id, $name, $hospital_code, null, $latitude, $longitude);
+            $hospitalModel->updateHospital($id, $name, $hospital_code, 'S', $latitude, $longitude);
             LogsController::addLog($db, $_SESSION['user']['id'], 'UPDATE', "แก้ไขข้อมูล รพ.สต. ID: {$id} เป็น ({$name})");
             $_SESSION['success_msg'] = "แก้ไขข้อมูลหน่วยบริการสำเร็จ";
         }
@@ -88,7 +96,7 @@ class HospitalsController {
     }
 
     // ==========================================
-    // 🌟 ลบ รพ.สต.
+    // 🌟 ลบ รพ.สต. - ให้เฉพาะ Admin
     // ==========================================
     public function delete() {
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
@@ -98,9 +106,12 @@ class HospitalsController {
         $id = $_GET['id'] ?? null;
         
         if ($id && $id != 1) { 
-            $hospitalModel->deleteHospital($id);
-            LogsController::addLog($db, $_SESSION['user']['id'], 'DELETE', "ลบหน่วยบริการ ID: {$id}");
-            $_SESSION['success_msg'] = "ลบหน่วยบริการเรียบร้อยแล้ว";
+            if($hospitalModel->deleteHospital($id)) {
+                LogsController::addLog($db, $_SESSION['user']['id'], 'DELETE', "ลบหน่วยบริการ ID: {$id}");
+                $_SESSION['success_msg'] = "ลบหน่วยบริการเรียบร้อยแล้ว";
+            } else {
+                $_SESSION['error_msg'] = "ไม่สามารถลบได้ เนื่องจากมีพนักงานอยู่ในหน่วยบริการนี้";
+            }
         } else {
             $_SESSION['error_msg'] = "ไม่อนุญาตให้ลบหน่วยงานส่วนกลางหลักของระบบได้";
         }
@@ -112,7 +123,6 @@ class HospitalsController {
     // ==========================================
     // 🌟 ระบบนำเข้าไฟล์ Excel (CSV)
     // ==========================================
-
     public function download_template() {
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
 
@@ -120,15 +130,10 @@ class HospitalsController {
         header('Content-Disposition: attachment; filename=hospital_template.csv');
 
         $output = fopen('php://output', 'w');
-        
-        // พิมพ์ BOM (Byte Order Mark) เพื่อให้ Excel อ่านภาษาไทยออก
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-        
         fputcsv($output, ['รหัสอ้างอิง (ID)', 'รหัสหน่วยบริการ (5 หลัก)', 'ชื่อหน่วยบริการ']);
-        
         fputcsv($output, ['h990', '09990', 'รพ.สต. ตัวอย่างที่ 1']);
         fputcsv($output, ['h991', '09991', 'รพ.สต. ตัวอย่างที่ 2']);
-        
         fclose($output);
         exit;
     }

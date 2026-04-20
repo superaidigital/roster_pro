@@ -1,422 +1,235 @@
 <?php
 // ที่อยู่ไฟล์: views/settings/holidays.php
-// ชื่อไฟล์: holidays.php
+$year = $_GET['year'] ?? date('Y');
+$holidays = $holidays ?? [];
 
-// ฟังก์ชันสำหรับแปลงวันที่เป็นภาษาไทย (ในตาราง)
-function getThaiDate($date_str) {
-    if (empty($date_str)) return "-";
-    $thai_months = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-    $time = strtotime($date_str);
-    if (!$time) return "-";
-    
-    $d = date('j', $time);
-    $m = $thai_months[date('n', $time)];
-    $y = date('Y', $time) + 543;
-    return "$d $m $y";
+// ฟังก์ชันแปลงวันที่เป็นรูปแบบ พ.ศ. (วว/ดด/ปปปป)
+function formatDateThai($dateString) {
+    if (!$dateString) return '';
+    $date = new DateTime($dateString);
+    $yearThai = $date->format('Y') + 543;
+    return $date->format('d/m/') . $yearThai;
 }
 ?>
 
-<!-- 🌟 นำเข้า CSS ปฏิทิน (ใช้ลิงก์ jsdelivr ที่เสถียร) -->
+<!-- เพิ่ม Flatpickr CSS สำหรับ Datepicker ภาษาไทย -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/airbnb.css">
-
 <style>
-    .cursor-pointer { cursor: pointer !important; }
-    .page-item.active .page-link { background-color: #0d6efd; border-color: #0d6efd; }
-    .page-link { color: #495057; }
-    
-    /* 🌟 CSS เทคนิคซ่อนเลข ค.ศ. เดิมในปฏิทิน เพื่อเอาเลข พ.ศ. มาวางทับ */
-    .flatpickr-current-month .numInput.cur-year {
-        color: transparent !important;
-        background: transparent !important;
-    }
-    .flatpickr-current-month .numInput.cur-year::selection {
-        background: transparent;
-        color: transparent;
-    }
-    .thai-year-overlay {
-        color: #484848; /* สีข้อความให้เข้ากับธีม airbnb */
-        font-family: inherit;
-        font-size: 1.15em;
-    }
+    .card-modern { border: none; border-radius: 1.25rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); background: #ffffff; }
+    /* ปรับแต่งฟอนต์ปฏิทินให้กลืนกับระบบ */
+    .flatpickr-calendar { font-family: inherit; }
 </style>
 
-<div class="w-100 bg-light p-3 p-md-4 min-vh-100">
-    <div class="container-fluid max-w-7xl mx-auto">
-        
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+<div class="container-fluid px-3 px-md-4 py-4">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width: 50px; height: 50px;">
+                <i class="bi bi-calendar2-event fs-4"></i>
+            </div>
             <div>
-                <h4 class="fw-bold text-dark mb-1">จัดการวันหยุดนักขัตฤกษ์</h4>
-                <p class="text-muted mb-0" style="font-size: 14px;">ตั้งค่าวันหยุด เพื่อให้ระบบไฮไลต์สีแดงในตารางจัดเวรอัตโนมัติ</p>
-            </div>
-            <div class="d-flex gap-2 flex-wrap">
-                <a href="index.php?c=settings&a=sync_api&year=<?= date('Y') ?>" class="btn btn-outline-success fw-bold shadow-sm" onclick="return confirm('ระบบจะดึงวันหยุดของปี <?= date('Y') ?> จากฐานข้อมูลสากลมาเพิ่มในระบบ\n\n(ระบบจะข้ามวันที่มีอยู่ในฐานข้อมูลแล้วเพื่อป้องกันข้อมูลซ้ำ)\n\nคุณต้องการดำเนินการต่อหรือไม่?')">
-                    <i class="bi bi-cloud-download me-1"></i> ดึงวันหยุดปี <?= date('Y') ?> (API)
-                </a>
-                
-                <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addHolidayModal">
-                    <i class="bi bi-plus-lg me-1"></i> เพิ่มวันหยุดเอง
-                </button>
+                <h2 class="h4 text-dark mb-0 fw-bold">จัดการวันหยุดนักขัตฤกษ์</h2>
+                <p class="text-muted mb-0" style="font-size: 13px;">ข้อมูลอ้างอิงเพื่อใช้คำนวณสิทธิการลา และการจ่ายค่าตอบแทน OT วันหยุด</p>
             </div>
         </div>
+        <div class="d-flex gap-2">
+            <a href="index.php?c=settings&a=system" class="btn btn-light border fw-bold rounded-pill shadow-sm px-4">
+                <i class="bi bi-arrow-left me-1"></i> กลับ
+            </a>
+            <a href="index.php?c=settings&a=sync_api&year=<?= $year ?>" class="btn btn-primary fw-bold rounded-pill shadow-sm px-4" onclick="return confirm('ระบบจะทำการดึงข้อมูลจาก Server ส่วนกลาง (Data.go.th / Nager Date)\nต้องการดำเนินการต่อหรือไม่?');">
+                <i class="bi bi-cloud-arrow-down me-1"></i> ซิงค์ API ปี <?= $year ?>
+            </a>
+        </div>
+    </div>
 
-        <?php if(isset($_SESSION['success_msg'])): ?>
-            <div class="alert alert-success alert-dismissible fade show shadow-sm border-0" role="alert">
-                <i class="bi bi-check-circle-fill me-2"></i> <strong>สำเร็จ!</strong> <?= $_SESSION['success_msg'] ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            <?php unset($_SESSION['success_msg']); ?>
-        <?php endif; ?>
+    <!-- Alerts -->
+    <?php if (isset($_SESSION['success_msg'])): ?>
+        <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
+            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+        </div>
+        <?php unset($_SESSION['success_msg']); ?>
+    <?php endif; ?>
 
-        <?php if(isset($_SESSION['error_msg'])): ?>
-            <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i> <strong>ผิดพลาด!</strong> <?= $_SESSION['error_msg'] ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            <?php unset($_SESSION['error_msg']); ?>
-        <?php endif; ?>
+    <?php if (isset($_SESSION['error_msg'])): ?>
+        <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+        </div>
+        <?php unset($_SESSION['error_msg']); ?>
+    <?php endif; ?>
 
-        <div class="row mb-3">
-            <div class="col-12 col-md-5 col-lg-4">
-                <div class="input-group shadow-sm">
-                    <span class="input-group-text bg-white border-end-0 text-muted">
-                        <i class="bi bi-search"></i>
-                    </span>
-                    <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="ค้นหาชื่อวันหยุด หรือ วันที่ (เช่น 13 เม.ย.)...">
+    <div class="row g-4">
+        <!-- ฟอร์มเพิ่มวันหยุด -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card card-modern h-100">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-plus-circle text-primary me-2"></i>เพิ่มวันหยุด (Manual)</h6>
+                </div>
+                <div class="card-body p-4">
+                    <form action="index.php?c=settings&a=save_holiday" method="POST">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" style="font-size: 13px;">วันที่ <span class="text-danger">*</span></label>
+                            <div class="position-relative">
+                                <!-- เปลี่ยน Input เป็น Text เพื่อให้ Flatpickr เข้ามาคุมรูปแบบไทยได้ -->
+                                <input type="text" name="holiday_date" class="form-control form-control-sm rounded-3 datepicker-th bg-white" placeholder="วว/ดด/ปปปป" style="padding-right: 35px;" required>
+                                <i class="bi bi-calendar3 position-absolute text-muted" style="right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none;"></i>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" style="font-size: 13px;">ชื่อวันหยุด <span class="text-danger">*</span></label>
+                            <input type="text" name="holiday_name" class="form-control form-control-sm rounded-3" placeholder="เช่น วันสงกรานต์" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" style="font-size: 13px;">ประเภทวันหยุด</label>
+                            <select name="holiday_type" class="form-select form-select-sm rounded-3">
+                                <option value="REGULAR">🏖️ วันหยุดปกติ (Regular)</option>
+                                <option value="COMPENSATION">🔄 วันหยุดชดเชย (Compensation)</option>
+                                <option value="SPECIAL">🌟 วันหยุดพิเศษ/มติ ครม. (Special)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm">
+                            <i class="bi bi-save me-1"></i> บันทึกข้อมูล
+                        </button>
+                    </form>
+                    
+                    <hr class="my-4 text-muted">
+                    <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-dark" style="font-size: 12px; line-height: 1.5;">
+                        <i class="bi bi-info-circle-fill text-warning me-1"></i>
+                        <b>เกร็ดความรู้:</b> การเพิ่ม "วันหยุดพิเศษ" ระหว่างเดือนที่จัดเวรไปแล้ว อาจต้องให้เจ้าหน้าที่ทำการแก้ไขเรทค่าเวรให้ตรงกับเงื่อนไข OT วันหยุดด้วยตนเอง
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0 align-middle">
-                        <thead class="bg-light">
-                            <tr>
-                                <th class="py-3 px-4" width="25%">วันที่</th>
-                                <th class="py-3 px-4">ชื่อวันหยุด / เทศกาล</th>
-                                <th class="py-3 px-4 text-center" width="20%">จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody id="holidayTableBody">
-                            <?php if(count($holidays) > 0): ?>
-                                <?php foreach($holidays as $h): ?>
-                                <tr class="holiday-row">
-                                    <td class="px-4 fw-bold text-danger">
-                                        <?= getThaiDate($h['holiday_date']) ?>
-                                    </td>
-                                    <td class="px-4 holiday-name">
-                                        <?= htmlspecialchars($h['holiday_name']) ?>
-                                    </td>
-                                    <td class="px-4 text-center">
-                                        <button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="openEditModal(<?= $h['id'] ?>, '<?= $h['holiday_date'] ?>', '<?= htmlspecialchars(addslashes($h['holiday_name'])) ?>')">
-                                            <i class="bi bi-pencil"></i> แก้ไข
-                                        </button>
-                                        <a href="index.php?c=settings&a=delete_holiday&id=<?= $h['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('คุณต้องการลบวันหยุดนี้ใช่หรือไม่?')">
-                                            <i class="bi bi-trash"></i> ลบ
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr id="noDataRow">
-                                    <td colspan="3" class="text-center py-5 text-muted">
-                                        <i class="bi bi-calendar-x fs-1 d-block mb-3 text-light"></i>
-                                        ยังไม่มีข้อมูลวันหยุดในระบบ<br>
-                                        <small>คุณสามารถกดปุ่ม "ดึงวันหยุดปี <?= date('Y') ?> (API)" เพื่อเพิ่มวันหยุดอัตโนมัติได้เลย</small>
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                            
-                            <tr id="noSearchResult" style="display: none;">
-                                <td colspan="3" class="text-center py-5 text-muted">
-                                    <i class="bi bi-search fs-2 d-block mb-3 text-light"></i>
-                                    <span id="searchFeedback">ไม่พบข้อมูลที่ค้นหา</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <div class="card-footer bg-white border-top py-3 flex-column flex-md-row justify-content-between align-items-center" id="paginationWrapper" style="display: none;">
-                <div class="text-muted small mb-3 mb-md-0 fw-medium" id="paginationInfo">แสดงข้อมูล...</div>
-                <div class="d-flex align-items-center justify-content-between w-100 w-md-auto gap-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <label for="rowsPerPage" class="text-muted small mb-0 d-none d-sm-block">แสดง:</label>
-                        <select id="rowsPerPage" class="form-select form-select-sm text-secondary bg-light border-0 shadow-none cursor-pointer font-monospace" style="width: auto;">
-                            <option value="10" selected>10 แถว</option>
-                            <option value="20">20 แถว</option>
-                            <option value="50">50 แถว</option>
-                            <option value="all">ทั้งหมด</option>
+        <!-- รายการวันหยุด -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card card-modern h-100">
+                <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-list-ul text-secondary me-2"></i>ปฏิทินวันหยุดประจำปี</h6>
+                    
+                    <!-- ตัวกรองปี -->
+                    <form action="index.php" method="GET" class="d-flex align-items-center">
+                        <input type="hidden" name="c" value="settings">
+                        <input type="hidden" name="a" value="holidays">
+                        <select name="year" class="form-select form-select-sm rounded-pill px-3 shadow-sm" onchange="this.form.submit()" style="width: auto;">
+                            <?php 
+                                $currentYear = date('Y');
+                                for($i = $currentYear - 2; $i <= $currentYear + 2; $i++): 
+                            ?>
+                                <option value="<?= $i ?>" <?= $year == $i ? 'selected' : '' ?>>ปี พ.ศ. <?= $i + 543 ?></option>
+                            <?php endfor; ?>
                         </select>
+                    </form>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 13.5px;">
+                            <thead class="table-light text-muted sticky-top" style="font-size: 12.5px;">
+                                <tr>
+                                    <th class="py-3 ps-4">วันที่</th>
+                                    <th>ชื่อวันหยุด</th>
+                                    <th>ประเภท</th>
+                                    <th class="text-center">สถานะใช้งาน</th>
+                                    <th class="text-center">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($holidays)): ?>
+                                    <tr><td colspan="5" class="py-5 text-center text-muted">ไม่พบข้อมูลวันหยุดในปี <?= $year ?> (กรุณากดซิงค์ API)</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($holidays as $h): ?>
+                                    <tr class="<?= isset($h['is_active']) && $h['is_active'] == 0 ? 'opacity-50 text-decoration-line-through' : '' ?>">
+                                        <td class="py-3 ps-4 fw-bold text-dark">
+                                            <?= formatDateThai($h['holiday_date']) ?>
+                                        </td>
+                                        <td><?= htmlspecialchars($h['holiday_name']) ?></td>
+                                        <td>
+                                            <?php 
+                                                $type = $h['holiday_type'] ?? 'REGULAR';
+                                                if($type == 'COMPENSATION') echo '<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25"><i class="bi bi-arrow-repeat me-1"></i>ชดเชย</span>';
+                                                elseif($type == 'SPECIAL') echo '<span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25"><i class="bi bi-star-fill me-1"></i>กรณีพิเศษ</span>';
+                                                else echo '<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"><i class="bi bi-calendar-check me-1"></i>วันหยุดปกติ</span>';
+                                            ?>
+                                        </td>
+                                        <td class="text-center">
+                                            <?php if(isset($h['is_active']) && $h['is_active'] == 1): ?>
+                                                <a href="index.php?c=settings&a=toggle_holiday&id=<?= $h['id'] ?>&status=0" class="btn btn-sm btn-success rounded-pill" style="font-size: 11px;" title="กดเพื่อปิดใช้งาน">กำลังใช้งาน</a>
+                                            <?php else: ?>
+                                                <a href="index.php?c=settings&a=toggle_holiday&id=<?= $h['id'] ?>&status=1" class="btn btn-sm btn-secondary rounded-pill" style="font-size: 11px;" title="กดเพื่อเปิดใช้งาน">ปิดใช้งาน</a>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="text-center">
+                                            <a href="index.php?c=settings&a=delete_holiday&id=<?= $h['id'] ?>" 
+                                               class="btn btn-sm btn-outline-danger rounded-circle" 
+                                               onclick="return confirm('ยืนยันการลบวันหยุดนี้?');" title="ลบ">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
                     </div>
-                    <nav aria-label="Page navigation">
-                        <ul class="pagination pagination-sm mb-0 shadow-sm" id="paginationControls"></ul>
-                    </nav>
                 </div>
             </div>
-
-        </div>
-
-    </div>
-</div>
-
-<!-- ================= Modal เพิ่มวันหยุดเอง ================= -->
-<div class="modal fade" id="addHolidayModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-bold">เพิ่มวันหยุดใหม่</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form action="index.php?c=settings&a=add_holiday" method="POST">
-                <div class="modal-body pt-3">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">วันที่หยุด</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-0 text-muted"><i class="bi bi-calendar-event"></i></span>
-                            <input type="text" name="holiday_date" id="holiday_date" class="form-control bg-light border-0 thai-datepicker" placeholder="คลิกเพื่อเลือกวันที่..." required style="cursor: pointer; background-color: #f8f9fa !important;">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">ชื่อวันหยุด</label>
-                        <input type="text" name="holiday_name" class="form-control bg-light border-0" placeholder="เช่น วันสงกรานต์, วันปิยมหาราช" required>
-                    </div>
-                </div>
-                <div class="modal-footer border-top-0 pt-0">
-                    <button type="button" class="btn btn-light fw-bold" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary fw-bold px-4">บันทึกวันหยุด</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- ================= Modal แก้ไขวันหยุด ================= -->
-<div class="modal fade" id="editHolidayModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-bold">แก้ไขวันหยุด</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form action="index.php?c=settings&a=edit_holiday" method="POST">
-                <input type="hidden" name="id" id="edit_holiday_id">
-                <div class="modal-body pt-3">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">วันที่หยุด</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-0 text-muted"><i class="bi bi-calendar-event"></i></span>
-                            <input type="text" name="holiday_date" id="edit_holiday_date" class="form-control bg-light border-0 thai-datepicker" placeholder="คลิกเพื่อเลือกวันที่..." required style="cursor: pointer; background-color: #f8f9fa !important;">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary">ชื่อวันหยุด</label>
-                        <input type="text" name="holiday_name" id="edit_holiday_name" class="form-control bg-light border-0" placeholder="เช่น วันสงกรานต์, วันปิยมหาราช" required>
-                    </div>
-                </div>
-                <div class="modal-footer border-top-0 pt-0">
-                    <button type="button" class="btn btn-light fw-bold" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary fw-bold px-4">บันทึกการแก้ไข</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- 🌟 นำเข้า JS ปฏิทิน (ใช้ลิงก์ jsdelivr ที่เสถียร) -->
+<!-- เพิ่ม Flatpickr JS และตั้งค่าภาษาไทย -->
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
-
+<script src="https://npmcdn.com/flatpickr/dist/l10n/th.js"></script>
 <script>
-// ฟังก์ชันโยนข้อมูลลง Modal แก้ไข
-function openEditModal(id, date, name) {
-    document.getElementById('edit_holiday_id').value = id;
-    document.getElementById('edit_holiday_name').value = name;
-    
-    const dateInput = document.getElementById('edit_holiday_date');
-    if (dateInput && dateInput._flatpickr) {
-        dateInput._flatpickr.setDate(date);
-    } else {
-        dateInput.value = date;
-    }
-
-    const editModal = new bootstrap.Modal(document.getElementById('editHolidayModal'));
-    editModal.show();
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // 🌟 ตั้งค่า Flatpickr ภาษาไทย + แสดงผล พ.ศ. แบบแม่นยำ 100%
-    if (typeof flatpickr !== 'undefined') {
-        flatpickr(".thai-datepicker", {
-            locale: "th",                  
-            altInput: true,                
-            altFormat: "j F Y", // รูปแบบช่องกรอกจะถูก override ด้วย formatDate ด้านล่าง     
-            dateFormat: "Y-m-d", // ส่งค่าไป Database         
-            disableMobile: true,         
-            
-            // 🌟 บังคับใช้ชื่อเดือนภาษาไทยและบวก พ.ศ. ทันทีเมื่อแสดงผลบนช่อง Input
-            formatDate: function(date, format, locale) {
-                if (format === 'j F Y') {
-                    const thaiMonthsFull = [
-                        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-                        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-                    ];
-                    const d = date.getDate();
-                    const m = thaiMonthsFull[date.getMonth()];
-                    const y = date.getFullYear() + 543;
-                    return `${d} ${m} ${y}`;
-                }
-                
-                // ถ้ารูปแบบอื่นปล่อยให้ Flatpickr จัดการ (เช่น Y-m-d สำหรับบันทึกลง DB)
-                return flatpickr.formatDate(date, format);
-            },
-            
-            // เทคนิคสร้าง Overlay เปลี่ยน ค.ศ. เป็น พ.ศ. ด้านในตัวปฏิทิน
-            onReady: function(selectedDates, dateStr, instance) {
-                const yearWrapper = instance.currentYearElement.parentNode;
-                yearWrapper.style.position = 'relative';
-                
-                const overlay = document.createElement('span');
-                overlay.className = 'thai-year-overlay fw-bold';
-                overlay.style.position = 'absolute';
-                overlay.style.top = '0';
-                overlay.style.left = '0';
-                overlay.style.width = '100%';
-                overlay.style.height = '100%';
-                overlay.style.display = 'flex';
-                overlay.style.alignItems = 'center';
-                overlay.style.justifyContent = 'center';
-                overlay.style.pointerEvents = 'none'; 
-                
-                yearWrapper.appendChild(overlay);
-                
-                instance.updateThaiYear = function() {
-                    overlay.textContent = instance.currentYear + 543;
-                };
-                instance.updateThaiYear();
-            },
-            onYearChange: function(selectedDates, dateStr, instance) {
-                if(instance.updateThaiYear) instance.updateThaiYear();
-            },
-            onMonthChange: function(selectedDates, dateStr, instance) {
-                if(instance.updateThaiYear) instance.updateThaiYear();
+    flatpickr(".datepicker-th", {
+        altInput: true,         // สร้าง Input หลอกขึ้นมาแสดงผลภาษาไทย
+        altFormat: "d/m/Y",     // เราจะดักจับและเปลี่ยนเป็น พ.ศ. ตรง formatDate
+        dateFormat: "Y-m-d",    // ค่าจริงที่ส่งไปให้ Backend (ปี ค.ศ.)
+        locale: "th",           // ใช้ภาษาไทย
+        allowInput: true,
+        onChange: function(selectedDates, dateStr, instance) {
+             // อัปเดตปี พ.ศ. ทุกครั้งที่มีการเลือกวัน
+             updateFlatpickrYearToThai(instance);
+        },
+        onOpen: function(selectedDates, dateStr, instance) {
+             // แปลงปี ค.ศ. เป็น พ.ศ. ตอนเปิด
+             updateFlatpickrYearToThai(instance);
+        },
+        onMonthChange: function(selectedDates, dateStr, instance) {
+            // แปลงปี ค.ศ. เป็น พ.ศ. ตอนเปลี่ยนเดือน
+             updateFlatpickrYearToThai(instance);
+        },
+        onYearChange: function(selectedDates, dateStr, instance) {
+             // แปลงปี ค.ศ. เป็น พ.ศ. ตอนเปลี่ยนปี
+             updateFlatpickrYearToThai(instance);
+        },
+        formatDate: function(date, format, locale) {
+            // ดักจับ Format เพื่อแก้ไขปี ค.ศ. เป็น ปี พ.ศ. ตอนแสดงผลใน Input
+            if (format === "d/m/Y") {
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear() + 543; // บวก 543 เข้าไป
+                return `${day}/${month}/${year}`;
             }
-        });
-    } else {
-        console.error("Flatpickr Library ไม่สามารถโหลดได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต");
-    }
+            return flatpickr.formatDate(date, format);
+        }
+    });
 
-    // ระบบค้นหาและแบ่งหน้า (Pagination)
-    const searchInput = document.getElementById('searchInput');
-    const tableBody = document.getElementById('holidayTableBody');
-    const rows = Array.from(tableBody.querySelectorAll('.holiday-row'));
-    const noSearchResult = document.getElementById('noSearchResult');
-    const searchFeedback = document.getElementById('searchFeedback');
-    const noDataRow = document.getElementById('noDataRow');
-    
-    const paginationWrapper = document.getElementById('paginationWrapper');
-    const paginationInfo = document.getElementById('paginationInfo');
-    const rowsPerPageSelect = document.getElementById('rowsPerPage');
-    const paginationControls = document.getElementById('paginationControls');
+    // ฟังก์ชันสำหรับแปลงปี ค.ศ. เป็น พ.ศ. ในส่วน UI ของ Flatpickr
+    function updateFlatpickrYearToThai(instance) {
+        if (!instance.currentYearElement) return;
 
-    let currentPage = 1;
-    let rowsPerPage = 10;
-    let filteredRows = [...rows];
+        // ห้ามให้ Trigger event onYearChange เพื่อป้องกัน Loop ไม่สิ้นสุด
+        let currentYear = instance.currentYear;
+        // ปรับค่าที่แสดงผลให้เป็น พ.ศ. (ค่าจริงๆ ของ instance.currentYear ยังเป็น ค.ศ. อยู่)
+        instance.currentYearElement.value = currentYear + 543;
 
-    function updateTable() {
-        const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
-
-        filteredRows = rows.filter(row => {
-            const dateText = row.cells[0].textContent.toLowerCase();
-            const nameText = row.cells[1].textContent.toLowerCase();
-            return dateText.includes(searchTerm) || nameText.includes(searchTerm);
-        });
-
-        const totalRows = filteredRows.length;
-        const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(totalRows / rowsPerPage);
-
-        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
-        if (currentPage < 1) currentPage = 1;
-
-        const startIdx = rowsPerPage === 'all' ? 0 : (currentPage - 1) * rowsPerPage;
-        const endIdx = rowsPerPage === 'all' ? totalRows : startIdx + rowsPerPage;
-
-        rows.forEach(row => row.style.display = 'none');
-        filteredRows.slice(startIdx, endIdx).forEach(row => row.style.display = '');
-
-        if (rows.length === 0) {
-            if(paginationWrapper) paginationWrapper.style.display = 'none';
-        } else if (totalRows === 0 && searchTerm !== '') {
-            noSearchResult.style.display = '';
-            searchFeedback.innerHTML = `ไม่พบข้อมูลที่ค้นหา <b>"${searchInput.value}"</b>`;
-            if(paginationWrapper) paginationWrapper.style.display = 'none';
-            if(noDataRow) noDataRow.style.display = 'none';
-        } else {
-            noSearchResult.style.display = 'none';
-            if(noDataRow) noDataRow.style.display = 'none';
-            
-            if(paginationWrapper) {
-                paginationWrapper.style.display = 'flex';
-                paginationWrapper.classList.add('d-md-flex');
-                renderPagination(totalRows, totalPages, startIdx, endIdx);
-            }
+        // เช็คว่ามี Select box สำหรับเดือนและปีไหม ถ้ามีให้ปรับด้วย
+        if(instance.yearElements) {
+             instance.yearElements.forEach((el, index) => {
+                 el.value = instance.currentYear + 543;
+             });
         }
     }
-
-    function renderPagination(totalRows, totalPages, startIdx, endIdx) {
-        const actualEnd = Math.min(endIdx, totalRows);
-        paginationInfo.innerHTML = `แสดง <b>${totalRows > 0 ? startIdx + 1 : 0}</b> ถึง <b>${actualEnd}</b> จากทั้งหมด <b>${totalRows}</b> รายการ`;
-        
-        paginationControls.innerHTML = '';
-        
-        if (totalPages <= 1) {
-            paginationControls.style.display = 'none';
-            return;
-        }
-        
-        paginationControls.style.display = 'flex';
-
-        const prevLi = document.createElement('li');
-        prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-        prevLi.innerHTML = `<a class="page-link cursor-pointer" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a>`;
-        if (currentPage > 1) {
-            prevLi.onclick = (e) => { e.preventDefault(); currentPage--; updateTable(); };
-        }
-        paginationControls.appendChild(prevLi);
-
-        for (let i = 1; i <= totalPages; i++) {
-            const li = document.createElement('li');
-            li.className = `page-item ${currentPage === i ? 'active' : ''}`;
-            li.innerHTML = `<a class="page-link cursor-pointer">${i}</a>`;
-            li.onclick = (e) => { e.preventDefault(); currentPage = i; updateTable(); };
-            paginationControls.appendChild(li);
-        }
-
-        const nextLi = document.createElement('li');
-        nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-        nextLi.innerHTML = `<a class="page-link cursor-pointer" aria-label="Next"><span aria-hidden="true">&raquo;</span></a>`;
-        if (currentPage < totalPages) {
-            nextLi.onclick = (e) => { e.preventDefault(); currentPage++; updateTable(); };
-        }
-        paginationControls.appendChild(nextLi);
-    }
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() { currentPage = 1; updateTable(); });
-    }
-
-    if (rowsPerPageSelect) {
-        rowsPerPageSelect.addEventListener('change', function() {
-            rowsPerPage = this.value === 'all' ? 'all' : parseInt(this.value);
-            currentPage = 1; updateTable();
-        });
-    }
-
-    updateTable();
 });
 </script>

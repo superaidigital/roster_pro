@@ -5,7 +5,10 @@ require_once 'config/database.php';
 $db = (new Database())->getConnection();
 
 // 🌟 1. ดึงสิทธิ์ผู้ใช้งาน
-$isAdmin = in_array($_SESSION['user']['role'] ?? '', ['ADMIN', 'SUPERADMIN']);
+$user_role = strtoupper($_SESSION['user']['role'] ?? '');
+$isAdmin = in_array($user_role, ['ADMIN', 'SUPERADMIN']);
+$isDirector = ($user_role === 'DIRECTOR');
+$my_hospital_id = $_SESSION['user']['hospital_id'] ?? null;
 
 // 🌟 2. คัดกรองข้อมูล (Filter) ให้แสดงทุกหน่วยงาน ยกเว้น "ส่วนกลาง"
 $all_hospitals = $hospitals ?? [];
@@ -79,28 +82,17 @@ if (!empty($hospital_ids)) {
 ?>
 
 <style>
-    /* ==========================================================================
-       🌟 Modern UI Styles สำหรับตาราง รพ.สต.
-       ========================================================================== */
     body { background-color: #f4f6f9; }
     .card-modern { border: none; border-radius: 1.25rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); background: #ffffff; }
-    
-    /* สไตล์ตาราง */
     .table-modern th { font-weight: 600; color: #475569; font-size: 13px; background-color: #f8fafc; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; letter-spacing: 0.5px; padding: 1rem 0.75rem; }
     .table-modern td { vertical-align: middle; font-size: 14.5px; border-bottom: 1px solid #f1f5f9; padding: 1rem 0.75rem; background-color: #ffffff; transition: background-color 0.2s; }
     .table-modern tbody tr:hover td { background-color: #f8fafc; }
-    
-    /* ช่องค้นหา */
     .search-box { border: 1px solid #e2e8f0; background: #fff; transition: all 0.2s; border-radius: 1rem; overflow: hidden; }
     .search-box:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
     .search-box input { border: none; box-shadow: none; background: transparent; font-size: 14px; }
     .search-box input:focus { outline: none; }
-    
-    /* ปุ่ม Action */
     .btn-action { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; }
     .btn-action:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    
-    /* ป้ายบอกขนาด รพ.สต. */
     .size-badge { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 800; font-size: 13px; }
     .size-s { background-color: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
     .size-m { background-color: #e0e7ff; color: #4f46e5; border: 1px solid #c7d2fe; }
@@ -128,16 +120,16 @@ if (!empty($hospital_ids)) {
             </div>
             
             <div class="d-flex gap-2">
-                <!-- 🌟 เพิ่มปุ่ม ส่งออก Excel -->
                 <button class="btn btn-outline-success fw-bold shadow-sm d-flex align-items-center justify-content-center flex-grow-1 text-nowrap rounded-pill bg-white" onclick="exportTableToExcel('hospitalsTable', 'ข้อมูลหน่วยบริการ_รพสต')">
-                    <i class="bi bi-file-earmark-excel-fill me-1"></i> ส่งออก Excel
+                    <i class="bi bi-file-earmark-excel-fill me-1"></i> ส่งออก
                 </button>
 
+                <!-- 🛡️ แสดงปุ่ม นำเข้า/เพิ่ม เฉพาะ Admin -->
+                <?php if($isAdmin): ?>
                 <button class="btn btn-success fw-bold shadow-sm d-flex align-items-center justify-content-center flex-grow-1 text-nowrap rounded-pill" data-bs-toggle="modal" data-bs-target="#uploadExcelModal">
-                    <i class="bi bi-file-earmark-arrow-up-fill me-1"></i> นำเข้าข้อมูล
+                    <i class="bi bi-cloud-arrow-up-fill me-1"></i> นำเข้า
                 </button>
                 
-                <?php if($isAdmin): ?>
                 <button class="btn btn-primary fw-bold shadow-sm d-flex align-items-center justify-content-center flex-grow-1 text-nowrap rounded-pill" data-bs-toggle="modal" data-bs-target="#addHospitalModal">
                     <i class="bi bi-plus-lg me-1"></i> เพิ่ม รพ.สต.
                 </button>
@@ -162,7 +154,7 @@ if (!empty($hospital_ids)) {
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
-    <!-- 🌟 กล่องสรุปสถิติ 4 ช่องเชื่อมฐานข้อมูล (เฉพาะ รพ.สต.) -->
+    <!-- 🌟 กล่องสรุปสถิติ -->
     <div class="row g-3 mb-4">
         <!-- 1. จำนวน รพ.สต. -->
         <div class="col-xl-3 col-md-6">
@@ -258,17 +250,20 @@ if (!empty($hospital_ids)) {
                             </tr>
                         <?php else: ?>
                             <?php $no = 1; foreach ($hospitals as $h): 
-                                // จัดการป้ายขนาด (Size Badge)
+                                // จัดการป้ายขนาด
                                 $size = strtoupper(trim($h['hospital_size'] ?? 'S'));
                                 $size_class = 'size-unknown';
                                 if ($size === 'S') $size_class = 'size-s';
                                 elseif ($size === 'M') $size_class = 'size-m';
                                 elseif ($size === 'L') $size_class = 'size-l';
                                 elseif ($size === 'XL') $size_class = 'size-xl';
+
+                                // 🌟 เช็คสิทธิ์: เป็น Admin หรือ ผอ. ของ รพ. นี้เท่านั้น ถึงจะแก้ไขได้
+                                $canEdit = $isAdmin || ($isDirector && $h['id'] == $my_hospital_id);
                             ?>
-                            <tr class="hospital-row">
+                            <!-- ไฮไลท์สีเหลืองอ่อนสำหรับ รพ. ของตนเอง -->
+                            <tr class="hospital-row <?= ($isDirector && $h['id'] == $my_hospital_id) ? 'table-warning' : '' ?>">
                                 <td class="text-center text-muted fw-medium"><?= $no++ ?>
-                                    <!-- ซ่อน ID อ้างอิงไว้สำหรับค้นหา -->
                                     <span class="d-none hospital-id"><?= htmlspecialchars($h['id']) ?></span>
                                 </td>
                                 <td class="text-center font-monospace fw-bold text-primary hospital-code">
@@ -280,7 +275,7 @@ if (!empty($hospital_ids)) {
                                     </div>
                                     <?php if(!empty($h['district'])): ?>
                                         <div class="text-muted mt-1" style="font-size: 12px;">
-                                            <i class="bi bi-geo-alt-fill text-danger opacity-75 me-1"></i> อ.<?= htmlspecialchars($h['district']) ?> จ.<?= htmlspecialchars($h['province'] ?? 'ยโสธร') ?>
+                                            <i class="bi bi-geo-alt-fill text-danger opacity-75 me-1"></i> อ.<?= htmlspecialchars($h['district']) ?> จ.<?= htmlspecialchars($h['province'] ?? '') ?>
                                         </div>
                                     <?php endif; ?>
                                 </td>
@@ -309,21 +304,26 @@ if (!empty($hospital_ids)) {
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-center pe-4 text-nowrap">
+                                    <?php if($canEdit): ?>
+                                        <!-- ปุ่มแก้ไข (เห็นเฉพาะ Admin หรือ ผอ. รพ. ตัวเอง) -->
+                                        <button type="button" class="btn-action bg-warning bg-opacity-10 text-dark border border-warning border-opacity-50 me-1" title="เปลี่ยนชื่อ/รหัส"
+                                                onclick="openEditModal('<?= htmlspecialchars($h['id']) ?>', '<?= htmlspecialchars($h['hospital_code'] ?? '') ?>', '<?= htmlspecialchars($h['name'], ENT_QUOTES) ?>')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        
+                                        <a href="index.php?c=settings&a=hospital&id=<?= urlencode($h['id']) ?>" class="btn-action bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 me-1" title="ตั้งค่าข้อมูลพื้นฐาน/พิกัดแผนที่">
+                                            <i class="bi bi-gear-fill"></i>
+                                        </a>
+                                    <?php endif; ?>
+                                    
                                     <?php if($isAdmin): ?>
-                                    <button type="button" class="btn-action bg-warning bg-opacity-10 text-dark border border-warning border-opacity-50 me-1" title="เปลี่ยนชื่อ/รหัส"
-                                            onclick="openEditModal('<?= htmlspecialchars($h['id']) ?>', '<?= htmlspecialchars($h['hospital_code'] ?? '') ?>', '<?= htmlspecialchars($h['name'], ENT_QUOTES) ?>')">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    
-                                    <a href="index.php?c=settings&a=hospital&id=<?= urlencode($h['id']) ?>" class="btn-action bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 me-1" title="ตั้งค่าข้อมูลพื้นฐาน/พิกัดแผนที่">
-                                        <i class="bi bi-gear-fill"></i>
-                                    </a>
-                                    
-                                    <a href="index.php?c=hospitals&a=delete&id=<?= urlencode($h['id']) ?>" class="btn-action bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" title="ลบ" onclick="return confirm('คำเตือน: ยืนยันการลบ <?= htmlspecialchars($h['name'], ENT_QUOTES) ?> ?\n\n(หากมีพนักงานสังกัดอยู่ จะไม่สามารถลบได้)');">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </a>
-                                    <?php else: ?>
-                                    <span class="text-muted small"><i class="bi bi-lock-fill"></i></span>
+                                        <!-- ปุ่มลบ (เห็นเฉพาะ Admin) -->
+                                        <a href="index.php?c=hospitals&a=delete&id=<?= urlencode($h['id']) ?>" class="btn-action bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" title="ลบ" onclick="return confirm('คำเตือน: ยืนยันการลบ <?= htmlspecialchars($h['name'], ENT_QUOTES) ?> ?\n\n(หากมีพนักงานสังกัดอยู่ จะไม่สามารถลบได้)');">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </a>
+                                    <?php elseif(!$canEdit): ?>
+                                        <!-- ไอคอนล็อกกุญแจ หาก ผอ. ดู รพ. อื่น -->
+                                        <span class="text-muted small" title="คุณไม่มีสิทธิ์แก้ไขหน่วยบริการนี้"><i class="bi bi-lock-fill"></i></span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -353,7 +353,8 @@ if (!empty($hospital_ids)) {
     </div>
 </div>
 
-<!-- ================= 🌟 Modal นำเข้า Excel/CSV ================= -->
+<!-- ================= 🌟 Modal นำเข้า Excel/CSV (เฉพาะ Admin) ================= -->
+<?php if($isAdmin): ?>
 <div class="modal fade" id="uploadExcelModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
@@ -364,7 +365,6 @@ if (!empty($hospital_ids)) {
             
             <form action="index.php?c=hospitals&a=import_csv" method="POST" enctype="multipart/form-data">
                 <div class="modal-body p-4 text-center">
-                    
                     <div class="mb-4">
                         <div class="bg-light rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style="width: 80px; height: 80px;">
                             <i class="bi bi-cloud-arrow-up-fill text-success" style="font-size: 40px;"></i>
@@ -385,7 +385,6 @@ if (!empty($hospital_ids)) {
                             <li>รหัสอ้างอิงระบบ (ID) ต้องไม่ซ้ำกับของเดิมที่มีอยู่ (เช่น h99, h100)</li>
                         </ul>
                     </div>
-
                 </div>
                 <div class="modal-footer border-top-0 pt-0 pb-4 px-4 d-flex justify-content-between">
                     <a href="index.php?c=hospitals&a=download_template" class="btn btn-outline-success fw-bold rounded-pill px-3">
@@ -432,8 +431,9 @@ if (!empty($hospital_ids)) {
         </div>
     </div>
 </div>
+<?php endif; ?>
 
-<!-- ================= 🌟 Modal แก้ไขชื่อ/รหัส ================= -->
+<!-- ================= 🌟 Modal แก้ไขชื่อ/รหัส (Admin & Director) ================= -->
 <div class="modal fade" id="editHospitalModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">

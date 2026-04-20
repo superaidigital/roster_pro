@@ -49,6 +49,13 @@ class AuthController {
             $user = $userModel->login($username, $password);
 
             if($user) {
+                // 🌟 ตรวจสอบสถานะบัญชี (is_active) ถ้าเป็น 0 ไม่อนุญาตให้เข้าระบบ
+                if (isset($user['is_active']) && $user['is_active'] == 0) {
+                    $_SESSION['login_error'] = "⛔ บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ";
+                    header("Location: index.php?c=auth&a=index");
+                    exit;
+                }
+
                 // ล็อกอินสำเร็จ: บันทึกข้อมูลลง Session
                 $_SESSION['user'] = $user;
                 unset($_SESSION['login_error']); // ล้างค่า Error

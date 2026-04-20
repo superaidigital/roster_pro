@@ -31,21 +31,37 @@ try {
         $app_subtitle = $sys_settings['app_subtitle'];
     }
     
-    // 🚨 ตรวจสอบโหมดปิดปรับปรุงระบบ (เฉพาะเมื่อมีการล็อกอิน)
+    // 🚨 ตรวจสอบโหมดปิดปรับปรุงระบบ และ สถานะการระงับบัญชี (เฉพาะเมื่อมีการล็อกอิน)
     if (isset($_SESSION['user'])) {
+        
+        // 1. เช็ค Maintenance Mode
         $is_maintenance = $sys_settings['maintenance_mode'] ?? '0';
         if ($is_maintenance === '1' && !in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) {
-            // ยกเลิก Session และเตะออกจากระบบ
             session_unset();
             session_destroy();
-            
-            // เริ่ม Session ใหม่เพื่อแสดงข้อความ Error ในหน้า Login
             session_start(); 
             $_SESSION['error_msg'] = "🚧 ขณะนี้ระบบกำลังอยู่ในช่วงปิดปรับปรุง (Maintenance Mode) ขออภัยในความไม่สะดวกครับ";
-            
-            // ส่งกลับไปหน้า Login
             header("Location: index.php");
             exit;
+        }
+
+        // 2. 🌟 เช็คสถานะการระงับบัญชี (is_active) แบบ Real-time
+        try {
+            $stmt_status = $db_check->prepare("SELECT is_active FROM users WHERE id = ?");
+            $stmt_status->execute([$_SESSION['user']['id']]);
+            $user_status = $stmt_status->fetchColumn();
+
+            // ถ้ายูสเซอร์ถูกลบ หรือ is_active กลายเป็น 0 ให้ทำลาย Session ทิ้ง (เตะออก)
+            if ($user_status === false || $user_status == '0') {
+                session_unset();
+                session_destroy();
+                session_start(); 
+                $_SESSION['login_error'] = "⛔ เซสชั่นหมดอายุ หรือบัญชีของคุณถูกระงับการใช้งานโดยผู้ดูแลระบบ";
+                header("Location: index.php");
+                exit;
+            }
+        } catch (Exception $e) {
+            // ข้ามไปหากตาราง/คอลัมน์ยังไม่สมบูรณ์
         }
     }
 } catch (Exception $e) {
@@ -324,7 +340,6 @@ if (isset($_SESSION['user'])) {
 <div id="pwaInstallToast" class="pwa-toast">
     <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center fs-4 shadow-sm" style="width: 45px; height: 45px;"><i class="bi bi-app-indicator"></i></div>
     <div class="flex-grow-1">
-        <!-- 🌟 ดึงชื่อแอปมาแสดงที่ข้อความเชิญติดตั้ง -->
         <h6 class="fw-bold mb-1" style="font-size: 15px;">ติดตั้ง <?= htmlspecialchars($app_name) ?></h6>
         <div class="text-muted" style="font-size: 12px;">เพิ่มลงหน้าจอหลักเพื่อใช้งานเต็มจอ</div>
     </div>

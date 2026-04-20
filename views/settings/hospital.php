@@ -1,447 +1,370 @@
 <?php
 // ที่อยู่ไฟล์: views/settings/hospital.php
-// ชื่อไฟล์: hospital.php
+$hospital = $hospital ?? [];
+$user_role = strtoupper($_SESSION['user']['role'] ?? '');
+$isAdmin = in_array($user_role, ['SUPERADMIN', 'ADMIN']);
+$isDirector = ($user_role === 'DIRECTOR');
+$my_hospital_id = $_SESSION['user']['hospital_id'] ?? null;
 
-// 🌟 กำหนดสิทธิ์การแก้ไขข้อมูล: เฉพาะ ADMIN และ DIRECTOR เท่านั้นที่แก้ไขข้อมูล รพ.สต. ได้
-$can_edit = false;
-if (isset($_SESSION['user'])) {
-    if ($_SESSION['user']['role'] === 'ADMIN' || $_SESSION['user']['role'] === 'DIRECTOR') {
-        $can_edit = true;
-    }
+// 🛡️ ป้องกันความปลอดภัยขั้นสูงสุด: ถ้า ผอ. พยายามเข้าหน้าตั้งค่าของ รพ. อื่นตรงๆ ให้เตะกลับ
+if ($isDirector && isset($hospital['id']) && $hospital['id'] != $my_hospital_id) {
+    $_SESSION['error_msg'] = "⛔ ปฏิเสธการเข้าถึง: คุณไม่มีสิทธิ์ตั้งค่าข้อมูลของหน่วยบริการอื่น";
+    echo "<script>window.location.replace('index.php?c=hospitals');</script>";
+    exit;
 }
 
-// ตรวจสอบข้อมูล รพ.สต. ถ้าไม่มีให้ใช้ค่าเริ่มต้น
-if (empty($hospital)) {
-    $hospital = [
-        'id' => '', 'hospital_code' => '', 'name' => 'ยังไม่ได้ตั้งชื่อ รพ.สต.', 'address' => '',
-        'sub_district' => '', 'district' => '', 'province' => '', 'zipcode' => '',
-        'latitude' => '', 'longitude' => '', 'hospital_size' => 'S', 'phone' => '', 'email' => '',
-        'morning_shift' => '08:30 - 16:30', 'afternoon_shift' => '16:30 - 00:30', 'night_shift' => '00:30 - 08:30',
-        'director_name' => '', 'director_position' => ''
-    ];
+// ดึงโลโก้จาก HospitalModel (ถ้ามี) หรือใช้รูป Default
+$logo_url = isset($hospitalModel) && !empty($hospital) ? $hospitalModel->getHospitalLogo($hospital) : 'assets/images/default_hospital.png';
+
+// Helper Function: แยกเวลาเข้าและออก
+function getShiftTimes($shiftStr, $defaultStart, $defaultEnd) {
+    if (empty($shiftStr)) return [$defaultStart, $defaultEnd];
+    $parts = explode('-', str_replace(' ', '', $shiftStr));
+    if (count($parts) == 2) return [$parts[0], $parts[1]];
+    return [$defaultStart, $defaultEnd];
 }
 
-// สร้างที่อยู่แบบเต็มสำหรับแสดงผลในนามบัตร
-$full_address = [];
-if(!empty($hospital['address'])) $full_address[] = $hospital['address'];
-if(!empty($hospital['sub_district'])) $full_address[] = "ต." . $hospital['sub_district'];
-if(!empty($hospital['district'])) $full_address[] = "อ." . $hospital['district'];
-if(!empty($hospital['province'])) $full_address[] = "จ." . $hospital['province'];
-if(!empty($hospital['zipcode'])) $full_address[] = $hospital['zipcode'];
-$full_address_str = !empty($full_address) ? implode(' ', $full_address) : 'ยังไม่ได้ระบุที่อยู่';
-
-// 🌟 ดึงโลโก้หรือตัวอักษรย่อ (ผ่าน Model ที่ถูกส่งมาจาก Controller)
-$logoSrc = isset($hospitalModel) ? $hospitalModel->getHospitalLogo($hospital) : 'public/images/default-logo.png';
+list($m_start, $m_end) = getShiftTimes($hospital['morning_shift'] ?? '', '08:00', '16:00');
+list($a_start, $a_end) = getShiftTimes($hospital['afternoon_shift'] ?? '', '16:00', '00:00');
+list($n_start, $n_end) = getShiftTimes($hospital['night_shift'] ?? '', '00:00', '08:00');
 ?>
 
-<!-- 🌟 นำเข้า CSS ของ Leaflet (แผนที่) และ jquery.Thailand.js -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/dist/jquery.Thailand.min.css">
+<style>
+    .card-modern { border: none; border-radius: 1.25rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); background: #ffffff; }
+    .form-control, .form-select { border-radius: 0.75rem; padding: 0.6rem 1rem; border: 1px solid #e2e8f0; transition: border-color 0.2s, box-shadow 0.2s; }
+    .form-control:focus, .form-select:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+    .form-label { font-size: 13.5px; font-weight: 600; color: #475569; margin-bottom: 0.4rem; }
+    
+    .logo-preview { width: 130px; height: 130px; border-radius: 1.5rem; object-fit: cover; border: 4px solid #f8fafc; box-shadow: 0 8px 20px rgba(0,0,0,0.08); background-color: #f1f5f9; }
+    .cursor-pointer { cursor: pointer; }
+    
+    .shift-card { border-radius: 1rem; padding: 1.5rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .shift-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
+</style>
 
-<div class="w-100 bg-light p-3 p-md-4 min-vh-100">
-    <div class="container-fluid max-w-7xl mx-auto">
-        
-        <div class="mb-4">
-            <h4 class="fw-bold text-dark mb-1">ข้อมูลพื้นฐานหน่วยบริการ</h4>
-            <p class="text-muted mb-0" style="font-size: 14px;">จัดการข้อมูล รพ.สต., พิกัดที่ตั้ง และตั้งค่าเวลาเข้า-ออกเวร</p>
+<div class="container-fluid px-3 px-md-4 py-4 min-vh-100 d-flex flex-column" style="background-color: #f4f6f9;">
+
+    <!-- Header Section -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width: 50px; height: 50px;">
+                <i class="bi bi-building-gear fs-4"></i>
+            </div>
+            <div>
+                <h4 class="fw-bold text-dark mb-0">ข้อมูลและตั้งค่าหน่วยบริการ</h4>
+                <p class="text-muted mb-0" style="font-size: 13px;">จัดการชื่อ รพ.สต., พิกัดตำแหน่งบนแผนที่ และเวลาทำงาน</p>
+            </div>
         </div>
-
-        <!-- 🌟 แสดงแจ้งเตือน (Alerts) -->
-        <?php if(isset($_SESSION['success_msg'])): ?>
-            <div class="alert alert-success alert-dismissible fade show shadow-sm border-0" role="alert">
-                <i class="bi bi-check-circle-fill me-2"></i> <strong>สำเร็จ!</strong> <?= $_SESSION['success_msg'] ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            <?php unset($_SESSION['success_msg']); ?>
-        <?php endif; ?>
-
-        <?php if(isset($_SESSION['error_msg'])): ?>
-            <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i> <strong>เกิดข้อผิดพลาด!</strong> <?= $_SESSION['error_msg'] ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            <?php unset($_SESSION['error_msg']); ?>
-        <?php endif; ?>
-
-        <?php if(!$can_edit): ?>
-            <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-                <i class="bi bi-shield-lock-fill fs-4 me-3 text-warning"></i>
-                <div>
-                    <strong>อ่านได้อย่างเดียว:</strong> คุณกำลังดูข้อมูลในโหมดอ่านเท่านั้น สิทธิ์ในการแก้ไขข้อมูลสงวนไว้สำหรับระดับ "ผู้อำนวยการ" และ "ส่วนกลาง"
-                </div>
-            </div>
-        <?php endif; ?>
-
-        <div class="row g-4">
-            <!-- ============================================
-                 ด้านซ้าย: นามบัตร/โปรไฟล์ รพ.สต. 
-            ============================================= -->
-            <div class="col-xl-4 col-lg-5">
-                <div class="card border-0 shadow-sm rounded-4 overflow-hidden sticky-top" style="top: 20px;">
-                    <div class="bg-primary bg-gradient p-4 text-center text-white position-relative">
-                        <i class="bi bi-building" style="font-size: 4rem; opacity: 0.8;"></i>
-                    </div>
-                    <div class="card-body text-center pt-4 pb-4">
-                        <h5 class="fw-bold text-dark mb-1"><?= htmlspecialchars($hospital['name']) ?></h5>
-                        <p class="text-muted small mb-2">รหัสหน่วยบริการ: <span class="badge bg-light text-dark border"><?= !empty($hospital['hospital_code']) ? htmlspecialchars($hospital['hospital_code']) : 'ไม่มีข้อมูล' ?></span></p>
-                        
-                        <div class="mb-3">
-                            <span class="badge bg-info text-white">ขนาด รพ.สต.: Size <?= !empty($hospital['hospital_size']) ? htmlspecialchars($hospital['hospital_size']) : 'S' ?></span>
-                        </div>
-                        
-                        <!-- 🌟 ดึงข้อมูลผู้อำนวยการ รพ.สต. มาแสดง -->
-                        <div class="p-3 bg-light rounded-3 text-start mb-3 border">
-                            <div class="d-flex align-items-center mb-1">
-                                <i class="bi bi-person-badge text-primary me-2 fs-5"></i>
-                                <span class="fw-bold text-dark" style="font-size: 14px;">ผู้บริหารหน่วยงาน</span>
-                            </div>
-                            <div class="ps-4">
-                                <div class="fw-bold text-dark" style="font-size: 14px;">
-                                    <?= !empty($hospital['director_name']) ? htmlspecialchars($hospital['director_name']) : 'ยังไม่ได้ระบุ (รอดึงข้อมูลจากระบบ)' ?>
-                                </div>
-                                <div class="text-muted" style="font-size: 12px;">
-                                    <?= !empty($hospital['director_position']) ? htmlspecialchars($hospital['director_position']) : 'ผู้อำนวยการ รพ.สต.' ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="text-muted opacity-25">
-                        
-                        <div class="d-flex flex-column gap-2 text-start mt-3">
-                            <div class="d-flex text-muted" style="font-size: 14px;">
-                                <i class="bi bi-telephone-fill me-3 text-success mt-1"></i>
-                                <span><?= !empty($hospital['phone']) ? htmlspecialchars($hospital['phone']) : '-' ?></span>
-                            </div>
-                            <div class="d-flex text-muted" style="font-size: 14px;">
-                                <i class="bi bi-envelope-fill me-3 text-warning mt-1"></i>
-                                <span><?= !empty($hospital['email']) ? htmlspecialchars($hospital['email']) : '-' ?></span>
-                            </div>
-                            <div class="d-flex text-muted" style="font-size: 14px;">
-                                <i class="bi bi-geo-alt-fill me-3 text-danger mt-1"></i>
-                                <span><?= htmlspecialchars($full_address_str) ?></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ============================================
-                 ด้านขวา: ฟอร์มแก้ไขข้อมูล 
-            ============================================= -->
-            <div class="col-xl-8 col-lg-7">
-                <form action="index.php?c=settings&a=save_hospital" method="POST" enctype="multipart/form-data">
-                    
-                    <!-- ส่วนที่ 1: ข้อมูลทั่วไป -->
-                    <div class="card border-0 shadow-sm rounded-4 mb-4">
-                        <div class="card-header bg-white border-bottom p-3 px-4">
-                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-info-square text-primary me-2"></i> ข้อมูลทั่วไป & ขนาดหน่วยบริการ</h6>
-                        </div>
-                        <div class="card-body p-4">
-                            
-                            <!-- 🌟 Logo Section (แสดงโลโก้หรืออักษรย่อออโต้) -->
-                            <div class="text-center mb-4 pb-4 border-bottom">
-                                <div class="position-relative d-inline-block mb-3">
-                                    <img id="logoPreview" src="<?= $logoSrc ?>" 
-                                         alt="Logo" class="rounded-circle object-fit-cover shadow-sm bg-white" 
-                                         style="width: 120px; height: 120px; border: 4px solid #f8fafc;">
-                                    
-                                    <?php if($can_edit): ?>
-                                    <label for="logoUpload" class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow" style="width: 35px; height: 35px; cursor: pointer; transition: 0.2s;">
-                                        <i class="bi bi-camera-fill"></i>
-                                    </label>
-                                    <input type="file" name="logo" id="logoUpload" class="d-none" accept="image/png, image/jpeg, image/jpg">
-                                    <?php endif; ?>
-                                </div>
-                                <?php if($can_edit): ?>
-                                <p class="text-muted small mb-0">คลิกที่ไอคอนกล้องเพื่ออัปโหลดโลโก้ใหม่ (แนะนำ 300x300px)</p>
-                                <?php endif; ?>
-                            </div>
-
-                            <div class="row g-3">
-                                <!-- ฟิลด์ซ่อน ID รพ.สต. -->
-                                <input type="hidden" name="id" value="<?= htmlspecialchars($hospital['id'] ?? '') ?>">
-                                
-                                <div class="col-md-4">
-                                    <label class="form-label fw-semibold text-secondary small">รหัสหน่วยบริการ (5 หลัก)</label>
-                                    <input type="text" name="hospital_code" class="form-control <?= $_SESSION['user']['role'] !== 'ADMIN' ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['hospital_code'] ?? '') ?>" placeholder="เช่น 04123" required <?= $_SESSION['user']['role'] !== 'ADMIN' ? 'readonly' : '' ?>>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label fw-semibold text-secondary small">ชื่อ รพ.สต.</label>
-                                    <input type="text" name="name" class="form-control <?= $_SESSION['user']['role'] !== 'ADMIN' ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['name'] ?? '') ?>" required <?= $_SESSION['user']['role'] !== 'ADMIN' ? 'readonly' : '' ?>>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">เบอร์โทรศัพท์ติดต่อ</label>
-                                    <input type="text" name="phone" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['phone'] ?? '') ?>" placeholder="045-XXX-XXX" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">อีเมล</label>
-                                    <input type="email" name="email" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['email'] ?? '') ?>" placeholder="example@email.com" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">ขนาด รพ.สต.</label>
-                                    <select name="hospital_size" class="form-select <?= !$can_edit ? 'bg-light border-0' : '' ?>" <?= !$can_edit ? 'disabled' : '' ?>>
-                                        <option value="S" <?= (($hospital['hospital_size'] ?? '') == 'S') ? 'selected' : '' ?>>ขนาดเล็ก (S)</option>
-                                        <option value="M" <?= (($hospital['hospital_size'] ?? '') == 'M') ? 'selected' : '' ?>>ขนาดกลาง (M)</option>
-                                        <option value="L" <?= (($hospital['hospital_size'] ?? '') == 'L') ? 'selected' : '' ?>>ขนาดใหญ่ (L)</option>
-                                        <option value="XL" <?= (($hospital['hospital_size'] ?? '') == 'XL') ? 'selected' : '' ?>>ขนาดใหญ่พิเศษ (XL)</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 🌟 ส่วนที่ 1.5: ข้อมูลผู้บริหาร (แสดงผลเท่านั้น) -->
-                    <div class="card border-0 shadow-sm rounded-4 mb-4">
-                        <div class="card-header bg-white border-bottom p-3 px-4 d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-person-badge text-primary me-2"></i> ข้อมูลผู้บริหาร (สำหรับออกรายงาน)</h6>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="alert alert-light border shadow-sm mb-3">
-                                <i class="bi bi-info-circle-fill text-info me-2"></i> ข้อมูลส่วนนี้จะถูก <strong>อัปเดตอัตโนมัติ</strong> จากรายชื่อเจ้าหน้าที่ในระบบที่มีระดับสิทธิ์เป็น <code>DIRECTOR</code>
-                            </div>
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">ชื่อ-นามสกุล ผอ.รพ.สต.</label>
-                                    <!-- ไม่ใช้ name="" เพื่อไม่ให้ส่งไปกับฟอร์ม เพราะเราดึงจากตาราง users อัตโนมัติ -->
-                                    <input type="text" class="form-control bg-light border-0" value="<?= htmlspecialchars($hospital['director_name'] ?? 'ยังไม่ได้ระบุ') ?>" readonly>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">ตำแหน่ง ผอ.รพ.สต.</label>
-                                    <!-- ไม่ใช้ name="" เพื่อไม่ให้ส่งไปกับฟอร์ม -->
-                                    <input type="text" class="form-control bg-light border-0" value="<?= htmlspecialchars($hospital['director_position'] ?? 'ผู้อำนวยการ รพ.สต.') ?>" readonly>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ส่วนที่ 2: ที่อยู่ (Auto-complete) -->
-                    <div class="card border-0 shadow-sm rounded-4 mb-4">
-                        <div class="card-header bg-white border-bottom p-3 px-4">
-                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-geo-alt-fill text-danger me-2"></i> ข้อมูลที่ตั้ง (มีระบบค้นหาอัตโนมัติ)</h6>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <label class="form-label fw-semibold text-secondary small">บ้านเลขที่ / หมู่ / ถนน</label>
-                                    <input type="text" name="address" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['address'] ?? '') ?>" placeholder="เช่น 123 ม.4 ถ.สุขุมวิท" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">ตำบล / แขวง</label>
-                                    <input type="text" id="sub_district" name="sub_district" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['sub_district'] ?? '') ?>" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">อำเภอ / เขต</label>
-                                    <input type="text" id="district" name="district" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['district'] ?? '') ?>" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">จังหวัด</label>
-                                    <input type="text" id="province" name="province" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['province'] ?? '') ?>" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">รหัสไปรษณีย์</label>
-                                    <input type="text" id="zipcode" name="zipcode" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['zipcode'] ?? '') ?>" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ส่วนที่ 3: พิกัดแผนที่ (Map) -->
-                    <div class="card border-0 shadow-sm rounded-4 mb-4">
-                        <div class="card-header bg-white border-bottom p-3 px-4 d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-map-fill text-success me-2"></i> พิกัดแผนที่ (Latitude / Longitude)</h6>
-                            <?php if($can_edit): ?>
-                            <button type="button" class="btn btn-sm btn-outline-primary" id="btn-get-location"><i class="bi bi-crosshair"></i> ดึงพิกัดปัจจุบัน</button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">ละติจูด (Latitude)</label>
-                                    <input type="text" id="latitude" name="latitude" class="form-control <?= !$can_edit ? 'bg-light border-0' : 'bg-white' ?>" value="<?= htmlspecialchars($hospital['latitude'] ?? '') ?>" <?= !$can_edit ? 'readonly' : '' ?>>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary small">ลองจิจูด (Longitude)</label>
-                                    <input type="text" id="longitude" name="longitude" class="form-control <?= !$can_edit ? 'bg-light border-0' : 'bg-white' ?>" value="<?= htmlspecialchars($hospital['longitude'] ?? '') ?>" <?= !$can_edit ? 'readonly' : '' ?>>
-                                </div>
-                            </div>
-                            <!-- กล่องแสดงแผนที่ -->
-                            <div id="map" class="rounded-3 border shadow-sm" style="height: 300px; width: 100%; z-index: 1;"></div>
-                            <small class="text-muted mt-2 d-block">
-                                <?= $can_edit ? '<i class="bi bi-info-circle"></i> คุณสามารถคลิกบนแผนที่ หรือลากหมุดสีแดงเพื่อเปลี่ยนพิกัดได้' : '' ?>
-                            </small>
-                        </div>
-                    </div>
-
-                    <!-- ส่วนที่ 4: ตั้งค่าเวลาปฏิบัติงาน -->
-                    <div class="card border-0 shadow-sm rounded-4 mb-4">
-                        <div class="card-header bg-white border-bottom p-3 px-4">
-                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-clock-history text-primary me-2"></i> ตั้งค่าเวลาปฏิบัติงาน (ตารางเวร)</h6>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3">
-                                <div class="col-md-4">
-                                    <label class="form-label fw-semibold" style="color: #ea580c; font-size: 13px;"><i class="bi bi-brightness-high me-1"></i> เวรเช้า</label>
-                                    <input type="text" name="morning_shift" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['morning_shift'] ?? '') ?>" placeholder="เช่น 08:30 - 16:30" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label fw-semibold" style="color: #4f46e5; font-size: 13px;"><i class="bi bi-moon me-1"></i> เวรบ่าย</label>
-                                    <input type="text" name="afternoon_shift" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['afternoon_shift'] ?? '') ?>" placeholder="เช่น 16:30 - 00:30" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label fw-semibold text-dark" style="font-size: 13px;"><i class="bi bi-stars me-1"></i> เวรดึก</label>
-                                    <input type="text" name="night_shift" class="form-control <?= !$can_edit ? 'bg-light border-0' : '' ?>" value="<?= htmlspecialchars($hospital['night_shift'] ?? '') ?>" placeholder="เช่น 00:30 - 08:30" <?= !$can_edit ? 'disabled' : '' ?>>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ปุ่มบันทึก -->
-                    <?php if($can_edit): ?>
-                    <div class="d-flex justify-content-end mb-5">
-                        <button type="submit" class="btn btn-primary fw-bold px-5 shadow-sm rounded-pill">
-                            <i class="bi bi-save me-2"></i> บันทึกข้อมูล
-                        </button>
-                    </div>
-                    <?php endif; ?>
-
-                </form>
-            </div>
+        <div>
+            <?php 
+            // 🌟 ปลดล็อก: ให้ ผอ. เห็นปุ่มย้อนกลับไปหน้ารวมได้
+            $canGoBack = $isAdmin || $isDirector;
+            if(isset($_GET['id']) && $canGoBack): 
+            ?>
+            <a href="index.php?c=hospitals" class="btn btn-light border shadow-sm rounded-pill fw-bold px-4">
+                <i class="bi bi-arrow-left me-1"></i> กลับหน้ารวม รพ.สต.
+            </a>
+            <?php endif; ?>
         </div>
     </div>
+
+    <!-- Alert Messages -->
+    <?php if (isset($_SESSION['success_msg'])): ?>
+        <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
+            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+        </div>
+        <?php unset($_SESSION['success_msg']); ?>
+    <?php endif; ?>
+    <?php if (isset($_SESSION['error_msg'])): ?>
+        <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+        </div>
+        <?php unset($_SESSION['error_msg']); ?>
+    <?php endif; ?>
+
+    <form action="index.php?c=settings&a=save_hospital" method="POST" enctype="multipart/form-data" id="hospitalSettingsForm">
+        <!-- Hidden Inputs -->
+        <input type="hidden" name="id" value="<?= htmlspecialchars($hospital['id'] ?? '') ?>">
+        <?php if(isset($_GET['id'])): ?>
+            <input type="hidden" name="redirect_to" value="hospitals">
+        <?php endif; ?>
+
+        <!-- Hidden Inputs for Merged Shift Times -->
+        <input type="hidden" name="morning_shift" id="morning_shift">
+        <input type="hidden" name="afternoon_shift" id="afternoon_shift">
+        <input type="hidden" name="night_shift" id="night_shift">
+
+        <div class="row g-4">
+            <!-- 🌟 คอลัมน์ซ้าย: ข้อมูลพื้นฐาน -->
+            <div class="col-xl-4 col-lg-5">
+                <div class="card card-modern h-100">
+                    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center">
+                        <i class="bi bi-info-circle-fill text-primary fs-5 me-2"></i>
+                        <h6 class="fw-bold mb-0 text-dark">ข้อมูลพื้นฐาน</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <!-- ส่วนอัปโหลดโลโก้ -->
+                        <div class="text-center mb-4 pb-3 border-bottom">
+                            <img src="<?= $logo_url ?>" alt="Hospital Logo" class="logo-preview mb-3" id="logoPreview">
+                            <div>
+                                <label for="logoInput" class="btn btn-sm btn-outline-primary rounded-pill px-4 fw-bold shadow-sm cursor-pointer">
+                                    <i class="bi bi-camera-fill me-1"></i> เปลี่ยนรูปตราสัญลักษณ์
+                                </label>
+                                <input type="file" name="logo" id="logoInput" class="d-none" accept="image/jpeg, image/png">
+                                <div class="text-muted mt-2" style="font-size: 11.5px;">รองรับ JPG, PNG ขนาดไม่เกิน 2MB</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">รหัสหน่วยบริการ (5 หลัก) <span class="text-danger">*</span></label>
+                            <input type="text" name="hospital_code" class="form-control font-monospace" value="<?= htmlspecialchars($hospital['hospital_code'] ?? '') ?>" placeholder="เช่น 04875" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">ชื่อหน่วยบริการ (รพ.สต. / โรงพยาบาล) <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control fw-bold text-dark" value="<?= htmlspecialchars($hospital['name'] ?? '') ?>" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">ขนาดหน่วยบริการ</label>
+                            <select name="hospital_size" class="form-select bg-light">
+                                <?php $size = $hospital['hospital_size'] ?? 'S'; ?>
+                                <option value="S" <?= $size == 'S' ? 'selected' : '' ?>>ขนาด S (รพ.สต. ขนาดเล็ก)</option>
+                                <option value="M" <?= $size == 'M' ? 'selected' : '' ?>>ขนาด M (รพ.สต. ขนาดกลาง)</option>
+                                <option value="L" <?= $size == 'L' ? 'selected' : '' ?>>ขนาด L (รพ.สต. ขนาดใหญ่)</option>
+                                <option value="XL" <?= $size == 'XL' ? 'selected' : '' ?>>ขนาด XL (โรงพยาบาลศูนย์/ทั่วไป)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🌟 คอลัมน์ขวา: ที่อยู่ และ พิกัด GPS -->
+            <div class="col-xl-8 col-lg-7">
+                <div class="card card-modern h-100">
+                    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center">
+                        <i class="bi bi-geo-alt-fill text-success fs-5 me-2"></i>
+                        <h6 class="fw-bold mb-0 text-dark">ช่องทางการติดต่อ และที่ตั้ง</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label"><i class="bi bi-telephone text-muted me-1"></i> เบอร์โทรศัพท์ติดต่อ</label>
+                                <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($hospital['phone'] ?? '') ?>" placeholder="เช่น 045-xxx-xxx">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label"><i class="bi bi-envelope text-muted me-1"></i> อีเมล (Email)</label>
+                                <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($hospital['email'] ?? '') ?>" placeholder="example@email.com">
+                            </div>
+                        </div>
+                        
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3 mt-2" style="font-size: 14px;">ที่อยู่สำหรับจัดส่งเอกสาร</h6>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">บ้านเลขที่ / หมู่ / ถนน</label>
+                                <input type="text" name="address" class="form-control" value="<?= htmlspecialchars($hospital['address'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">ตำบล</label>
+                                <input type="text" name="sub_district" class="form-control" value="<?= htmlspecialchars($hospital['sub_district'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">อำเภอ</label>
+                                <input type="text" name="district" class="form-control" value="<?= htmlspecialchars($hospital['district'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">จังหวัด</label>
+                                <input type="text" name="province" class="form-control" value="<?= htmlspecialchars($hospital['province'] ?? '') ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">รหัสไปรษณีย์</label>
+                                <input type="text" name="zipcode" class="form-control font-monospace" value="<?= htmlspecialchars($hospital['zipcode'] ?? '') ?>">
+                            </div>
+                        </div>
+
+                        <!-- 📍 พิกัดแผนที่ -->
+                        <div class="mt-4 bg-light p-4 rounded-4 border border-1 shadow-sm">
+                            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                <div class="fw-bold text-dark">
+                                    <i class="bi bi-geo text-danger fs-5 me-1"></i> พิกัด GPS แผนที่ (Latitude, Longitude)
+                                </div>
+                                <button type="button" class="btn btn-sm btn-danger fw-bold rounded-pill shadow-sm px-3" onclick="getCurrentLocation()">
+                                    <i class="bi bi-crosshair me-1"></i> ดึงพิกัดอัตโนมัติ
+                                </button>
+                            </div>
+                            <p class="text-muted mb-3" style="font-size: 12px;">จำเป็นสำหรับการเช็คอิน-เช็คเอาต์ผ่านมือถือ หรือการคำนวณระยะทาง</p>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" name="latitude" id="latInput" class="form-control font-monospace" placeholder="Latitude" value="<?= htmlspecialchars($hospital['latitude'] ?? '') ?>">
+                                        <label>ละติจูด (Latitude)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-floating">
+                                        <input type="text" name="longitude" id="lngInput" class="form-control font-monospace" placeholder="Longitude" value="<?= htmlspecialchars($hospital['longitude'] ?? '') ?>">
+                                        <label>ลองจิจูด (Longitude)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="geoMessage" class="small mt-2 fw-medium"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🌟 แถวล่างเต็ม: ตั้งค่าเวลาเข้า-ออกเวร (Shift Timing) -->
+            <div class="col-12">
+                <div class="card card-modern">
+                    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center">
+                        <i class="bi bi-clock-fill text-warning fs-5 me-2"></i>
+                        <h6 class="fw-bold mb-0 text-dark">ตั้งค่าเวลาเข้า-ออกเวร (Shift Timing)</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-muted small mb-4">เวลาปฏิบัติงานเหล่านี้จะถูกนำไปใช้แสดงในตารางเวร และอ้างอิงในการบันทึกเวลาเข้า-ออกของบุคลากร</p>
+
+                        <div class="row g-4">
+                            <!-- เวรเช้า -->
+                            <div class="col-lg-4 col-md-6">
+                                <div class="shift-card bg-primary bg-opacity-10 border border-primary border-opacity-25">
+                                    <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-primary border-opacity-25">
+                                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 45px; height: 45px;">
+                                            <i class="bi bi-sun-fill fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="fw-bolder text-primary mb-0 fs-5">เวรเช้า (M)</h6>
+                                            <small class="text-primary opacity-75">Morning Shift</small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="flex-grow-1">
+                                            <label class="form-label small text-muted mb-1 fw-bold">เข้างาน</label>
+                                            <input type="time" id="m_s" class="form-control text-center fw-bold fs-6" value="<?= $m_start ?>" required>
+                                        </div>
+                                        <div class="pt-3 fw-bold text-muted opacity-50"><i class="bi bi-arrow-right"></i></div>
+                                        <div class="flex-grow-1">
+                                            <label class="form-label small text-muted mb-1 fw-bold">ออกงาน</label>
+                                            <input type="time" id="m_e" class="form-control text-center fw-bold fs-6" value="<?= $m_end ?>" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- เวรบ่าย -->
+                            <div class="col-lg-4 col-md-6">
+                                <div class="shift-card bg-warning bg-opacity-10 border border-warning border-opacity-25">
+                                    <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-warning border-opacity-25">
+                                        <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 45px; height: 45px;">
+                                            <i class="bi bi-sunset-fill fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="fw-bolder text-dark mb-0 fs-5">เวรบ่าย (A)</h6>
+                                            <small class="text-dark opacity-75">Afternoon Shift</small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="flex-grow-1">
+                                            <label class="form-label small text-muted mb-1 fw-bold">เข้างาน</label>
+                                            <input type="time" id="a_s" class="form-control text-center fw-bold fs-6" value="<?= $a_start ?>" required>
+                                        </div>
+                                        <div class="pt-3 fw-bold text-muted opacity-50"><i class="bi bi-arrow-right"></i></div>
+                                        <div class="flex-grow-1">
+                                            <label class="form-label small text-muted mb-1 fw-bold">ออกงาน</label>
+                                            <input type="time" id="a_e" class="form-control text-center fw-bold fs-6" value="<?= $a_end ?>" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- เวรดึก -->
+                            <div class="col-lg-4 col-md-6">
+                                <div class="shift-card bg-dark bg-opacity-10 border border-dark border-opacity-25">
+                                    <div class="d-flex align-items-center mb-3 pb-2 border-bottom border-dark border-opacity-25">
+                                        <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 45px; height: 45px;">
+                                            <i class="bi bi-moon-stars-fill fs-5"></i>
+                                        </div>
+                                        <div>
+                                            <h6 class="fw-bolder text-dark mb-0 fs-5">เวรดึก (N)</h6>
+                                            <small class="text-dark opacity-75">Night Shift</small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="flex-grow-1">
+                                            <label class="form-label small text-muted mb-1 fw-bold">เข้างาน</label>
+                                            <input type="time" id="n_s" class="form-control text-center fw-bold fs-6" value="<?= $n_start ?>" required>
+                                        </div>
+                                        <div class="pt-3 fw-bold text-muted opacity-50"><i class="bi bi-arrow-right"></i></div>
+                                        <div class="flex-grow-1">
+                                            <label class="form-label small text-muted mb-1 fw-bold">ออกงาน</label>
+                                            <input type="time" id="n_e" class="form-control text-center fw-bold fs-6" value="<?= $n_end ?>" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Submit Button (Sticky Bottom for Mobile) -->
+            <div class="col-12 mb-5">
+                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold rounded-pill shadow" onclick="prepareSubmit()" style="letter-spacing: 1px;">
+                    <i class="bi bi-save-fill me-2"></i> บันทึกข้อมูลและตั้งค่า
+                </button>
+            </div>
+        </div>
+    </form>
 </div>
 
-<!-- 🌟 นำเข้าสคริปต์ jQuery และ Plugins -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/dependencies/JQL.min.js"></script>
-<script src="https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/dependencies/typeahead.bundle.js"></script>
-<script src="https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/dist/jquery.Thailand.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    
-    const canEdit = <?= $can_edit ? 'true' : 'false' ?>;
-
-    // ==========================================
-    // 1. ระบบ Auto-complete ที่อยู่ (jquery.Thailand.js)
-    // ==========================================
-    if (canEdit) {
-        $.Thailand({
-            database: 'https://earthchie.github.io/jquery.Thailand.js/jquery.Thailand.js/database/db.json',
-            $district: $('#sub_district'), // ตำบล
-            $amphoe:   $('#district'),     // อำเภอ
-            $province: $('#province'),     // จังหวัด
-            $zipcode:  $('#zipcode'),      // รหัสไปรษณีย์
-        });
-    }
-
-    // ==========================================
-    // 2. ระบบแผนที่ (Leaflet.js)
-    // ==========================================
-    const latInput = document.getElementById('latitude');
-    const lngInput = document.getElementById('longitude');
-    
-    // ตั้งค่าพิกัดเริ่มต้น (ถ้าไม่มีข้อมูลให้ไปที่ใจกลางประเทศไทย)
-    let initialLat = parseFloat(latInput.value) || 15.2287; // Default: อุบลราชธานี
-    let initialLng = parseFloat(lngInput.value) || 104.8564;
-
-    // สร้างแผนที่
-    const map = L.map('map').setView([initialLat, initialLng], 13);
-    
-    // ดึงภาพแผนที่จาก OpenStreetMap
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    // สร้างหมุด (Marker)
-    const marker = L.marker([initialLat, initialLng], {
-        draggable: canEdit // ให้ลากได้เฉพาะตอนมีสิทธิ์แก้
-    }).addTo(map);
-
-    if (canEdit) {
-        // เมื่อลากหมุดเสร็จ ให้อัปเดตค่าในช่อง Input
-        marker.on('dragend', function(e) {
-            const coords = e.target.getLatLng();
-            latInput.value = coords.lat.toFixed(6);
-            lngInput.value = coords.lng.toFixed(6);
-        });
-
-        // เมื่อคลิกบนแผนที่ ให้ย้ายหมุดมาที่จุดนั้นและอัปเดต Input
-        map.on('click', function(e) {
-            marker.setLatLng(e.latlng);
-            latInput.value = e.latlng.lat.toFixed(6);
-            lngInput.value = e.latlng.lng.toFixed(6);
-        });
-
-        // ฟังก์ชันดึงพิกัดจาก GPS ของอุปกรณ์
-        document.getElementById('btn-get-location').addEventListener('click', function() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(position) {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    
-                    map.setView([lat, lng], 15);
-                    marker.setLatLng([lat, lng]);
-                    
-                    latInput.value = lat.toFixed(6);
-                    lngInput.value = lng.toFixed(6);
-                }, function(error) {
-                    alert('ไม่สามารถดึงตำแหน่งปัจจุบันได้ กรุณาอนุญาตการเข้าถึง Location ในเบราว์เซอร์ของคุณ');
-                });
-            } else {
-                alert('เบราว์เซอร์ของคุณไม่รองรับการดึงตำแหน่ง (Geolocation)');
-            }
-        });
-        
-        // ==========================================
-        // 3. Script สำหรับแสดงรูปภาพตัวอย่างทันทีเมื่อเลือกไฟล์ (Logo Preview)
-        // ==========================================
-        const logoUpload = document.getElementById('logoUpload');
-        const logoPreview = document.getElementById('logoPreview');
-
-        if (logoUpload && logoPreview) {
-            logoUpload.addEventListener('change', function(event) {
-                const file = event.target.files[0];
-                if (file) {
-                    // ตรวจสอบว่าเป็นไฟล์รูปภาพ
-                    if (file.type.startsWith('image/')) {
-                        const reader = new FileReader();
-                        
-                        reader.onload = function(e) {
-                            logoPreview.src = e.target.result;
-                        }
-                        
-                        reader.readAsDataURL(file);
-                    } else {
-                        alert('กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น (PNG, JPG, JPEG)');
-                        logoUpload.value = ''; // ล้างค่าที่เลือกผิด
-                    }
-                }
-            });
+// 1. ระบบพรีวิวรูปภาพก่อนอัปโหลด
+document.getElementById('logoInput').addEventListener('change', function(e) {
+    if(e.target.files && e.target.files[0]) {
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('logoPreview').src = e.target.result;
         }
+        reader.readAsDataURL(e.target.files[0]);
     }
 });
-</script>
 
-<style>
-    /* แก้ไขปัญหากล่อง Auto-complete ของ Typeahead ทับกับ Bootstrap */
-    .tt-menu {
-        background-color: #fff;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        width: 100%;
-        margin-top: 5px;
-        padding: 5px 0;
-        z-index: 1000 !important;
+// 2. ระบบค้นหาพิกัดอัตโนมัติ (HTML5 Geolocation)
+function getCurrentLocation() {
+    const msgEl = document.getElementById('geoMessage');
+    msgEl.innerHTML = '<span class="text-primary fw-bold"><i class="spinner-border spinner-border-sm me-2"></i> กำลังร้องขอและดึงพิกัดจากอุปกรณ์ของคุณ...</span>';
+    
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                document.getElementById('latInput').value = position.coords.latitude;
+                document.getElementById('lngInput').value = position.coords.longitude;
+                msgEl.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i> ดึงพิกัด GPS สำเร็จและลงฟอร์มแล้ว</span>';
+                
+                // ซ่อนข้อความหลังจาก 4 วินาที
+                setTimeout(() => { msgEl.innerHTML = ''; }, 4000);
+            },
+            function(error) {
+                let errorMsg = "ไม่สามารถดึงพิกัดได้ ขาดการเชื่อมต่อ GPS";
+                if(error.code === 1) errorMsg = "กรุณากด 'อนุญาต' (Allow) ให้เบราว์เซอร์เข้าถึง Location เพื่อดึงพิกัดอัตโนมัติ";
+                msgEl.innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${errorMsg}</span>`;
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+    } else {
+        msgEl.innerHTML = '<span class="text-danger fw-bold"><i class="bi bi-x-circle-fill me-1"></i> อุปกรณ์หรือเบราว์เซอร์ของคุณไม่รองรับ GPS</span>';
     }
-    .tt-suggestion {
-        padding: 8px 15px;
-        cursor: pointer;
-        font-size: 14px;
-    }
-    .tt-suggestion:hover, .tt-cursor {
-        background-color: #f0f4f8;
-        color: #0d6efd;
-    }
-</style>
+}
+
+// 3. จัดเตรียมค่าเวลาก่อนกด Save (รวม Start-End เป็น String เดี่ยวเพื่อส่งเข้า Controller)
+function prepareSubmit() {
+    const ms = document.getElementById('m_s').value;
+    const me = document.getElementById('m_e').value;
+    document.getElementById('morning_shift').value = ms + '-' + me;
+
+    const as = document.getElementById('a_s').value;
+    const ae = document.getElementById('a_e').value;
+    document.getElementById('afternoon_shift').value = as + '-' + ae;
+
+    const ns = document.getElementById('n_s').value;
+    const ne = document.getElementById('n_e').value;
+    document.getElementById('night_shift').value = ns + '-' + ne;
+}
+</script>
