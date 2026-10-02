@@ -1,0 +1,14 @@
+# Local environment secrets
+.env
+.env.*
+!.env.example
+
+# Runtime backup data
+/storage/backups/*
+!/storage/backups/.gitkeep
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
