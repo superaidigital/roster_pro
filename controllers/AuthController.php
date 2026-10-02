@@ -81,7 +81,13 @@ class AuthController {
                 // ล็อกอินไม่สำเร็จ: ตรวจสอบว่าใน DB รหัสผ่านถูก Hash หรือยัง
                 
                 // 📝 บันทึก Log: พยายามเข้าสู่ระบบล้มเหลว (ใช้ ID = 0 สำหรับคนแปลกหน้า)
-                LogsController::addLog($db, 0, LogsController::ACTION_LOGIN, "พยายามเข้าสู่ระบบล้มเหลว (รหัสผ่านผิด) Username: {$username}");
+                LogsController::addLog(
+                    $db,
+                    0,
+                    LogsController::ACTION_LOGIN,
+                    security_login_failure_details($username),
+                    security_client_ip()
+                );
                 
                 $_SESSION['login_error'] = "ชื่อผู้ใช้ หรือ รหัสผ่านไม่ถูกต้อง (กรุณาตรวจสอบว่ารหัสใน DB ถูกเข้ารหัสแล้ว)";
                 header("Location: index.php?c=auth&a=index");
