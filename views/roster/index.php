@@ -318,7 +318,10 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                             <i class="bi bi-copy me-1"></i> คัดลอกเดือนก่อน
                         </button>
                         
-                        <a href="javascript:void(0)" onclick="confirmAction('index.php?c=roster&a=clear_roster&month=<?= $selected_month ?>', 'ยืนยันการล้างตารางเวรทั้งหมดของเดือนนี้?', this)" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm bg-white text-nowrap rounded-3">
+                        <form action="index.php?c=roster&a=clear_roster" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการล้างตารางเวรทั้งหมดของเดือนนี้?');">
+                            <?= security_csrf_input() ?>
+                            <input type="hidden" name="month" value="<?= htmlspecialchars($selected_month, ENT_QUOTES, 'UTF-8') ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm bg-white text-nowrap rounded-3">
                             <i class="bi bi-eraser-fill me-1"></i> ล้างข้อมูล
                         </a>
 
