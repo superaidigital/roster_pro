@@ -376,13 +376,37 @@ if (isset($_SESSION['user'])) {
     // ==========================================
     // 🌟 PWA & Notifications & DOM Setup
     // ==========================================
-    
-    // 1. ลงทะเบียน Service Worker (จำเป็นสำหรับ PWA)
+    // 1. ลงทะเบียน Service Worker (Production only)
+    // บน localhost ปิด Service Worker และล้าง cache อัตโนมัติ เพื่อไม่ให้ cache เก่ารบกวนการพัฒนา
     if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
-                .then(registration => console.log('ServiceWorker ใช้งานได้! Scope: ', registration.scope))
-                .catch(err => console.log('ServiceWorker ใช้งานไม่ได้: ', err));
+        window.addEventListener('load', async () => {
+            const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+            if (isLocalDev) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(registration => registration.unregister()));
+
+                    if ('caches' in window) {
+                        const cacheNames = await caches.keys();
+                        await Promise.all(
+                            cacheNames
+                                .filter(name => name.toLowerCase().startsWith('roster'))
+                                .map(name => caches.delete(name))
+                        );
+                    }
+
+                    console.info('Roster Pro dev mode: Service Worker และ cache เก่าถูกปิดบน localhost');
+                } catch (err) {
+                    console.warn('ไม่สามารถล้าง Service Worker ในโหมดพัฒนาได้:', err);
+                }
+                return;
+            }
+
+            navigator.serviceWorker.register('sw.js?v=6', { updateViaCache: 'none' })
+                .then(registration => registration.update())
+                .then(() => console.log('ServiceWorker ใช้งานได้'))
+                .catch(err => console.log('ServiceWorker ใช้งานไม่ได้:', err));
         });
     }
 
