@@ -1,10 +1,10 @@
 <?php
 // ที่อยู่ไฟล์: index.php (ไฟล์นอกสุดของโปรเจกต์)
 
+require_once 'config/security.php';
+
 // 🌟 1. เริ่มต้น Session และตั้งค่าพื้นฐาน
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+security_start_session();
 
 date_default_timezone_set('Asia/Bangkok');
 
