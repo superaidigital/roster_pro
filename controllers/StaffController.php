@@ -206,10 +206,10 @@ class StaffController {
     public function delete() {
         $this->requireMutation();
         $this->checkAuth();
-        if (isset($_GET['id'])) {
+        if (isset($_POST['id'])) {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
-            $id = $_GET['id'];
+            $id = $_POST['id'];
             $current_role = strtoupper($_SESSION['user']['role']);
             $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR']);
 
@@ -291,11 +291,11 @@ class StaffController {
     public function toggle() {
         $this->requireMutation();
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['status'])) {
+        if (isset($_POST['id']) && isset($_POST['status'])) {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
-            $id = $_GET['id'];
-            $status = (int)$_GET['status'];
+            $id = $_POST['id'];
+            $status = (int)$_POST['status'];
             
             $current_role = strtoupper($_SESSION['user']['role']);
             $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR']);
