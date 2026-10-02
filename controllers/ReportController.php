@@ -393,7 +393,7 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
 
         // 1. ดึงข้อมูลประวัติการลาหยุด
         $sql = "SELECT lr.*, u.name as user_name, u.type as user_type, h.name as hospital_name, lq.leave_type,
-                       DATEDIFF(lr.end_date, lr.start_date) + 1 as leave_days
+                       lr.num_days as leave_days
                 FROM leave_requests lr
                 JOIN users u ON lr.user_id = u.id
                 JOIN hospitals h ON u.hospital_id = h.id
