@@ -228,6 +228,77 @@ foreach($hospitals_list as $h) {
     }
 </style>
 
+<style>
+/* Users Existing Markup Fallback */
+.users-page > .card.card-modern.mb-4 {
+    background:#fff;
+    border:1px solid #e7edf5;
+    border-radius:20px;
+    box-shadow:0 10px 28px rgba(15,23,42,.045);
+    margin-bottom:18px;
+    overflow:visible;
+}
+.users-page > .card.card-modern.mb-4 > .card-body { padding:16px; }
+.users-page > .card.card-modern.mb-4 .row {
+    display:grid;
+    grid-template-columns:minmax(260px,1.6fr) minmax(220px,1.25fr) minmax(145px,.75fr) minmax(170px,.9fr) 48px;
+    gap:10px;
+    align-items:center;
+}
+.users-page > .card.card-modern.mb-4 [class*="col-"],
+.users-page > .card.card-modern.mb-4 [class*="col-md-"] {
+    width:auto !important;
+    max-width:none !important;
+    padding:0 !important;
+}
+.users-page .input-group { display:flex; width:100%; min-height:42px; }
+.users-page .input-group-text {
+    display:flex; align-items:center; padding:0 0 0 14px;
+    border:1px solid #dbe2ea; border-right:0;
+    border-radius:11px 0 0 11px; background:#fff; color:#94a3b8;
+}
+.users-page .input-group .form-control { border-left:0; border-radius:0 11px 11px 0; }
+.users-page .card-modern {
+    background:#fff; border:1px solid #e7edf5; border-radius:20px;
+    box-shadow:0 10px 28px rgba(15,23,42,.045);
+}
+.users-page .card-header {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:16px 18px; border-bottom:1px solid #edf2f7; background:#fff;
+}
+.users-page .table-responsive { padding:0 14px 10px !important; }
+.users-page .bg-primary.bg-opacity-10.rounded-circle {
+    width:52px !important; height:52px !important; border-radius:16px !important;
+    background:#eff6ff !important; border:1px solid #dbeafe; color:#2563eb !important;
+}
+.users-page .btn { font-weight:600; box-shadow:none !important; transition:.18s ease; }
+.users-page .btn:hover { transform:translateY(-1px); }
+.users-page .form-select, .users-page .form-control {
+    min-height:42px; border-radius:11px; border:1px solid #dbe2ea; background:#fff;
+}
+.users-page .select2-container { width:100% !important; }
+.users-page .dataTables_wrapper { width:100%; overflow:visible; }
+.users-page .dataTables_wrapper .bottom {
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between;
+    gap:10px; padding:4px 4px 0;
+}
+.users-page .dataTables_wrapper .dataTables_length select {
+    min-width:70px; min-height:34px; border:1px solid #dbe2ea;
+    border-radius:9px; background:#fff;
+}
+.users-page .dataTables_wrapper .dataTables_paginate { display:flex; align-items:center; }
+.users-page .dataTables_wrapper .dataTables_paginate .paginate_button {
+    display:inline-flex !important; align-items:center; justify-content:center;
+}
+@media (max-width:1100px) {
+    .users-page > .card.card-modern.mb-4 .row { grid-template-columns:1fr 1fr; }
+}
+@media (max-width:767.98px) {
+    .users-page > .card.card-modern.mb-4 .row { grid-template-columns:1fr; }
+    .users-page .card-header { align-items:flex-start; flex-direction:column; }
+}
+</style>
+
 <div class="container-fluid px-3 px-md-4 py-4 users-page">
 
     <!-- Header Section -->
