@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/LeaveController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/LeaveModel.php';
 require_once 'models/UserModel.php';
 require_once 'models/HolidayModel.php';
@@ -56,8 +57,8 @@ class LeaveController {
                 "Authorization: Bearer " . $line_token
             ]);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             $result = curl_exec($ch);
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -116,6 +117,7 @@ class LeaveController {
     // 🌟 ส่งคำขอลา (Submit Leave Request)
     // ==========================================
     public function request() {
+        $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
             $this->autoPatchDatabase($db); 
@@ -305,6 +307,7 @@ class LeaveController {
     // 🌟 ยกเลิกใบลา (ปรับปรุง: ลบทิ้งเพื่อล้างประวัติ)
     // ==========================================
     public function cancel() {
+        $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_id'])) {
             $db = (new Database())->getConnection();
             $this->autoPatchDatabase($db);
@@ -395,6 +398,7 @@ class LeaveController {
 
     // 🌟 ประมวลผลการอนุมัติ (รวมถึงการอนุมัติให้ยกเลิก)
     public function process_approval() {
+        $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && isset($_POST['request_id'])) {
             $db = (new Database())->getConnection(); 
             $this->autoPatchDatabase($db);
@@ -485,6 +489,7 @@ class LeaveController {
         
         // 🌟 แก้ไข: ดึงข้อมูลพนักงานที่แก้ไขจากฐานข้อมูล (ป้องกันบัคเปลี่ยนคนตอนบันทึก)
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'update_balance') {
+            $this->requireMutation();
             $stmt_bal = $db->prepare("SELECT user_id, budget_year FROM leave_balances WHERE id = ?");
             $stmt_bal->execute([$_POST['balance_id']]);
             $bal = $stmt_bal->fetch(PDO::FETCH_ASSOC);
@@ -561,6 +566,7 @@ class LeaveController {
     }
 
     public function save_balance() {
+        $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_SESSION['user'])) {
             $db = (new Database())->getConnection(); 
             $leaveModel = new LeaveModel($db);
@@ -601,6 +607,7 @@ class LeaveController {
     // 🌟 3. ประมวลผลตัดยอดวันลาพักผ่อนปีงบประมาณใหม่
     // ==========================================
     public function process_new_year() {
+        $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_SESSION['user'])) {
             $db = (new Database())->getConnection();
             $leaveModel = new LeaveModel($db);
