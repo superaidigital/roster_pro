@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/NotificationController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/NotificationModel.php';
 
 class NotificationController {
@@ -9,9 +10,7 @@ class NotificationController {
     private $notifModel;
 
     public function __construct() {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        security_start_session();
 
         // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน (ต้องล็อกอินก่อน)
         if (!isset($_SESSION['user'])) {
