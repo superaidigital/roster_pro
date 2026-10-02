@@ -314,7 +314,8 @@ if (!empty($hospital_ids)) {
                                     <?php if (!empty($h['phone'])): ?>
                                         <a href="tel:<?= htmlspecialchars($h['phone']) ?>" class="text-decoration-none text-dark fw-medium">
                                             <i class="bi bi-telephone-fill text-success me-1 opacity-75"></i> <?= htmlspecialchars($h['phone']) ?>
-                                        </a>
+                                        </button>
+                                            </form>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
@@ -332,7 +333,10 @@ if (!empty($hospital_ids)) {
                                     <?php endif; ?>
                                     
                                     <?php if($isAdmin): ?>
-                                        <a href="index.php?c=hospitals&a=delete&id=<?= urlencode($h['id']) ?>" class="btn-action bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" title="ลบ" onclick="return confirm('คำเตือน: ยืนยันการลบ <?= htmlspecialchars($h['name'], ENT_QUOTES) ?> ?\n\n(ลบแบบ Soft Delete จะไม่สามารถกู้คืนได้เอง)');">
+                                        <form action="index.php?c=hospitals&a=delete" method="POST" class="d-inline" onsubmit="return confirm('คำเตือน: ยืนยันการลบ <?= htmlspecialchars($h['name'], ENT_QUOTES) ?> ?');">
+                                                <?= security_csrf_input() ?>
+                                                <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+                                                <button type="submit" class="btn-action bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" title="ลบ">
                                             <i class="bi bi-trash-fill"></i>
                                         </a>
                                     <?php elseif(!$canEdit): ?>
