@@ -57,11 +57,181 @@ foreach($hospitals_list as $h) {
     /* ซ่อน Search bar เดิมของ DataTables เพราะเราใช้กล่องค้นหาด้านบนแทน */
     .dataTables_filter { display: none; }
 </style>
+<style>
+    /* Users Management UI v2 */
+    .users-page {
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+    .users-hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 22px 24px;
+        margin-bottom: 18px;
+        background:
+            linear-gradient(135deg, rgba(37,99,235,.08), rgba(14,165,233,.04)),
+            #fff;
+        border: 1px solid #e7edf5;
+        border-radius: 20px;
+        box-shadow: 0 12px 32px rgba(15,23,42,.05);
+    }
+    .users-hero__identity {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 0;
+    }
+    .users-hero__icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #2563eb;
+        background: #eff6ff;
+        border: 1px solid #dbeafe;
+        flex: 0 0 auto;
+    }
+    .users-hero h2 { margin: 0; font-size: 1.35rem; letter-spacing: -.02em; }
+    .users-hero p { margin: 3px 0 0; color: #64748b; font-size: .88rem; }
+    .users-hero__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .users-filter-card,
+    .users-table-card {
+        border: 1px solid #e7edf5;
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 10px 28px rgba(15,23,42,.045);
+    }
+    .users-filter-card { padding: 16px; margin-bottom: 18px; }
+    .users-filter-grid {
+        display: grid;
+        grid-template-columns: minmax(240px, 1.6fr) minmax(220px, 1.25fr) minmax(150px, .8fr) minmax(170px, .9fr) 46px;
+        gap: 10px;
+        align-items: center;
+    }
+    .users-search {
+        position: relative;
+    }
+    .users-search i {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        pointer-events: none;
+    }
+    .users-search input { padding-left: 42px; }
+    .users-table-card { overflow: hidden; }
+    .users-table-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 18px;
+        border-bottom: 1px solid #edf2f7;
+    }
+    .users-table-toolbar h6 { margin: 0; }
+    .users-table-scroll { overflow-x: auto; padding: 0 14px 10px; }
+    #usersTable { min-width: 1080px !important; margin: 0; }
+    #usersTable thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: .78rem;
+        letter-spacing: .01em;
+        color: #64748b;
+        white-space: nowrap;
+    }
+    #usersTable tbody tr { transition: background .18s ease, transform .18s ease; }
+    #usersTable tbody tr:hover td { background: #fbfdff; }
+    #usersTable td { vertical-align: middle; }
+    .avatar-circle {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        font-size: .95rem;
+        flex: 0 0 42px;
+    }
+    .drag-handle {
+        display: inline-flex;
+        width: 34px;
+        height: 34px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+    .btn-action {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 11px !important;
+    }
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate {
+        padding: 12px 4px;
+        color: #64748b;
+        font-size: .82rem;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        min-width: 34px;
+        height: 34px;
+        padding: 6px 10px !important;
+        border-radius: 9px !important;
+        border: 1px solid #e2e8f0 !important;
+        background: #fff !important;
+        margin: 0 2px;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: #2563eb !important;
+        border-color: #2563eb !important;
+        color: #fff !important;
+    }
+    .dataTables_empty {
+        padding: 48px 16px !important;
+        color: #64748b !important;
+        text-align: center !important;
+        font-weight: 600;
+    }
+    .modal-content {
+        border-radius: 22px !important;
+        overflow: hidden;
+    }
+    .modal-header { background: linear-gradient(180deg,#fff,#fbfdff); }
+    .select2-container .select2-selection--single {
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+    }
+    @media (max-width: 1100px) {
+        .users-filter-grid { grid-template-columns: 1fr 1fr; }
+        .users-filter-grid > :last-child { width: 46px; }
+    }
+    @media (max-width: 767.98px) {
+        .users-page { padding: 0 !important; }
+        .users-hero { align-items: flex-start; flex-direction: column; padding: 16px; border-radius: 16px; }
+        .users-hero__actions { width: 100%; }
+        .users-hero__actions .btn { flex: 1 1 auto; }
+        .users-filter-card { padding: 12px; border-radius: 16px; }
+        .users-filter-grid { grid-template-columns: 1fr; }
+        .users-filter-grid > :last-child { width: 100%; }
+        .users-table-card { border-radius: 16px; }
+        .users-table-toolbar { align-items: flex-start; flex-direction: column; }
+        .users-table-scroll { padding: 0 8px 8px; }
+    }
+</style>
 
-<div class="container-fluid px-3 px-md-4 py-4">
+<div class="container-fluid px-3 px-md-4 py-4 users-page">
 
     <!-- Header Section -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div class="users-hero">
         <div class="d-flex align-items-center gap-3">
             <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width: 50px; height: 50px;">
                 <i class="bi bi-person-lines-fill fs-4"></i>
@@ -71,7 +241,7 @@ foreach($hospitals_list as $h) {
                 <p class="text-muted mb-0" style="font-size: 13px;">รายชื่อบุคลากรทั้งหมดภายใต้การกำกับดูแลของคุณ</p>
             </div>
         </div>
-        <div class="d-flex gap-2 flex-wrap">
+        <div class="users-hero__actions">
             <!-- ปุ่มลบหลายรายการ -->
             <button class="btn btn-danger fw-bold rounded-pill shadow-sm px-4 d-none" id="btn-bulk-delete" onclick="bulkDelete()">
                 <i class="bi bi-trash me-1"></i> ลบที่เลือก (<span id="selected-count">0</span>)
@@ -88,13 +258,13 @@ foreach($hospitals_list as $h) {
     <!-- Alert Messages -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars($_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
@@ -148,12 +318,12 @@ foreach($hospitals_list as $h) {
     </div>
 
     <!-- Main Data Card -->
-    <div class="card card-modern overflow-hidden">
-        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+    <div class="users-table-card">
+        <div class="users-table-toolbar">
             <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-list-stars text-primary me-2"></i>ทำเนียบบุคลากร</h6>
             <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill shadow-sm"><i class="bi bi-grip-vertical"></i> ลากที่ไอคอนเพื่อสลับตำแหน่ง</span>
         </div>
-        <div class="table-responsive p-3">
+        <div class="users-table-scroll">
             <table id="usersTable" class="table table-modern mb-0" style="min-width: 1100px;">
                 <thead>
                     <tr>
