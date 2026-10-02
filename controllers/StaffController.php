@@ -2,6 +2,7 @@
 // ไฟล์: controllers/StaffController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/UserModel.php';
 require_once 'models/HospitalModel.php';
 require_once 'models/PayRateModel.php';
@@ -9,9 +10,18 @@ require_once 'controllers/LogsController.php';
 
 class StaffController {
     
+    private function requireMutation() {
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+    }
+
     // ตรวจสอบสิทธิ์ (SCHEDULER ขึ้นไปสามารถใช้งานส่วนนี้ได้)
     private function checkAuth() {
-        if (session_status() === PHP_SESSION_NONE) session_start();
+        security_start_session();
         if (!isset($_SESSION['user'])) {
             header("Location: index.php?c=auth&a=login");
             exit;
@@ -51,6 +61,7 @@ class StaffController {
     
     // เพิ่มบุคลากร
     public function add() {
+        $this->requireMutation();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
@@ -109,6 +120,7 @@ class StaffController {
 
     // 🌟 แก้ไขบุคลากร (ปรับปรุงสิทธิ์การเข้าถึงให้ ผอ.)
     public function edit() {
+        $this->requireMutation();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
@@ -192,6 +204,7 @@ class StaffController {
 
     // ลบเดี่ยว
     public function delete() {
+        $this->requireMutation();
         $this->checkAuth();
         if (isset($_GET['id'])) {
             $db = (new Database())->getConnection();
@@ -234,6 +247,7 @@ class StaffController {
 
     // ลบหลายรายการ
     public function bulk_delete() {
+        $this->requireMutation();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = (new Database())->getConnection();
@@ -275,6 +289,7 @@ class StaffController {
 
     // เปิด/ปิด การใช้งาน (บัญชี)
     public function toggle() {
+        $this->requireMutation();
         $this->checkAuth();
         if (isset($_GET['id']) && isset($_GET['status'])) {
             $db = (new Database())->getConnection();
@@ -314,6 +329,7 @@ class StaffController {
 
     // 🌟 ฟังก์ชันใหม่: เปิด/ปิด การแสดงชื่อในตารางเวร (Show in Roster)
     public function toggle_roster_status() {
+        $this->requireMutation();
         $this->checkAuth();
         header('Content-Type: application/json');
 
@@ -349,6 +365,7 @@ class StaffController {
 
     // อัปเดตลำดับลากวาง
     public function update_order() {
+        $this->requireMutation();
         $this->checkAuth();
         header('Content-Type: application/json');
         
@@ -398,6 +415,7 @@ class StaffController {
 
     // นำเข้า CSV
     public function import() {
+        $this->requireMutation();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['import_file'])) {
             $db = (new Database())->getConnection();
@@ -492,6 +510,7 @@ class StaffController {
     // 🌟 ฟังก์ชันใหม่: บันทึกลายเซ็นอิเล็กทรอนิกส์ (E-Signature)
     // ==========================================
     public function save_signature() {
+        $this->requireMutation();
         $this->checkAuth();
         header('Content-Type: application/json');
 
