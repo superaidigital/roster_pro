@@ -17,7 +17,7 @@ class Database {
         try {
             // 🌟 1. กำหนด DSN พร้อมระบุ charset=utf8mb4 
             // (utf8mb4 ปลอดภัยและรองรับอักขระพิเศษ/อีโมจิได้ดีกว่า utf8 ธรรมดา)
-            $dsn = "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4";
+            $dsn = "mysql:host=" . $this->host . ";port=" . $this->port . ";dbname=" . $this->db_name . ";charset=utf8mb4";
             
             // 🌟 2. กำหนด Options พื้นฐานสำหรับ PDO
             $options = [
@@ -31,7 +31,8 @@ class Database {
             
             // 🌟 3. บังคับ Timezone ของ Database ให้เป็นเวลาประเทศไทย (+07:00) เสมอ
             // สำคัญมากสำหรับระบบตารางเวรและการบันทึก created_at ในตาราง Logs
-            $this->conn->exec("SET time_zone = '+07:00'");
+            $tzStmt = $this->conn->prepare("SET time_zone = ?");
+            $tzStmt->execute([$this->timezone]);
 
         } catch(PDOException $exception) {
             // 🌟 4. ความปลอดภัย (Security Focus)
