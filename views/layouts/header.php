@@ -11,6 +11,12 @@ $app_subtitle = "ระบบจัดการตารางปฏิบัต
 // 🛑 ดึงตั้งค่าระบบจากฐานข้อมูล และตรวจสอบ Maintenance Mode
 // ========================================================
 require_once 'config/database.php';
+
+// 🌟 นำเข้า LogsController เพื่อเก็บบันทึกประวัติกรณีถูกบังคับเตะออกจากระบบ
+if (file_exists('controllers/LogsController.php')) {
+    require_once 'controllers/LogsController.php';
+}
+
 try {
     $db_check = (new Database())->getConnection();
     
@@ -34,9 +40,17 @@ try {
     // 🚨 ตรวจสอบโหมดปิดปรับปรุงระบบ และ สถานะการระงับบัญชี (เฉพาะเมื่อมีการล็อกอิน)
     if (isset($_SESSION['user'])) {
         
+        $current_user_id = $_SESSION['user']['id'];
+        
         // 1. เช็ค Maintenance Mode
         $is_maintenance = $sys_settings['maintenance_mode'] ?? '0';
         if ($is_maintenance === '1' && !in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) {
+            
+            // 📝 บันทึก Log ก่อนล้าง Session
+            if (class_exists('LogsController')) {
+                LogsController::addLog($db_check, $current_user_id, 'LOGOUT', "ถูกบังคับออกจากระบบ (เข้าสู่ Maintenance Mode)");
+            }
+            
             session_unset();
             session_destroy();
             session_start(); 
@@ -48,11 +62,17 @@ try {
         // 2. 🌟 เช็คสถานะการระงับบัญชี (is_active) แบบ Real-time
         try {
             $stmt_status = $db_check->prepare("SELECT is_active FROM users WHERE id = ?");
-            $stmt_status->execute([$_SESSION['user']['id']]);
+            $stmt_status->execute([$current_user_id]);
             $user_status = $stmt_status->fetchColumn();
 
             // ถ้ายูสเซอร์ถูกลบ หรือ is_active กลายเป็น 0 ให้ทำลาย Session ทิ้ง (เตะออก)
             if ($user_status === false || $user_status == '0') {
+                
+                // 📝 บันทึก Log ก่อนล้าง Session
+                if (class_exists('LogsController')) {
+                    LogsController::addLog($db_check, $current_user_id, 'LOGOUT', "ถูกบังคับออกจากระบบ (บัญชีถูกระงับหรือลบออกจากฐานข้อมูล)");
+                }
+                
                 session_unset();
                 session_destroy();
                 session_start(); 
@@ -353,6 +373,17 @@ if (isset($_SESSION['user'])) {
     // ==========================================
     // 🌟 PWA & Notifications & DOM Setup
     // ==========================================
+    
+    // 1. ลงทะเบียน Service Worker (จำเป็นสำหรับ PWA)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(registration => console.log('ServiceWorker ใช้งานได้! Scope: ', registration.scope))
+                .catch(err => console.log('ServiceWorker ใช้งานไม่ได้: ', err));
+        });
+    }
+
+    // 2. จัดการหน้าต่าง Install PWA
     let deferredPrompt;
 
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -390,6 +421,7 @@ if (isset($_SESSION['user'])) {
         }
     });
 
+    // 3. ระบบเช็คการแจ้งเตือน Real-time
     <?php if(isset($_SESSION['user'])): ?>
     function checkNewNotifications() {
         fetch('index.php?c=ajax&a=check_new_notif').then(res => res.json()).then(data => {

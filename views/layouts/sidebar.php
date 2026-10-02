@@ -20,7 +20,7 @@ try {
         // 1. เช็คสถานะการเปิด/ปิดเมนู (รองรับชื่อคอลัมน์หลายแบบ)
         $is_active = $menu['is_active'] ?? $menu['status'] ?? $menu['active'] ?? 1;
         if ($is_active == 0 || $is_active === '0') {
-            continue; // ถ้าเมนูปิดอยู่ ข้ามไปเลย
+            continue; 
         }
 
         // 2. ตรวจสอบสิทธิ์ (Role)
@@ -52,15 +52,18 @@ try {
             if (strpos($name, 'ตาราง') !== false || strpos($name, 'ปฏิบัติงาน') !== false) $allowed_controllers[] = 'roster';
             if (strpos($name, 'ติดตาม') !== false || strpos($name, 'ส่งเวร') !== false) $allowed_controllers[] = 'report';
             if (strpos($name, 'ประวัติ') !== false && strpos($name, 'ใช้งาน') !== false) $allowed_controllers[] = 'logs';
+            if (strpos($name, 'HR') !== false || strpos($name, 'บุคคล') !== false) $allowed_controllers[] = 'hr';
         }
     }
 } catch (Exception $e) {
     // Fallback: หากตารางระบบเมนูมีปัญหา ให้โหลดสิทธิ์พื้นฐาน
     error_log("Sidebar Menu Query Error: " . $e->getMessage());
     if (in_array($role, ['SUPERADMIN', 'ADMIN'])) {
-        $allowed_controllers = ['roster', 'report', 'leave', 'staff', 'users', 'settings', 'logs', 'hospitals'];
+        $allowed_controllers = ['roster', 'report', 'leave', 'staff', 'users', 'settings', 'logs', 'hospitals', 'hr'];
+    } else if ($role === 'HR') {
+        $allowed_controllers = ['staff', 'users', 'hr'];
     } else if ($role === 'DIRECTOR') {
-        $allowed_controllers = ['roster', 'report', 'leave', 'staff', 'settings'];
+        $allowed_controllers = ['roster', 'report', 'leave', 'staff', 'settings', 'hr'];
     } else if ($role === 'SCHEDULER') {
         $allowed_controllers = ['roster', 'report', 'leave', 'staff'];
     } else {
@@ -68,11 +71,18 @@ try {
     }
 }
 
-// กำจัดชื่อ Controller ที่ซ้ำกัน
 $allowed_controllers = array_unique($allowed_controllers);
 
-// อนุญาตให้เข้าถึงหน้าพื้นฐานเสมอ (ป้องกันการโดน Lockout)
-$allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile']);
+// 🌟 HARDCODE OVERRIDE: จัดการสิทธิ์ HR ให้แน่ชัด
+if ($role === 'HR') {
+    // 🌟 HR จะไม่ได้รับอนุญาตให้เข้าถึงหน้าหลัก 'dashboard' ปกติ
+    $allowed_controllers = ['staff', 'users', 'hr', 'profile'];
+} else {
+    // ตำแหน่งอื่น อนุญาตให้เข้าถึงหน้าพื้นฐานเสมอ
+    $allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile']);
+}
+
+$allowed_controllers = array_unique($allowed_controllers);
 ?>
 
 <style>
@@ -96,7 +106,8 @@ $allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile'
     #desktopSidebar.collapsed .nav-link i { margin-right: 0 !important; font-size: 1.4rem !important; }
     
     /* ซ่อนเมนูย่อยเวลาพับ Sidebar */
-    #desktopSidebar.collapsed .leave-dropdown-container ul { display: none !important; }
+    #desktopSidebar.collapsed .leave-dropdown-container ul,
+    #desktopSidebar.collapsed .hr-dropdown-container ul { display: none !important; }
 
     .sidebar-menu { list-style: none; padding: 15px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
     .nav-link { 
@@ -134,7 +145,8 @@ if (!function_exists('renderSidebarMenu')) {
         ?>
         <ul class="sidebar-menu">
             
-            <!-- 🌟 หมวดหมู่: แดชบอร์ดสถิติ -->
+            <!-- 🌟 ซ่อนเมนูหน้าหลักและปฏิทินเวร สำหรับ HR 🌟 -->
+            <?php if ($role !== 'HR'): ?>
             <li class="sidebar-heading">แดชบอร์ดสถิติ</li>
             <li class="nav-item">
                 <a class="nav-link <?= ($c == 'dashboard') ? 'active' : '' ?>" href="index.php?c=dashboard">
@@ -146,10 +158,11 @@ if (!function_exists('renderSidebarMenu')) {
                     <i class="bi bi-calendar-heart-fill text-danger"></i> <span class="sidebar-text">ปฏิทินเวรของฉัน</span>
                 </a>
             </li>
+            <?php endif; ?>
 
             <!-- 🌟 หมวดหมู่: การปฏิบัติงาน -->
             <?php if (in_array('roster', $allowed_controllers) || in_array('report', $allowed_controllers) || in_array('leave', $allowed_controllers)): ?>
-            <li class="sidebar-heading mt-2">การปฏิบัติงาน</li>
+            <li class="sidebar-heading <?= $role === 'HR' ? '' : 'mt-2' ?>">การปฏิบัติงาน</li>
             
                 <?php if (in_array('roster', $allowed_controllers)): ?>
                 <li class="nav-item">
@@ -159,7 +172,7 @@ if (!function_exists('renderSidebarMenu')) {
                 </li>
                 <?php endif; ?>
 
-                <?php if (in_array('report', $allowed_controllers) || in_array($role, ['SUPERADMIN', 'ADMIN', 'DIRECTOR', 'SCHEDULER'])): ?>
+                <?php if (in_array('report', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'report' && $a == 'overview') ? 'active' : '' ?>" href="index.php?c=report&a=overview">
                         <i class="bi bi-bar-chart-line-fill text-success"></i> <span class="sidebar-text">ติดตามการส่งเวร</span>
@@ -171,7 +184,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('leave', $allowed_controllers)): ?>
                 <li class="nav-item leave-dropdown-container">
                     <a class="nav-link <?= ($c == 'leave') ? '' : 'collapsed' ?> d-flex justify-content-between align-items-center" 
-                       data-bs-toggle="collapse" href="#leaveMenu" role="button" aria-expanded="<?= ($c == 'leave') ? 'true' : 'false' ?>">
+                        data-bs-toggle="collapse" href="#leaveMenu" role="button" aria-expanded="<?= ($c == 'leave') ? 'true' : 'false' ?>">
                         <div><i class="bi bi-envelope-paper-fill text-warning"></i> <span class="sidebar-text">ระบบจัดการวันลา</span></div>
                         <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
                     </a>
@@ -197,7 +210,7 @@ if (!function_exists('renderSidebarMenu')) {
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link submenu-item <?= ($c == 'leave' && $a == 'balances') ? 'active' : '' ?>" href="index.php?c=leave&a=balances">
-                                        จัดการวันลาสะสม (พักผ่อน)
+                                        จัดการวันลาสะสม
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -220,8 +233,8 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php endif; ?>
             <?php endif; ?>
 
-            <!-- 🌟 หมวดหมู่: การจัดการภายใน -->
-            <?php if (in_array('staff', $allowed_controllers) || in_array('users', $allowed_controllers)): ?>
+            <!-- 🌟 หมวดหมู่: การจัดการภายใน (รวมระบบ HR ไว้ที่นี่) -->
+            <?php if (in_array('staff', $allowed_controllers) || in_array('users', $allowed_controllers) || in_array('hr', $allowed_controllers)): ?>
             <li class="sidebar-heading mt-2">การจัดการภายใน</li>
                 
                 <?php if (in_array('staff', $allowed_controllers)): ?>
@@ -239,6 +252,42 @@ if (!function_exists('renderSidebarMenu')) {
                     </a>
                 </li>
                 <?php endif; ?>
+
+                <!-- 🌟 ระบบ HR (แบบมี Dropdown) -->
+                <?php if (in_array('hr', $allowed_controllers)): ?>
+                <li class="nav-item hr-dropdown-container">
+                    <a class="nav-link <?= ($c == 'hr') ? '' : 'collapsed' ?> d-flex justify-content-between align-items-center" 
+                        data-bs-toggle="collapse" href="#hrMenu" role="button" aria-expanded="<?= ($c == 'hr') ? 'true' : 'false' ?>">
+                        <div><i class="bi bi-person-bounding-box text-danger"></i> <span class="sidebar-text">ระบบงานบุคคล (HR)</span></div>
+                        <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
+                    </a>
+                    <div class="collapse <?= ($c == 'hr') ? 'show' : '' ?>" id="hrMenu">
+                        <ul class="sidebar-menu pb-0 mt-1 mb-2 p-0 position-relative" style="gap: 2px;">
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'hr' && $a == 'dashboard') ? 'active' : '' ?>" href="index.php?c=hr&a=dashboard">
+                                    แดชบอร์ดฝ่ายบุคคล
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'hr' && $a == 'payroll') ? 'active' : '' ?>" href="index.php?c=hr&a=payroll">
+                                    รายงานค่าตอบแทน
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'hr' && $a == 'inactive') ? 'active' : '' ?>" href="index.php?c=hr&a=inactive">
+                                    ทำเนียบผู้พ้นสภาพ
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'hr' && $a == 'completeness') ? 'active' : '' ?>" href="index.php?c=hr&a=completeness">
+                                    ตรวจสอบข้อมูล
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <?php endif; ?>
+
             <?php endif; ?>
 
             <!-- 🌟 หมวดหมู่: ระบบส่วนกลาง -->
@@ -333,16 +382,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // บันทึกสถานะลงใน Browser
             if (desktopSidebar.classList.contains('collapsed')) {
                 localStorage.setItem('sidebarState', 'collapsed');
+                
                 // สั่งปิดเมนู Dropdown อัตโนมัติเวลาพับ Sidebar
-                const leaveMenu = document.getElementById('leaveMenu');
-                if(leaveMenu && leaveMenu.classList.contains('show')) {
-                    const bsCollapse = new bootstrap.Collapse(leaveMenu, {toggle: false});
-                    bsCollapse.hide();
-                    
-                    // ปรับสถานะลูกศร
-                    const leaveBtn = document.querySelector('[href="#leaveMenu"]');
-                    if(leaveBtn) leaveBtn.setAttribute('aria-expanded', 'false');
-                }
+                const menusToCollapse = ['leaveMenu', 'hrMenu'];
+                menusToCollapse.forEach(menuId => {
+                    const menuElement = document.getElementById(menuId);
+                    if(menuElement && menuElement.classList.contains('show')) {
+                        const bsCollapse = new bootstrap.Collapse(menuElement, {toggle: false});
+                        bsCollapse.hide();
+                        const menuBtn = document.querySelector(`[href="#${menuId}"]`);
+                        if(menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
+                    }
+                });
+
             } else {
                 localStorage.setItem('sidebarState', 'expanded');
             }
