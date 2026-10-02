@@ -623,7 +623,7 @@ class SettingsController {
 
         // ดึงรายการไฟล์ Backup ที่อยู่ในเซิร์ฟเวอร์
         $server_backups = [];
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = 'storage/backups/';
         if (is_dir($backup_dir)) {
             $files = scandir($backup_dir);
             foreach ($files as $file) {
@@ -633,8 +633,7 @@ class SettingsController {
                         'filename' => $file,
                         'size' => round(filesize($filepath) / 1024, 2), // KB
                         'date' => date("d/m/Y H:i:s", filemtime($filepath)),
-                        'path' => $filepath
-                    ];
+                        ];
                 }
             }
             // เรียงจากใหม่ไปเก่า
@@ -743,11 +742,11 @@ class SettingsController {
         ini_set('memory_limit', '256M');
 
         $db = (new Database())->getConnection();
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = 'storage/backups/';
 
         try {
             if (!is_dir($backup_dir)) {
-                mkdir($backup_dir, 0777, true);
+                mkdir($backup_dir, 0700, true);
             }
 
             $sqlScript = $this->generateSqlScript($db);
@@ -761,7 +760,7 @@ class SettingsController {
                 LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "สำรองข้อมูลจัดเก็บลงเซิร์ฟเวอร์ ({$backup_file_name})");
                 $_SESSION['success_msg'] = "บันทึกไฟล์สำรองข้อมูลลงเซิร์ฟเวอร์เรียบร้อยแล้ว";
             } else {
-                $_SESSION['error_msg'] = "ไม่สามารถเขียนไฟล์ลงในโฟลเดอร์ public/uploads/Backup/ ได้ โปรดตรวจสอบ Permission (CHMOD 777)";
+                $_SESSION['error_msg'] = "ไม่สามารถเขียนไฟล์ลงในโฟลเดอร์ storage/backups/ ได้ โปรดตรวจสอบ Permission";
             }
 
         } catch (Exception $e) {
@@ -772,12 +771,33 @@ class SettingsController {
         exit;
     }
 
+    public function download_server_backup() {
+        $this->requireAccess(['SUPERADMIN']);
+        $filename = basename((string)($_GET['file'] ?? ''));
+        $filepath = 'storage/backups/' . $filename;
+
+        if ($filename === '' || !is_file($filepath) || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) !== 'sql') {
+            http_response_code(404);
+            exit('Backup file not found.');
+        }
+
+        $db = (new Database())->getConnection();
+        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "ดาวน์โหลดไฟล์สำรองข้อมูลในเซิร์ฟเวอร์ ({$filename})");
+
+        header('Content-Type: application/sql');
+        header('Content-Disposition: attachment; filename="' . rawurlencode($filename) . '"');
+        header('Content-Length: ' . filesize($filepath));
+        header('X-Content-Type-Options: nosniff');
+        readfile($filepath);
+        exit;
+    }
+
     // ฟังก์ชันใหม่: ลบไฟล์ Backup ใน Server
     public function delete_server_backup() {
         $this->requirePost();
         $this->requireAccess(['SUPERADMIN']);
         $filename = $_POST['file'] ?? '';
-        $filepath = 'public/uploads/Backup/' . basename($filename);
+        $filepath = 'storage/backups/' . basename($filename);
 
         if (!empty($filename) && file_exists($filepath)) {
             unlink($filepath);
@@ -795,10 +815,10 @@ class SettingsController {
 
     // ฟังก์ชันใหม่: URL สำหรับให้ Cron Job เรียกใช้งาน (ไม่ต้อง Login)
     public function cron_monthly_backup() {
-        $secret_key = "ROSTER_PRO_CRON_2026"; 
+        $secret_key = (string)(getenv('ROSTER_CRON_KEY') ?: ''); 
         $provided_key = $_GET['key'] ?? '';
 
-        if ($provided_key !== $secret_key) {
+        if ($secret_key === '' || !hash_equals($secret_key, (string)$provided_key)) {
             die("Access Denied: Invalid Cron Key.");
         }
 
@@ -806,11 +826,11 @@ class SettingsController {
         ini_set('memory_limit', '256M');
 
         $db = (new Database())->getConnection();
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = 'storage/backups/';
 
         try {
             if (!is_dir($backup_dir)) {
-                mkdir($backup_dir, 0777, true);
+                mkdir($backup_dir, 0700, true);
             }
 
             // เช็คว่าเดือนนี้มีไฟล์แล้วหรือยัง
