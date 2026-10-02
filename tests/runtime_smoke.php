@@ -1,0 +1,120 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../models/UserModel.php';
+require_once __DIR__ . '/../models/ShiftModel.php';
+require_once __DIR__ . '/../models/SwapModel.php';
+require_once __DIR__ . '/../models/LeaveModel.php';
+require_once __DIR__ . '/../models/NotificationModel.php';
+require_once __DIR__ . '/../models/RosterModel.php';
+
+function ok(bool $condition, string $message): void {
+    if (!$condition) {
+        fwrite(STDERR, "FAIL: {$message}\n");
+        exit(1);
+    }
+    echo "PASS: {$message}\n";
+}
+
+$db = (new Database())->getConnection();
+ok($db instanceof PDO, 'database connection');
+
+$db->exec("INSERT INTO hospitals (hospital_code, name, short_name, is_active) VALUES ('T001', 'Synthetic Test Hospital', 'TEST', 1)");
+$hospitalId = (int)$db->lastInsertId();
+ok($hospitalId > 0, 'synthetic hospital created');
+
+$users = new UserModel($db);
+$baseUser = [
+    'hospital_id' => $hospitalId,
+    'password' => 'SmokePass!2026',
+    'phone' => null,
+    'role' => 'STAFF',
+    'type' => 'Test Staff',
+    'position' => 'Test Position',
+    'color_theme' => 'primary',
+    'employee_type' => 'ข้าราชการ/พนักงานท้องถิ่น',
+    'start_date' => '2020-01-01',
+    'id_card' => null,
+    'position_number' => null,
+    'pay_rate_id' => null,
+];
+
+$u1 = $baseUser;
+$u1['username'] = 'smoke_user_1';
+$u1['name'] = 'Synthetic User One';
+ok($users->addUser($u1), 'first synthetic user created');
+$user1 = $users->login('smoke_user_1', 'SmokePass!2026');
+ok(is_array($user1) && (int)$user1['id'] > 0, 'UserModel login verifies password hash');
+
+$u2 = $baseUser;
+$u2['username'] = 'smoke_user_2';
+$u2['name'] = 'Synthetic User Two';
+ok($users->addUser($u2), 'second synthetic user created');
+$user2 = $users->login('smoke_user_2', 'SmokePass!2026');
+ok(is_array($user2) && (int)$user2['id'] > 0, 'second user login');
+
+$uid1 = (int)$user1['id'];
+$uid2 = (int)$user2['id'];
+
+$shiftModel = new ShiftModel($db);
+$shift1 = $shiftModel->addShift('2026-10-10', 'บ', $uid1, $hospitalId);
+$shift2 = $shiftModel->addShift('2026-10-11', 'ร', $uid2, $hospitalId);
+ok((bool)$shift1 && (bool)$shift2, 'two shifts created');
+ok($shiftModel->getRosterStatus($hospitalId, '2026-10') === 'DRAFT', 'roster status initialized');
+
+$swapModel = new SwapModel($db);
+$swapData = [
+    'hospital_id' => $hospitalId,
+    'requestor_id' => $uid1,
+    'requestor_date' => '2026-10-10',
+    'requestor_shift' => 'บ',
+    'target_user_id' => $uid2,
+    'target_date' => '2026-10-11',
+    'target_shift' => 'ร',
+    'reason' => 'Synthetic runtime smoke test',
+];
+ok($swapModel->createRequest($swapData), 'swap request created');
+$swapId = (int)$db->lastInsertId();
+ok($swapModel->updateStatus($swapId, 'PENDING_DIRECTOR'), 'swap advanced to director approval');
+ok($swapModel->executeSwapInRoster($swapId), 'swap executed atomically against shifts');
+
+$check = $db->prepare("SELECT COUNT(*) FROM shifts WHERE user_id = ? AND shift_date = ? AND shift_type = ?");
+$check->execute([$uid2, '2026-10-10', 'บ']);
+ok((int)$check->fetchColumn() === 1, 'target user received requestor shift');
+$check->execute([$uid1, '2026-10-11', 'ร']);
+ok((int)$check->fetchColumn() === 1, 'requestor received target shift');
+$status = $db->prepare("SELECT status FROM shift_swaps WHERE id = ?");
+$status->execute([$swapId]);
+ok($status->fetchColumn() === 'APPROVED', 'swap marked approved only after exchange');
+
+$db->exec("INSERT INTO leave_quotas (leave_type, max_days, calculation_type, description) VALUES ('Synthetic Leave', 10.0, 'WORKING_DAYS', 'CI smoke')");
+$leaveTypeId = (int)$db->lastInsertId();
+$leaveModel = new LeaveModel($db);
+ok($leaveModel->addLeaveRequest([
+    'user_id' => $uid1,
+    'leave_type_id' => $leaveTypeId,
+    'start_date' => '2026-10-15',
+    'end_date' => '2026-10-15',
+    'num_days' => 0.5,
+    'reason' => 'Synthetic half-day leave',
+    'has_med_cert' => 0,
+    'med_cert_path' => null,
+]), 'half-day leave request created');
+$leaveId = (int)$db->lastInsertId();
+$leave = $leaveModel->getLeaveRequestById($leaveId);
+ok(is_array($leave) && (float)$leave['num_days'] === 0.5, 'half-day leave duration preserved');
+
+$notificationModel = new NotificationModel($db);
+ok($notificationModel->addNotification($uid1, 'INFO', 'Smoke Test', 'Synthetic notification', 'index.php?c=dashboard'), 'notification created');
+ok((int)$notificationModel->getUnreadCount($uid1) === 1, 'unread notification counted');
+$notif = $notificationModel->getUserNotifications($uid1, 1);
+ok(count($notif) === 1, 'notification retrieved');
+ok($notificationModel->markAsRead((int)$notif[0]['id'], $uid1), 'notification marked read');
+ok((int)$notificationModel->getUnreadCount($uid1) === 0, 'notification unread count cleared');
+
+$rosterModel = new RosterModel($db);
+ok($rosterModel->publishRoster($hospitalId, 2026, 10), 'RosterModel publishes via roster_status');
+ok($shiftModel->getRosterStatus($hospitalId, '2026-10') === 'APPROVED', 'published roster status is approved');
+
+echo "Runtime smoke test completed successfully.\n";
