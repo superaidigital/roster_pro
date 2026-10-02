@@ -318,7 +318,9 @@ if (isset($_SESSION['user'])) {
                 <?php if (!empty($latest_notifications)): ?>
                     <!-- ปุ่ม Footer ทำเครื่องหมายอ่านแล้ว -->
                     <div class="p-2 border-top bg-light text-center" style="border-radius: 0 0 1rem 1rem;">
-                        <a href="index.php?c=notification&a=read_all" class="text-decoration-none text-muted fw-bold small d-block py-2" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')" onclick="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
+                        <form action="index.php?c=notification&a=read_all" method="POST" class="m-0" onsubmit="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
+                            <?= security_csrf_input() ?>
+                            <button type="submit" class="btn btn-link text-decoration-none text-muted fw-bold small d-block py-2 w-100 text-start border-0 bg-transparent" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')">
                             <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
                         </a>
                     </div>
