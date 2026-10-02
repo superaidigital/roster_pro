@@ -22,6 +22,9 @@ jobs:
           php-version: '8.2'
           coverage: none
 
+      - name: Schema contract
+        run: php scripts/schema_contract.php
+
       - name: Lint PHP files
         shell: bash
         run: |
