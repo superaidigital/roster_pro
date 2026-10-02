@@ -152,7 +152,11 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
                                 
                                 <!-- Delete Button -->
                                 <?php if($user['id'] != $_SESSION['user']['id']): ?>
-                                    <a href="index.php?c=staff&a=delete&id=<?= $user['id'] ?>" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm" onclick="return confirm('ยืนยันการลบข้อมูลบุคลากร?');"><i class="bi bi-trash-fill"></i></a>
+                                    <form action="index.php?c=staff&a=delete" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบข้อมูลบุคลากร?');">
+                                        <?= security_csrf_input() ?>
+                                        <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm" title="ลบข้อมูลบุคลากร"><i class="bi bi-trash-fill"></i></button>
+                                    </form>
                                 <?php endif; ?>
                             </td>
                         </tr>
