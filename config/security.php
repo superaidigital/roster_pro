@@ -67,3 +67,56 @@ function security_verify_csrf(?string $token): bool {
         && is_string($_SESSION['_csrf_token'])
         && hash_equals($_SESSION['_csrf_token'], $token);
 }
+
+function security_request_csrf_token(): ?string {
+    if (isset($_POST['_csrf']) && is_string($_POST['_csrf'])) {
+        return $_POST['_csrf'];
+    }
+
+    $header = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+    return is_string($header) && $header !== '' ? $header : null;
+}
+
+function security_is_valid_post_csrf(): bool {
+    return ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+        && security_verify_csrf(security_request_csrf_token());
+}
+
+function security_client_ip(): string {
+    // Use the socket peer address for security decisions. Do not trust arbitrary
+    // X-Forwarded-For values unless the reverse proxy is explicitly trusted.
+    return trim((string)($_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN'));
+}
+
+function security_login_failure_details(string $username): string {
+    return "พยายามเข้าสู่ระบบล้มเหลว (รหัสผ่านผิด) Username: " . $username;
+}
+
+function security_check_login_rate_limit(PDO $db, string $username, int $maxAttempts = 5, int $windowSeconds = 900): array {
+    $username = trim($username);
+    $ip = security_client_ip();
+    $since = date('Y-m-d H:i:s', time() - $windowSeconds);
+    $details = security_login_failure_details($username);
+
+    $stmt = $db->prepare(
+        "SELECT COUNT(*) AS attempts, MAX(created_at) AS last_attempt
+         FROM logs
+         WHERE user_id = 0
+           AND action = 'LOGIN'
+           AND ip_address = ?
+           AND details = ?
+           AND created_at >= ?"
+    );
+    $stmt->execute([$ip, $details, $since]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['attempts' => 0, 'last_attempt' => null];
+
+    $attempts = (int)($row['attempts'] ?? 0);
+    if ($attempts < $maxAttempts) {
+        return ['allowed' => true, 'attempts' => $attempts, 'retry_after' => 0];
+    }
+
+    $lastAttempt = !empty($row['last_attempt']) ? strtotime((string)$row['last_attempt']) : time();
+    $retryAfter = max(1, ($lastAttempt + $windowSeconds) - time());
+
+    return ['allowed' => false, 'attempts' => $attempts, 'retry_after' => $retryAfter];
+}
