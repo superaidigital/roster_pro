@@ -63,8 +63,8 @@ class SettingsController {
         $hospitalModel = new HospitalModel($db);
 
         $hospital_id = $_SESSION['user']['hospital_id'];
-        if (isset($_GET['id']) && in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) {
-            $hospital_id = $_GET['id'];
+        if (isset($_POST['id']) && in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) {
+            $hospital_id = $_POST['id'];
         }
         
         $hospital = $hospitalModel->getHospitalById($hospital_id);
@@ -285,6 +285,7 @@ class SettingsController {
     }
 
     public function test_line() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
 
         $db = (new Database())->getConnection();
@@ -356,13 +357,14 @@ class SettingsController {
     }
 
     public function toggle_holiday() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
 
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        $status = isset($_GET['status']) && (int)$_GET['status'] === 1 ? 1 : 0;
+        $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+        $status = isset($_POST['status']) && (int)$_POST['status'] === 1 ? 1 : 0;
 
         if ($id > 0 && $holidayModel->toggleStatus($id, $status)) {
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "เปลี่ยนสถานะวันหยุด ID: " . $id);
@@ -374,18 +376,19 @@ class SettingsController {
     }
 
     public function delete_holiday() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
         
-        if (isset($_GET['id'])) {
+        if (isset($_POST['id'])) {
             // ดึงชื่อวันหยุดมาเพื่อบันทึก Log ให้ชัดเจน
             $stmt = $db->prepare("SELECT holiday_name FROM holidays WHERE id = ?");
-            $stmt->execute([$_GET['id']]);
-            $holiday_name = $stmt->fetchColumn() ?: "ID: " . $_GET['id'];
+            $stmt->execute([$_POST['id']]);
+            $holiday_name = $stmt->fetchColumn() ?: "ID: " . $_POST['id'];
             
-            $holidayModel->deleteHoliday($_GET['id']);
+            $holidayModel->deleteHoliday($_POST['id']);
             
             // 🌟 บันทึก Log: ลบวันหยุด
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบวันหยุดนักขัตฤกษ์: {$holiday_name}");
@@ -396,8 +399,9 @@ class SettingsController {
     }
 
     public function sync_api() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
-        $year = isset($_GET['year']) ? $_GET['year'] : date('Y');
+        $year = isset($_POST['year']) ? $_POST['year'] : date('Y');
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
@@ -492,16 +496,17 @@ class SettingsController {
     }
 
     public function delete_payrate() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         $db = (new Database())->getConnection();
         require_once 'models/PayRateModel.php';
         $payRateModel = new PayRateModel($db);
         
-        if (isset($_GET['id'])) {
-            $payRateModel->deleteRate($_GET['id']);
+        if (isset($_POST['id'])) {
+            $payRateModel->deleteRate($_POST['id']);
             
             // 🌟 บันทึก Log: ลบเรทค่าตอบแทน
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบหมวดเรทค่าตอบแทน ID: " . $_GET['id']);
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบหมวดเรทค่าตอบแทน ID: " . $_POST['id']);
             $_SESSION['success_msg'] = "ลบเรทค่าตอบแทนเรียบร้อยแล้ว";
         }
         header("Location: index.php?c=settings&a=shift_types");
@@ -769,8 +774,9 @@ class SettingsController {
 
     // ฟังก์ชันใหม่: ลบไฟล์ Backup ใน Server
     public function delete_server_backup() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN']);
-        $filename = $_GET['file'] ?? '';
+        $filename = $_POST['file'] ?? '';
         $filepath = 'public/uploads/Backup/' . basename($filename);
 
         if (!empty($filename) && file_exists($filepath)) {
