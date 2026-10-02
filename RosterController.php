@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/RosterController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 
 class RosterController {
@@ -10,7 +11,7 @@ class RosterController {
     // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน
     // ====================================================
     private function checkAuth() {
-        if (session_status() === PHP_SESSION_NONE) { session_start(); }
+        security_start_session();
         if (!isset($_SESSION['user'])) {
             header("Location: index.php?c=auth&a=index");
             exit;
@@ -187,11 +188,12 @@ class RosterController {
     // 🗑️ 3. ฟังก์ชันล้างตารางเวรทั้งหมดของเดือนนั้น
     // ====================================================
     public function clear_roster() {
+        $this->requireMutation();
         $this->checkAuth();
         $db = (new Database())->getConnection();
         
         $hospital_id = $_SESSION['user']['hospital_id'];
-        $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+        $month = isset($_POST['month']) ? $_POST['month'] : date('Y-m');
         $month_like = $month . '-%';
         
         try {
@@ -213,11 +215,12 @@ class RosterController {
     // 🎲 4. ฟังก์ชันสุ่มจัดเวรอัตโนมัติ (Automated Randomize)
     // ====================================================
     public function randomize_roster() {
+        $this->requireMutation();
         $this->checkAuth();
         $db = (new Database())->getConnection();
         
         $hospital_id = $_SESSION['user']['hospital_id'];
-        $month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+        $month = isset($_POST['month']) ? $_POST['month'] : date('Y-m');
         $month_like = $month . '-%';
         $days_in_month = cal_days_in_month(CAL_GREGORIAN, (int)substr($month, 5, 2), (int)substr($month, 0, 4));
         
@@ -273,6 +276,7 @@ class RosterController {
     // 🔄 5. ฟังก์ชันอัปเดตลำดับบุคลากรในตารางเวร (Drag & Drop)
     // ====================================================
     public function update_order() {
+        $this->requireMutation();
         $this->checkAuth();
         header('Content-Type: application/json');
 
@@ -295,7 +299,8 @@ class RosterController {
                 echo json_encode(['success' => true, 'message' => 'อัปเดตลำดับสำเร็จ']);
             } catch (Exception $e) {
                 if ($db->inTransaction()) $db->rollBack();
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                error_log('Roster update_order failed: ' . $e->getMessage());
+                echo json_encode(['success' => false, 'message' => 'Server error']);
             }
         } else {
             echo json_encode(['success' => false, 'message' => 'ข้อมูลไม่ถูกต้อง']);
@@ -307,6 +312,7 @@ class RosterController {
     // 🌟 6. บันทึกข้อมูลผู้ลงนามในตารางเวร (E-Signature Setup)
     // ====================================================
     public function save_signatures() {
+        $this->requireMutation();
         $this->checkAuth();
         header('Content-Type: application/json');
 
