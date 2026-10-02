@@ -47,6 +47,73 @@ class PayRateModel {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function updateRate($id, array $data) {
+        $name = trim((string)($data['name'] ?? ''));
+        $keywords = trim((string)($data['keywords'] ?? ''));
+        if ($name === '') {
+            $parts = array_values(array_filter(array_map('trim', explode(',', $keywords))));
+            $name = $parts[0] ?? 'กลุ่มค่าตอบแทน';
+        }
+
+        $columns = $this->conn->query("SHOW COLUMNS FROM " . $this->table_name)->fetchAll(PDO::FETCH_COLUMN);
+        $sets = [];
+        $params = [];
+
+        if (in_array('name', $columns, true)) { $sets[] = "name = ?"; $params[] = $name; }
+        if (in_array('group_name', $columns, true)) { $sets[] = "group_name = ?"; $params[] = $name; }
+        $sets[] = "keywords = ?"; $params[] = $keywords;
+        $sets[] = "rate_r = ?"; $params[] = (int)($data['rate_r'] ?? 0);
+        $sets[] = "rate_y = ?"; $params[] = (int)($data['rate_y'] ?? 0);
+        $sets[] = "rate_b = ?"; $params[] = (int)($data['rate_b'] ?? 0);
+        $params[] = (int)$id;
+
+        $stmt = $this->conn->prepare("UPDATE " . $this->table_name . " SET " . implode(', ', $sets) . " WHERE id = ?");
+        return $stmt->execute($params);
+    }
+
+    public function addRate(array $data) {
+        $name = trim((string)($data['name'] ?? ''));
+        $keywords = trim((string)($data['keywords'] ?? ''));
+        if ($name === '') {
+            $parts = array_values(array_filter(array_map('trim', explode(',', $keywords))));
+            $name = $parts[0] ?? 'กลุ่มค่าตอบแทน';
+        }
+
+        $columns = $this->conn->query("SHOW COLUMNS FROM " . $this->table_name)->fetchAll(PDO::FETCH_COLUMN);
+        $fields = [];
+        $values = [];
+        $params = [];
+
+        if (in_array('name', $columns, true)) { $fields[] = 'name'; $values[] = '?'; $params[] = $name; }
+        if (in_array('group_name', $columns, true)) { $fields[] = 'group_name'; $values[] = '?'; $params[] = $name; }
+        if (in_array('group_level', $columns, true)) {
+            $nextLevel = (int)$this->conn->query("SELECT COALESCE(MAX(group_level), 0) + 1 FROM " . $this->table_name)->fetchColumn();
+            $fields[] = 'group_level'; $values[] = '?'; $params[] = $nextLevel;
+        }
+
+        $fields = array_merge($fields, ['keywords', 'rate_r', 'rate_y', 'rate_b']);
+        $values = array_merge($values, ['?', '?', '?', '?']);
+        $params[] = $keywords;
+        $params[] = (int)($data['rate_r'] ?? 0);
+        $params[] = (int)($data['rate_y'] ?? 0);
+        $params[] = (int)($data['rate_b'] ?? 0);
+
+        if (in_array('display_order', $columns, true)) {
+            $nextOrder = (int)$this->conn->query("SELECT COALESCE(MAX(display_order), 0) + 1 FROM " . $this->table_name)->fetchColumn();
+            $fields[] = 'display_order'; $values[] = '?'; $params[] = $nextOrder;
+        }
+
+        $stmt = $this->conn->prepare(
+            "INSERT INTO " . $this->table_name . " (" . implode(', ', $fields) . ") VALUES (" . implode(', ', $values) . ")"
+        );
+        return $stmt->execute($params);
+    }
+
+    public function deleteRate($id) {
+        $stmt = $this->conn->prepare("DELETE FROM " . $this->table_name . " WHERE id = ?");
+        return $stmt->execute([(int)$id]);
+    }
+
     // 🌟 ระบบบันทึกแบบฉลาด (อัปเดตอันเก่า เพิ่มอันใหม่ ลบอันที่ถูกกากบาททิ้ง)
     public function saveAllRates($ratesData) {
         try {
