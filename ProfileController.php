@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/ProfileController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/UserModel.php';
 require_once 'models/ProfileModel.php';
 require_once 'controllers/LogsController.php'; 
@@ -12,7 +13,7 @@ class ProfileController {
     // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน
     // ====================================================
     private function checkAuth() {
-        if (session_status() === PHP_SESSION_NONE) session_start();
+        security_start_session();
         if (!isset($_SESSION['user'])) {
             header("Location: index.php?c=auth&a=login");
             exit;
@@ -30,7 +31,7 @@ class ProfileController {
         $profileModel = new ProfileModel($db);
 
         // ตรวจสอบว่าจะดูประวัติใคร (ถ้าไม่ส่ง id มา ให้ดึงของตัวเอง)
-        $target_user_id = isset($_GET['id']) ? (int)$_GET['id'] : $_SESSION['user']['id'];
+        $target_user_id = isset($_POST['id']) ? (int)$_POST['id'] : $_SESSION['user']['id'];
         
         // ดึงข้อมูลพื้นฐานจากระบบ
         $target_user = $userModel->getUserById($target_user_id);
@@ -42,7 +43,7 @@ class ProfileController {
 
         // ตรวจสอบสิทธิ์ (HR, ADMIN, SUPERADMIN, DIRECTOR ดูได้ทุกคน / STAFF ดูได้แค่ของตัวเอง)
         $current_role = strtoupper($_SESSION['user']['role']);
-        if (!in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR', 'SCHEDULER']) && $_SESSION['user']['id'] != $target_user_id) {
+        if (!$this->canManageProfile($target_user_id)) {
             $_SESSION['error_msg'] = "ปฏิเสธการเข้าถึง: คุณสามารถดูได้เฉพาะประวัติของตนเองเท่านั้น";
             header("Location: index.php?c=profile&id=" . $_SESSION['user']['id']);
             exit;
@@ -101,7 +102,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $target_user_id = (int)$_POST['user_id'];
+            $target_user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($target_user_id);
             
             $data = [
                 'user_id' => $target_user_id,
@@ -147,7 +150,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $user_id = (int)$_POST['user_id'];
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($user_id);
             $data = [
                 'user_id' => $user_id,
                 'degree_level' => trim($_POST['degree_level'] ?? ''),
@@ -170,16 +175,16 @@ class ProfileController {
 
     public function delete_education() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['user_id'])) {
+        if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            if ($profileModel->deleteEducation($_GET['id'], $_GET['user_id'])) {
+            if ($profileModel->deleteEducation($_POST['id'], $_POST['user_id'])) {
                 $_SESSION['success_msg'] = "ลบประวัติการศึกษาสำเร็จ";
             } else {
                 $_SESSION['error_msg'] = "ไม่สามารถลบข้อมูลได้";
             }
-            header("Location: index.php?c=profile&id=" . $_GET['user_id']);
+            header("Location: index.php?c=profile&id=" . $_POST['user_id']);
             exit;
         }
     }
@@ -193,7 +198,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $user_id = (int)$_POST['user_id'];
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($user_id);
             $data = [
                 'user_id' => $user_id,
                 'license_name' => trim($_POST['license_name'] ?? ''),
@@ -216,14 +223,14 @@ class ProfileController {
 
     public function delete_license() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['user_id'])) {
+        if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            if ($profileModel->deleteLicense($_GET['id'], $_GET['user_id'])) {
+            if ($profileModel->deleteLicense($_POST['id'], $_POST['user_id'])) {
                 $_SESSION['success_msg'] = "ลบข้อมูลใบประกอบวิชาชีพสำเร็จ";
             }
-            header("Location: index.php?c=profile&id=" . $_GET['user_id']);
+            header("Location: index.php?c=profile&id=" . $_POST['user_id']);
             exit;
         }
     }
@@ -237,7 +244,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $user_id = (int)$_POST['user_id'];
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($user_id);
             $data = [
                 'user_id' => $user_id,
                 'company_name' => trim($_POST['company_name'] ?? ''),
@@ -259,12 +268,12 @@ class ProfileController {
 
     public function delete_work() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['user_id'])) {
+        if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
-            $profileModel->deleteWorkHistory($_GET['id'], $_GET['user_id']);
+            $profileModel->deleteWorkHistory($_POST['id'], $_POST['user_id']);
             $_SESSION['success_msg'] = "ลบประวัติการทำงานสำเร็จ";
-            header("Location: index.php?c=profile&id=" . $_GET['user_id']);
+            header("Location: index.php?c=profile&id=" . $_POST['user_id']);
             exit;
         }
     }
@@ -278,7 +287,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $user_id = (int)$_POST['user_id'];
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($user_id);
             $data = [
                 'user_id' => $user_id,
                 'course_name' => trim($_POST['course_name'] ?? ''),
@@ -298,12 +309,12 @@ class ProfileController {
 
     public function delete_training() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['user_id'])) {
+        if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
-            $profileModel->deleteTraining($_GET['id'], $_GET['user_id']);
+            $profileModel->deleteTraining($_POST['id'], $_POST['user_id']);
             $_SESSION['success_msg'] = "ลบประวัติการฝึกอบรมสำเร็จ";
-            header("Location: index.php?c=profile&id=" . $_GET['user_id']);
+            header("Location: index.php?c=profile&id=" . $_POST['user_id']);
             exit;
         }
     }
