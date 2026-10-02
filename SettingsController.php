@@ -346,12 +346,30 @@ class SettingsController {
         $holidayModel = new HolidayModel($db);
         
         if (!empty($_POST['holiday_date']) && !empty($_POST['holiday_name'])) {
-            $holidayModel->addHoliday($_POST['holiday_date'], $_POST['holiday_name']);
+            $holidayModel->addHoliday($_POST['holiday_date'], $_POST['holiday_name'], $_POST['holiday_type'] ?? 'REGULAR');
             
             // 🌟 บันทึก Log: เพิ่มวันหยุด
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มวันหยุดนักขัตฤกษ์ด้วยตนเอง: " . $_POST['holiday_name']);
             $_SESSION['success_msg'] = "เพิ่มวันหยุดเรียบร้อยแล้ว";
         }
+        header("Location: index.php?c=settings&a=holidays");
+        exit;
+    }
+
+    public function toggle_holiday() {
+        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+        $db = (new Database())->getConnection();
+        require_once 'models/HolidayModel.php';
+        $holidayModel = new HolidayModel($db);
+
+        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        $status = isset($_GET['status']) && (int)$_GET['status'] === 1 ? 1 : 0;
+
+        if ($id > 0 && $holidayModel->toggleStatus($id, $status)) {
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "เปลี่ยนสถานะวันหยุด ID: " . $id);
+            $_SESSION['success_msg'] = $status ? "เปิดใช้งานวันหยุดเรียบร้อยแล้ว" : "ปิดใช้งานวันหยุดเรียบร้อยแล้ว";
+        }
+
         header("Location: index.php?c=settings&a=holidays");
         exit;
     }
@@ -412,6 +430,33 @@ class SettingsController {
 
     public function pay_rates() {
         $this->shift_types();
+    }
+
+    public function save_pay_rates() {
+        $this->requirePost();
+        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+
+        $db = (new Database())->getConnection();
+        require_once 'models/PayRateModel.php';
+        $payRateModel = new PayRateModel($db);
+        $rates = $payRateModel->getAllRates();
+
+        foreach ($rates as $rate) {
+            $id = (int)$rate['id'];
+            $data = [
+                'name' => $rate['name'] ?? ($rate['group_name'] ?? ''),
+                'keywords' => $rate['keywords'] ?? '',
+                'rate_y' => $_POST['rate_y_' . $id] ?? $rate['rate_y'],
+                'rate_b' => $_POST['rate_b_' . $id] ?? $rate['rate_b'],
+                'rate_r' => $_POST['rate_r_' . $id] ?? $rate['rate_r'],
+            ];
+            $payRateModel->updateRate($id, $data);
+        }
+
+        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "ปรับปรุงอัตราค่าตอบแทน");
+        $_SESSION['success_msg'] = "บันทึกอัตราค่าตอบแทนเรียบร้อยแล้ว";
+        header("Location: index.php?c=settings&a=shift_types");
+        exit;
     }
 
     public function save_payrate() {
