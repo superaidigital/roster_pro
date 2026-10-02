@@ -455,7 +455,8 @@ if (isset($_SESSION['user'])) {
                             <?= security_csrf_input() ?>
                             <button type="submit" class="btn btn-link text-decoration-none text-muted fw-bold small d-block py-2 w-100 text-start border-0 bg-transparent" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')">
                             <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
-                        </a>
+                            </button>
+                        </form>
                     </div>
                 <?php endif; ?>
             </div>
