@@ -321,7 +321,7 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                                         <td>
                                             <form action="index.php?c=profile&a=delete_license" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบ?');">
                                                 <?= security_csrf_input() ?>
-                                                <input type="hidden" name="id" value="<?= \$lic\['id'\] ?>">
+                                                <input type="hidden" name="id" value="<?= $lic['id'] ?>">
                                                 <input type="hidden" name="user_id" value="<?= $target_user_id ?>">
                                                 <button type="submit" class="btn btn-sm btn-light text-danger rounded-circle" aria-label="ลบ"><i class="bi bi-trash"></i></button>
                                             </form>
@@ -368,7 +368,7 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                                         <td>
                                             <form action="index.php?c=profile&a=delete_education" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบ?');">
                                                 <?= security_csrf_input() ?>
-                                                <input type="hidden" name="id" value="<?= \$edu\['id'\] ?>">
+                                                <input type="hidden" name="id" value="<?= $edu['id'] ?>">
                                                 <input type="hidden" name="user_id" value="<?= $target_user_id ?>">
                                                 <button type="submit" class="btn btn-sm btn-light text-danger rounded-circle" aria-label="ลบ"><i class="bi bi-trash"></i></button>
                                             </form>
@@ -420,7 +420,7 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                                         <td>
                                             <form action="index.php?c=profile&a=delete_work" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบ?');">
                                                 <?= security_csrf_input() ?>
-                                                <input type="hidden" name="id" value="<?= \$work\['id'\] ?>">
+                                                <input type="hidden" name="id" value="<?= $work['id'] ?>">
                                                 <input type="hidden" name="user_id" value="<?= $target_user_id ?>">
                                                 <button type="submit" class="btn btn-sm btn-light text-danger rounded-circle" aria-label="ลบ"><i class="bi bi-trash"></i></button>
                                             </form>
@@ -469,7 +469,7 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                                         <td>
                                             <form action="index.php?c=profile&a=delete_training" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบ?');">
                                                 <?= security_csrf_input() ?>
-                                                <input type="hidden" name="id" value="<?= \$tr\['id'\] ?>">
+                                                <input type="hidden" name="id" value="<?= $tr['id'] ?>">
                                                 <input type="hidden" name="user_id" value="<?= $target_user_id ?>">
                                                 <button type="submit" class="btn btn-sm btn-light text-danger rounded-circle" aria-label="ลบ"><i class="bi bi-trash"></i></button>
                                             </form>
