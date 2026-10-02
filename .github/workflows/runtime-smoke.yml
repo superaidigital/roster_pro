@@ -1,0 +1,53 @@
+name: Runtime Smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - security-hardening-v1
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-smoke:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: roster_pro_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: roster_pro_test
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_TIMEZONE: '+07:00'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql
+          coverage: none
+
+      - name: Install MariaDB client
+        run: sudo apt-get update && sudo apt-get install -y mariadb-client
+
+      - name: Load schema-only database
+        run: mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_pro_test < database/schema.sql
+
+      - name: Run runtime smoke test
+        run: php tests/runtime_smoke.php
