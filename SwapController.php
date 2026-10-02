@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/SwapController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/SwapModel.php';
 require_once 'models/UserModel.php';
 
@@ -13,9 +14,18 @@ if (file_exists('models/NotificationModel.php')) {
 class SwapController {
     
     private function checkAuth() {
-        if (session_status() === PHP_SESSION_NONE) { session_start(); }
+        security_start_session();
         if(!isset($_SESSION['user'])) {
             header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+    }
+
+    private function requireMutation() {
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่";
+            header("Location: index.php?c=swap");
             exit;
         }
     }
@@ -45,6 +55,7 @@ class SwapController {
 
     // 🌟 สร้างคำขอแลกเวรใหม่
     public function create() {
+        $this->requireMutation();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = (new Database())->getConnection();
@@ -91,13 +102,14 @@ class SwapController {
 
     // 🌟 จัดการสถานะการกดปุ่ม (ยอมรับ/ปฏิเสธ/อนุมัติ/ยกเลิก)
     public function action() {
+        $this->requireMutation();
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['act'])) {
+        if (isset($_POST['id']) && isset($_POST['act'])) {
             $db = (new Database())->getConnection();
             $swapModel = new SwapModel($db);
             
-            $swap_id = $_GET['id'];
-            $action = $_GET['act'];
+            $swap_id = $_POST['id'];
+            $action = $_POST['act'];
             $user_id = $_SESSION['user']['id'];
             $role = strtoupper($_SESSION['user']['role']);
             
