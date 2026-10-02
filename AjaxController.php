@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/AjaxController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/ShiftModel.php';
 require_once 'models/NotificationModel.php';
 require_once 'models/UserModel.php';
@@ -93,6 +94,7 @@ class AjaxController {
     // 🌟 API: ทดสอบ LINE Notify
     // ==========================================
     public function test_line_notify() {
+        $this->requireAjaxMutation();
         error_reporting(0); // 🌟 ปิด Warning ไม่ให้แทรก JSON
         header('Content-Type: application/json');
         
@@ -133,6 +135,7 @@ class AjaxController {
     // 🌟 API: บันทึกเวร (Save Shift)
     // ==========================================
     public function save_shift() {
+        $this->requireAjaxMutation();
         error_reporting(0); // 🌟 ปิด Warning
         header('Content-Type: application/json');
         
@@ -216,6 +219,7 @@ class AjaxController {
     // 🌟 API: อัปเดตลำดับรายชื่อ (Drag & Drop)
     // ==========================================
     public function update_order() {
+        $this->requireAjaxMutation();
         header('Content-Type: application/json');
         
         // อนุญาตเฉพาะ POST Request และต้องล็อกอิน
@@ -260,6 +264,7 @@ class AjaxController {
     // 🌟 API: คัดลอกตารางจากเดือนก่อน (Copy Previous Month)
     // ==========================================
     public function copy_roster_previous() {
+        $this->requireAjaxMutation();
         error_reporting(0);
         header('Content-Type: application/json');
         if (!isset($_SESSION['user'])) { echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit; }
@@ -321,6 +326,7 @@ class AjaxController {
     // 🌟 API: ขอแลกเวร/เปลี่ยนเวร (Shift Swap Request)
     // ==========================================
     public function request_swap() {
+        $this->requireAjaxMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
             header("Location: index.php?c=roster"); exit;
         }
@@ -366,6 +372,7 @@ class AjaxController {
     // 🌟 เปลี่ยนสถานะตารางเวร (Workflow)
     // ==========================================
     public function change_status() {
+        $this->requireAjaxMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
             header("Location: index.php?c=roster"); exit;
         }
@@ -474,6 +481,7 @@ class AjaxController {
     // 🌟 ขอแก้ไขตาราง (Request Edit)
     // ==========================================
     public function request_edit() {
+        $this->requireAjaxMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) { header("Location: index.php?c=roster"); exit; }
 
         $month_year = $_POST['month_year'];
@@ -518,6 +526,7 @@ class AjaxController {
     // 🌟 เสนอเพิ่มวันหยุดใหม่ (Request Holiday)
     // ==========================================
     public function request_holiday() {
+        $this->requireAjaxMutation();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents("php://input"));
         
@@ -724,6 +733,7 @@ class AjaxController {
     // 🌟 สุ่มจัดเวรอัตโนมัติ (Auto-Schedule) 
     // ==========================================
     public function auto_schedule() {
+        $this->requireAjaxMutation();
         error_reporting(0); // 🌟 ปิด Warning
         header('Content-Type: application/json');
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) { 
@@ -862,6 +872,26 @@ class AjaxController {
         }
     }
 
+    public function check_new_notif() {
+        error_reporting(0);
+        header('Content-Type: application/json');
+
+        if (!isset($_SESSION['user_id']) && !isset($_SESSION['user'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+            exit;
+        }
+
+        $userId = $_SESSION['user_id'] ?? $_SESSION['user']['id'];
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+
+        echo json_encode([
+            'status' => 'success',
+            'unread_count' => $notificationModel->getUnreadCount($userId)
+        ]);
+        exit;
+    }
+
     public function getUnreadNotifications() {
         error_reporting(0); header('Content-Type: application/json');
         if(!isset($_SESSION['user_id']) && !isset($_SESSION['user'])) {
@@ -876,6 +906,7 @@ class AjaxController {
     }
 
     public function markNotificationAsRead() {
+        $this->requireAjaxMutation();
         error_reporting(0); header('Content-Type: application/json');
         if(!isset($_SESSION['user_id']) && !isset($_SESSION['user'])) { echo json_encode(['status' => 'error']); return; }
         if (!isset($_POST['noti_id'])) { echo json_encode(['status' => 'error', 'message' => 'Missing ID']); return; }
