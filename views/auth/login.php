@@ -207,6 +207,7 @@
                     <!-- ซ่อน Input บอกทิศทาง Controller ป้องกันบัคหน้าขาว -->
                     <input type="hidden" name="c" value="auth">
                     <input type="hidden" name="a" value="login">
+                    <?= security_csrf_input() ?>
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold text-dark small mb-1">ชื่อผู้ใช้งาน (Username)</label>
