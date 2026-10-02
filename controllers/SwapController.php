@@ -155,9 +155,12 @@ class SwapController {
                 // ========================================================
                 else if (in_array($role, ['DIRECTOR', 'SCHEDULER', 'ADMIN', 'SUPERADMIN']) && ($action === 'approve' || $action === 'decline')) {
                     if ($action === 'approve' && $swap['status'] === 'PENDING_DIRECTOR') {
-                        $swapModel->updateStatus($swap_id, 'APPROVED');
-                        // สลับเวรในตารางข้อมูลจริง
-                        $swapModel->executeSwapInRoster($swap_id);
+                        // สลับเวรและอัปเดตสถานะ APPROVED ภายใน Transaction เดียวกัน
+                        if (!$swapModel->executeSwapInRoster($swap_id)) {
+                            $_SESSION['error_msg'] = "ไม่สามารถอนุมัติการแลกเวรได้ เนื่องจากข้อมูลตารางเวรเปลี่ยนแปลงหรือมีเวรซ้ำ";
+                            header("Location: index.php?c=swap&a=index");
+                            exit;
+                        }
                         $_SESSION['success_msg'] = "อนุมัติการแลกเวรเรียบร้อย ระบบได้สลับตารางเวรให้แล้ว";
 
                         // 🔔 แจ้งเตือนทั้งสองฝ่ายว่าสำเร็จแล้ว
