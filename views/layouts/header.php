@@ -218,6 +218,7 @@ if (isset($_SESSION['user'])) {
         }
         .pwa-toast.show { transform: translateX(-50%) translateY(0); }
     </style>
+    <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
 </head>
 <body>
 
