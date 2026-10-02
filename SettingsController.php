@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/SettingsController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 
 class SettingsController {
@@ -11,9 +12,7 @@ class SettingsController {
     // ========================================================
 
     private function requireAccess($allowed_roles = []) {
-        if (session_status() === PHP_SESSION_NONE) { 
-            session_start(); 
-        }
+        security_start_session();
 
         if (!isset($_SESSION['user'])) {
             header("Location: index.php?c=auth&a=index");
