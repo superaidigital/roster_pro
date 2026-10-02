@@ -91,7 +91,6 @@ class RosterModel {
                 $stmt->bindValue(':user_id', $user_id);
                 $stmt->bindValue(':shift_date', $date);
                 $stmt->bindValue(':shift_type', strtoupper($type));
-                $stmt->bindValue(':status', 'DRAFT'); // ตอนจัดครั้งแรกให้เป็นฉบับร่างก่อน
                 $stmt->execute();
             }
             
@@ -108,13 +107,18 @@ class RosterModel {
      * อนุมัติและประกาศใช้ตารางเวร (เปลี่ยน DRAFT เป็น PUBLISHED)
      */
     public function publishRoster($hospital_id, $year, $month) {
-        $query = "UPDATE " . $this->table_name . " SET status = 'PUBLISHED' 
-                  WHERE hospital_id = :hospital_id AND YEAR(shift_date) = :year AND MONTH(shift_date) = :month";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':hospital_id', $hospital_id);
-        $stmt->bindParam(':year', $year);
-        $stmt->bindParam(':month', $month);
-        try { return $stmt->execute(); } catch (PDOException $e) { return false; }
+        $monthYear = sprintf('%04d-%02d', (int)$year, (int)$month);
+
+        $stmt = $this->conn->prepare(
+            "INSERT INTO roster_status (hospital_id, month_year, status, updated_at)
+             VALUES (:hid, :my, 'APPROVED', NOW())
+             ON DUPLICATE KEY UPDATE status = 'APPROVED', updated_at = NOW()"
+        );
+
+        return $stmt->execute([
+            ':hid' => (int)$hospital_id,
+            ':my' => $monthYear,
+        ]);
     }
 }
 ?>
