@@ -115,7 +115,7 @@ $waiting_hospitals = $filtered_waiting;
             </a>
         </div>
         <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=leave&a=approve" class="quick-action-btn position-relative">
+            <a href="index.php?c=leave&a=approvals" class="quick-action-btn position-relative">
                 <i class="bi bi-envelope-paper text-danger"></i>พิจารณาใบลา
                 <?php if($pending_leaves > 0): ?>
                     <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow"><?= $pending_leaves ?></span>
@@ -373,7 +373,7 @@ $waiting_hospitals = $filtered_waiting;
             <div class="card dashboard-card h-100">
                 <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
                     <h6 class="fw-bold text-dark mb-0"><i class="bi bi-envelope-exclamation-fill text-danger me-2"></i> คำขอลาล่าสุด (รออนุมัติ)</h6>
-                    <a href="index.php?c=leave&a=approve" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size:12px;">จัดการใบลารออนุมัติ (<?= $pending_leaves ?>)</a>
+                    <a href="index.php?c=leave&a=approvals" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size:12px;">จัดการใบลารออนุมัติ (<?= $pending_leaves ?>)</a>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -403,7 +403,7 @@ $waiting_hospitals = $filtered_waiting;
                                         <td><span class="badge bg-secondary bg-opacity-10 text-dark border px-2 py-1"><?= htmlspecialchars($leave['leave_type']) ?></span></td>
                                         <td class="font-monospace text-primary fw-medium" style="font-size: 12px;"><?= $sd ?> - <?= $ed ?></td>
                                         <td class="text-muted small"><?= date('d/m/Y H:i', strtotime($leave['created_at'])) ?></td>
-                                        <td><a href="index.php?c=leave&a=approve" class="btn btn-sm btn-primary rounded-pill shadow-sm" style="font-size:11px;">พิจารณา</a></td>
+                                        <td><a href="index.php?c=leave&a=approvals" class="btn btn-sm btn-primary rounded-pill shadow-sm" style="font-size:11px;">พิจารณา</a></td>
                                     </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
