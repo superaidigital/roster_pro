@@ -274,7 +274,9 @@ class HospitalsController {
                 echo json_encode(['success' => true]);
             } catch (Exception $e) {
                 if ($db->inTransaction()) $db->rollBack();
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                error_log('Hospital operation failed: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'ไม่สามารถดำเนินการข้อมูลหน่วยบริการได้']);
             }
         } else {
             echo json_encode(['success' => false, 'message' => 'รูปแบบข้อมูลไม่ถูกต้อง']);
