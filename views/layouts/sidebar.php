@@ -284,9 +284,17 @@ if (!function_exists('renderSidebarMenu')) {
     </a>
     <!-- Script ป้องกันการกระพริบของเมนูตอนโหลดหน้าเว็บ -->
     <script>
-        if (localStorage.getItem('sidebarState') === 'collapsed') {
-            document.getElementById('desktopSidebar').classList.add('collapsed');
-        }
+        (function () {
+            const collapsed = localStorage.getItem('sidebarState') === 'collapsed';
+            const sidebar = document.getElementById('desktopSidebar');
+
+            if (collapsed && sidebar) {
+                sidebar.classList.add('collapsed');
+                document.body.classList.add('rp-sidebar-collapsed');
+            } else {
+                document.body.classList.remove('rp-sidebar-collapsed');
+            }
+        })();
     </script>
     
     <div class="flex-grow-1 overflow-auto custom-scrollbar pb-3">
@@ -327,31 +335,50 @@ if (!function_exists('renderSidebarMenu')) {
 document.addEventListener('DOMContentLoaded', function() {
     const toggleBtn = document.getElementById('sidebarToggleBtn');
     const desktopSidebar = document.getElementById('desktopSidebar');
-    
+
+    function syncSidebarState(collapsed) {
+        if (!desktopSidebar) return;
+
+        desktopSidebar.classList.toggle('collapsed', collapsed);
+        document.body.classList.toggle('rp-sidebar-collapsed', collapsed);
+        localStorage.setItem('sidebarState', collapsed ? 'collapsed' : 'expanded');
+
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggleBtn.setAttribute(
+                'aria-label',
+                collapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง'
+            );
+        }
+
+        if (collapsed) {
+            ['leaveMenu', 'hrMenu'].forEach(menuId => {
+                const menuElement = document.getElementById(menuId);
+
+                if (menuElement && menuElement.classList.contains('show')) {
+                    if (window.bootstrap && bootstrap.Collapse) {
+                        bootstrap.Collapse
+                            .getOrCreateInstance(menuElement, { toggle: false })
+                            .hide();
+                    } else {
+                        menuElement.classList.remove('show');
+                    }
+                }
+
+                const menuBtn = document.querySelector(`[href="#${menuId}"]`);
+                if (menuBtn) {
+                    menuBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+    }
+
+    syncSidebarState(localStorage.getItem('sidebarState') === 'collapsed');
+
     if (toggleBtn && desktopSidebar) {
         toggleBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            desktopSidebar.classList.toggle('collapsed');
-            
-            // บันทึกสถานะลงใน Browser
-            if (desktopSidebar.classList.contains('collapsed')) {
-                localStorage.setItem('sidebarState', 'collapsed');
-                
-                // สั่งปิดเมนู Dropdown อัตโนมัติเวลาพับ Sidebar
-                const menusToCollapse = ['leaveMenu', 'hrMenu'];
-                menusToCollapse.forEach(menuId => {
-                    const menuElement = document.getElementById(menuId);
-                    if(menuElement && menuElement.classList.contains('show')) {
-                        const bsCollapse = new bootstrap.Collapse(menuElement, {toggle: false});
-                        bsCollapse.hide();
-                        const menuBtn = document.querySelector(`[href="#${menuId}"]`);
-                        if(menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
-                    }
-                });
-
-            } else {
-                localStorage.setItem('sidebarState', 'expanded');
-            }
+            syncSidebarState(!desktopSidebar.classList.contains('collapsed'));
         });
     }
 });
