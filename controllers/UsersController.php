@@ -192,7 +192,8 @@ class UsersController {
                     }
                 }
             } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error: " . $e->getMessage();
+                error_log('UsersController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
             }
         }
         header("Location: index.php?c=users");
@@ -261,7 +262,8 @@ class UsersController {
                     }
                 }
             } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error deleting user: " . $e->getMessage();
+                error_log('UsersController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
             }
         } else {
              // ดักจับกรณีผู้ใช้เผลอกดลิงก์มาแบบ GET หรือไม่มีค่า id ส่งมา
@@ -307,7 +309,8 @@ class UsersController {
                     
                 }
             } catch (Exception $e) { 
-                $_SESSION['error_msg'] = "เกิดข้อผิดพลาดทางเทคนิค: " . $e->getMessage(); 
+                error_log('UsersController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ"; 
             }
         }
         header("Location: index.php?c=users");
@@ -543,7 +546,8 @@ class UsersController {
                     $_SESSION['error_msg'] = "ไม่สามารถปลดล็อกบัญชีได้";
                 }
             } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error restoring user: " . $e->getMessage();
+                error_log('UsersController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
             }
         }
         header("Location: index.php?c=users");
