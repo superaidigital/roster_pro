@@ -12,3 +12,12 @@
 Thumbs.db
 .idea/
 .vscode/
+
+
+# Never commit database exports/dumps at repository root
+/*.sql
+
+# Local database exports and temporary backups
+*.dump
+*.bak
+*.sql.gz
