@@ -84,60 +84,6 @@ if ($role === 'HR') {
 
 $allowed_controllers = array_unique($allowed_controllers);
 ?>
-
-<style>
-    /* 🌟 CSS สำหรับ Sidebar */
-    #desktopSidebar {
-        width: 260px; min-width: 260px; max-width: 260px;
-        flex-shrink: 0; height: 100%;
-        background-color: var(--sidebar-bg, #ffffff); border-right: 1px solid #e2e8f0;
-        overflow-y: auto; overflow-x: hidden;
-        transition: width 0.3s ease; z-index: 1040;
-    }
-    #desktopSidebar.collapsed { width: 80px; min-width: 80px; max-width: 80px; }
-    
-    /* ซ่อนข้อความและลูกศรเวลาพับเมนู */
-    #desktopSidebar.collapsed .sidebar-text, 
-    #desktopSidebar.collapsed .sidebar-heading,
-    #desktopSidebar.collapsed .dropdown-arrow { display: none !important; }
-    
-    /* จัดไอคอนให้อยู่กึ่งกลางเวลาพับเมนู */
-    #desktopSidebar.collapsed .nav-link { justify-content: center !important; padding: 0.8rem 0 !important; }
-    #desktopSidebar.collapsed .nav-link i { margin-right: 0 !important; font-size: 1.4rem !important; }
-    
-    /* ซ่อนเมนูย่อยเวลาพับ Sidebar */
-    #desktopSidebar.collapsed .leave-dropdown-container ul,
-    #desktopSidebar.collapsed .hr-dropdown-container ul { display: none !important; }
-
-    .sidebar-menu { list-style: none; padding: 15px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
-    .nav-link { 
-        display: flex; align-items: center; padding: 12px 15px; 
-        color: #475569; border-radius: 10px; transition: all 0.2s ease; 
-        font-weight: 500; text-decoration: none; white-space: nowrap;
-    }
-    .nav-link:hover { background-color: #f1f5f9; color: #0d6efd; }
-    .nav-link.active { background-color: #eff6ff; color: #0d6efd; font-weight: 600; }
-    .nav-link i { font-size: 1.25rem; margin-right: 12px; width: 24px; text-align: center; transition: transform 0.2s; }
-    .nav-link:hover i { transform: scale(1.1); }
-    
-    .sidebar-heading { 
-        font-size: 0.75rem; font-weight: 700; color: #94a3b8; 
-        text-transform: uppercase; padding: 15px 15px 5px; letter-spacing: 0.5px; 
-    }
-    
-    /* แอนิเมชันลูกศร Dropdown */
-    .dropdown-arrow { transition: transform 0.3s ease; font-size: 0.8rem; }
-    [aria-expanded="true"] .dropdown-arrow { transform: rotate(180deg); }
-    
-    /* สไตล์สำหรับเมนูย่อย */
-    .submenu-item { padding: 8px 15px 8px 45px !important; font-size: 14px; }
-    .submenu-item.active { background-color: transparent !important; color: #0d6efd; font-weight: 600; }
-    .submenu-item.active::before {
-        content: ''; position: absolute; left: 20px; width: 6px; height: 6px; 
-        background-color: #0d6efd; border-radius: 50%;
-    }
-</style>
-
 <?php
 // ฟังก์ชันสร้างเมนูด้านซ้าย เพื่อเรียกใช้ซ้ำทั้งแบบ Desktop และ Mobile
 if (!function_exists('renderSidebarMenu')) {
