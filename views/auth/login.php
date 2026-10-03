@@ -30,7 +30,7 @@
         }
         
         .login-container {
-            max-width: 1000px;
+            max-width: 62rem;
             width: 100%;
             background: #ffffff;
             border-radius: 1.5rem;
@@ -42,7 +42,7 @@
         /* 🌟 ฝั่งซ้าย (รูปภาพ) */
         .login-left {
             background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-            padding: 3rem;
+            padding: clamp(2rem, 4vw, 3rem);
             color: white;
             display: flex;
             flex-direction: column;
@@ -76,7 +76,7 @@
 
         /* 🌟 ฝั่งขวา (ฟอร์ม) */
         .login-right {
-            padding: 4rem 3rem;
+            padding: clamp(2rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -181,7 +181,7 @@
                 <?php if (isset($_SESSION['login_error'])): ?>
                     <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm">
                         <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
-                        <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['login_error'] ?></div>
+                        <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['login_error'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
                     <?php unset($_SESSION['login_error']); ?>
                 <?php endif; ?>
@@ -189,7 +189,7 @@
                 <?php if (isset($_SESSION['error_msg'])): ?>
                     <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm">
                         <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
-                        <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['error_msg'] ?></div>
+                        <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
                     <?php unset($_SESSION['error_msg']); ?>
                 <?php endif; ?>
@@ -197,7 +197,7 @@
                 <?php if (isset($_SESSION['success_msg'])): ?>
                     <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm">
                         <i class="bi bi-check-circle-fill fs-5 me-3"></i> 
-                        <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['success_msg'] ?></div>
+                        <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
                     <?php unset($_SESSION['success_msg']); ?>
                 <?php endif; ?>
