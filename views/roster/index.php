@@ -337,6 +337,32 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <?php endif; ?>
                 </div>
             </div>
+            <div class="rp-workflow-card mx-3 mb-3 rp-roster-workflow">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                    <div class="fw-bold text-dark"><i class="bi bi-diagram-3-fill text-primary me-2"></i>ขั้นตอนการจัดตารางเวร</div>
+                    <small class="text-muted"><?= $roster_status === 'REQUEST_EDIT' ? 'มีคำขอแก้ไข' : 'อัปเดตตามสถานะปัจจุบัน' ?></small>
+                </div>
+                <div class="rp-workflow <?= $roster_status === 'REQUEST_EDIT' ? 'rp-workflow--warning' : '' ?>"
+                     style="--rp-workflow-count:3; --rp-workflow-progress:<?= (int)$roster_progress_percent ?>%;">
+                    <?php
+                    $roster_steps = [
+                        1 => ['icon' => 'bi-pencil-fill', 'label' => 'จัดทำตาราง'],
+                        2 => ['icon' => 'bi-send-check-fill', 'label' => $roster_status === 'REQUEST_EDIT' ? 'ขอแก้ไข' : 'ส่งตรวจสอบ'],
+                        3 => ['icon' => 'bi-check-lg', 'label' => 'อนุมัติ']
+                    ];
+                    foreach ($roster_steps as $stepNo => $stepData):
+                        $stepClass = '';
+                        if ($stepNo < $roster_progress_step) $stepClass = 'is-complete';
+                        elseif ($stepNo === $roster_progress_step) $stepClass = 'is-current';
+                    ?>
+                        <div class="rp-workflow-step <?= $stepClass ?>">
+                            <div class="rp-workflow-dot"><i class="bi <?= $stepData['icon'] ?>"></i></div>
+                            <div class="rp-workflow-label"><?= htmlspecialchars($stepData['label'], ENT_QUOTES, 'UTF-8') ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
             <!-- 🌟 แสดงผลลัพธ์การตรวจสอบตารางเวรทั่วไป -->
             <div id="rosterWarnings" class="px-3 pb-3" style="display: none;"></div>
         </div>
