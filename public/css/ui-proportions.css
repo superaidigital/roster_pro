@@ -829,3 +829,110 @@ textarea.form-control {
     display: none !important;
   }
 }
+
+
+/* ==========================================================================
+   Field UX finalization v14
+   ========================================================================== */
+
+/* Collapsed sidebar must always be icon-only. */
+#desktopSidebar.collapsed .sidebar-text,
+#desktopSidebar.collapsed .sidebar-heading,
+#desktopSidebar.collapsed .dropdown-arrow,
+#desktopSidebar.collapsed .rp-sidebar-brand-copy {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  max-width: 0 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+#desktopSidebar.collapsed .nav-link {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+}
+
+#desktopSidebar.collapsed .nav-link > div {
+  display: contents !important;
+}
+
+#desktopSidebar.collapsed .nav-link i {
+  display: block !important;
+  margin: 0 !important;
+}
+
+#desktopSidebar.collapsed .submenu-item,
+#desktopSidebar.collapsed .collapse {
+  display: none !important;
+}
+
+/* Prevent topbar collision on medium desktop widths. */
+.rp-topbar-left {
+  overflow: hidden;
+}
+
+.rp-topbar-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 1399.98px) and (min-width: 1024px) {
+  .rp-profile-meta,
+  .rp-profile-chevron,
+  .top-navbar .vr {
+    display: none !important;
+  }
+
+  .profile-pill {
+    width: 2.5rem !important;
+    min-width: 2.5rem !important;
+    padding: .1rem !important;
+    justify-content: center !important;
+  }
+
+  .rp-page-subtitle {
+    max-width: min(38vw, 28rem);
+  }
+}
+
+/* Field/mobile tap targets: minimum 48x48px. */
+@media (max-width: 639.98px) {
+  .nav-icon-btn,
+  .rp-theme-toggle,
+  .profile-pill,
+  .btn:not(.btn-close),
+  button:not(.btn-close) {
+    min-height: 3rem !important;
+  }
+
+  .nav-icon-btn,
+  .rp-theme-toggle {
+    width: 3rem !important;
+    height: 3rem !important;
+    min-width: 3rem !important;
+  }
+
+  .profile-pill {
+    width: 3rem !important;
+    min-width: 3rem !important;
+    padding: .2rem !important;
+    justify-content: center !important;
+  }
+
+  .form-check-input {
+    min-width: 1.5rem;
+    min-height: 1.5rem;
+  }
+
+  .dropdown-item {
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+  }
+}
