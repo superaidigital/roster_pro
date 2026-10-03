@@ -936,3 +936,29 @@ textarea.form-control {
     align-items: center;
   }
 }
+
+
+/* Final typography: Sarabun for field/office readability */
+body,
+button,
+input,
+select,
+textarea,
+table,
+.dropdown-menu,
+.modal,
+.offcanvas {
+  font-family: "Sarabun", "Noto Sans Thai", Tahoma, sans-serif !important;
+}
+
+.app-main h1,
+.app-main h2,
+.app-main h3,
+.app-main h4,
+.app-main h5,
+.app-main h6,
+.rp-page-title,
+.rp-sidebar-brand-copy strong {
+  font-family: "Sarabun", "Noto Sans Thai", Tahoma, sans-serif !important;
+  font-weight: 700;
+}
