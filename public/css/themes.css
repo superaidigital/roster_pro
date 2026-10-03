@@ -301,3 +301,46 @@ html[data-theme="dark"] .flatpickr-day:hover {
     height: 2.45rem !important;
   }
 }
+
+
+/* Login theme integration */
+.rp-login-theme-toggle {
+  position: fixed !important;
+  top: max(.8rem, env(safe-area-inset-top));
+  right: max(.8rem, env(safe-area-inset-right));
+  z-index: 1100;
+  box-shadow: 0 .45rem 1.2rem var(--rp-theme-shadow) !important;
+}
+
+html[data-theme="dark"] .login-container,
+html[data-theme="dark"] .login-right {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-surface) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+html[data-theme="dark"] .login-right h2,
+html[data-theme="dark"] .login-right h3,
+html[data-theme="dark"] .login-right .text-dark {
+  color: var(--rp-theme-text) !important;
+}
+
+html[data-theme="dark"] .login-right .input-group-modern {
+  background: var(--rp-theme-input) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+html[data-theme="dark"] .login-right .input-group-modern:focus-within {
+  background: var(--rp-theme-input) !important;
+  border-color: var(--rp-theme-primary) !important;
+}
+
+html[data-theme="dark"] .login-right .input-group-text,
+html[data-theme="dark"] .login-right .form-control {
+  color: var(--rp-theme-text) !important;
+  background: transparent !important;
+}
+
+html[data-theme="dark"] .login-right .form-control::placeholder {
+  color: var(--rp-theme-muted) !important;
+}
