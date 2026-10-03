@@ -158,6 +158,7 @@ class FieldController {
 
         $filters = [
             'status' => in_array($_GET['status'] ?? '', ['DRAFT', 'COMPLETED'], true) ? $_GET['status'] : '',
+            'risk_level' => in_array($_GET['risk_level'] ?? '', ['ROUTINE', 'WATCH', 'HIGH', 'URGENT'], true) ? $_GET['risk_level'] : '',
             'date_from' => $this->validDate((string)($_GET['date_from'] ?? '')) ? $_GET['date_from'] : '',
             'date_to' => $this->validDate((string)($_GET['date_to'] ?? '')) ? $_GET['date_to'] : '',
             'q' => mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100, 'UTF-8'),
@@ -165,6 +166,18 @@ class FieldController {
 
         $visits = $model->getVisibleVisits($user, $filters, 150);
         $summary = $model->getSummary($user);
+
+        $editVisit = null;
+        $editId = (int)($_GET['edit'] ?? 0);
+        if ($editId > 0) {
+            $candidate = $model->getVisibleVisitById($editId, $user);
+            if ($candidate && strtoupper((string)$candidate['status']) === 'DRAFT') {
+                $editVisit = $candidate;
+            } else {
+                $_SESSION['error_msg'] = 'ไม่พบร่างที่สามารถแก้ไขได้ หรือคุณไม่มีสิทธิ์เข้าถึงรายการนี้';
+            }
+        }
+
         $canSelectHospital = $this->isGlobal($user);
         $hospitals = [];
 
@@ -186,9 +199,21 @@ class FieldController {
             $db = (new Database())->getConnection();
             $model = new FieldVisitModel($db);
 
-            $hospitalId = $this->isGlobal($user)
-                ? (int)($_POST['hospital_id'] ?? 0)
-                : (int)($user['hospital_id'] ?? 0);
+            $visitId = (int)($_POST['visit_id'] ?? 0);
+            $existingDraft = null;
+
+            if ($visitId > 0) {
+                $existingDraft = $model->getVisibleVisitById($visitId, $user);
+                if (!$existingDraft || strtoupper((string)$existingDraft['status']) !== 'DRAFT') {
+                    throw new RuntimeException('ไม่พบร่างที่สามารถแก้ไขได้ หรือคุณไม่มีสิทธิ์แก้ไขรายการนี้');
+                }
+            }
+
+            $hospitalId = $existingDraft
+                ? (int)$existingDraft['hospital_id']
+                : ($this->isGlobal($user)
+                    ? (int)($_POST['hospital_id'] ?? 0)
+                    : (int)($user['hospital_id'] ?? 0));
 
             if ($hospitalId <= 0) {
                 throw new InvalidArgumentException('กรุณาเลือกหน่วยบริการ');
@@ -213,6 +238,26 @@ class FieldController {
             $status = strtoupper(trim((string)($_POST['status'] ?? 'DRAFT')));
             if (!in_array($status, ['DRAFT', 'COMPLETED'], true)) {
                 $status = 'DRAFT';
+            }
+
+            $riskLevel = strtoupper(trim((string)($_POST['risk_level'] ?? 'ROUTINE')));
+            if (!in_array($riskLevel, ['ROUTINE', 'WATCH', 'HIGH', 'URGENT'], true)) {
+                $riskLevel = 'ROUTINE';
+            }
+
+            $followUpDateRaw = trim((string)($_POST['follow_up_date'] ?? ''));
+            $followUpDate = null;
+            if ($followUpDateRaw !== '') {
+                if (!$this->validDate($followUpDateRaw)) {
+                    throw new InvalidArgumentException('วันที่ติดตามครั้งถัดไปไม่ถูกต้อง');
+                }
+                $followUpDate = $followUpDateRaw;
+            }
+
+            $referralRequired = isset($_POST['referral_required']) ? 1 : 0;
+            $referralNote = $this->cleanString('referral_note', 500) ?: null;
+            if ($referralRequired && !$referralNote) {
+                throw new InvalidArgumentException('กรุณาระบุรายละเอียดการส่งต่อ');
             }
 
             $photos = $this->collectPhotos();
@@ -240,6 +285,11 @@ class FieldController {
                 'symptoms' => $this->cleanString('symptoms', 3000) ?: null,
                 'assessment' => $this->cleanString('assessment', 3000) ?: null,
                 'care_plan' => $this->cleanString('care_plan', 3000) ?: null,
+                'risk_level' => $riskLevel,
+                'follow_up_date' => $followUpDate,
+                'follow_up_status' => $followUpDate ? 'PENDING' : 'NONE',
+                'referral_required' => $referralRequired,
+                'referral_note' => $referralNote,
                 'latitude' => $this->nullableFloat('latitude', -90, 90),
                 'longitude' => $this->nullableFloat('longitude', -180, 180),
                 'accuracy_m' => $this->nullableFloat('accuracy_m', 0, 100000),
@@ -252,7 +302,13 @@ class FieldController {
             $db->beginTransaction();
 
             try {
-                $visitId = $model->createVisit($data);
+                if ($existingDraft) {
+                    if (!$model->updateDraft($visitId, $data, $user)) {
+                        throw new RuntimeException('ไม่สามารถอัปเดตร่างได้');
+                    }
+                } else {
+                    $visitId = $model->createVisit($data);
+                }
 
                 if ($photos) {
                     $storageRoot = dirname(__DIR__) . '/storage/field_visits';
@@ -288,13 +344,13 @@ class FieldController {
             LogsController::addLog(
                 $db,
                 (int)$user['id'],
-                LogsController::ACTION_CREATE,
-                'บันทึกเยี่ยมบ้าน ID ' . $visitId . ' สถานะ ' . $status
+                $existingDraft ? LogsController::ACTION_UPDATE : LogsController::ACTION_CREATE,
+                ($existingDraft ? 'แก้ไขร่างเยี่ยมบ้าน ID ' : 'บันทึกเยี่ยมบ้าน ID ') . $visitId . ' สถานะ ' . $status
             );
 
             $_SESSION['success_msg'] = $status === 'COMPLETED'
                 ? 'บันทึกผลเยี่ยมบ้านเรียบร้อย'
-                : 'บันทึกร่างเยี่ยมบ้านเรียบร้อย';
+                : ($existingDraft ? 'อัปเดตร่างเยี่ยมบ้านเรียบร้อย' : 'บันทึกร่างเยี่ยมบ้านเรียบร้อย');
 
             header('Location: index.php?c=field&saved=1');
             exit;
@@ -303,6 +359,44 @@ class FieldController {
         } catch (Throwable $e) {
             error_log('Field visit save failed: ' . $e->getMessage());
             $_SESSION['error_msg'] = 'เกิดข้อผิดพลาดภายในระบบ ไม่สามารถบันทึกข้อมูลได้';
+        }
+
+        header('Location: index.php?c=field');
+        exit;
+    }
+
+    public function complete_followup(): void {
+        $this->requirePost();
+        $user = $this->currentUser();
+        $visitId = (int)($_POST['visit_id'] ?? 0);
+
+        if ($visitId <= 0) {
+            $_SESSION['error_msg'] = 'ไม่พบรายการติดตาม';
+            header('Location: index.php?c=field');
+            exit;
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $model = new FieldVisitModel($db);
+
+            if (!$model->markFollowUpDone($visitId, $user)) {
+                throw new RuntimeException('ไม่พบงานติดตามที่สามารถปิดได้ หรือคุณไม่มีสิทธิ์');
+            }
+
+            LogsController::addLog(
+                $db,
+                (int)$user['id'],
+                LogsController::ACTION_UPDATE,
+                'ปิดงานติดตามเยี่ยมบ้าน ID ' . $visitId
+            );
+
+            $_SESSION['success_msg'] = 'ปิดงานติดตามเรียบร้อย';
+        } catch (RuntimeException $e) {
+            $_SESSION['error_msg'] = $e->getMessage();
+        } catch (Throwable $e) {
+            error_log('Field follow-up completion failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = 'เกิดข้อผิดพลาด ไม่สามารถปิดงานติดตามได้';
         }
 
         header('Location: index.php?c=field');
@@ -352,6 +446,7 @@ class FieldController {
 
         $filters = [
             'status' => in_array($_GET['status'] ?? '', ['DRAFT', 'COMPLETED'], true) ? $_GET['status'] : '',
+            'risk_level' => in_array($_GET['risk_level'] ?? '', ['ROUTINE', 'WATCH', 'HIGH', 'URGENT'], true) ? $_GET['risk_level'] : '',
             'date_from' => $this->validDate((string)($_GET['date_from'] ?? '')) ? $_GET['date_from'] : '',
             'date_to' => $this->validDate((string)($_GET['date_to'] ?? '')) ? $_GET['date_to'] : '',
             'q' => mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100, 'UTF-8'),
@@ -367,7 +462,7 @@ class FieldController {
 
         $out = fopen('php://output', 'wb');
         fwrite($out, "\xEF\xBB\xBF");
-        fputcsv($out, ['วันที่', 'หน่วยบริการ', 'รหัสผู้รับบริการ', 'ชื่อ', 'ประเภท', 'อาการ/เหตุผล', 'ผู้บันทึก', 'สถานะ']);
+        fputcsv($out, ['วันที่', 'หน่วยบริการ', 'รหัสผู้รับบริการ', 'ชื่อ', 'ประเภท', 'อาการ/เหตุผล', 'ระดับความเสี่ยง', 'วันติดตาม', 'สถานะติดตาม', 'ต้องส่งต่อ', 'รายละเอียดส่งต่อ', 'ผู้บันทึก', 'สถานะ']);
 
         foreach ($rows as $row) {
             fputcsv($out, [
@@ -377,6 +472,11 @@ class FieldController {
                 $this->safeCsvValue($row['patient_name']),
                 $this->safeCsvValue($row['visit_type']),
                 $this->safeCsvValue($row['chief_concern']),
+                $this->safeCsvValue($row['risk_level']),
+                $this->safeCsvValue($row['follow_up_date']),
+                $this->safeCsvValue($row['follow_up_status']),
+                $this->safeCsvValue((int)$row['referral_required'] === 1 ? 'ใช่' : 'ไม่'),
+                $this->safeCsvValue($row['referral_note']),
                 $this->safeCsvValue($row['created_by_name']),
                 $this->safeCsvValue($row['status']),
             ]);
