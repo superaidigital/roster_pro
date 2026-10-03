@@ -79,7 +79,7 @@ if ($role === 'HR') {
     $allowed_controllers = ['staff', 'users', 'hr', 'profile'];
 } else {
     // ตำแหน่งอื่น อนุญาตให้เข้าถึงหน้าพื้นฐานเสมอ
-    $allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile']);
+    $allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile', 'field']);
 }
 
 $allowed_controllers = array_unique($allowed_controllers);
@@ -102,6 +102,16 @@ if (!function_exists('renderSidebarMenu')) {
             <li class="nav-item">
                 <a class="nav-link <?= ($c == 'profile' && $a == 'schedule') ? 'active' : '' ?>" href="index.php?c=profile&a=schedule">
                     <i class="bi bi-calendar-heart-fill text-danger"></i> <span class="sidebar-text">ปฏิทินเวรของฉัน</span>
+                </a>
+            </li>
+            <?php endif; ?>
+
+            <?php if (in_array('field', $allowed_controllers)): ?>
+            <li class="sidebar-heading mt-2">งานภาคสนาม</li>
+            <li class="nav-item">
+                <a class="nav-link <?= ($c == 'field') ? 'active' : '' ?>" href="index.php?c=field">
+                    <i class="bi bi-house-heart-fill text-success"></i>
+                    <span class="sidebar-text">เยี่ยมบ้าน / งานชุมชน</span>
                 </a>
             </li>
             <?php endif; ?>
