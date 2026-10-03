@@ -11,6 +11,8 @@
     <!-- นำเข้า Bootstrap และ Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="public/css/style.css?v=20261003-ui-v9">
+    <script src="public/js/progress.js?v=20261003-ui-v9" defer></script>
     
     <!-- นำเข้าฟอนต์ Noto Sans Thai -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +22,9 @@
     <style>
         body {
             font-family: 'Noto Sans Thai', sans-serif;
-            background-color: #f4f6f9;
+            background:
+                radial-gradient(circle at 10% 10%, rgba(15,108,189,.12), transparent 28rem),
+                linear-gradient(160deg, #f8fbfd 0%, #edf6f8 100%);
             min-height: 100vh;
             margin: 0;
             display: flex;
@@ -41,7 +45,7 @@
 
         /* 🌟 ฝั่งซ้าย (รูปภาพ) */
         .login-left {
-            background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+            background: linear-gradient(145deg, #0f6cbd 0%, #0f766e 100%);
             padding: clamp(2rem, 4vw, 3rem);
             color: white;
             display: flex;
@@ -119,7 +123,7 @@
         }
 
         .btn-login {
-            background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+            background: linear-gradient(135deg, #0f6cbd 0%, #0f766e 100%);
             border: none;
             border-radius: 0.75rem;
             padding: 0.85rem;
@@ -132,7 +136,7 @@
 
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+            box-shadow: 0 8px 20px rgba(15, 108, 189, 0.24);
             color: white;
         }
 
