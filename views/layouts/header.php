@@ -352,10 +352,18 @@ if (isset($_SESSION['user'])) {
         }
     </style>
 
-    <link rel="stylesheet" href="public/css/style.css?v=20261003-field-v2">
-    <script src="public/js/responsive.js?v=20261003-field-v2" defer></script>
+    <link rel="stylesheet" href="public/css/style.css?v=20261003-ui-v8">
+    <script src="public/js/responsive.js?v=20261003-ui-v8" defer></script>
+    <script src="public/js/progress.js?v=20261003-ui-v8" defer></script>
 </head>
 <body>
+<div id="rpGlobalProgress" class="rp-global-progress" role="progressbar" aria-label="สถานะการประมวลผล" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="rp-global-progress-track">
+        <div id="rpGlobalProgressBar" class="rp-global-progress-bar"></div>
+    </div>
+    <div id="rpGlobalProgressLabel" class="rp-global-progress-label" aria-hidden="true"></div>
+</div>
+<div id="rpProgressLive" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
 <!-- 🌟 1. Top Navbar -->
 <nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4">
