@@ -65,8 +65,9 @@ body {
   width: calc(100% - var(--rp-sidebar-w)) !important;
   min-width: 0 !important;
   height: calc(100dvh - var(--rp-header-h)) !important;
+  margin-top: var(--rp-header-h) !important;
   margin-left: var(--rp-sidebar-w) !important;
-  padding-top: var(--rp-header-h);
+  padding-top: 0 !important;
 }
 
 .rp-desktop-sidebar,
@@ -476,8 +477,9 @@ textarea.form-control {
     width: 100% !important;
     height: auto !important;
     min-height: calc(100dvh - var(--rp-header-h)) !important;
+    margin-top: var(--rp-header-h) !important;
     margin-left: 0 !important;
-    padding-top: var(--rp-header-h);
+    padding-top: 0 !important;
   }
 
   .app-main {
