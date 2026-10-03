@@ -68,6 +68,38 @@ class HolidayModel {
         }
     }
 
+    // เสนอวันหยุดจากหน่วยบริการ: ยังไม่ถูกนำไปใช้จนกว่าผู้ดูแลจะอนุมัติ
+    public function requestHoliday($date, $name, $hospitalId) {
+        $date = trim((string)$date);
+        $name = trim((string)$name);
+        $hospitalId = (int)$hospitalId;
+
+        $stmt = $this->conn->prepare(
+            "SELECT id, status, is_active, hospital_id
+             FROM holidays
+             WHERE holiday_date = ?
+               AND (hospital_id IS NULL OR hospital_id = 0 OR hospital_id = ?)
+             ORDER BY id ASC"
+        );
+        $stmt->execute([$date, $hospitalId]);
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (($row['status'] ?? 'APPROVED') === 'PENDING' && (int)($row['hospital_id'] ?? 0) === $hospitalId) {
+                return 'PENDING';
+            }
+            if (($row['status'] ?? 'APPROVED') === 'APPROVED' && (int)($row['is_active'] ?? 1) === 1) {
+                return 'EXISTS';
+            }
+        }
+
+        $insert = $this->conn->prepare(
+            "INSERT INTO holidays (hospital_id, status, holiday_date, holiday_name, holiday_type, is_active)
+             VALUES (?, 'PENDING', ?, ?, 'SPECIAL', 0)"
+        );
+
+        return $insert->execute([$hospitalId, $date, $name]) ? 'SUCCESS' : 'ERROR';
+    }
+
     // ลบวันหยุด
     public function deleteHoliday($id) {
         $stmt = $this->conn->prepare("DELETE FROM holidays WHERE id = ?");
@@ -87,7 +119,8 @@ class HolidayModel {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);

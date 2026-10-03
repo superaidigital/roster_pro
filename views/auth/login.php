@@ -5,22 +5,41 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>เข้าสู่ระบบ | Roster Pro</title>
+    <meta name="theme-color" content="#f8fbfd">
+    <script id="rp-theme-prepaint">
+    (() => {
+      try {
+        const saved = localStorage.getItem('rp-theme');
+        const theme = saved === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      } catch (_) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-bs-theme', 'light');
+      }
+    })();
+    </script>
     
     <!-- นำเข้า Bootstrap และ Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="public/css/style.css?v=20261004-health-v15">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-health-v15">
+    <script src="public/js/progress.js?v=20261004-health-v15" defer></script>
     
     <!-- นำเข้าฟอนต์ Noto Sans Thai -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         body {
-            font-family: 'Noto Sans Thai', sans-serif;
-            background-color: #f4f6f9;
+            font-family: 'Sarabun', sans-serif;
+            background:
+                radial-gradient(circle at 10% 10%, rgba(15,108,189,.12), transparent 28rem),
+                linear-gradient(160deg, #f8fbfd 0%, #edf6f8 100%);
             min-height: 100vh;
             margin: 0;
             display: flex;
@@ -30,7 +49,7 @@
         }
         
         .login-container {
-            max-width: 1000px;
+            max-width: 62rem;
             width: 100%;
             background: #ffffff;
             border-radius: 1.5rem;
@@ -41,8 +60,8 @@
 
         /* 🌟 ฝั่งซ้าย (รูปภาพ) */
         .login-left {
-            background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-            padding: 3rem;
+            background: linear-gradient(145deg, #0f6cbd 0%, #0f766e 100%);
+            padding: clamp(2rem, 4vw, 3rem);
             color: white;
             display: flex;
             flex-direction: column;
@@ -76,7 +95,7 @@
 
         /* 🌟 ฝั่งขวา (ฟอร์ม) */
         .login-right {
-            padding: 4rem 3rem;
+            padding: clamp(2rem, 5vw, 4rem) clamp(1.5rem, 4vw, 3rem);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -119,7 +138,7 @@
         }
 
         .btn-login {
-            background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+            background: linear-gradient(135deg, #0f6cbd 0%, #0f766e 100%);
             border: none;
             border-radius: 0.75rem;
             padding: 0.85rem;
@@ -132,7 +151,7 @@
 
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+            box-shadow: 0 8px 20px rgba(15, 108, 189, 0.24);
             color: white;
         }
 
@@ -142,8 +161,104 @@
             .login-right { padding: 3rem 1.5rem; }
         }
     </style>
+<style>
+/* Modern Clinical Login v10 */
+.login-container {
+    max-width: 66rem !important;
+    min-height: min(42rem, calc(100dvh - 3rem));
+    border: 1px solid #d7e3ea;
+    border-radius: 1.4rem !important;
+    background: #fff;
+    box-shadow: 0 2rem 5rem rgba(11,31,47,.16) !important;
+}
+.login-left {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 20% 20%, rgba(45,212,191,.24), transparent 18rem),
+        linear-gradient(145deg, #12384d 0%, #0b1f2f 72%) !important;
+}
+.login-left::before {
+    content: '';
+    position: absolute;
+    width: 22rem;
+    height: 22rem;
+    right: -10rem;
+    bottom: -8rem;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 3rem rgba(255,255,255,.025),
+        0 0 0 7rem rgba(255,255,255,.02);
+}
+.login-left .brand-logo-large {
+    color: #5eead4 !important;
+    filter: drop-shadow(0 .6rem 1.2rem rgba(45,212,191,.16));
+}
+.login-left h2 {
+    font-size: clamp(2rem, 3vw, 2.7rem);
+    letter-spacing: -.04em;
+}
+.login-right {
+    background: #fff;
+}
+.login-right h3 {
+    color: #10212e !important;
+    letter-spacing: -.025em;
+}
+.input-group-modern {
+    min-height: 3.15rem;
+    border: 1px solid #cbd9e4 !important;
+    border-radius: .82rem !important;
+    background: #fbfdfe !important;
+    box-shadow: none !important;
+}
+.input-group-modern:focus-within {
+    border-color: #0f6cbd !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 .2rem rgba(15,108,189,.12) !important;
+}
+.btn-login {
+    min-height: 3.2rem;
+    border: 0 !important;
+    border-radius: .82rem !important;
+    color: #fff !important;
+    background: linear-gradient(135deg, #0f6cbd, #0f766e) !important;
+    box-shadow: 0 .7rem 1.5rem rgba(15,108,189,.18) !important;
+}
+.btn-login:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 .85rem 1.8rem rgba(15,108,189,.22) !important;
+}
+@media (max-width: 767.98px) {
+    .login-container {
+        min-height: 100dvh;
+        border: 0;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+}
+</style>
+    <link rel="stylesheet" href="public/css/themes.css?v=20261004-theme-v4">
+    <script src="public/js/theme.js?v=20261004-theme-v4" defer></script>
 </head>
 <body>
+<button type="button"
+        class="nav-icon-btn rp-theme-toggle rp-login-theme-toggle"
+        data-rp-theme-toggle
+        aria-pressed="false"
+        aria-label="เปลี่ยนเป็นโหมดมืด"
+        title="โหมดมืด">
+    <i class="bi bi-moon-stars-fill" data-rp-theme-icon></i>
+</button>
+
+<div id="rpGlobalProgress" class="rp-global-progress" role="progressbar" aria-label="สถานะการประมวลผล" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="rp-global-progress-track">
+        <div id="rpGlobalProgressBar" class="rp-global-progress-bar"></div>
+    </div>
+    <div id="rpGlobalProgressLabel" class="rp-global-progress-label" aria-hidden="true"></div>
+</div>
+<div id="rpProgressLive" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
 <div class="login-container">
     <div class="row g-0 w-100">
@@ -151,10 +266,10 @@
         <!-- 🎨 ฝั่งซ้าย: รูปภาพและโลโก้ (ซ่อนในมือถือ) -->
         <div class="col-md-5 login-left d-none d-md-flex">
             <div style="z-index: 2;">
-                <i class="bi bi-calendar2-check-fill brand-logo-large text-white"></i>
+                <i class="bi bi-heart-pulse-fill brand-logo-large text-white"></i>
                 <h2 class="fw-bold mb-3">Roster<span class="fw-light">Pro</span></h2>
                 <p class="opacity-75 fw-light mb-0" style="font-size: 1.1rem; line-height: 1.6;">
-                    ระบบจัดตารางปฏิบัติงานและลางานออนไลน์<br>สำหรับหน่วยบริการสุขภาพ
+                    พื้นที่ทำงานดิจิทัลสำหรับการจัดเวร วันลา และบุคลากร<br>ออกแบบสำหรับหน่วยบริการปฐมภูมิ
                 </p>
             </div>
             <div class="position-absolute bottom-0 mb-4 opacity-50 small" style="z-index: 2;">
@@ -168,7 +283,7 @@
                 
                 <!-- โลโก้สำหรับหน้าจอมือถือ -->
                 <div class="text-center d-md-none mb-4 pb-2">
-                    <i class="bi bi-calendar2-check-fill text-primary" style="font-size: 3.5rem;"></i>
+                    <i class="bi bi-heart-pulse-fill text-primary" style="font-size: 3.5rem;"></i>
                     <h2 class="fw-bold text-dark mt-2 mb-0">Roster<span class="text-primary">Pro</span></h2>
                 </div>
 
@@ -181,7 +296,7 @@
                 <?php if (isset($_SESSION['login_error'])): ?>
                     <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm">
                         <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
-                        <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['login_error'] ?></div>
+                        <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['login_error'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
                     <?php unset($_SESSION['login_error']); ?>
                 <?php endif; ?>
@@ -189,7 +304,7 @@
                 <?php if (isset($_SESSION['error_msg'])): ?>
                     <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm">
                         <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
-                        <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['error_msg'] ?></div>
+                        <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
                     <?php unset($_SESSION['error_msg']); ?>
                 <?php endif; ?>
@@ -197,7 +312,7 @@
                 <?php if (isset($_SESSION['success_msg'])): ?>
                     <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm">
                         <i class="bi bi-check-circle-fill fs-5 me-3"></i> 
-                        <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['success_msg'] ?></div>
+                        <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
                     <?php unset($_SESSION['success_msg']); ?>
                 <?php endif; ?>
@@ -207,6 +322,7 @@
                     <!-- ซ่อน Input บอกทิศทาง Controller ป้องกันบัคหน้าขาว -->
                     <input type="hidden" name="c" value="auth">
                     <input type="hidden" name="a" value="login">
+                    <?= security_csrf_input() ?>
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold text-dark small mb-1">ชื่อผู้ใช้งาน (Username)</label>

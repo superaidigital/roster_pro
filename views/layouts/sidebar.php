@@ -79,65 +79,11 @@ if ($role === 'HR') {
     $allowed_controllers = ['staff', 'users', 'hr', 'profile'];
 } else {
     // ตำแหน่งอื่น อนุญาตให้เข้าถึงหน้าพื้นฐานเสมอ
-    $allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile']);
+    $allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile', 'field']);
 }
 
 $allowed_controllers = array_unique($allowed_controllers);
 ?>
-
-<style>
-    /* 🌟 CSS สำหรับ Sidebar */
-    #desktopSidebar {
-        width: 260px; min-width: 260px; max-width: 260px;
-        flex-shrink: 0; height: 100%;
-        background-color: var(--sidebar-bg, #ffffff); border-right: 1px solid #e2e8f0;
-        overflow-y: auto; overflow-x: hidden;
-        transition: width 0.3s ease; z-index: 1040;
-    }
-    #desktopSidebar.collapsed { width: 80px; min-width: 80px; max-width: 80px; }
-    
-    /* ซ่อนข้อความและลูกศรเวลาพับเมนู */
-    #desktopSidebar.collapsed .sidebar-text, 
-    #desktopSidebar.collapsed .sidebar-heading,
-    #desktopSidebar.collapsed .dropdown-arrow { display: none !important; }
-    
-    /* จัดไอคอนให้อยู่กึ่งกลางเวลาพับเมนู */
-    #desktopSidebar.collapsed .nav-link { justify-content: center !important; padding: 0.8rem 0 !important; }
-    #desktopSidebar.collapsed .nav-link i { margin-right: 0 !important; font-size: 1.4rem !important; }
-    
-    /* ซ่อนเมนูย่อยเวลาพับ Sidebar */
-    #desktopSidebar.collapsed .leave-dropdown-container ul,
-    #desktopSidebar.collapsed .hr-dropdown-container ul { display: none !important; }
-
-    .sidebar-menu { list-style: none; padding: 15px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
-    .nav-link { 
-        display: flex; align-items: center; padding: 12px 15px; 
-        color: #475569; border-radius: 10px; transition: all 0.2s ease; 
-        font-weight: 500; text-decoration: none; white-space: nowrap;
-    }
-    .nav-link:hover { background-color: #f1f5f9; color: #0d6efd; }
-    .nav-link.active { background-color: #eff6ff; color: #0d6efd; font-weight: 600; }
-    .nav-link i { font-size: 1.25rem; margin-right: 12px; width: 24px; text-align: center; transition: transform 0.2s; }
-    .nav-link:hover i { transform: scale(1.1); }
-    
-    .sidebar-heading { 
-        font-size: 0.75rem; font-weight: 700; color: #94a3b8; 
-        text-transform: uppercase; padding: 15px 15px 5px; letter-spacing: 0.5px; 
-    }
-    
-    /* แอนิเมชันลูกศร Dropdown */
-    .dropdown-arrow { transition: transform 0.3s ease; font-size: 0.8rem; }
-    [aria-expanded="true"] .dropdown-arrow { transform: rotate(180deg); }
-    
-    /* สไตล์สำหรับเมนูย่อย */
-    .submenu-item { padding: 8px 15px 8px 45px !important; font-size: 14px; }
-    .submenu-item.active { background-color: transparent !important; color: #0d6efd; font-weight: 600; }
-    .submenu-item.active::before {
-        content: ''; position: absolute; left: 20px; width: 6px; height: 6px; 
-        background-color: #0d6efd; border-radius: 50%;
-    }
-</style>
-
 <?php
 // ฟังก์ชันสร้างเมนูด้านซ้าย เพื่อเรียกใช้ซ้ำทั้งแบบ Desktop และ Mobile
 if (!function_exists('renderSidebarMenu')) {
@@ -156,6 +102,16 @@ if (!function_exists('renderSidebarMenu')) {
             <li class="nav-item">
                 <a class="nav-link <?= ($c == 'profile' && $a == 'schedule') ? 'active' : '' ?>" href="index.php?c=profile&a=schedule">
                     <i class="bi bi-calendar-heart-fill text-danger"></i> <span class="sidebar-text">ปฏิทินเวรของฉัน</span>
+                </a>
+            </li>
+            <?php endif; ?>
+
+            <?php if (in_array('field', $allowed_controllers)): ?>
+            <li class="sidebar-heading mt-2">งานภาคสนาม</li>
+            <li class="nav-item">
+                <a class="nav-link <?= ($c == 'field') ? 'active' : '' ?>" href="index.php?c=field">
+                    <i class="bi bi-house-heart-fill text-success"></i>
+                    <span class="sidebar-text">เยี่ยมบ้าน / งานชุมชน</span>
                 </a>
             </li>
             <?php endif; ?>
@@ -328,12 +284,27 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 1. Desktop Sidebar -->
 <!-- ========================================== -->
-<aside id="desktopSidebar" class="d-none d-md-flex flex-column h-100 bg-white">
+<aside id="desktopSidebar" class="rp-desktop-sidebar flex-column h-100" aria-label="เมนูหลัก">
+    <a href="index.php?c=dashboard" class="rp-sidebar-brand text-decoration-none">
+        <span class="rp-sidebar-brand-mark"><i class="bi bi-heart-pulse-fill"></i></span>
+        <span class="rp-sidebar-brand-copy sidebar-text">
+            <strong>Roster Pro</strong>
+            <small>Primary Care Workspace</small>
+        </span>
+    </a>
     <!-- Script ป้องกันการกระพริบของเมนูตอนโหลดหน้าเว็บ -->
     <script>
-        if (localStorage.getItem('sidebarState') === 'collapsed') {
-            document.getElementById('desktopSidebar').classList.add('collapsed');
-        }
+        (function () {
+            const collapsed = localStorage.getItem('sidebarState') === 'collapsed';
+            const sidebar = document.getElementById('desktopSidebar');
+
+            if (collapsed && sidebar) {
+                sidebar.classList.add('collapsed');
+                document.body.classList.add('rp-sidebar-collapsed');
+            } else {
+                document.body.classList.remove('rp-sidebar-collapsed');
+            }
+        })();
     </script>
     
     <div class="flex-grow-1 overflow-auto custom-scrollbar pb-3">
@@ -341,7 +312,7 @@ if (!function_exists('renderSidebarMenu')) {
     </div>
     
     <!-- ปุ่มออกจากระบบ (ล่างสุด) -->
-    <div class="mt-auto p-3 border-top bg-white">
+    <div class="rp-sidebar-footer mt-auto p-3">
         <a href="index.php?c=auth&a=logout" class="nav-link d-flex align-items-center py-2 px-3 rounded-3 text-decoration-none" style="color: #ef4444; font-weight: bold;" onclick="return confirm('คุณต้องการออกจากระบบใช่หรือไม่?');" onmouseover="this.style.backgroundColor='#fef2f2';" onmouseout="this.style.backgroundColor='transparent';">
             <i class="bi bi-box-arrow-left me-2 fs-5" style="color: #ef4444;"></i> <span class="sidebar-text">ออกจากระบบ</span>
         </a>
@@ -351,14 +322,15 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 2. Mobile Sidebar (Offcanvas) -->
 <!-- ========================================== -->
-<div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" style="width: 280px;">
-    <div class="offcanvas-header border-bottom px-4 py-3">
-        <h5 class="offcanvas-title fw-bold d-flex align-items-center text-primary">
-            <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center me-2 shadow-sm" style="width: 32px; height: 32px;">
-                <i class="bi bi-calendar2-check-fill fs-6"></i>
-            </div>
-            Roster<span class="text-dark">Pro</span>
-        </h5>
+<div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" aria-label="เมนูหลักบนมือถือ">
+    <div class="offcanvas-header rp-mobile-sidebar-header px-4 py-3">
+        <div class="rp-mobile-sidebar-brand">
+            <span class="rp-sidebar-brand-mark"><i class="bi bi-heart-pulse-fill"></i></span>
+            <span>
+                <strong>Roster Pro</strong>
+                <small>Primary Care Workspace</small>
+            </span>
+        </div>
         <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body p-0 d-flex flex-column custom-scrollbar pb-4">
@@ -373,31 +345,75 @@ if (!function_exists('renderSidebarMenu')) {
 document.addEventListener('DOMContentLoaded', function() {
     const toggleBtn = document.getElementById('sidebarToggleBtn');
     const desktopSidebar = document.getElementById('desktopSidebar');
-    
+
+    function syncSidebarState(collapsed) {
+        if (!desktopSidebar) return;
+
+        desktopSidebar.classList.toggle('collapsed', collapsed);
+        document.body.classList.toggle('rp-sidebar-collapsed', collapsed);
+        localStorage.setItem('sidebarState', collapsed ? 'collapsed' : 'expanded');
+
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggleBtn.setAttribute(
+                'aria-label',
+                collapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง'
+            );
+        }
+
+        desktopSidebar.querySelectorAll('.sidebar-menu .nav-link, .rp-sidebar-footer .nav-link').forEach(link => {
+            const label = link.querySelector('.sidebar-text');
+            const text = label ? label.textContent.replace(/\s+/g, ' ').trim() : '';
+
+            if (collapsed && text) {
+                link.setAttribute('title', text);
+                if (!link.hasAttribute('aria-label')) {
+                    link.setAttribute('aria-label', text);
+                }
+            } else {
+                link.removeAttribute('title');
+            }
+        });
+
+        if (collapsed) {
+            ['leaveMenu', 'hrMenu'].forEach(menuId => {
+                const menuElement = document.getElementById(menuId);
+
+                if (menuElement && menuElement.classList.contains('show')) {
+                    if (window.bootstrap && bootstrap.Collapse) {
+                        bootstrap.Collapse
+                            .getOrCreateInstance(menuElement, { toggle: false })
+                            .hide();
+                    } else {
+                        menuElement.classList.remove('show');
+                    }
+                }
+
+                const menuBtn = document.querySelector(`[href="#${menuId}"]`);
+                if (menuBtn) {
+                    menuBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+    }
+
+    syncSidebarState(localStorage.getItem('sidebarState') === 'collapsed');
+
+    const syncSidebarMode = () => {
+        if (window.innerWidth < 1024) {
+            document.body.classList.remove('rp-sidebar-collapsed');
+        } else {
+            document.body.classList.toggle('rp-sidebar-collapsed', desktopSidebar?.classList.contains('collapsed'));
+        }
+    };
+
+    window.addEventListener('resize', syncSidebarMode);
+    syncSidebarMode();
+
     if (toggleBtn && desktopSidebar) {
         toggleBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            desktopSidebar.classList.toggle('collapsed');
-            
-            // บันทึกสถานะลงใน Browser
-            if (desktopSidebar.classList.contains('collapsed')) {
-                localStorage.setItem('sidebarState', 'collapsed');
-                
-                // สั่งปิดเมนู Dropdown อัตโนมัติเวลาพับ Sidebar
-                const menusToCollapse = ['leaveMenu', 'hrMenu'];
-                menusToCollapse.forEach(menuId => {
-                    const menuElement = document.getElementById(menuId);
-                    if(menuElement && menuElement.classList.contains('show')) {
-                        const bsCollapse = new bootstrap.Collapse(menuElement, {toggle: false});
-                        bsCollapse.hide();
-                        const menuBtn = document.querySelector(`[href="#${menuId}"]`);
-                        if(menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
-                    }
-                });
-
-            } else {
-                localStorage.setItem('sidebarState', 'expanded');
-            }
+            syncSidebarState(!desktopSidebar.classList.contains('collapsed'));
         });
     }
 });
@@ -406,4 +422,4 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ========================================== -->
 <!-- 🌟 4. เปิดพื้นที่ Main Content (ส่วนแสดงผลข้อมูล) -->
 <!-- ========================================== -->
-<main class="flex-grow-1 position-relative overflow-y-auto custom-scrollbar" style="background-color: #f4f6f9; padding: 1.5rem; height: 100%;">
+<main class="app-main flex-grow-1 position-relative custom-scrollbar">

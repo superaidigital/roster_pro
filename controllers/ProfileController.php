@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/ProfileController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/UserModel.php';
 require_once 'models/ProfileModel.php';
 require_once 'controllers/LogsController.php'; 
@@ -12,7 +13,7 @@ class ProfileController {
     // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน
     // ====================================================
     private function checkAuth() {
-        if (session_status() === PHP_SESSION_NONE) session_start();
+        security_start_session();
         if (!isset($_SESSION['user'])) {
             header("Location: index.php?c=auth&a=login");
             exit;
@@ -30,7 +31,7 @@ class ProfileController {
         $profileModel = new ProfileModel($db);
 
         // ตรวจสอบว่าจะดูประวัติใคร (ถ้าไม่ส่ง id มา ให้ดึงของตัวเอง)
-        $target_user_id = isset($_GET['id']) ? (int)$_GET['id'] : $_SESSION['user']['id'];
+        $target_user_id = isset($_POST['id']) ? (int)$_POST['id'] : $_SESSION['user']['id'];
         
         // ดึงข้อมูลพื้นฐานจากระบบ
         $target_user = $userModel->getUserById($target_user_id);
@@ -42,7 +43,7 @@ class ProfileController {
 
         // ตรวจสอบสิทธิ์ (HR, ADMIN, SUPERADMIN, DIRECTOR ดูได้ทุกคน / STAFF ดูได้แค่ของตัวเอง)
         $current_role = strtoupper($_SESSION['user']['role']);
-        if (!in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR', 'SCHEDULER']) && $_SESSION['user']['id'] != $target_user_id) {
+        if (!$this->canManageProfile($target_user_id)) {
             $_SESSION['error_msg'] = "ปฏิเสธการเข้าถึง: คุณสามารถดูได้เฉพาะประวัติของตนเองเท่านั้น";
             header("Location: index.php?c=profile&id=" . $_SESSION['user']['id']);
             exit;
@@ -74,34 +75,103 @@ class ProfileController {
     public function schedule() {
         $this->checkAuth();
         $db = (new Database())->getConnection();
-        
-        $userModel = new UserModel($db);
-        $profileModel = new ProfileModel($db);
 
         $user_id = $_SESSION['user']['id'];
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
-        
-        // ดึงข้อมูลพื้นฐานและตารางเวรส่วนตัว
-        $target_user = $userModel->getUserById($user_id);
-        $shifts = $profileModel->getUserShifts($user_id, $selected_month);
+        $selected_ym = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
 
-        // โหลด View
+        $my_shifts = [];
+        $my_leaves = [];
+        $raw_leaves = []; // เก็บใบลาแบบรวบยอด (ช่วงวันที่) เพื่อไปโชว์ฝั่งขวา
+        $holidays = [];
+        $summary = ['บ' => 0, 'ร' => 0, 'ย' => 0, 'pay' => 0];
+
+        // 1. ดึงวันหยุดนักขัตฤกษ์
+        $stmt = $db->prepare("SELECT holiday_date, holiday_name FROM holidays WHERE holiday_date LIKE ?");
+        $stmt->execute(["$selected_ym-%"]);
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) { $holidays[$row['holiday_date']] = $row['holiday_name']; }
+
+        // 2. ดึงข้อมูลประวัติการลา 
+        $first_day = "$selected_ym-01";
+        $last_day = date('Y-m-t', strtotime($first_day));
+        
+        // 🌟 แก้ไข: กลับมาใช้ JOIN ตาราง leave_quotas และเรียกฟิลด์ lq.leave_type ให้ตรงกับ Database ของคุณ
+        $stmt = $db->prepare("
+            SELECT lr.start_date, lr.end_date, lq.leave_type, lr.status 
+            FROM leave_requests lr
+            JOIN leave_quotas lq ON lr.leave_type_id = lq.id
+            WHERE lr.user_id = ? 
+            AND (lr.start_date LIKE ? OR lr.end_date LIKE ? OR (lr.start_date <= ? AND lr.end_date >= ?))
+        ");
+        $ym_like = "$selected_ym-%";
+        $stmt->execute([$user_id, $ym_like, $ym_like, $last_day, $first_day]);
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $raw_leaves[] = $row; // เก็บข้อมูลช่วงการลาเพื่อส่งให้ List View (ฝั่งขวา)
+
+            $begin = new DateTime($row['start_date']);
+            $end = new DateTime($row['end_date']);
+            $end->modify('+1 day'); 
+            $period = new DatePeriod($begin, DateInterval::createFromDateString('1 day'), $end);
+            
+            foreach ($period as $dt) {
+                $d_str = $dt->format("Y-m-d");
+                if (strpos($d_str, $selected_ym) === 0) {
+                    $my_leaves[$d_str] = ['type' => $row['leave_type'], 'status' => $row['status']];
+                }
+            }
+        }
+
+        // 3. ดึงเรทค่าตอบแทน
+        $rates = ['ร' => 0, 'ย' => 0, 'บ' => 0];
+        $stmt = $db->prepare("SELECT employee_type FROM users WHERE id = ?");
+        $stmt->execute([$user_id]);
+        $staff_type = $stmt->fetch(PDO::FETCH_ASSOC)['employee_type'] ?? '';
+
+        $stmt = $db->query("SELECT * FROM pay_rates");
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $group) {
+            $keywords = explode(',', $group['keywords']);
+            foreach ($keywords as $kw) {
+                if (trim($kw) !== '' && mb_strpos($staff_type, trim($kw)) !== false) {
+                    $rates = ['ร' => $group['rate_r'], 'ย' => $group['rate_y'], 'บ' => $group['rate_b']];
+                    break 2;
+                }
+            }
+        }
+
+        // 4. ดึงกะเวร
+        $stmt = $db->prepare("SELECT shift_date, shift_type FROM shifts WHERE user_id = ? AND shift_date LIKE ? AND shift_type != ''");
+        $stmt->execute([$user_id, "$selected_ym-%"]);
+        
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $d_str = $row['shift_date'];
+            $val = $row['shift_type'];
+            $my_shifts[$d_str] = $val;
+            $leave_status = isset($my_leaves[$d_str]) ? $my_leaves[$d_str]['status'] : null;
+            
+            if ($leave_status !== 'APPROVED') {
+                if ($val === 'ร') { $summary['ร']++; $summary['pay'] += $rates['ร']; }
+                elseif ($val === 'ย') { $summary['ย']++; $summary['pay'] += $rates['ย']; }
+                elseif ($val === 'บ') { $summary['บ']++; $summary['pay'] += $rates['บ']; }
+                elseif ($val === 'บ/ร' || $val === 'ร/บ') { $summary['บ']++; $summary['ร']++; $summary['pay'] += ($rates['บ'] + $rates['ร']); }
+                elseif ($val === 'ย/บ' || $val === 'บ/ย') { $summary['ย']++; $summary['บ']++; $summary['pay'] += ($rates['ย'] + $rates['บ']); }
+            }
+        }
+
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
         require_once 'views/profile/schedule.php';
         echo "</main></div></body></html>";
     }
 
-    // ====================================================
-    // 💾 2. บันทึกข้อมูลส่วนตัวและที่อยู่ (General Profile)
-    // ====================================================
     public function save_profile() {
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $target_user_id = (int)$_POST['user_id'];
+            $target_user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($target_user_id);
             
             $data = [
                 'user_id' => $target_user_id,
@@ -147,7 +217,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $user_id = (int)$_POST['user_id'];
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($user_id);
             $data = [
                 'user_id' => $user_id,
                 'degree_level' => trim($_POST['degree_level'] ?? ''),
@@ -170,16 +242,16 @@ class ProfileController {
 
     public function delete_education() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['user_id'])) {
+        if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            if ($profileModel->deleteEducation($_GET['id'], $_GET['user_id'])) {
+            if ($profileModel->deleteEducation($_POST['id'], $_POST['user_id'])) {
                 $_SESSION['success_msg'] = "ลบประวัติการศึกษาสำเร็จ";
             } else {
                 $_SESSION['error_msg'] = "ไม่สามารถลบข้อมูลได้";
             }
-            header("Location: index.php?c=profile&id=" . $_GET['user_id']);
+            header("Location: index.php?c=profile&id=" . $_POST['user_id']);
             exit;
         }
     }
@@ -193,7 +265,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $user_id = (int)$_POST['user_id'];
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($user_id);
             $data = [
                 'user_id' => $user_id,
                 'license_name' => trim($_POST['license_name'] ?? ''),
@@ -216,14 +290,14 @@ class ProfileController {
 
     public function delete_license() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['user_id'])) {
+        if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            if ($profileModel->deleteLicense($_GET['id'], $_GET['user_id'])) {
+            if ($profileModel->deleteLicense($_POST['id'], $_POST['user_id'])) {
                 $_SESSION['success_msg'] = "ลบข้อมูลใบประกอบวิชาชีพสำเร็จ";
             }
-            header("Location: index.php?c=profile&id=" . $_GET['user_id']);
+            header("Location: index.php?c=profile&id=" . $_POST['user_id']);
             exit;
         }
     }
@@ -237,7 +311,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $user_id = (int)$_POST['user_id'];
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($user_id);
             $data = [
                 'user_id' => $user_id,
                 'company_name' => trim($_POST['company_name'] ?? ''),
@@ -259,12 +335,12 @@ class ProfileController {
 
     public function delete_work() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['user_id'])) {
+        if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
-            $profileModel->deleteWorkHistory($_GET['id'], $_GET['user_id']);
+            $profileModel->deleteWorkHistory($_POST['id'], $_POST['user_id']);
             $_SESSION['success_msg'] = "ลบประวัติการทำงานสำเร็จ";
-            header("Location: index.php?c=profile&id=" . $_GET['user_id']);
+            header("Location: index.php?c=profile&id=" . $_POST['user_id']);
             exit;
         }
     }
@@ -278,7 +354,9 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
-            $user_id = (int)$_POST['user_id'];
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $this->requirePostAndCsrf();
+            $this->requireProfileManagePermission($user_id);
             $data = [
                 'user_id' => $user_id,
                 'course_name' => trim($_POST['course_name'] ?? ''),
@@ -298,14 +376,13 @@ class ProfileController {
 
     public function delete_training() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['user_id'])) {
+        if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
-            $profileModel->deleteTraining($_GET['id'], $_GET['user_id']);
+            $profileModel->deleteTraining($_POST['id'], $_POST['user_id']);
             $_SESSION['success_msg'] = "ลบประวัติการฝึกอบรมสำเร็จ";
-            header("Location: index.php?c=profile&id=" . $_GET['user_id']);
+            header("Location: index.php?c=profile&id=" . $_POST['user_id']);
             exit;
         }
     }
 }
-?>

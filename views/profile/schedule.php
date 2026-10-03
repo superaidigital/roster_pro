@@ -184,6 +184,7 @@ function getShiftBadgeClass($shift) {
         <div class="col-xl-8">
             <div class="card card-modern overflow-hidden h-100">
                 <div class="card-body p-0">
+                    <div class="calendar-scroll-shell" tabindex="0" role="region" aria-label="ปฏิทินเวรแบบเลื่อนได้">
                     <div class="calendar-grid-header border-bottom">
                         <div class="text-danger">อาทิตย์</div>
                         <div class="text-dark">จันทร์</div>
@@ -246,6 +247,7 @@ function getShiftBadgeClass($shift) {
                         $end_day_of_week = date('w', strtotime($year . '-' . $month . '-' . $days_in_month));
                         for ($i = 0; $i < (6 - $end_day_of_week); $i++) { echo '<div class="calendar-cell empty-cell"></div>'; }
                         ?>
+                    </div>
                     </div>
                 </div>
             </div>

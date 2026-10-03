@@ -131,11 +131,13 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                                             <a href="<?= htmlspecialchars($file['path']) ?>" download class="btn btn-sm btn-outline-primary rounded-circle" title="ดาวน์โหลด">
                                                 <i class="bi bi-download"></i>
                                             </a>
-                                            <a href="index.php?c=settings&a=delete_server_backup&file=<?= urlencode($file['filename']) ?>" 
-                                               class="btn btn-sm btn-outline-danger rounded-circle ms-1" 
-                                               onclick="return confirm('ยืนยันการลบไฟล์ <?= htmlspecialchars($file['filename']) ?> ?');" title="ลบไฟล์">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
+                                            <form action="index.php?c=settings&a=delete_server_backup" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบไฟล์ <?= htmlspecialchars($file['filename']) ?> ?');">
+                                                <?= security_csrf_input() ?>
+                                                <input type="hidden" name="file" value="<?= htmlspecialchars($file['filename'], ENT_QUOTES, 'UTF-8') ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle ms-1" title="ลบไฟล์">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -148,7 +150,7 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                         <h6 class="fw-bold" style="font-size: 13px;"><i class="bi bi-robot text-primary me-1"></i> การตั้งค่าสำรองข้อมูลอัตโนมัติ (Cron Job)</h6>
                         <p class="text-muted mb-1" style="font-size: 12px;">หากต้องการให้ระบบสำรองข้อมูลอัตโนมัติทุกเดือน ให้นำ URL ด้านล่างไปตั้งค่าใน Cron Job ของโฮสติ้ง (เช่น ตั้งค่าให้ทำงานทุกวันที่ 1 ของเดือน)</p>
                         <code class="d-block bg-dark text-white p-2 rounded mt-2" style="font-size: 11px; word-break: break-all;">
-                            curl -s "http://<?= $_SERVER['HTTP_HOST'] ?>/index.php?c=settings&a=cron_monthly_backup&key=ROSTER_PRO_CRON_2026"
+                            curl -s "https://<?= htmlspecialchars($_SERVER['HTTP_HOST'] ?? 'your-host') ?>/index.php?c=settings&a=cron_monthly_backup&key=&lt;ROSTER_CRON_KEY&gt;"
                         </code>
                     </div>
                 </div>

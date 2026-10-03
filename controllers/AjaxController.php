@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/AjaxController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/ShiftModel.php';
 require_once 'models/NotificationModel.php';
 require_once 'models/UserModel.php';
@@ -43,8 +44,8 @@ class AjaxController {
             "Authorization: Bearer " . $line_token
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         
         $result = curl_exec($ch);
         curl_close($ch);
@@ -93,6 +94,7 @@ class AjaxController {
     // 🌟 API: ทดสอบ LINE Notify
     // ==========================================
     public function test_line_notify() {
+        $this->requireAjaxMutation();
         error_reporting(0); // 🌟 ปิด Warning ไม่ให้แทรก JSON
         header('Content-Type: application/json');
         
@@ -114,8 +116,8 @@ class AjaxController {
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['message' => $message]));
         curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/x-www-form-urlencoded", "Authorization: Bearer " . $token]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         
         $result = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -133,6 +135,7 @@ class AjaxController {
     // 🌟 API: บันทึกเวร (Save Shift)
     // ==========================================
     public function save_shift() {
+        $this->requireAjaxMutation();
         error_reporting(0); // 🌟 ปิด Warning
         header('Content-Type: application/json');
         
@@ -206,7 +209,9 @@ class AjaxController {
                 }
                 exit;
             } catch (Exception $e) {
-                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); exit;
+                error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']); exit;
             }
         }
         echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
@@ -216,6 +221,7 @@ class AjaxController {
     // 🌟 API: อัปเดตลำดับรายชื่อ (Drag & Drop)
     // ==========================================
     public function update_order() {
+        $this->requireAjaxMutation();
         header('Content-Type: application/json');
         
         // อนุญาตเฉพาะ POST Request และต้องล็อกอิน
@@ -248,7 +254,9 @@ class AjaxController {
                 echo json_encode(['status' => 'success', 'message' => 'บันทึกลำดับเรียบร้อยแล้ว']);
             } catch (PDOException $e) {
                 $db->rollBack();
-                echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+                error_log('Ajax database operation failed: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่']);
             }
         } else {
             echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ถูกต้อง']);
@@ -260,6 +268,7 @@ class AjaxController {
     // 🌟 API: คัดลอกตารางจากเดือนก่อน (Copy Previous Month)
     // ==========================================
     public function copy_roster_previous() {
+        $this->requireAjaxMutation();
         error_reporting(0);
         header('Content-Type: application/json');
         if (!isset($_SESSION['user'])) { echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit; }
@@ -312,7 +321,9 @@ class AjaxController {
             LogsController::addLog($db, $_SESSION['user']['id'], 'CREATE', "คัดลอกเวรจากเดือน {$prev_month} ไปยังเดือน {$target_month}");
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
         }
         exit;
     }
@@ -321,6 +332,7 @@ class AjaxController {
     // 🌟 API: ขอแลกเวร/เปลี่ยนเวร (Shift Swap Request)
     // ==========================================
     public function request_swap() {
+        $this->requireAjaxMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
             header("Location: index.php?c=roster"); exit;
         }
@@ -366,6 +378,7 @@ class AjaxController {
     // 🌟 เปลี่ยนสถานะตารางเวร (Workflow)
     // ==========================================
     public function change_status() {
+        $this->requireAjaxMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
             header("Location: index.php?c=roster"); exit;
         }
@@ -463,7 +476,8 @@ class AjaxController {
                 $_SESSION['success_msg'] = "อนุมัติตารางเวรเดือน {$month_name} เรียบร้อยแล้ว";
             }
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+            error_log('AjaxController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
 
         $redirect = (in_array($_SESSION['user']['role'], ['ADMIN', 'SUPERADMIN'])) ? "index.php?c=report&a=overview&month=".$month_year : "index.php?c=roster&month=".$month_year;
@@ -474,6 +488,7 @@ class AjaxController {
     // 🌟 ขอแก้ไขตาราง (Request Edit)
     // ==========================================
     public function request_edit() {
+        $this->requireAjaxMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) { header("Location: index.php?c=roster"); exit; }
 
         $month_year = $_POST['month_year'];
@@ -518,6 +533,7 @@ class AjaxController {
     // 🌟 เสนอเพิ่มวันหยุดใหม่ (Request Holiday)
     // ==========================================
     public function request_holiday() {
+        $this->requireAjaxMutation();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents("php://input"));
         
@@ -715,7 +731,9 @@ class AjaxController {
             echo json_encode(['status' => 'success', 'warnings' => array_unique($all_issues), 'has_error' => (count($errors) > 0)]);
             
         } catch (Exception $e) {
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
         }
         exit;
     }
@@ -724,6 +742,7 @@ class AjaxController {
     // 🌟 สุ่มจัดเวรอัตโนมัติ (Auto-Schedule) 
     // ==========================================
     public function auto_schedule() {
+        $this->requireAjaxMutation();
         error_reporting(0); // 🌟 ปิด Warning
         header('Content-Type: application/json');
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) { 
@@ -844,7 +863,9 @@ class AjaxController {
 
         } catch (Exception $e) {
             $db->rollBack();
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
         }
         exit;
     }
@@ -862,6 +883,26 @@ class AjaxController {
         }
     }
 
+    public function check_new_notif() {
+        error_reporting(0);
+        header('Content-Type: application/json');
+
+        if (!isset($_SESSION['user_id']) && !isset($_SESSION['user'])) {
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+            exit;
+        }
+
+        $userId = $_SESSION['user_id'] ?? $_SESSION['user']['id'];
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+
+        echo json_encode([
+            'status' => 'success',
+            'unread_count' => $notificationModel->getUnreadCount($userId)
+        ]);
+        exit;
+    }
+
     public function getUnreadNotifications() {
         error_reporting(0); header('Content-Type: application/json');
         if(!isset($_SESSION['user_id']) && !isset($_SESSION['user'])) {
@@ -876,6 +917,7 @@ class AjaxController {
     }
 
     public function markNotificationAsRead() {
+        $this->requireAjaxMutation();
         error_reporting(0); header('Content-Type: application/json');
         if(!isset($_SESSION['user_id']) && !isset($_SESSION['user'])) { echo json_encode(['status' => 'error']); return; }
         if (!isset($_POST['noti_id'])) { echo json_encode(['status' => 'error', 'message' => 'Missing ID']); return; }

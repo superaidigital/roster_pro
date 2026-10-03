@@ -152,9 +152,19 @@ function formatDateThai($dateString) {
                                         </td>
                                         <td class="text-center">
                                             <?php if(isset($h['is_active']) && $h['is_active'] == 1): ?>
-                                                <a href="index.php?c=settings&a=toggle_holiday&id=<?= $h['id'] ?>&status=0" class="btn btn-sm btn-success rounded-pill" style="font-size: 11px;" title="กดเพื่อปิดใช้งาน">กำลังใช้งาน</a>
+                                                <form action="index.php?c=settings&a=toggle_holiday" method="POST" class="d-inline">
+                                                    <?= security_csrf_input() ?>
+                                                    <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+                                                    <input type="hidden" name="status" value="0">
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill" style="font-size: 11px;" title="กดเพื่อปิดใช้งาน">กำลังใช้งาน</button>
+                                                </form>
                                             <?php else: ?>
-                                                <a href="index.php?c=settings&a=toggle_holiday&id=<?= $h['id'] ?>&status=1" class="btn btn-sm btn-secondary rounded-pill" style="font-size: 11px;" title="กดเพื่อเปิดใช้งาน">ปิดใช้งาน</a>
+                                                <form action="index.php?c=settings&a=toggle_holiday" method="POST" class="d-inline">
+                                                    <?= security_csrf_input() ?>
+                                                    <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+                                                    <input type="hidden" name="status" value="1">
+                                                    <button type="submit" class="btn btn-sm btn-secondary rounded-pill" style="font-size: 11px;" title="กดเพื่อเปิดใช้งาน">ปิดใช้งาน</button>
+                                                </form>
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-center">

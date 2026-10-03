@@ -182,16 +182,16 @@ $progress_color = $completion_percent == 100 ? 'bg-success' : ($completion_perce
         to { opacity: 1; transform: translateY(0); }
     }
 
-    .kpi-card { border: none; border-radius: 1.25rem; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.02); transition: all 0.3s ease; position: relative; overflow: hidden; }
+    .kpi-card { border: none; border-radius: 1rem; background: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.02); transition: all 0.3s ease; position: relative; overflow: hidden; }
     .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 12px 25px rgba(0,0,0,0.06); }
-    .kpi-icon-wrapper { width: 54px; height: 54px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; }
+    .kpi-icon-wrapper { width: 2.7rem; height: 2.7rem; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 1.7rem; }
     
-    .custom-progress { height: 8px; border-radius: 50rem; background-color: #f1f5f9; overflow: hidden; }
-    .custom-progress-bar { height: 100%; border-radius: 50rem; transition: width 1s ease-in-out; }
+    .custom-progress { height: 8px; border-radius: .8rem; background-color: #f1f5f9; overflow: hidden; }
+    .custom-progress-bar { height: 100%; border-radius: .8rem; transition: width 1s ease-in-out; }
 
-    .card-modern { border: none; border-radius: 1.25rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); background: #ffffff; }
-    .table-modern th { font-weight: 700; color: #64748b; font-size: 12.5px; background-color: #f8fafc; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; padding: 1.2rem 1rem; letter-spacing: 0.5px; }
-    .table-modern td { vertical-align: middle; font-size: 14.5px; border-bottom: 1px solid #f1f5f9; padding: 1.2rem 1rem; transition: all 0.2s; }
+    .card-modern { border: none; border-radius: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); background: #ffffff; }
+    .table-modern th { font-weight: 700; color: #64748b; font-size: 12.5px; background-color: #f8fafc; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; padding: .72rem .75rem; letter-spacing: 0.5px; }
+    .table-modern td { vertical-align: middle; font-size: .88rem; border-bottom: 1px solid #f1f5f9; padding: .72rem .75rem; transition: all 0.2s; }
     .table-modern tbody tr:hover td { background-color: #f8fafc; }
     
     /* 🌟 ไฮไลท์พิเศษสำหรับหน่วยงานของตัวเอง */
@@ -206,7 +206,7 @@ $progress_color = $completion_percent == 100 ? 'bg-success' : ($completion_perce
     .status-draft { background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
     .status-request_edit { background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
 
-    .search-filter-group { border: 1px solid #e2e8f0; border-radius: 50rem; overflow: hidden; background: #fff; transition: all 0.2s; }
+    .search-filter-group { border: 1px solid #e2e8f0; border-radius: .8rem; overflow: hidden; background: #fff; transition: all 0.2s; }
     .search-filter-group:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
     .search-filter-group input, .search-filter-group select { border: none; box-shadow: none; background: transparent; }
     .search-filter-group input:focus, .search-filter-group select:focus { outline: none; box-shadow: none; }
