@@ -317,63 +317,43 @@ class UsersController {
     // ฟังก์ชันช่วยย่อยสำหรับอัปเดตสถานะและสร้างคอลัมน์อัตโนมัติ
     private function executeUpdateStatus($db, $id, $status, $reason, $date, $note, $target_name) {
         try {
-            if ($status === 0) {
-                // ระงับการใช้งาน (บันทึกสาเหตุ)
-                $stmt = $db->prepare("UPDATE users SET is_active = 0, inactive_reason = ?, inactive_date = ?, inactive_note = ? WHERE id = ?");
-                $stmt->execute([$reason, $date, $note, $id]);
+            if ((int)$status === 0) {
+                $stmt = $db->prepare(
+                    "UPDATE users
+                     SET is_active = 0,
+                         inactive_reason = ?,
+                         inactive_date = ?,
+                         inactive_note = ?
+                     WHERE id = ?"
+                );
+                $stmt->execute([$reason, $date ?: null, $note, $id]);
                 $logTxt = "ระงับบัญชี (เหตุผล: {$reason})";
             } else {
-                // เปิดใช้งาน (ล้างสาเหตุทิ้ง)
-                $stmt = $db->prepare("UPDATE users SET is_active = 1, inactive_reason = NULL, inactive_date = NULL, inactive_note = NULL WHERE id = ?");
+                $stmt = $db->prepare(
+                    "UPDATE users
+                     SET is_active = 1,
+                         inactive_reason = NULL,
+                         inactive_date = NULL,
+                         inactive_note = NULL
+                     WHERE id = ?"
+                );
                 $stmt->execute([$id]);
                 $logTxt = "เปิดใช้งาน";
             }
 
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "{$logTxt} บัญชี ID: {$id}");
+            LogsController::addLog(
+                $db,
+                $_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                "{$logTxt} บัญชี ID: {$id}"
+            );
             $_SESSION['success_msg'] = "อัปเดตสถานะ {$target_name} สำเร็จ";
-
-        } catch (PDOException $e) {
-            // 🌟 ระบบ Auto-Migration: สร้างคอลัมน์อัตโนมัติหากยังไม่มี
-            if (strpos($e->getMessage(), 'Unknown column') !== false) {
-                try {
-                    $stmt_cols = $db->query("SHOW COLUMNS FROM users");
-                    $columns = $stmt_cols->fetchAll(PDO::FETCH_COLUMN);
-
-                    if (!in_array('inactive_reason', $columns)) {
-                        $db->exec("ALTER TABLE users ADD COLUMN inactive_reason VARCHAR(100) NULL COMMENT 'สาเหตุการระงับ'");
-                    }
-                    if (!in_array('inactive_date', $columns)) {
-                        $db->exec("ALTER TABLE users ADD COLUMN inactive_date DATE NULL COMMENT 'วันที่ระงับ/ลาออก/เกษียณ'");
-                    }
-                    if (!in_array('inactive_note', $columns)) {
-                        $db->exec("ALTER TABLE users ADD COLUMN inactive_note TEXT NULL COMMENT 'หมายเหตุเพิ่มเติม'");
-                    }
-
-                    // ลองรันคำสั่งอีกครั้งหลังจากเพิ่มคอลัมน์แล้ว
-                    if ($status === 0) {
-                        $stmt = $db->prepare("UPDATE users SET is_active = 0, inactive_reason = ?, inactive_date = ?, inactive_note = ? WHERE id = ?");
-                        $stmt->execute([$reason, $date, $note, $id]);
-                        $logTxt = "ระงับบัญชี (เหตุผล: {$reason})";
-                    } else {
-                        $stmt = $db->prepare("UPDATE users SET is_active = 1, inactive_reason = NULL, inactive_date = NULL, inactive_note = NULL WHERE id = ?");
-                        $stmt->execute([$id]);
-                        $logTxt = "เปิดใช้งาน";
-                    }
-                    LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "{$logTxt} บัญชี ID: {$id}");
-                    $_SESSION['success_msg'] = "อัปเดตสถานะ {$target_name} สำเร็จ";
-
-                } catch (Exception $ex) {
-                    $_SESSION['error_msg'] = "Auto-Migration ล้มเหลว: " . $ex->getMessage();
-                }
-            } else {
-                $_SESSION['error_msg'] = "Database Error: " . $e->getMessage();
-            }
+        } catch (Throwable $e) {
+            error_log('Users status update failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถอัปเดตสถานะผู้ใช้งานได้ กรุณาตรวจสอบฐานข้อมูลและลองใหม่";
         }
     }
 
-    // ====================================================
-    // 🌟 6. บันทึกลำดับการจัดเรียงใหม่ (AJAX Update Order)
-    // ====================================================
     public function update_order() {
         $this->requireMutation();
         security_start_session();
