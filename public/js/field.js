@@ -351,12 +351,14 @@
   if (photoInput && preview) {
     photoInput.addEventListener('change', () => {
       preview.innerHTML = '';
-      const files = Array.from(photoInput.files || []).slice(0, 3);
-
       if ((photoInput.files || []).length > 3) {
-        showDraftNotice('เลือกได้สูงสุด 3 รูป ระบบจะบันทึกเฉพาะ 3 รูปแรก', 'warning');
+        photoInput.value = '';
+        preview.innerHTML = '';
+        showDraftNotice('เลือกได้สูงสุด 3 รูป กรุณาเลือกใหม่ไม่เกิน 3 รูป', 'warning');
+        return;
       }
 
+      const files = Array.from(photoInput.files || []);
       files.forEach((file) => {
         if (!file.type.startsWith('image/')) return;
 
