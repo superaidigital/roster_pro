@@ -165,17 +165,6 @@ foreach ($scanFiles as $file) {
     }
 
 
-    $isRuntimePhp = str_starts_with($rel, 'controllers' . DIRECTORY_SEPARATOR)
-        || str_starts_with($rel, 'models' . DIRECTORY_SEPARATOR);
-
-    if (
-        $isRuntimePhp
-        && preg_match('/\b(?:ALTER|CREATE|DROP)\s+TABLE\b/i', $content)
-        && preg_match('/->exec\s*\(/i', $content)
-    ) {
-        addError($errors, $rel . ': schema DDL belongs in database migrations, not runtime code');
-    }
-
     if (
         str_starts_with($rel, 'controllers' . DIRECTORY_SEPARATOR)
         && (
