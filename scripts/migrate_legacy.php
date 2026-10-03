@@ -85,6 +85,17 @@ try {
     // Fill short_name for legacy rows so dashboards have a label immediately.
     $db->exec("UPDATE hospitals SET short_name = name WHERE (short_name IS NULL OR short_name = '')");
 
+    // Normalize legacy leave request status column once during migration.
+    if ($db->query("SHOW TABLES LIKE 'leave_requests'")->fetchColumn()) {
+        $stmtStatus = $db->query("SHOW COLUMNS FROM leave_requests LIKE 'status'");
+        $statusColumn = $stmtStatus ? $stmtStatus->fetch(PDO::FETCH_ASSOC) : false;
+        if ($statusColumn && stripos((string)$statusColumn['Type'], 'varchar(50)') === false) {
+            $db->exec("ALTER TABLE leave_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'PENDING'");
+            echo "ALTER leave_requests.status -> VARCHAR(50)\n";
+        }
+        $db->exec("UPDATE leave_requests SET status = 'PENDING' WHERE status IS NULL OR status = ''");
+    }
+
     // roster_status
     if ($db->query("SHOW TABLES LIKE 'roster_status'")->fetchColumn()) {
         addColumnIfMissing($db, 'roster_status', 'reviewer_id', "INT NULL");
