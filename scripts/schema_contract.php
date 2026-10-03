@@ -2,10 +2,10 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
-$sqlPath = $root . '/roster_pro_db.sql';
+$sqlPath = $root . '/database/schema.sql';
 
 if (!is_file($sqlPath)) {
-    fwrite(STDERR, "Schema dump not found: roster_pro_db.sql\n");
+    fwrite(STDERR, "Schema file not found: database/schema.sql\n");
     exit(1);
 }
 
