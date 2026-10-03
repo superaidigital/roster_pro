@@ -8,6 +8,7 @@ require_once __DIR__ . '/../models/SwapModel.php';
 require_once __DIR__ . '/../models/LeaveModel.php';
 require_once __DIR__ . '/../models/NotificationModel.php';
 require_once __DIR__ . '/../models/RosterModel.php';
+require_once __DIR__ . '/../models/FieldVisitModel.php';
 
 function ok(bool $condition, string $message): void {
     if (!$condition) {
@@ -112,6 +113,44 @@ $notif = $notificationModel->getUserNotifications($uid1, 1);
 ok(count($notif) === 1, 'notification retrieved');
 ok($notificationModel->markAsRead((int)$notif[0]['id'], $uid1), 'notification marked read');
 ok((int)$notificationModel->getUnreadCount($uid1) === 0, 'notification unread count cleared');
+
+$fieldModel = new FieldVisitModel($db);
+$fieldVisitId = $fieldModel->createVisit([
+    'hospital_id' => $hospitalId,
+    'created_by' => $uid1,
+    'visit_date' => '2026-10-20',
+    'patient_ref' => 'SYNTH-HN-001',
+    'patient_name' => 'Synthetic Patient',
+    'patient_age' => 50,
+    'visit_type' => 'HOME_VISIT',
+    'chief_concern' => 'Synthetic field visit',
+    'systolic' => 120,
+    'diastolic' => 80,
+    'pulse' => 72,
+    'temperature' => 36.7,
+    'spo2' => 98,
+    'weight' => 60.0,
+    'height' => 165.0,
+    'symptoms' => 'Smoke test only',
+    'assessment' => 'Synthetic assessment',
+    'care_plan' => 'Synthetic plan',
+    'latitude' => 15.0,
+    'longitude' => 104.0,
+    'accuracy_m' => 8.0,
+    'address_note' => 'Synthetic location',
+    'photo_consent' => 0,
+    'status' => 'COMPLETED',
+]);
+ok($fieldVisitId > 0, 'field visit created');
+
+$fieldSummary = $fieldModel->getSummary($user1);
+ok($fieldSummary['completed_count'] === 1, 'field visit summary scoped to staff user');
+
+$fieldRows = $fieldModel->getVisibleVisits($user1, [], 10);
+ok(count($fieldRows) === 1 && (int)$fieldRows[0]['id'] === $fieldVisitId, 'staff can read own field visit');
+
+$fieldRowsOtherUser = $fieldModel->getVisibleVisits($user2, [], 10);
+ok(count($fieldRowsOtherUser) === 0, 'staff field visit scope prevents cross-user read');
 
 $rosterModel = new RosterModel($db);
 ok($rosterModel->publishRoster($hospitalId, 2026, 10), 'RosterModel publishes via roster_status');
