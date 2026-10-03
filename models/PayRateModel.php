@@ -7,38 +7,6 @@ class PayRateModel {
 
     public function __construct($db) {
         $this->conn = $db;
-        $this->checkAndCreateTable();
-    }
-
-    private function checkAndCreateTable() {
-        $query = "CREATE TABLE IF NOT EXISTS `" . $this->table_name . "` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `name` VARCHAR(100) NOT NULL,
-            `keywords` TEXT NULL,
-            `rate_r` INT DEFAULT 0,
-            `rate_y` INT DEFAULT 0,
-            `rate_b` INT DEFAULT 0,
-            `display_order` INT DEFAULT 0
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
-        try {
-            $this->conn->exec($query);
-            $cols = $this->conn->query("SHOW COLUMNS FROM " . $this->table_name)->fetchAll(PDO::FETCH_COLUMN);
-            if (!in_array('name', $cols)) {
-                $this->conn->exec("ALTER TABLE `" . $this->table_name . "` ADD COLUMN `name` VARCHAR(100) NULL AFTER `id`");
-                $this->conn->exec("UPDATE `" . $this->table_name . "` SET `name` = `keywords` WHERE `name` IS NULL");
-            }
-            if (!in_array('display_order', $cols)) {
-                $this->conn->exec("ALTER TABLE `" . $this->table_name . "` ADD COLUMN `display_order` INT DEFAULT 0");
-            }
-            
-            $stmtCount = $this->conn->query("SELECT COUNT(*) FROM " . $this->table_name);
-            if ($stmtCount->fetchColumn() == 0) {
-                $this->conn->exec("INSERT INTO `" . $this->table_name . "` (`name`, `keywords`, `rate_r`, `rate_y`, `rate_b`, `display_order`) VALUES 
-                ('แพทย์', 'แพทย์,หมอ,พญ,นพ', 1200, 1200, 1200, 1),
-                ('พยาบาลวิชาชีพ', 'พยาบาลวิชาชีพ,พยาบาล,วิชาชีพ', 800, 800, 800, 2),
-                ('เจ้าพนักงาน', 'เจ้าพนักงาน,จพง,จพ.,ลูกจ้าง,พนักงาน', 600, 600, 600, 3)");
-            }
-        } catch(PDOException $e) {}
     }
 
     public function getAllRates() {
