@@ -1,124 +1,114 @@
 <?php
-// ที่อยู่ไฟล์: models/RosterModel.php
+// Canonical roster data access for the current schema.
 
 class RosterModel {
-    private $conn;
-    private $table_name = "shifts";
+    private PDO $conn;
+    private string $table_name = 'shifts';
 
-    public function __construct($db) {
+    public function __construct(PDO $db) {
         $this->conn = $db;
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        
-        // 🌟 รันฟังก์ชันตรวจสอบและสร้างตาราง/คอลัมน์อัตโนมัติ
-        $this->checkAndCreateTable();
     }
 
-    /**
-     * 🌟 ระบบ Auto-Migration: สร้างตาราง shifts อัตโนมัติ
-     */
-    private function checkAndCreateTable() {
-        try {
-            $query = "CREATE TABLE IF NOT EXISTS `" . $this->table_name . "` (
-                `id` INT(11) AUTO_INCREMENT PRIMARY KEY,
-                `hospital_id` INT(11) NOT NULL COMMENT 'รหัส รพ.สต.',
-                `user_id` INT(11) NOT NULL COMMENT 'รหัสพนักงาน',
-                `shift_date` DATE NOT NULL COMMENT 'วันที่ขึ้นเวร',
-                `shift_type` VARCHAR(10) NOT NULL COMMENT 'ประเภทเวร (M, A, N, OFF)',
-                `is_holiday` TINYINT(1) DEFAULT 0 COMMENT '1=เป็นวันหยุดนักขัตฤกษ์',
-                `status` ENUM('DRAFT', 'PUBLISHED') DEFAULT 'DRAFT' COMMENT 'สถานะเวร',
-                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                UNIQUE KEY `unique_user_date` (`user_id`, `shift_date`) COMMENT 'ป้องกันการจัดเวรซ้ำวันเดิม'
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
-            
-            $this->conn->exec($query);
-        } catch (PDOException $e) {
-            error_log("Roster Auto-migration failed: " . $e->getMessage());
-        }
-    }
+    public function getShiftsByMonth($hospital_id, $year, $month): array {
+        $stmt = $this->conn->prepare(
+            "SELECT id, hospital_id, user_id, shift_date, shift_type
+             FROM {$this->table_name}
+             WHERE hospital_id = :hospital_id
+               AND YEAR(shift_date) = :year
+               AND MONTH(shift_date) = :month
+             ORDER BY shift_date ASC, user_id ASC"
+        );
+        $stmt->execute([
+            ':hospital_id' => (int)$hospital_id,
+            ':year' => (int)$year,
+            ':month' => (int)$month,
+        ]);
 
-    /**
-     * ดึงข้อมูลเวรทั้งหมดของเดือนและปีที่กำหนด (อ้างอิงตาม รพ.สต.)
-     */
-    public function getShiftsByMonth($hospital_id, $year, $month) {
-        $query = "SELECT * FROM " . $this->table_name . " 
-                  WHERE hospital_id = :hospital_id 
-                  AND YEAR(shift_date) = :year 
-                  AND MONTH(shift_date) = :month";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':hospital_id', $hospital_id);
-        $stmt->bindParam(':year', $year);
-        $stmt->bindParam(':month', $month);
-        $stmt->execute();
-        
-        // จัดรูปแบบให้อ่านง่าย: $result[user_id][date] = shift_type
         $shifts = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $date = date('j', strtotime($row['shift_date'])); // เอาแค่วันที่ 1-31
-            $shifts[$row['user_id']][$date] = [
+            $day = (int)date('j', strtotime($row['shift_date']));
+            $shifts[(int)$row['user_id']][$day] = [
+                'id' => (int)$row['id'],
                 'type' => $row['shift_type'],
-                'status' => $row['status'],
-                'is_holiday' => $row['is_holiday']
+                'date' => $row['shift_date'],
             ];
         }
+
         return $shifts;
     }
 
-    /**
-     * บันทึกหรืออัปเดตเวร (Upsert) - รองรับการบันทึกทีละหลายรายการ
-     */
-    public function saveShifts($hospital_id, $user_id, $shifts_data) {
+    public function saveShifts($hospital_id, $user_id, array $shifts_data): bool {
         try {
             $this->conn->beginTransaction();
-            
-            // ใช้คำสั่ง INSERT ... ON DUPLICATE KEY UPDATE (ถ้ามีข้อมูลวันนั้นแล้วให้อัปเดต)
-            $query = "INSERT INTO " . $this->table_name . " 
-                      (hospital_id, user_id, shift_date, shift_type, status) 
-                      VALUES (:hospital_id, :user_id, :shift_date, :shift_type, :status)
-                      ON DUPLICATE KEY UPDATE shift_type = VALUES(shift_type), status = VALUES(status)";
-            
-            $stmt = $this->conn->prepare($query);
-            
+
+            $upsert = $this->conn->prepare(
+                "INSERT INTO {$this->table_name}
+                    (hospital_id, user_id, shift_date, shift_type)
+                 VALUES
+                    (:hospital_id, :user_id, :shift_date, :shift_type)
+                 ON DUPLICATE KEY UPDATE
+                    hospital_id = VALUES(hospital_id),
+                    shift_type = VALUES(shift_type)"
+            );
+
+            $delete = $this->conn->prepare(
+                "DELETE FROM {$this->table_name}
+                 WHERE hospital_id = :hospital_id
+                   AND user_id = :user_id
+                   AND shift_date = :shift_date"
+            );
+
             foreach ($shifts_data as $date => $type) {
-                // ถ้าค่าว่าง ให้ทำการลบเวรของวันนั้นทิ้ง
-                if (empty($type)) {
-                    $del_stmt = $this->conn->prepare("DELETE FROM " . $this->table_name . " WHERE user_id = ? AND shift_date = ?");
-                    $del_stmt->execute([$user_id, $date]);
+                $date = trim((string)$date);
+                $type = trim((string)$type);
+
+                if ($date === '') {
                     continue;
                 }
 
-                $stmt->bindValue(':hospital_id', $hospital_id);
-                $stmt->bindValue(':user_id', $user_id);
-                $stmt->bindValue(':shift_date', $date);
-                $stmt->bindValue(':shift_type', strtoupper($type));
-                $stmt->execute();
+                if ($type === '') {
+                    $delete->execute([
+                        ':hospital_id' => (int)$hospital_id,
+                        ':user_id' => (int)$user_id,
+                        ':shift_date' => $date,
+                    ]);
+                    continue;
+                }
+
+                $upsert->execute([
+                    ':hospital_id' => (int)$hospital_id,
+                    ':user_id' => (int)$user_id,
+                    ':shift_date' => $date,
+                    ':shift_type' => $type,
+                ]);
             }
-            
+
             $this->conn->commit();
             return true;
-        } catch (PDOException $e) {
-            $this->conn->rollBack();
-            error_log("Save Shifts Error: " . $e->getMessage());
+        } catch (Throwable $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
+            error_log('RosterModel::saveShifts failed: ' . $e->getMessage());
             return false;
         }
     }
 
-    /**
-     * อนุมัติและประกาศใช้ตารางเวร (เปลี่ยน DRAFT เป็น PUBLISHED)
-     */
-    public function publishRoster($hospital_id, $year, $month) {
+    public function publishRoster($hospital_id, $year, $month): bool {
         $monthYear = sprintf('%04d-%02d', (int)$year, (int)$month);
 
         $stmt = $this->conn->prepare(
             "INSERT INTO roster_status (hospital_id, month_year, status, updated_at)
-             VALUES (:hid, :my, 'APPROVED', NOW())
-             ON DUPLICATE KEY UPDATE status = 'APPROVED', updated_at = NOW()"
+             VALUES (:hospital_id, :month_year, 'APPROVED', NOW())
+             ON DUPLICATE KEY UPDATE
+                status = 'APPROVED',
+                updated_at = NOW()"
         );
 
         return $stmt->execute([
-            ':hid' => (int)$hospital_id,
-            ':my' => $monthYear,
+            ':hospital_id' => (int)$hospital_id,
+            ':month_year' => $monthYear,
         ]);
     }
 }
-?>
