@@ -146,6 +146,84 @@
             .login-right { padding: 3rem 1.5rem; }
         }
     </style>
+<style>
+/* Modern Clinical Login v10 */
+.login-container {
+    max-width: 66rem !important;
+    min-height: min(42rem, calc(100dvh - 3rem));
+    border: 1px solid #d7e3ea;
+    border-radius: 1.4rem !important;
+    background: #fff;
+    box-shadow: 0 2rem 5rem rgba(11,31,47,.16) !important;
+}
+.login-left {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 20% 20%, rgba(45,212,191,.24), transparent 18rem),
+        linear-gradient(145deg, #12384d 0%, #0b1f2f 72%) !important;
+}
+.login-left::before {
+    content: '';
+    position: absolute;
+    width: 22rem;
+    height: 22rem;
+    right: -10rem;
+    bottom: -8rem;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 50%;
+    box-shadow:
+        0 0 0 3rem rgba(255,255,255,.025),
+        0 0 0 7rem rgba(255,255,255,.02);
+}
+.login-left .brand-logo-large {
+    color: #5eead4 !important;
+    filter: drop-shadow(0 .6rem 1.2rem rgba(45,212,191,.16));
+}
+.login-left h2 {
+    font-size: clamp(2rem, 3vw, 2.7rem);
+    letter-spacing: -.04em;
+}
+.login-right {
+    background: #fff;
+}
+.login-right h3 {
+    color: #10212e !important;
+    letter-spacing: -.025em;
+}
+.input-group-modern {
+    min-height: 3.15rem;
+    border: 1px solid #cbd9e4 !important;
+    border-radius: .82rem !important;
+    background: #fbfdfe !important;
+    box-shadow: none !important;
+}
+.input-group-modern:focus-within {
+    border-color: #0f6cbd !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 .2rem rgba(15,108,189,.12) !important;
+}
+.btn-login {
+    min-height: 3.2rem;
+    border: 0 !important;
+    border-radius: .82rem !important;
+    color: #fff !important;
+    background: linear-gradient(135deg, #0f6cbd, #0f766e) !important;
+    box-shadow: 0 .7rem 1.5rem rgba(15,108,189,.18) !important;
+}
+.btn-login:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 .85rem 1.8rem rgba(15,108,189,.22) !important;
+}
+@media (max-width: 767.98px) {
+    .login-container {
+        min-height: 100dvh;
+        border: 0;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+}
+</style>
 </head>
 <body>
 
@@ -155,10 +233,10 @@
         <!-- 🎨 ฝั่งซ้าย: รูปภาพและโลโก้ (ซ่อนในมือถือ) -->
         <div class="col-md-5 login-left d-none d-md-flex">
             <div style="z-index: 2;">
-                <i class="bi bi-calendar2-check-fill brand-logo-large text-white"></i>
+                <i class="bi bi-heart-pulse-fill brand-logo-large text-white"></i>
                 <h2 class="fw-bold mb-3">Roster<span class="fw-light">Pro</span></h2>
                 <p class="opacity-75 fw-light mb-0" style="font-size: 1.1rem; line-height: 1.6;">
-                    ระบบจัดตารางปฏิบัติงานและลางานออนไลน์<br>สำหรับหน่วยบริการสุขภาพ
+                    พื้นที่ทำงานดิจิทัลสำหรับการจัดเวร วันลา และบุคลากร<br>ออกแบบสำหรับหน่วยบริการปฐมภูมิ
                 </p>
             </div>
             <div class="position-absolute bottom-0 mb-4 opacity-50 small" style="z-index: 2;">
@@ -172,7 +250,7 @@
                 
                 <!-- โลโก้สำหรับหน้าจอมือถือ -->
                 <div class="text-center d-md-none mb-4 pb-2">
-                    <i class="bi bi-calendar2-check-fill text-primary" style="font-size: 3.5rem;"></i>
+                    <i class="bi bi-heart-pulse-fill text-primary" style="font-size: 3.5rem;"></i>
                     <h2 class="fw-bold text-dark mt-2 mb-0">Roster<span class="text-primary">Pro</span></h2>
                 </div>
 
