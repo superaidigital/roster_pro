@@ -1962,3 +1962,31 @@ body {
     font-size: .72rem;
   }
 }
+
+
+.min-w-0 { min-width: 0 !important; }
+
+.rp-mini-progress {
+  width: 100%;
+  height: .42rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+}
+
+.rp-mini-progress > span {
+  display: block;
+  width: var(--rp-progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--rp-primary), #10b981);
+  transition: width .35s ease;
+}
+
+.rp-mini-progress.is-warning > span {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.rp-mini-progress.is-danger > span {
+  background: linear-gradient(90deg, #b91c1c, #ef4444);
+}
