@@ -161,7 +161,8 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
             }
 
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการดึงข้อมูลรายงาน: " . $e->getMessage();
+            error_log('ReportController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
 
         // โหลด View ไปแสดงผล
