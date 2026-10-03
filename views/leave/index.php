@@ -155,7 +155,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                     </h5>
                 </div>
                 <div class="card-body p-4">
-                    <form action="index.php?c=leave&a=request" method="POST" id="leaveForm" enctype="multipart/form-data">
+                    <form action="index.php?c=leave&a=request" method="POST" id="leaveForm" enctype="multipart/form-data" data-rp-wizard="leave">
                         
                         <div class="mb-4">
                             <label class="form-label fw-bold text-secondary small text-uppercase">ประเภทการลา <span class="text-danger">*</span></label>
