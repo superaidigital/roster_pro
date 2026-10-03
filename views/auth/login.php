@@ -11,9 +11,9 @@
     <!-- นำเข้า Bootstrap และ Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="public/css/style.css?v=20261003-proportion-v11">
-    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261003-v11">
-    <script src="public/js/progress.js?v=20261003-proportion-v11" defer></script>
+    <link rel="stylesheet" href="public/css/style.css?v=20261004-stable-v12">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-stable-v12">
+    <script src="public/js/progress.js?v=20261004-stable-v12" defer></script>
     
     <!-- นำเข้าฟอนต์ Noto Sans Thai -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
