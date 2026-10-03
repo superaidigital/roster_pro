@@ -131,10 +131,10 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261003-proportion-v11">
-    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-v12">
-    <script src="public/js/responsive.js?v=20261003-proportion-v11" defer></script>
-    <script src="public/js/progress.js?v=20261003-proportion-v11" defer></script>
+<link rel="stylesheet" href="public/css/style.css?v=20261004-stable-v12">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-stable-v12">
+    <script src="public/js/responsive.js?v=20261004-stable-v12" defer></script>
+    <script src="public/js/progress.js?v=20261004-stable-v12" defer></script>
 </head>
 <?php
 $rpController = strtolower(trim($_GET['c'] ?? 'dashboard'));
