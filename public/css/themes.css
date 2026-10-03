@@ -344,3 +344,116 @@ html[data-theme="dark"] .login-right .form-control {
 html[data-theme="dark"] .login-right .form-control::placeholder {
   color: var(--rp-theme-muted) !important;
 }
+
+
+/* ==========================================================================
+   Theme coverage hardening v4
+   ========================================================================== */
+
+/* Outdoor light mode: stronger contrast and crisper boundaries. */
+html[data-theme="light"] {
+  --rp-theme-bg: #f2f6f8;
+  --rp-theme-surface: #ffffff;
+  --rp-theme-surface-2: #f8fafc;
+  --rp-theme-surface-3: #e8f0f5;
+  --rp-theme-text: #071a28;
+  --rp-theme-muted: #3f5969;
+  --rp-theme-border: #bfcfd9;
+  --rp-theme-input: #ffffff;
+  --rp-theme-hover: #edf5f8;
+  --rp-theme-primary: #075b9b;
+  --rp-theme-accent: #0b6f68;
+}
+
+/* Eye-comfort dark mode: slate, never pure black. */
+html[data-theme="dark"] {
+  --rp-theme-bg: #0b1720;
+  --rp-theme-surface: #11232e;
+  --rp-theme-surface-2: #162b37;
+  --rp-theme-surface-3: #1c3542;
+  --rp-theme-text: #edf6f8;
+  --rp-theme-muted: #afc1ca;
+  --rp-theme-border: #35505f;
+  --rp-theme-input: #142a36;
+  --rp-theme-hover: #1a3543;
+  --rp-theme-primary: #79c7ef;
+  --rp-theme-accent: #67e8d2;
+}
+
+.dropdown-menu-notif .custom-scrollbar,
+.dropdown-menu-notif .notif-item,
+.dropdown-menu-notif .notif-header {
+  background-color: var(--rp-theme-surface) !important;
+}
+
+.dropdown-menu-notif .notif-header {
+  background-color: var(--rp-theme-surface-2) !important;
+}
+
+.dropdown-item {
+  color: var(--rp-theme-text) !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-hover) !important;
+}
+
+.dropdown-divider {
+  border-color: var(--rp-theme-border) !important;
+}
+
+.select2-container--default .select2-results__option {
+  color: var(--rp-theme-text);
+  background: var(--rp-theme-surface);
+}
+
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+  color: #fff;
+  background: #0f6cbd;
+}
+
+.dataTables_wrapper select,
+.dataTables_wrapper input {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-input) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+/* SweetAlert follows the active theme. */
+html[data-theme="dark"] .swal2-popup {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-surface) !important;
+  border: 1px solid var(--rp-theme-border);
+}
+
+html[data-theme="dark"] .swal2-title,
+html[data-theme="dark"] .swal2-html-container {
+  color: var(--rp-theme-text) !important;
+}
+
+/* Semantic text remains readable in both modes. */
+html[data-theme="dark"] .text-dark {
+  color: var(--rp-theme-text) !important;
+}
+
+html[data-theme="dark"] .text-secondary,
+html[data-theme="dark"] .text-muted {
+  color: var(--rp-theme-muted) !important;
+}
+
+html[data-theme="dark"] .progress,
+html[data-theme="dark"] .rp-mini-progress,
+html[data-theme="dark"] .rp-wizard-mobile-track {
+  background: var(--rp-theme-surface-3) !important;
+}
+
+/* Theme toggle is a primary utility on touch devices. */
+@media (max-width: 639.98px) {
+  .rp-theme-toggle {
+    width: 3rem !important;
+    height: 3rem !important;
+    min-width: 3rem !important;
+  }
+}
