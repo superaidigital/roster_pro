@@ -473,6 +473,59 @@ CREATE TABLE `users` (
 --
 
 
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `field_visits`
+--
+
+CREATE TABLE `field_visits` (
+  `id` bigint NOT NULL,
+  `hospital_id` int(11) NOT NULL,
+  `created_by` int(11) NOT NULL,
+  `visit_date` date NOT NULL,
+  `patient_ref` varchar(50) NOT NULL,
+  `patient_name` varchar(150) DEFAULT NULL,
+  `patient_age` smallint DEFAULT NULL,
+  `visit_type` varchar(40) NOT NULL DEFAULT 'HOME_VISIT',
+  `chief_concern` varchar(255) DEFAULT NULL,
+  `systolic` smallint DEFAULT NULL,
+  `diastolic` smallint DEFAULT NULL,
+  `pulse` smallint DEFAULT NULL,
+  `temperature` decimal(4,1) DEFAULT NULL,
+  `spo2` tinyint unsigned DEFAULT NULL,
+  `weight` decimal(6,2) DEFAULT NULL,
+  `height` decimal(6,2) DEFAULT NULL,
+  `symptoms` text DEFAULT NULL,
+  `assessment` text DEFAULT NULL,
+  `care_plan` text DEFAULT NULL,
+  `latitude` decimal(10,7) DEFAULT NULL,
+  `longitude` decimal(10,7) DEFAULT NULL,
+  `accuracy_m` decimal(10,2) DEFAULT NULL,
+  `address_note` varchar(255) DEFAULT NULL,
+  `photo_consent` tinyint(1) NOT NULL DEFAULT 0,
+  `status` varchar(20) NOT NULL DEFAULT 'DRAFT',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `field_visit_photos`
+--
+
+CREATE TABLE `field_visit_photos` (
+  `id` bigint NOT NULL,
+  `field_visit_id` bigint NOT NULL,
+  `stored_path` varchar(500) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `mime_type` varchar(100) NOT NULL,
+  `file_size` int unsigned NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 --
 -- Indexes for dumped tables
 --
@@ -610,6 +663,23 @@ ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `username` (`username`);
 
+
+--
+-- Indexes for table `field_visits`
+--
+ALTER TABLE `field_visits`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_field_hospital_date` (`hospital_id`,`visit_date`),
+  ADD KEY `idx_field_creator_date` (`created_by`,`visit_date`),
+  ADD KEY `idx_field_status` (`status`);
+
+--
+-- Indexes for table `field_visit_photos`
+--
+ALTER TABLE `field_visit_photos`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_field_photo_visit` (`field_visit_id`);
+
 --
 -- AUTO_INCREMENT for dumped tables
 --
@@ -722,6 +792,19 @@ ALTER TABLE `system_menus`
 ALTER TABLE `users`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
 
+
+--
+-- AUTO_INCREMENT for table `field_visits`
+--
+ALTER TABLE `field_visits`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `field_visit_photos`
+--
+ALTER TABLE `field_visit_photos`
+  MODIFY `id` bigint NOT NULL AUTO_INCREMENT;
+
 --
 -- Constraints for dumped tables
 --
@@ -761,6 +844,20 @@ ALTER TABLE `employee_work_history`
 --
 ALTER TABLE `logs`
   ADD CONSTRAINT `fk_logs_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Constraints for table `field_visits`
+--
+ALTER TABLE `field_visits`
+  ADD CONSTRAINT `fk_field_visit_hospital` FOREIGN KEY (`hospital_id`) REFERENCES `hospitals` (`id`),
+  ADD CONSTRAINT `fk_field_visit_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `field_visit_photos`
+--
+ALTER TABLE `field_visit_photos`
+  ADD CONSTRAINT `fk_field_photo_visit` FOREIGN KEY (`field_visit_id`) REFERENCES `field_visits` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
