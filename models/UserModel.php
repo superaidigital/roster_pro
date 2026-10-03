@@ -8,10 +8,7 @@ class UserModel {
     public function __construct($db) {
         $this->conn = $db;
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        
-        // รันฟังก์ชันตรวจสอบและสร้างคอลัมน์อัตโนมัติเมื่อมีการเรียกใช้ Model
-        $this->checkAndCreateColumns();
-    }
+}
 
     /**
      * 🌟 ระบบ Auto-Migration (อัปเดตโครงสร้างฐานข้อมูลอัตโนมัติ)
