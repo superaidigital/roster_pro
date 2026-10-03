@@ -40,7 +40,7 @@ class StaffController {
         $current_role = strtoupper($_SESSION['user']['role']);
         $my_hosp_id = $_SESSION['user']['hospital_id'];
         
-        $is_admin_level = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR']);
+        $is_admin_level = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR'], true);
 
         // หากเป็นผู้จัดเวร ให้เห็นเฉพาะบุคลากรในหน่วยงานตัวเอง
         if ($is_admin_level) {
