@@ -74,7 +74,7 @@ class StaffController {
                 'hospital_id' => $is_global_admin ? ($_POST['hospital_id'] ?? null) : $_SESSION['user']['hospital_id'],
                 'name' => trim($_POST['name'] ?? ''),
                 'username' => trim($_POST['username'] ?? ''),
-                'password' => !empty($_POST['password']) ? $_POST['password'] : '123456', // รหัสเริ่มต้น
+                'password' => $newPassword,
                 'role' => strtoupper($_POST['role'] ?? 'STAFF'),
                 'pay_rate_id' => !empty($_POST['pay_rate_id']) ? $_POST['pay_rate_id'] : null,
                 'position' => trim($_POST['position'] ?? ''), 
@@ -481,7 +481,7 @@ class StaffController {
                     'position' => $position,
                     'employee_type' => $employee_type,
                     'phone' => $phone,
-                    'password' => '123456', // รหัสเริ่มต้น
+                    'password' => $password,
                     'role' => 'STAFF',
                     'is_active' => 1,
                     'color_theme' => 'success'
