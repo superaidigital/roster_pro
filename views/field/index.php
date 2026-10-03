@@ -1,11 +1,19 @@
 <?php
 $exportParams = array_filter([
     'status' => $filters['status'] ?? '',
+    'risk_level' => $filters['risk_level'] ?? '',
     'date_from' => $filters['date_from'] ?? '',
     'date_to' => $filters['date_to'] ?? '',
     'q' => $filters['q'] ?? '',
 ], static fn($value) => $value !== '');
 $exportUrl = 'index.php?c=field&a=export_csv' . ($exportParams ? '&' . http_build_query($exportParams) : '');
+
+$riskLabels = [
+    'ROUTINE' => ['label' => 'ทั่วไป', 'class' => 'secondary'],
+    'WATCH' => ['label' => 'เฝ้าระวัง', 'class' => 'warning'],
+    'HIGH' => ['label' => 'เสี่ยงสูง', 'class' => 'danger'],
+    'URGENT' => ['label' => 'เร่งด่วน', 'class' => 'danger'],
+];
 
 $visitTypeLabels = [
     'HOME_VISIT' => 'เยี่ยมบ้านทั่วไป',
@@ -48,32 +56,46 @@ $visitTypeLabels = [
     </div>
 
     <div class="row g-3 mb-3">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-xl-2">
             <div class="rp-field-stat">
                 <span>เยี่ยมวันนี้</span>
                 <strong><?= number_format($summary['today_count']) ?></strong>
                 <i class="bi bi-calendar2-check"></i>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-xl-2">
             <div class="rp-field-stat">
                 <span>ร่างค้าง</span>
                 <strong><?= number_format($summary['draft_count']) ?></strong>
                 <i class="bi bi-pencil-square"></i>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-xl-2">
             <div class="rp-field-stat">
                 <span>เสร็จแล้ว</span>
                 <strong><?= number_format($summary['completed_count']) ?></strong>
                 <i class="bi bi-check2-circle"></i>
             </div>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4 col-xl-2">
             <div class="rp-field-stat">
                 <span>ทั้งหมด</span>
                 <strong><?= number_format($summary['total']) ?></strong>
                 <i class="bi bi-clipboard2-pulse"></i>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="rp-field-stat rp-field-stat-danger">
+                <span>งานเสี่ยงสูง</span>
+                <strong><?= number_format($summary['high_risk_count'] ?? 0) ?></strong>
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="rp-field-stat rp-field-stat-warning">
+                <span>ติดตามถึงกำหนด</span>
+                <strong><?= number_format($summary['followup_due_count'] ?? 0) ?></strong>
+                <i class="bi bi-calendar2-event-fill"></i>
             </div>
         </div>
     </div>
@@ -82,12 +104,19 @@ $visitTypeLabels = [
         <section class="card rp-field-form-card">
             <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
                 <div>
-                    <h5 class="mb-1"><i class="bi bi-house-heart-fill text-primary me-2"></i>บันทึกเยี่ยมบ้าน</h5>
+                    <h5 class="mb-1"><i class="bi bi-house-heart-fill text-primary me-2"></i><?= $editVisit ? 'แก้ไขร่างเยี่ยมบ้าน' : 'บันทึกเยี่ยมบ้าน' ?></h5>
                     <small class="text-muted">ระบบจะเก็บร่างบนอุปกรณ์นี้ชั่วคราวสูงสุด 8 ชั่วโมง และไม่เก็บรูปในร่างออฟไลน์</small>
                 </div>
-                <button type="button" class="btn btn-light btn-sm" id="fieldDiscardDraft">
-                    <i class="bi bi-trash3 me-1"></i>ล้างร่างบนเครื่อง
-                </button>
+                <div class="d-flex gap-2 flex-wrap">
+                    <?php if ($editVisit): ?>
+                        <a class="btn btn-outline-secondary btn-sm" id="fieldCancelEdit" href="index.php?c=field">
+                            <i class="bi bi-x-circle me-1"></i>ยกเลิกแก้ไข
+                        </a>
+                    <?php endif; ?>
+                    <button type="button" class="btn btn-light btn-sm" id="fieldDiscardDraft">
+                        <i class="bi bi-trash3 me-1"></i>ล้างร่างบนเครื่อง
+                    </button>
+                </div>
             </div>
 
             <div class="card-body">
@@ -99,8 +128,10 @@ $visitTypeLabels = [
                       id="fieldVisitForm"
                       data-rp-wizard="field"
                       data-field-user="<?= (int)$user['id'] ?>"
+                      data-field-record="<?= (int)($editVisit['id'] ?? 0) ?>"
                       data-field-saved="<?= isset($_GET['saved']) ? '1' : '0' ?>">
                     <?= security_csrf_input() ?>
+                    <input type="hidden" name="visit_id" value="<?= (int)($editVisit['id'] ?? 0) ?>">
                     <input type="hidden" name="status" id="fieldStatus" value="DRAFT">
 
                     <section data-rp-step data-rp-step-title="ข้อมูลทั่วไป">
@@ -168,31 +199,31 @@ $visitTypeLabels = [
                         </div>
 
                         <div class="row g-3">
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <label class="form-label" for="systolic">SBP (mmHg)</label>
                                 <input class="form-control" id="systolic" name="systolic" type="number" min="40" max="320" inputmode="numeric">
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <label class="form-label" for="diastolic">DBP (mmHg)</label>
                                 <input class="form-control" id="diastolic" name="diastolic" type="number" min="20" max="220" inputmode="numeric">
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <label class="form-label" for="pulse">ชีพจร (ครั้ง/นาที)</label>
                                 <input class="form-control" id="pulse" name="pulse" type="number" min="20" max="260" inputmode="numeric">
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <label class="form-label" for="temperature">อุณหภูมิ (°C)</label>
                                 <input class="form-control" id="temperature" name="temperature" type="number" step="0.1" min="25" max="50" inputmode="decimal">
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <label class="form-label" for="spo2">SpO₂ (%)</label>
                                 <input class="form-control" id="spo2" name="spo2" type="number" min="1" max="100" inputmode="numeric">
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <label class="form-label" for="weight">น้ำหนัก (kg)</label>
                                 <input class="form-control" id="weight" name="weight" type="number" step="0.1" min="0.1" max="600" inputmode="decimal">
                             </div>
-                            <div class="col-6 col-md-3">
+                            <div class="col-6 col-md-4 col-xl-2">
                                 <label class="form-label" for="height">ส่วนสูง (cm)</label>
                                 <input class="form-control" id="height" name="height" type="number" step="0.1" min="20" max="280" inputmode="decimal">
                             </div>
@@ -220,6 +251,31 @@ $visitTypeLabels = [
                             <div class="col-12">
                                 <label class="form-label" for="care_plan">แผนดูแล/ติดตามต่อ</label>
                                 <textarea class="form-control" id="care_plan" name="care_plan" rows="4" maxlength="3000"></textarea>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label" for="risk_level">ระดับความเสี่ยง</label>
+                                <select class="form-select" id="risk_level" name="risk_level">
+                                    <option value="ROUTINE">ทั่วไป</option>
+                                    <option value="WATCH">เฝ้าระวัง</option>
+                                    <option value="HIGH">เสี่ยงสูง</option>
+                                    <option value="URGENT">เร่งด่วน</option>
+                                </select>
+                                <div class="form-text">เจ้าหน้าที่เป็นผู้ประเมินระดับความเสี่ยงตามแนวทางของหน่วยงาน</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="follow_up_date">วันนัดติดตามครั้งถัดไป</label>
+                                <input class="form-control" id="follow_up_date" name="follow_up_date" type="date">
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check rp-referral-check">
+                                    <input class="form-check-input" type="checkbox" value="1" id="referral_required" name="referral_required">
+                                    <label class="form-check-label fw-semibold" for="referral_required">ต้องส่งต่อ/ประสานหน่วยบริการอื่น</label>
+                                </div>
+                            </div>
+                            <div class="col-12 d-none" id="fieldReferralNoteWrap">
+                                <label class="form-label" for="referral_note">รายละเอียดการส่งต่อ/ประสานงาน</label>
+                                <textarea class="form-control" id="referral_note" name="referral_note" rows="3" maxlength="500"></textarea>
                             </div>
 
                             <div class="col-12">
@@ -291,7 +347,7 @@ $visitTypeLabels = [
                     <div class="col-12 col-md-5">
                         <input class="form-control form-control-sm" name="q" value="<?= htmlspecialchars($filters['q'], ENT_QUOTES, 'UTF-8') ?>" placeholder="ค้นหารหัส/ชื่อ/เหตุผล">
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md-4 col-xl-2">
                         <select class="form-select form-select-sm" name="status">
                             <option value="">ทุกสถานะ</option>
                             <option value="DRAFT" <?= $filters['status'] === 'DRAFT' ? 'selected' : '' ?>>ร่าง</option>
@@ -312,15 +368,17 @@ $visitTypeLabels = [
                                 <th>วันที่</th>
                                 <th>ผู้รับบริการ</th>
                                 <th>ประเภท</th>
+                                <th>ความเสี่ยง</th>
+                                <th>ติดตาม</th>
                                 <th>ผู้บันทึก</th>
                                 <th>สถานะ</th>
-                                <th>รูป</th>
+                                <th>จัดการ</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (!$visits): ?>
                                 <tr>
-                                    <td colspan="6" class="text-center py-5 text-muted">
+                                    <td colspan="9" class="text-center py-5 text-muted">
                                         <i class="bi bi-inbox fs-2 d-block mb-2"></i>
                                         ยังไม่มีข้อมูลเยี่ยมบ้าน
                                     </td>
@@ -334,6 +392,23 @@ $visitTypeLabels = [
                                             <small class="text-muted"><?= htmlspecialchars($visit['patient_ref'], ENT_QUOTES, 'UTF-8') ?></small>
                                         </td>
                                         <td><?= htmlspecialchars($visitTypeLabels[$visit['visit_type']] ?? $visit['visit_type'], ENT_QUOTES, 'UTF-8') ?></td>
+                                        <?php $riskMeta = $riskLabels[$visit['risk_level'] ?? 'ROUTINE'] ?? $riskLabels['ROUTINE']; ?>
+                                        <td>
+                                            <span class="badge bg-<?= htmlspecialchars($riskMeta['class'], ENT_QUOTES, 'UTF-8') ?>">
+                                                <?= htmlspecialchars($riskMeta['label'], ENT_QUOTES, 'UTF-8') ?>
+                                            </span>
+                                            <?php if (!empty($visit['referral_required'])): ?>
+                                                <span class="badge bg-info text-dark d-block mt-1">ส่งต่อ</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if (!empty($visit['follow_up_date'])): ?>
+                                                <div class="fw-semibold"><?= htmlspecialchars($visit['follow_up_date'], ENT_QUOTES, 'UTF-8') ?></div>
+                                                <small class="text-muted"><?= ($visit['follow_up_status'] ?? 'NONE') === 'DONE' ? 'ติดตามแล้ว' : 'รอติดตาม' ?></small>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <span><?= htmlspecialchars($visit['created_by_name'] ?? '-', ENT_QUOTES, 'UTF-8') ?></span>
                                             <?php if (!empty($visit['hospital_name'])): ?>
@@ -348,13 +423,33 @@ $visitTypeLabels = [
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <?php if ((int)$visit['photo_count'] > 0 && !empty($visit['first_photo_id'])): ?>
-                                                <a href="index.php?c=field&a=photo&id=<?= (int)$visit['first_photo_id'] ?>" target="_blank" class="btn btn-light btn-sm">
-                                                    <i class="bi bi-image me-1"></i><?= (int)$visit['photo_count'] ?>
-                                                </a>
-                                            <?php else: ?>
-                                                <span class="text-muted">-</span>
-                                            <?php endif; ?>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <?php if ((int)$visit['photo_count'] > 0 && !empty($visit['first_photo_id'])): ?>
+                                                    <a href="index.php?c=field&a=photo&id=<?= (int)$visit['first_photo_id'] ?>" target="_blank" class="btn btn-light btn-sm" aria-label="ดูรูปประกอบ">
+                                                        <i class="bi bi-image"></i> <?= (int)$visit['photo_count'] ?>
+                                                    </a>
+                                                <?php endif; ?>
+
+                                                <?php if (($visit['status'] ?? '') === 'DRAFT'): ?>
+                                                    <a href="index.php?c=field&edit=<?= (int)$visit['id'] ?>" class="btn btn-outline-primary btn-sm">
+                                                        <i class="bi bi-pencil-square"></i> แก้ไข
+                                                    </a>
+                                                <?php endif; ?>
+
+                                                <?php if (($visit['follow_up_status'] ?? '') === 'PENDING'): ?>
+                                                    <form action="index.php?c=field&a=complete_followup" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันว่าดำเนินการติดตามรายการนี้แล้ว?');">
+                                                        <?= security_csrf_input() ?>
+                                                        <input type="hidden" name="visit_id" value="<?= (int)$visit['id'] ?>">
+                                                        <button type="submit" class="btn btn-outline-success btn-sm">
+                                                            <i class="bi bi-check2-circle"></i> ปิดติดตาม
+                                                        </button>
+                                                    </form>
+                                                <?php endif; ?>
+
+                                                <?php if ((int)$visit['photo_count'] === 0 && ($visit['status'] ?? '') !== 'DRAFT' && ($visit['follow_up_status'] ?? '') !== 'PENDING'): ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -367,4 +462,10 @@ $visitTypeLabels = [
     </div>
 </div>
 
-<script src="public/js/field.js?v=20261004-field-v1" defer></script>
+<?php if ($editVisit): ?>
+<script type="application/json" id="fieldEditPayload"><?= json_encode(
+    $editVisit,
+    JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+) ?></script>
+<?php endif; ?>
+<script src="public/js/field.js?v=20261004-field-v2" defer></script>
