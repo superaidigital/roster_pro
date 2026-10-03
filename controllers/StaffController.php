@@ -22,8 +22,16 @@ class StaffController {
     // ตรวจสอบสิทธิ์ (SCHEDULER ขึ้นไปสามารถใช้งานส่วนนี้ได้)
     private function checkAuth() {
         security_start_session();
+
         if (!isset($_SESSION['user'])) {
-            header("Location: index.php?c=auth&a=login");
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? 'STAFF'));
+        if (!in_array($role, ['SCHEDULER', 'DIRECTOR', 'ADMIN', 'SUPERADMIN', 'HR'], true)) {
+            $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์เข้าถึงส่วนจัดการบุคลากร";
+            header("Location: index.php?c=dashboard");
             exit;
         }
     }
