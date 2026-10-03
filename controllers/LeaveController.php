@@ -15,14 +15,6 @@ class LeaveController {
     // 🌟 ฟังก์ชันช่วยเหลือ (Helper Functions)
     // ==========================================
     
-    // 🛠️ ฟังก์ชันพิเศษ: ซ่อมแซมโครงสร้างฐานข้อมูลอัตโนมัติ
-    private function autoPatchDatabase($db) {
-        try {
-            $db->exec("ALTER TABLE leave_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'PENDING'");
-            $db->exec("UPDATE leave_requests SET status = 'CANCEL_REQUESTED' WHERE status = ''");
-        } catch (Exception $e) { }
-    }
-
     private function getCurrentBudgetYear() {
         $month = (int)date('m');
         $year = (int)date('Y');
@@ -73,9 +65,7 @@ class LeaveController {
         if (!isset($_SESSION['user'])) { header("Location: index.php?c=auth&a=index"); exit; }
 
         $db = (new Database())->getConnection();
-        $this->autoPatchDatabase($db); 
-        
-        $leaveModel = class_exists('LeaveModel') ? new LeaveModel($db) : null;
+$leaveModel = class_exists('LeaveModel') ? new LeaveModel($db) : null;
         
         $user_id = $_SESSION['user']['id'];
         $hospital_id = $_SESSION['user']['hospital_id'];
@@ -660,7 +650,8 @@ class LeaveController {
 
             } catch (Exception $e) {
                 $db->rollBack();
-                $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการประมวลผล: " . $e->getMessage();
+                error_log('LeaveController error: ' . $e->getMessage());
+                $_SESSION['error_msg'] = "ไม่สามารถดำเนินการข้อมูลวันลาได้ กรุณาลองใหม่";
             }
         }
         header("Location: index.php?c=leave&a=balances"); exit;
