@@ -159,7 +159,7 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
         <div class="tab-pane fade show active" id="nav-personal" role="tabpanel">
             <div class="card card-modern">
                 <div class="card-body p-4">
-                    <form action="index.php?c=profile&a=save_profile" method="POST">
+                    <form action="index.php?c=profile&a=save_profile" method="POST" id="profilePersonalForm" data-rp-wizard="profile" data-rp-wizard-titles="ข้อมูลพื้นฐาน|ที่อยู่และผู้ติดต่อ|ข้อมูลบัญชี">
                             <?= security_csrf_input() ?>
                         <input type="hidden" name="user_id" value="<?= $target_user_id ?>">
                         
