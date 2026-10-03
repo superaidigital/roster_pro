@@ -190,6 +190,8 @@ h5 { font-size: clamp(1rem, 1.1vw, 1.15rem); }
 
 #desktopSidebar,
 .rp-desktop-sidebar {
+  display: flex;
+  flex-direction: column;
   flex: 0 0 var(--rp-sidebar-width);
   width: var(--rp-sidebar-width) !important;
   min-width: var(--rp-sidebar-width) !important;
