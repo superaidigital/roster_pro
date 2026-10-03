@@ -1057,3 +1057,387 @@ body.rp-menu-open {
     width: 100%;
   }
 }
+
+
+/* ==========================================================================
+   Field-ready mobile UI for health staff
+   Designed for bright outdoor use and one-hand/touch interaction
+   ========================================================================== */
+
+:root {
+  --rp-field-text: #0b1220;
+  --rp-field-muted: #475569;
+  --rp-field-border: #cbd5e1;
+  --rp-touch: 3rem;
+}
+
+.form-control,
+.form-select,
+.input-group-text,
+.btn {
+  font-size: 1rem;
+}
+
+.form-control,
+.form-select {
+  min-height: var(--rp-touch);
+  border-color: var(--rp-field-border);
+  color: var(--rp-field-text);
+}
+
+.form-control::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 .2rem rgba(37, 99, 235, .18);
+}
+
+.form-label,
+legend {
+  color: var(--rp-field-text);
+}
+
+.btn {
+  min-height: var(--rp-touch);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.btn-primary,
+.btn-success,
+.btn-danger,
+.btn-dark {
+  color: #fff;
+}
+
+.btn-primary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+
+.alert,
+.badge,
+.status-badge {
+  border-width: 1px;
+  border-style: solid;
+}
+
+.text-muted {
+  color: var(--rp-field-muted) !important;
+}
+
+.card,
+.modal-content,
+.dropdown-menu {
+  border-color: var(--rp-field-border) !important;
+}
+
+/* Mobile card table: standard information tables become readable vertical cards.
+   Complex roster/calendar tables remain scrollable instead. */
+.rp-stack-table td[data-label]::before {
+  content: none;
+}
+
+@media (max-width: 639.98px) {
+  :root {
+    --rp-touch: 3.25rem;
+  }
+
+  body {
+    color: var(--rp-field-text);
+    background: #f1f5f9;
+  }
+
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    font-size: 1rem !important;
+  }
+
+  .app-main {
+    line-height: 1.6;
+  }
+
+  .form-label,
+  .form-check-label,
+  legend {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .form-control,
+  .form-select,
+  .input-group-text {
+    font-size: 1rem !important;
+    min-height: var(--rp-touch);
+  }
+
+  textarea.form-control {
+    min-height: 7rem;
+  }
+
+  .btn:not(.btn-close) {
+    min-height: var(--rp-touch);
+    font-size: 1rem !important;
+    padding: .7rem .9rem;
+  }
+
+  .btn-sm:not(.btn-close) {
+    min-height: 2.75rem;
+    font-size: .95rem !important;
+  }
+
+  .form-check-input {
+    width: 1.35rem;
+    height: 1.35rem;
+    margin-top: .08rem;
+  }
+
+  .form-check {
+    min-height: 2.4rem;
+    display: flex;
+    align-items: flex-start;
+    gap: .6rem;
+  }
+
+  /* Long data-entry forms stack to one field per row. */
+  form .row > [class*="col-md-"],
+  form .row > [class*="col-lg-"],
+  form .row > [class*="col-xl-"],
+  .modal-body .row > [class*="col-md-"],
+  .modal-body .row > [class*="col-lg-"],
+  .modal-body .row > [class*="col-xl-"] {
+    width: 100%;
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  form .row {
+    row-gap: .85rem;
+  }
+
+  .modal-body .row {
+    row-gap: .8rem;
+  }
+
+  .modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    background: #fff;
+    border-top: 1px solid var(--rp-field-border);
+    box-shadow: 0 -.5rem 1.25rem rgba(15, 23, 42, .06);
+  }
+
+  .modal-footer .btn,
+  .modal-footer form {
+    min-width: 0;
+  }
+
+  /* Standard tables become stacked cards. */
+  .table-responsive:has(.rp-stack-table) {
+    overflow: visible !important;
+    border-radius: 0;
+  }
+
+  table.rp-stack-table,
+  .rp-stack-table thead,
+  .rp-stack-table tbody,
+  .rp-stack-table tr,
+  .rp-stack-table th,
+  .rp-stack-table td {
+    display: block;
+    width: 100% !important;
+  }
+
+  .rp-stack-table {
+    min-width: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .rp-stack-table thead {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  .rp-stack-table tbody {
+    display: grid;
+    gap: .85rem;
+  }
+
+  .rp-stack-table tbody tr {
+    overflow: hidden;
+    padding: .35rem .9rem;
+    background: #fff;
+    border: 1px solid var(--rp-field-border);
+    border-radius: 1rem;
+    box-shadow: 0 .25rem .8rem rgba(15, 23, 42, .05);
+  }
+
+  .rp-stack-table tbody tr:hover td {
+    background: transparent !important;
+  }
+
+  .rp-stack-table tbody td {
+    display: grid !important;
+    grid-template-columns: minmax(7.5rem, 42%) minmax(0, 1fr);
+    align-items: center;
+    gap: .75rem;
+    min-height: 2.8rem;
+    padding: .65rem 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    text-align: right !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  .rp-stack-table tbody td:last-child {
+    border-bottom: 0 !important;
+  }
+
+  .rp-stack-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    min-width: 0;
+    color: #334155;
+    font-weight: 700;
+    text-align: left;
+    line-height: 1.35;
+  }
+
+  .rp-stack-table td .d-flex,
+  .rp-stack-table td .d-inline-flex {
+    justify-content: flex-end;
+  }
+
+  .rp-stack-table td .btn-group,
+  .rp-stack-table td .d-flex:has(.btn),
+  .rp-stack-table td form {
+    max-width: 100%;
+  }
+
+  .rp-stack-table td .btn {
+    min-height: 2.75rem;
+  }
+
+  .rp-stack-table .rp-empty-row {
+    padding: 0;
+  }
+
+  .rp-stack-table .rp-empty-row td {
+    display: block !important;
+    padding: 2rem 1rem !important;
+    text-align: center !important;
+    border: 0 !important;
+  }
+
+  .rp-stack-table .rp-empty-row td::before {
+    content: none !important;
+  }
+
+  /* Explicit scroll tables stay horizontally scrollable. */
+  .table-responsive:has(.rp-scroll-table),
+  .calendar-scroll-shell {
+    overflow-x: auto !important;
+    background: #fff;
+    border: 1px solid var(--rp-field-border);
+    border-radius: 1rem;
+  }
+
+  /* High visibility toolbar/action zones for field use. */
+  .card-header,
+  .users-hero,
+  .users-filter-card {
+    border-color: var(--rp-field-border) !important;
+  }
+
+  .card-header .btn,
+  .users-hero__actions .btn {
+    min-height: 3rem;
+  }
+
+  .users-filter-grid {
+    gap: .75rem !important;
+  }
+
+  .users-search input {
+    min-height: 3.25rem;
+  }
+
+  /* Remove hover-only movement on touch devices. */
+  .card:hover,
+  .btn:hover,
+  .nav-link:hover,
+  .quick-action-btn:hover {
+    transform: none !important;
+  }
+}
+
+/* Tablet: touch-friendly controls but more compact than phone. */
+@media (min-width: 640px) and (max-width: 1023.98px) {
+  :root {
+    --rp-touch: 3rem;
+  }
+
+  .form-control,
+  .form-select,
+  .btn {
+    font-size: 1rem;
+  }
+
+  .btn {
+    min-height: 3rem;
+  }
+
+  .card-body {
+    padding: 1.15rem;
+  }
+
+  .modal-dialog {
+    max-width: min(46rem, calc(100vw - 2rem));
+  }
+}
+
+/* Respect OS high-contrast preference and improve outdoor legibility. */
+@media (prefers-contrast: more) {
+  :root {
+    --rp-text: #000;
+    --rp-muted: #334155;
+    --rp-border: #94a3b8;
+    --rp-field-border: #94a3b8;
+  }
+
+  .card,
+  .modal-content,
+  .dropdown-menu,
+  .form-control,
+  .form-select,
+  .btn {
+    border-width: 2px !important;
+  }
+
+  .text-muted {
+    color: #334155 !important;
+  }
+}
