@@ -740,3 +740,92 @@ textarea.form-control {
     max-width: calc(100vw - var(--rp-sidebar-collapsed-w) - 11rem) !important;
   }
 }
+
+
+/* ==========================================================================
+   Collapsed sidebar integrity + topbar balance
+   ========================================================================== */
+
+.rp-topbar-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rp-topbar-actions {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+#desktopSidebar.collapsed {
+  overflow-x: hidden !important;
+}
+
+#desktopSidebar.collapsed .sidebar-text,
+#desktopSidebar.collapsed .sidebar-heading,
+#desktopSidebar.collapsed .dropdown-arrow,
+#desktopSidebar.collapsed .rp-sidebar-brand-copy,
+#desktopSidebar.collapsed .leave-dropdown-container .collapse,
+#desktopSidebar.collapsed .hr-dropdown-container .collapse {
+  display: none !important;
+}
+
+#desktopSidebar.collapsed .rp-sidebar-brand {
+  justify-content: center !important;
+}
+
+#desktopSidebar.collapsed .sidebar-menu {
+  padding-inline: .45rem !important;
+}
+
+#desktopSidebar.collapsed .nav-link {
+  justify-content: center !important;
+  gap: 0 !important;
+  padding-inline: .35rem !important;
+  white-space: nowrap !important;
+}
+
+#desktopSidebar.collapsed .nav-link > div {
+  display: contents;
+}
+
+#desktopSidebar.collapsed .nav-link i {
+  width: 1.45rem !important;
+  flex: 0 0 1.45rem !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+#desktopSidebar.collapsed .rp-sidebar-footer {
+  padding-inline: .45rem !important;
+}
+
+#desktopSidebar.collapsed .rp-sidebar-footer .nav-link {
+  justify-content: center !important;
+}
+
+@media (max-width: 1279.98px) and (min-width: 1024px) {
+  .rp-profile-meta,
+  .rp-profile-chevron,
+  .top-navbar .vr {
+    display: none !important;
+  }
+
+  .profile-pill {
+    padding: .2rem !important;
+  }
+
+  .rp-page-context {
+    max-width: calc(100vw - var(--rp-sidebar-w) - 14rem) !important;
+  }
+}
+
+@media (max-width: 1099.98px) and (min-width: 1024px) {
+  .rp-system-online {
+    display: none !important;
+  }
+
+  .rp-page-subtitle,
+  .rp-page-kicker {
+    display: none !important;
+  }
+}
