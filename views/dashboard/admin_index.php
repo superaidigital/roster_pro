@@ -56,33 +56,13 @@ $waiting_hospitals = $filtered_waiting;
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    body { background-color: #f4f6f9; font-family: 'Sarabun', sans-serif; }
-    
-    .dashboard-card {
-        border: none; border-radius: 1.25rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        transition: transform 0.2s ease, box-shadow 0.2s ease; background: #fff; overflow: hidden;
-    }
-    .dashboard-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
-    
-    .icon-circle { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-    
-    .bg-gradient-primary { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); color: white; }
+.bg-gradient-primary { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); color: white; }
     .bg-gradient-success { background: linear-gradient(135deg, #10b981 0%, #22c55e 100%); color: white; }
     .bg-gradient-warning { background: linear-gradient(135deg, #f59e0b 0%, #eab308 100%); color: white; }
     .bg-gradient-danger { background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%); color: white; }
     .bg-gradient-info { background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%); color: white; }
     .bg-gradient-purple { background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); color: white; }
-
-    .table-modern th { font-weight: 600; color: #64748b; background: #f8fafc; border-bottom: 2px solid #e2e8f0; font-size: 13px; text-transform: uppercase; }
-    .table-modern td { vertical-align: middle; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
-    
-    .chart-container { position: relative; height: 250px; width: 100%; }
-    
-    .quick-action-btn { transition: all 0.2s; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 1rem; color: #475569; font-weight: 600; text-align: center; padding: 15px 10px; text-decoration: none; display: block; }
-    .quick-action-btn i { font-size: 26px; display: block; margin-bottom: 8px; }
-    .quick-action-btn:hover { background: #fff; border-color: #3b82f6; color: #3b82f6; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.1); transform: translateY(-2px); }
-
-    /* Timeline Styles */
+/* Timeline Styles */
     .timeline { position: relative; padding-left: 30px; margin-bottom: 0; list-style: none; }
     .timeline::before { content: ''; position: absolute; top: 0; bottom: 0; left: 14px; width: 2px; background: #e2e8f0; }
     .timeline-item { position: relative; margin-bottom: 1.5rem; }
