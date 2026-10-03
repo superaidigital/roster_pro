@@ -25,3 +25,5 @@ public/uploads/Backup/
 public/uploads/backup/
 public/uploads/**/*.sql
 *.sql.zip
+/storage/field_visits/*
+!/storage/field_visits/.gitkeep
