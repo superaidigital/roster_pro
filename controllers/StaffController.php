@@ -195,7 +195,8 @@ class StaffController {
                     }
                 }
             } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error: " . $e->getMessage();
+                error_log('StaffController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
             }
         }
         header("Location: index.php?c=staff");
