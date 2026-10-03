@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS field_visits (
   symptoms TEXT NULL,
   assessment TEXT NULL,
   care_plan TEXT NULL,
+  risk_level VARCHAR(20) NOT NULL DEFAULT 'ROUTINE',
+  follow_up_date DATE NULL,
+  follow_up_status VARCHAR(20) NOT NULL DEFAULT 'NONE',
+  referral_required TINYINT(1) NOT NULL DEFAULT 0,
+  referral_note VARCHAR(500) NULL,
   latitude DECIMAL(10,7) NULL,
   longitude DECIMAL(10,7) NULL,
   accuracy_m DECIMAL(10,2) NULL,
@@ -32,7 +37,9 @@ CREATE TABLE IF NOT EXISTS field_visits (
   PRIMARY KEY (id),
   KEY idx_field_hospital_date (hospital_id, visit_date),
   KEY idx_field_creator_date (created_by, visit_date),
-  KEY idx_field_status (status)
+  KEY idx_field_status (status),
+  KEY idx_field_risk (risk_level),
+  KEY idx_field_followup (follow_up_status, follow_up_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS field_visit_photos (
