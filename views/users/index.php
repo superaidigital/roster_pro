@@ -68,13 +68,13 @@ foreach($hospitals_list as $h) {
         align-items: center;
         justify-content: space-between;
         gap: 18px;
-        padding: 22px 24px;
+        padding: 1rem 1.1rem;
         margin-bottom: 18px;
         background:
             linear-gradient(135deg, rgba(37,99,235,.08), rgba(14,165,233,.04)),
             #fff;
         border: 1px solid #e7edf5;
-        border-radius: 20px;
+        border-radius: 1rem;
         box-shadow: 0 12px 32px rgba(15,23,42,.05);
     }
     .users-hero__identity {
@@ -84,8 +84,8 @@ foreach($hospitals_list as $h) {
         min-width: 0;
     }
     .users-hero__icon {
-        width: 52px;
-        height: 52px;
+        width: 2.8rem;
+        height: 2.8rem;
         border-radius: 16px;
         display: flex;
         align-items: center;
@@ -102,7 +102,7 @@ foreach($hospitals_list as $h) {
     .users-table-card {
         border: 1px solid #e7edf5;
         background: #fff;
-        border-radius: 20px;
+        border-radius: 1rem;
         box-shadow: 0 10px 28px rgba(15,23,42,.045);
     }
     .users-filter-card { padding: 16px; margin-bottom: 18px; }
@@ -135,7 +135,7 @@ foreach($hospitals_list as $h) {
     }
     .users-table-toolbar h6 { margin: 0; }
     .users-table-scroll { overflow-x: auto; padding: 0 14px 10px; }
-    #usersTable { min-width: 1080px !important; margin: 0; }
+    #usersTable { min-width: 58rem !important; margin: 0; }
     #usersTable thead th {
         position: sticky;
         top: 0;
@@ -201,7 +201,7 @@ foreach($hospitals_list as $h) {
         font-weight: 600;
     }
     .modal-content {
-        border-radius: 22px !important;
+        border-radius: 1.05rem !important;
         overflow: hidden;
     }
     .modal-header { background: linear-gradient(180deg,#fff,#fbfdff); }
@@ -233,7 +233,7 @@ foreach($hospitals_list as $h) {
 .users-page > .card.card-modern.mb-4 {
     background:#fff;
     border:1px solid #e7edf5;
-    border-radius:20px;
+    border-radius: 1rem;
     box-shadow:0 10px 28px rgba(15,23,42,.045);
     margin-bottom:18px;
     overflow:visible;
@@ -259,7 +259,7 @@ foreach($hospitals_list as $h) {
 }
 .users-page .input-group .form-control { border-left:0; border-radius:0 11px 11px 0; }
 .users-page .card-modern {
-    background:#fff; border:1px solid #e7edf5; border-radius:20px;
+    background:#fff; border:1px solid #e7edf5; border-radius: 1rem;
     box-shadow:0 10px 28px rgba(15,23,42,.045);
 }
 .users-page .card-header {
@@ -268,7 +268,7 @@ foreach($hospitals_list as $h) {
 }
 .users-page .table-responsive { padding:0 14px 10px !important; }
 .users-page .bg-primary.bg-opacity-10.rounded-circle {
-    width:52px !important; height:52px !important; border-radius:16px !important;
+    width: 2.8rem !important; height: 2.8rem !important; border-radius:16px !important;
     background:#eff6ff !important; border:1px solid #dbeafe; color:#2563eb !important;
 }
 .users-page .btn { font-weight:600; box-shadow:none !important; transition:.18s ease; }
