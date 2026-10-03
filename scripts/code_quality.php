@@ -164,6 +164,24 @@ foreach ($scanFiles as $file) {
         addError($errors, $rel . ': malformed HTML (anchor closed with </button>)');
     }
 
+
+    $isRuntimePhp = str_starts_with($rel, 'controllers' . DIRECTORY_SEPARATOR)
+        || str_starts_with($rel, 'models' . DIRECTORY_SEPARATOR);
+
+    if ($isRuntimePhp && preg_match('/\b(?:ALTER|CREATE|DROP)\s+TABLE\b/i', $content)) {
+        addError($errors, $rel . ': schema DDL belongs in database migrations, not runtime code');
+    }
+
+    if (
+        str_starts_with($rel, 'controllers' . DIRECTORY_SEPARATOR)
+        && (
+            preg_match('/[\'"]password[\'"]\s*=>\s*[\'"](?:123456|password|admin)[\'"]/i', $content)
+            || preg_match('/\?\?\s*[\'"](?:123456|password|admin)[\'"]/i', $content)
+        )
+    ) {
+        addError($errors, $rel . ': predictable default password detected');
+    }
+
     if (
         preg_match('/json_encode\s*\(\s*\[[^\]]*\$e->getMessage\s*\(\)[^\]]*\]\s*\)/is', $content)
         || preg_match('/[\'"](?:message|error)[\'"]\s*=>\s*\$e->getMessage\s*\(\)/i', $content)
