@@ -204,7 +204,8 @@ class RosterController {
             
             $_SESSION['success_msg'] = "ล้างข้อมูลตารางเวรของเดือน {$month} เรียบร้อยแล้ว เริ่มจัดใหม่ได้ทันที";
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการลบข้อมูล: " . $e->getMessage();
+            error_log('RosterController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
         
         header("Location: index.php?c=roster&month={$month}&hospital_id={$hospital_id}");
@@ -265,7 +266,8 @@ class RosterController {
 
         } catch (Exception $e) {
             if ($db->inTransaction()) $db->rollBack();
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการสุ่มตารางเวร: " . $e->getMessage();
+            error_log('RosterController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
         
         header("Location: index.php?c=roster&month={$month}&hospital_id={$hospital_id}");
