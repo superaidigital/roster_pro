@@ -92,7 +92,7 @@
     const mobile = document.createElement('div');
     mobile.className = 'rp-wizard-mobile';
     mobile.innerHTML = `
-      <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+      <div class="rp-wizard-mobile-summary mb-2">
         <strong data-rp-mobile-step-label>ขั้นตอนที่ 1 จาก ${steps.length}</strong>
         <span data-rp-mobile-percent>0%</span>
       </div>
@@ -197,11 +197,12 @@
       const mobileTrack = progress.querySelector('.rp-wizard-mobile-track');
       const mobileTitle = progress.querySelector('[data-rp-mobile-title]');
 
-      if (mobileLabel) mobileLabel.textContent = `ขั้นตอนที่ ${current + 1} จาก ${steps.length}`;
+      const stepTitle = steps[current].dataset.rpStepTitle || '';
+      if (mobileLabel) mobileLabel.textContent = `ขั้นตอนที่ ${current + 1} จาก ${steps.length}: ${stepTitle}`;
       if (mobilePercent) mobilePercent.textContent = percent + '%';
       if (mobileBar) mobileBar.style.width = percent + '%';
       if (mobileTrack) mobileTrack.setAttribute('aria-valuenow', String(percent));
-      if (mobileTitle) mobileTitle.textContent = steps[current].dataset.rpStepTitle || '';
+      if (mobileTitle) mobileTitle.textContent = stepTitle;
 
       form.dataset.rpCurrentStep = String(current + 1);
 
@@ -267,10 +268,35 @@
     delete target.dataset.rpPreviousDisplay;
   }
 
+  async function withSkeleton(target, task, rows = 4) {
+    if (!target || typeof task !== 'function') {
+      throw new TypeError('withSkeleton requires a target element and task function');
+    }
+
+    createSkeleton(target, rows);
+    target.setAttribute('aria-busy', 'true');
+
+    try {
+      return await task();
+    } finally {
+      removeSkeleton(target);
+      target.removeAttribute('aria-busy');
+    }
+  }
+
+  async function fetchWithSkeleton(target, input, init = {}, rows = 4) {
+    return withSkeleton(target, () => fetch(input, init), rows);
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('form[data-rp-wizard]').forEach(enhanceForm);
   });
 
   window.RosterWizard = { enhance: enhanceForm };
-  window.RosterLoading = { showSkeleton: createSkeleton, hideSkeleton: removeSkeleton };
+  window.RosterLoading = {
+    showSkeleton: createSkeleton,
+    hideSkeleton: removeSkeleton,
+    withSkeleton,
+    fetchWithSkeleton
+  };
 })();
