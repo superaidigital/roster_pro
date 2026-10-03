@@ -25,9 +25,9 @@
     <!-- นำเข้า Bootstrap และ Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="public/css/style.css?v=20261004-ux-v13">
-    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ux-v13">
-    <script src="public/js/progress.js?v=20261004-ux-v13" defer></script>
+    <link rel="stylesheet" href="public/css/style.css?v=20261004-field-v14">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-field-v14">
+    <script src="public/js/progress.js?v=20261004-field-v14" defer></script>
     
     <!-- นำเข้าฟอนต์ Noto Sans Thai -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -239,8 +239,8 @@
     }
 }
 </style>
-    <link rel="stylesheet" href="public/css/themes.css?v=20261004-theme-v3">
-    <script src="public/js/theme.js?v=20261004-theme-v3" defer></script>
+    <link rel="stylesheet" href="public/css/themes.css?v=20261004-theme-v4">
+    <script src="public/js/theme.js?v=20261004-theme-v4" defer></script>
 </head>
 <body>
 <button type="button"
