@@ -144,14 +144,14 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261004-ux-v12">
-    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ux-v12">
-    <link rel="stylesheet" href="public/css/themes.css?v=20261004-theme-v1">
-    <link rel="stylesheet" href="public/css/wizard.css?v=20261004-wizard-v1">
-    <script src="public/js/responsive.js?v=20261004-ux-v12" defer></script>
-    <script src="public/js/progress.js?v=20261004-ux-v12" defer></script>
-    <script src="public/js/theme.js?v=20261004-theme-v1" defer></script>
-    <script src="public/js/wizard.js?v=20261004-wizard-v1" defer></script>
+<link rel="stylesheet" href="public/css/style.css?v=20261004-ux-v13">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ux-v13">
+    <link rel="stylesheet" href="public/css/themes.css?v=20261004-theme-v3">
+    <link rel="stylesheet" href="public/css/wizard.css?v=20261004-wizard-v2">
+    <script src="public/js/responsive.js?v=20261004-ux-v13" defer></script>
+    <script src="public/js/progress.js?v=20261004-ux-v13" defer></script>
+    <script src="public/js/theme.js?v=20261004-theme-v3" defer></script>
+    <script src="public/js/wizard.js?v=20261004-wizard-v2" defer></script>
 </head>
 <?php
 $rpController = strtolower(trim($_GET['c'] ?? 'dashboard'));
