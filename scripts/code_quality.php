@@ -136,7 +136,10 @@ foreach ($scanFiles as $file) {
         addError($errors, $rel . ': malformed HTML (anchor closed with </button>)');
     }
 
-    if (preg_match('/json_encode\s*\([\s\S]{0,500}\$e->getMessage\s*\(\)/i', $content)) {
+    if (
+        preg_match('/json_encode\s*\(\s*\[[^\]]*\$e->getMessage\s*\(\)[^\]]*\]\s*\)/is', $content)
+        || preg_match('/[\'"](?:message|error)[\'"]\s*=>\s*\$e->getMessage\s*\(\)/i', $content)
+    ) {
         $warnings[] = $rel . ': exception message may be exposed in JSON response';
     }
 }
