@@ -718,3 +718,25 @@ textarea.form-control {
     display: inline-flex !important;
   }
 }
+
+
+/* Laptop command bar compression: preserve page context without right-side overflow */
+@media (min-width: 1024px) and (max-width: 1439.98px) {
+  .top-navbar .profile-pill > div.d-none.d-md-block,
+  .top-navbar .profile-pill > .bi-chevron-down {
+    display: none !important;
+  }
+
+  .top-navbar .profile-pill {
+    padding: .2rem !important;
+    gap: 0 !important;
+  }
+
+  .top-navbar .rp-page-context {
+    max-width: calc(100vw - var(--rp-sidebar-w) - 11rem) !important;
+  }
+
+  body.rp-sidebar-collapsed .top-navbar .rp-page-context {
+    max-width: calc(100vw - var(--rp-sidebar-collapsed-w) - 11rem) !important;
+  }
+}
