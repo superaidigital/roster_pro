@@ -79,10 +79,10 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
             <i class="bi bi-arrow-left me-1"></i> ย้อนกลับ
         </a>
         <?php if (isset($_SESSION['success_msg'])): ?>
-            <div class="alert alert-success py-2 px-4 rounded-pill mb-0 shadow-sm border-0"><i class="bi bi-check-circle-fill me-2"></i><?= $_SESSION['success_msg']; unset($_SESSION['success_msg']); ?></div>
+            <div class="alert alert-success py-2 px-4 rounded-pill mb-0 shadow-sm border-0"><i class="bi bi-check-circle-fill me-2"></i><?= htmlspecialchars($_SESSION['success_msg'], ENT_QUOTES, 'UTF-8'); unset($_SESSION['success_msg']); ?></div>
         <?php endif; ?>
         <?php if (isset($_SESSION['error_msg'])): ?>
-            <div class="alert alert-danger py-2 px-4 rounded-pill mb-0 shadow-sm border-0"><i class="bi bi-exclamation-triangle-fill me-2"></i><?= $_SESSION['error_msg']; unset($_SESSION['error_msg']); ?></div>
+            <div class="alert alert-danger py-2 px-4 rounded-pill mb-0 shadow-sm border-0"><i class="bi bi-exclamation-triangle-fill me-2"></i><?= htmlspecialchars($_SESSION['error_msg'], ENT_QUOTES, 'UTF-8'); unset($_SESSION['error_msg']); ?></div>
         <?php endif; ?>
     </div>
 
