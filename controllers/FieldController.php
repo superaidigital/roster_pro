@@ -76,6 +76,20 @@ class FieldController {
         return $value;
     }
 
+    private function safeCsvValue(mixed $value): string {
+        $cell = (string)($value ?? '');
+        if ($cell === '') {
+            return '';
+        }
+
+        $first = $cell[0];
+        if (in_array($first, ['=', '+', '-', '@'], true) || ord($first) < 32) {
+            return "'" . $cell;
+        }
+
+        return $cell;
+    }
+
     private function validDate(string $value): bool {
         $dt = DateTime::createFromFormat('Y-m-d', $value);
         return $dt instanceof DateTime && $dt->format('Y-m-d') === $value;
@@ -347,6 +361,9 @@ class FieldController {
 
         header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="field_visits_' . date('Ymd_His') . '.csv"');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('X-Content-Type-Options: nosniff');
 
         $out = fopen('php://output', 'wb');
         fwrite($out, "\xEF\xBB\xBF");
@@ -354,18 +371,25 @@ class FieldController {
 
         foreach ($rows as $row) {
             fputcsv($out, [
-                $row['visit_date'],
-                $row['hospital_name'],
-                $row['patient_ref'],
-                $row['patient_name'],
-                $row['visit_type'],
-                $row['chief_concern'],
-                $row['created_by_name'],
-                $row['status'],
+                $this->safeCsvValue($row['visit_date']),
+                $this->safeCsvValue($row['hospital_name']),
+                $this->safeCsvValue($row['patient_ref']),
+                $this->safeCsvValue($row['patient_name']),
+                $this->safeCsvValue($row['visit_type']),
+                $this->safeCsvValue($row['chief_concern']),
+                $this->safeCsvValue($row['created_by_name']),
+                $this->safeCsvValue($row['status']),
             ]);
         }
 
         fclose($out);
+
+        LogsController::addLog(
+            $db,
+            (int)$user['id'],
+            LogsController::ACTION_EXPORT,
+            'ส่งออกรายการเยี่ยมบ้านเป็น CSV จำนวน ' . count($rows) . ' รายการ'
+        );
         exit;
     }
 }
