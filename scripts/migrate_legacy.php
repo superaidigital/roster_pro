@@ -85,6 +85,17 @@ try {
     // Fill short_name for legacy rows so dashboards have a label immediately.
     $db->exec("UPDATE hospitals SET short_name = name WHERE (short_name IS NULL OR short_name = '')");
 
+    // roster_status
+    if ($db->query("SHOW TABLES LIKE 'roster_status'")->fetchColumn()) {
+        addColumnIfMissing($db, 'roster_status', 'reviewer_id', "INT NULL");
+        addColumnIfMissing($db, 'roster_status', 'remark', "TEXT NULL");
+        addColumnIfMissing($db, 'roster_status', 'pay_summary', "TEXT NULL");
+        addColumnIfMissing($db, 'roster_status', 'submitted_at', "DATETIME NULL");
+        addColumnIfMissing($db, 'roster_status', 'updated_at', "DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+        addColumnIfMissing($db, 'roster_status', 'creator_id', "INT NULL");
+        addColumnIfMissing($db, 'roster_status', 'director_id', "INT NULL");
+    }
+
     // pay_rates
     if ($db->query("SHOW TABLES LIKE 'pay_rates'")->fetchColumn()) {
         addColumnIfMissing($db, 'pay_rates', 'group_name', "VARCHAR(100) NULL");
