@@ -235,3 +235,52 @@ html[data-theme="dark"] .rp-skeleton-row span::after {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ==========================================================================
+   Wizard field UX v3
+   ========================================================================== */
+
+.rp-wizard-progress {
+  scroll-margin-top: 1rem;
+}
+
+.rp-wizard-actions .btn {
+  min-height: 3rem;
+}
+
+@media (max-width: 639.98px) {
+  .rp-wizard-progress {
+    top: .35rem;
+    padding: .7rem .8rem;
+  }
+
+  .rp-wizard-mobile-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem;
+    min-width: 0;
+  }
+
+  .rp-wizard-mobile-summary strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .9rem;
+  }
+
+  .rp-wizard-mobile [data-rp-mobile-percent] {
+    flex: 0 0 auto;
+    font-size: .9rem;
+  }
+
+  .rp-wizard-mobile-title {
+    display: none;
+  }
+
+  .rp-wizard-actions .btn {
+    min-height: 3rem !important;
+  }
+}
