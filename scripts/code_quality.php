@@ -28,6 +28,34 @@ function phpFilesUnder(string $dir): array {
 foreach (glob($root . '/*.sql') ?: [] as $file) {
     addError($errors, 'Database dump must not be committed at repository root: ' . basename($file));
 }
+
+// Database/backup artifacts must never be web-accessible.
+$publicDir = $root . '/public';
+if (is_dir($publicDir)) {
+    $publicIterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($publicDir, FilesystemIterator::SKIP_DOTS)
+    );
+
+    foreach ($publicIterator as $publicFile) {
+        if (!$publicFile->isFile()) continue;
+
+        $name = strtolower($publicFile->getFilename());
+        $extension = strtolower($publicFile->getExtension());
+
+        if (
+            $extension === 'sql'
+            || str_ends_with($name, '.sql.gz')
+            || str_ends_with($name, '.sql.zip')
+            || preg_match('/(?:backup|dump).*(?:sql|gz|zip)$/i', $name)
+        ) {
+            addError(
+                $errors,
+                'Database/backup artifact must not be stored under public/: '
+                . ltrim(str_replace($publicDir, '', $publicFile->getPathname()), DIRECTORY_SEPARATOR)
+            );
+        }
+    }
+}
 foreach (glob($root . '/*Controller.php') ?: [] as $file) {
     addError($errors, 'Duplicate root controller detected: ' . basename($file));
 }
