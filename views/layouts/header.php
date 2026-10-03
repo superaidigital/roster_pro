@@ -352,10 +352,30 @@ if (isset($_SESSION['user'])) {
         }
     </style>
 
-    <link rel="stylesheet" href="public/css/style.css?v=20261003-ui-v9">
-    <script src="public/js/responsive.js?v=20261003-ui-v9" defer></script>
-    <script src="public/js/progress.js?v=20261003-ui-v9" defer></script>
+    <link rel="stylesheet" href="public/css/style.css?v=20261003-modern-v10">
+    <script src="public/js/responsive.js?v=20261003-modern-v10" defer></script>
+    <script src="public/js/progress.js?v=20261003-modern-v10" defer></script>
 </head>
+<?php
+$rpController = strtolower(trim($_GET['c'] ?? 'dashboard'));
+$rpAction = strtolower(trim($_GET['a'] ?? 'index'));
+$rpPageMap = [
+    'dashboard' => ['หน้าภาพรวม', 'สรุปข้อมูลสำคัญและงานที่ต้องดำเนินการ', 'bi-grid-1x2-fill'],
+    'roster' => ['ตารางปฏิบัติงาน', 'จัดเวร ตรวจสอบ และติดตามสถานะการอนุมัติ', 'bi-calendar3'],
+    'leave' => ['ระบบวันลา', 'ยื่นคำขอ ตรวจสอบสิทธิ์ และติดตามการอนุมัติ', 'bi-calendar2-minus-fill'],
+    'report' => ['รายงานและติดตาม', 'ภาพรวมการส่งเวร ภาระงาน และข้อมูลประกอบการบริหาร', 'bi-bar-chart-line-fill'],
+    'profile' => [$rpAction === 'schedule' ? 'ปฏิทินเวรของฉัน' : 'ข้อมูลส่วนบุคคล', $rpAction === 'schedule' ? 'ตรวจสอบวันเวรและกิจกรรมของคุณ' : 'จัดการข้อมูลประวัติและข้อมูลการทำงาน', $rpAction === 'schedule' ? 'bi-calendar-heart-fill' : 'bi-person-vcard-fill'],
+    'staff' => ['บุคลากร', 'จัดการรายชื่อและข้อมูลบุคลากรในหน่วยบริการ', 'bi-people-fill'],
+    'users' => ['ผู้ใช้งานและสิทธิ์', 'จัดการบัญชี สิทธิ์ และการเข้าถึงระบบ', 'bi-person-gear'],
+    'hospitals' => ['หน่วยบริการ รพ.สต.', 'จัดการข้อมูลหน่วยบริการและเครือข่าย', 'bi-hospital-fill'],
+    'settings' => ['ตั้งค่าระบบ', 'กำหนดค่าการใช้งานและข้อมูลส่วนกลาง', 'bi-sliders2'],
+    'hr' => ['งานทรัพยากรบุคคล', 'ตรวจสอบและจัดการข้อมูลบุคลากร', 'bi-person-workspace'],
+    'logs' => ['ประวัติการใช้งาน', 'ตรวจสอบกิจกรรมและเหตุการณ์ในระบบ', 'bi-clock-history'],
+    'swap' => ['แลกเวร', 'ส่งคำขอและติดตามสถานะการแลกเวร', 'bi-arrow-left-right'],
+    'notification' => ['การแจ้งเตือน', 'ติดตามรายการแจ้งเตือนและงานที่เกี่ยวข้อง', 'bi-bell-fill'],
+];
+$rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดการตารางปฏิบัติงาน', 'bi-window-stack'];
+?>
 <body>
 <div id="rpGlobalProgress" class="rp-global-progress" role="progressbar" aria-label="สถานะการประมวลผล" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
     <div class="rp-global-progress-track">
@@ -375,26 +395,21 @@ if (isset($_SESSION['user'])) {
             <i class="bi bi-list fs-4"></i>
         </button>
         
-        <!-- 🌟 โลโก้และชื่อระบบ -->
-        <a href="index.php?c=dashboard" class="text-decoration-none d-flex align-items-center gap-2 ps-1">
-            <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width:40px; height:40px;">
-                <i class="bi bi-calendar2-check-fill fs-5"></i>
+        <div class="rp-page-context d-flex align-items-center gap-3 min-w-0">
+            <div class="rp-page-icon d-none d-sm-grid">
+                <i class="bi <?= htmlspecialchars($rpPage[2], ENT_QUOTES, 'UTF-8') ?>"></i>
             </div>
-            <div class="d-none d-sm-block">
-                <!-- ชื่อหลัก -->
-                <h5 class="mb-0 fw-bold text-primary" style="line-height: 1.2; letter-spacing: -0.5px;">
-                    <?= htmlspecialchars($app_name) ?>
-                </h5>
-                <!-- ชื่อย่อย (Subtitle) -->
-                <div class="text-muted fw-medium" style="font-size: 11px; letter-spacing: 0.3px; line-height: 1;">
-                    <?= htmlspecialchars($app_subtitle) ?>
-                </div>
+            <div class="min-w-0">
+                <div class="rp-page-kicker">ROSTER PRO WORKSPACE</div>
+                <h1 class="rp-page-title mb-0"><?= htmlspecialchars($rpPage[0], ENT_QUOTES, 'UTF-8') ?></h1>
+                <div class="rp-page-subtitle d-none d-md-block"><?= htmlspecialchars($rpPage[1], ENT_QUOTES, 'UTF-8') ?></div>
             </div>
-        </a>
+        </div>
     </div>
 
     <div class="d-flex align-items-center gap-1 gap-md-2">
         <?php if(isset($_SESSION['user'])): ?>
+        <span class="rp-system-online d-none d-xl-inline-flex">ออนไลน์</span>
         
         <!-- 🔔 Notification Dropdown -->
         <div class="dropdown">
