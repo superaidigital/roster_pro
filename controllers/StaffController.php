@@ -431,109 +431,182 @@ class StaffController {
     public function download_template() {
         $this->checkAuth();
         $db = (new Database())->getConnection();
-        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "ดาวน์โหลดแม่แบบนำเข้าบุคลากร (CSV)");
-        
-        header('Content-Type: text/csv; charset=utf-8');
+
+        LogsController::addLog(
+            $db,
+            (int)$_SESSION['user']['id'],
+            LogsController::ACTION_EXPORT,
+            "ดาวน์โหลดแม่แบบนำเข้าบุคลากร (CSV)"
+        );
+
+        header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename=template_staff.csv');
-        $output = fopen('php://output', 'w');
-        fputs($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
-        
-        // รูปแบบใหม่ (7 คอลัมน์)
-        fputcsv($output, ['Hospital_ID', 'Name', 'Username', 'ID_Card', 'Position', 'Employee_Type', 'Phone']);
-        fputcsv($output, [$_SESSION['user']['hospital_id'], 'นาย ทดสอบ จัดเวร', 'test_staff_01', '1330000000000', 'พยาบาลวิชาชีพ', 'ข้าราชการ', '0812345678']);
+
+        $output = fopen('php://output', 'wb');
+        fwrite($output, "\xEF\xBB\xBF");
+        fputcsv($output, [
+            'Hospital_ID', 'Name', 'Username', 'Password',
+            'ID_Card', 'Position', 'Employee_Type', 'Phone'
+        ]);
+        fputcsv($output, [
+            (string)($_SESSION['user']['hospital_id'] ?? ''),
+            'นาย ตัวอย่าง บุคลากร',
+            'staff_example',
+            '',
+            '',
+            'พยาบาลวิชาชีพ',
+            'ข้าราชการ/พนักงานท้องถิ่น',
+            '0812345678'
+        ]);
         fclose($output);
         exit;
     }
 
-    // นำเข้า CSV
+    // นำเข้า CSV - ต้องใช้แม่แบบ 8 คอลัมน์และกำหนด Password เองอย่างน้อย 8 ตัวอักษร
     public function import() {
         $this->requireMutation();
         $this->checkAuth();
-        if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['import_file'])) {
-            $db = (new Database())->getConnection();
-            $userModel = new UserModel($db);
-            $handle = fopen($_FILES['import_file']['tmp_name'], "r");
-            
-            $bom = fread($handle, 3);
-            if ($bom !== "\xEF\xBB\xBF") rewind($handle);
-            
-            $header = fgetcsv($handle); // ข้าม Header และใช้นับจำนวนคอลัมน์
-            $col_count = is_array($header) ? count($header) : 0;
-            
-            $ok = 0; $fail = 0;
-            $fail_reasons = []; // เก็บเหตุผลที่ Error
-            $my_hosp = $_SESSION['user']['hospital_id'];
-            
-            while (($row = fgetcsv($handle)) !== FALSE) {
-                if (empty($row[1])) {
-                    $fail++;
-                    continue; // ชื่อห้ามว่าง
-                }
-                
-                $name = trim($row[1]);
-                
-                // ตรวจสอบว่าเป็นไฟล์ CSV รูปแบบเก่า (5 คอลัมน์) หรือรูปแบบใหม่ (7 คอลัมน์ขึ้นไป)
-                if ($col_count <= 5 || !isset($row[6])) {
-                    $position = trim($row[2] ?? '');
-                    $employee_type = trim($row[3] ?? 'พนักงานทั่วไป');
-                    $phone = trim($row[4] ?? '');
-                    $username = '';
-                    $id_card = '';
-                } else {
-                    $username = trim($row[2] ?? '');
-                    $id_card = trim($row[3] ?? '');
-                    $position = trim($row[4] ?? '');
-                    $employee_type = trim($row[5] ?? 'พนักงานทั่วไป');
-                    $phone = trim($row[6] ?? '');
-                }
-                
-                if (empty($username)) {
-                    $phone_clean = preg_replace('/[^0-9]/', '', $phone);
-                    if (!empty($phone_clean)) {
-                        $username = 'u' . $phone_clean;
-                    } else {
-                        $username = 'user_' . uniqid(); // สุ่มไอดี
-                    }
-                }
 
-                if ($userModel->checkUsernameExists($username)) { 
-                    $fail++; 
-                    $fail_reasons[] = "Username ซ้ำ ($username)";
-                    continue; 
-                }
-
-                $importData = [
-                    'hospital_id' => !empty($row[0]) ? (int)$row[0] : $my_hosp,
-                    'name' => $name,
-                    'username' => $username,
-                    'id_card' => $id_card,
-                    'position' => $position,
-                    'employee_type' => $employee_type,
-                    'phone' => $phone,
-                    'password' => $password,
-                    'role' => 'STAFF',
-                    'is_active' => 1,
-                    'color_theme' => 'success'
-                ];
-
-                if ($userModel->addUser($importData)) {
-                    $ok++;
-                } else {
-                    $fail++;
-                    $fail_reasons[] = "เกิดข้อผิดพลาดในการบันทึก ($name)";
-                }
-            }
-            fclose($handle);
-            
-            // บันทึก Log พร้อมเหตุผล
-            $log_details = "นำเข้าบุคลากรผ่านไฟล์ CSV สำเร็จ {$ok} คน, ล้มเหลว {$fail} คน";
-            if ($fail > 0 && count($fail_reasons) > 0) {
-                $log_details .= " (สาเหตุเบื้องต้น: " . implode(', ', array_slice($fail_reasons, 0, 3)) . ")";
-            }
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_IMPORT, $log_details);
-            
-            $_SESSION['success_msg'] = "นำเข้าบุคลากรสำเร็จ $ok คน, ล้มเหลว $fail คน" . ($fail > 0 ? " (โปรดตรวจสอบ Username หรือโหลด Template ใหม่ล่าสุดไปใช้งาน)" : "");
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST' || empty($_FILES['import_file'])) {
+            header("Location: index.php?c=staff");
+            exit;
         }
+
+        $file = $_FILES['import_file'];
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'] ?? '')) {
+            $_SESSION['error_msg'] = "ไม่สามารถอ่านไฟล์ CSV ที่อัปโหลดได้";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        if ((int)($file['size'] ?? 0) > 2 * 1024 * 1024) {
+            $_SESSION['error_msg'] = "ไฟล์ CSV ต้องมีขนาดไม่เกิน 2 MB";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+        $handle = fopen($file['tmp_name'], 'rb');
+
+        if ($handle === false) {
+            $_SESSION['error_msg'] = "ไม่สามารถเปิดไฟล์ CSV ได้";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
+
+        $header = fgetcsv($handle);
+        $expected = ['Hospital_ID','Name','Username','Password','ID_Card','Position','Employee_Type','Phone'];
+        $normalizedHeader = array_map(static fn($v) => trim((string)$v), is_array($header) ? $header : []);
+
+        if ($normalizedHeader !== $expected) {
+            fclose($handle);
+            $_SESSION['error_msg'] = "รูปแบบ CSV ไม่ถูกต้อง กรุณาดาวน์โหลดแม่แบบล่าสุด";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        $currentRole = strtoupper((string)($_SESSION['user']['role'] ?? 'STAFF'));
+        $isGlobalAdmin = in_array($currentRole, ['ADMIN', 'SUPERADMIN', 'HR'], true);
+        $sessionHospitalId = (int)($_SESSION['user']['hospital_id'] ?? 0);
+
+        $ok = 0;
+        $fail = 0;
+        $failReasons = [];
+        $rowNo = 1;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNo++;
+            if (!array_filter($row, static fn($value) => trim((string)$value) !== '')) {
+                continue;
+            }
+
+            if (count($row) < 8) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: จำนวนคอลัมน์ไม่ครบ";
+                continue;
+            }
+
+            $hospitalId = $isGlobalAdmin
+                ? (int)($row[0] ?: $sessionHospitalId)
+                : $sessionHospitalId;
+            $name = trim((string)$row[1]);
+            $username = trim((string)$row[2]);
+            $password = (string)$row[3];
+
+            if ($hospitalId <= 0 || $name === '' || $username === '') {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: หน่วยบริการ/ชื่อ/Username ไม่ครบ";
+                continue;
+            }
+
+            if (mb_strlen($password, 'UTF-8') < 8) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: Password ต้องอย่างน้อย 8 ตัวอักษร";
+                continue;
+            }
+
+            if ($userModel->checkUsernameExists($username)) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: Username ซ้ำ ({$username})";
+                continue;
+            }
+
+            $idCard = trim((string)$row[4]);
+            if ($idCard !== '' && $userModel->checkDuplicateField('id_card', $idCard)) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: เลขบัตรประชาชนซ้ำ";
+                continue;
+            }
+
+            $data = [
+                'hospital_id' => $hospitalId,
+                'name' => $name,
+                'username' => $username,
+                'password' => $password,
+                'id_card' => $idCard,
+                'position' => trim((string)$row[5]),
+                'employee_type' => trim((string)$row[6]) ?: 'ข้าราชการ/พนักงานท้องถิ่น',
+                'phone' => trim((string)$row[7]),
+                'role' => 'STAFF',
+                'type' => '',
+                'position_number' => '',
+                'pay_rate_id' => null,
+                'start_date' => null,
+                'color_theme' => 'success',
+            ];
+
+            if ($userModel->addUser($data)) {
+                $ok++;
+            } else {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: บันทึกไม่สำเร็จ";
+            }
+        }
+
+        fclose($handle);
+
+        $log = "นำเข้าบุคลากรผ่าน CSV สำเร็จ {$ok} คน, ล้มเหลว {$fail} คน";
+        LogsController::addLog(
+            $db,
+            (int)$_SESSION['user']['id'],
+            LogsController::ACTION_IMPORT,
+            $log
+        );
+
+        if ($fail > 0) {
+            $_SESSION['error_msg'] = $log . (!empty($failReasons)
+                ? " — " . implode('; ', array_slice($failReasons, 0, 3))
+                : '');
+        } else {
+            $_SESSION['success_msg'] = $log;
+        }
+
         header("Location: index.php?c=staff");
         exit;
     }
