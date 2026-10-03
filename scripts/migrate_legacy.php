@@ -108,6 +108,22 @@ try {
     }
 
     // pay_rates
+    if (!$db->query("SHOW TABLES LIKE 'pay_rates'")->fetchColumn()) {
+        $db->exec(
+            "CREATE TABLE pay_rates (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                group_name VARCHAR(100) NULL,
+                keywords TEXT NULL,
+                rate_y DECIMAL(10,2) NOT NULL DEFAULT 0,
+                rate_b DECIMAL(10,2) NOT NULL DEFAULT 0,
+                rate_r DECIMAL(10,2) NOT NULL DEFAULT 0,
+                display_order INT NOT NULL DEFAULT 0
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+        echo "CREATE pay_rates table\n";
+    }
+
     if ($db->query("SHOW TABLES LIKE 'pay_rates'")->fetchColumn()) {
         addColumnIfMissing($db, 'pay_rates', 'group_name', "VARCHAR(100) NULL");
         addColumnIfMissing($db, 'pay_rates', 'keywords', "TEXT NULL");
