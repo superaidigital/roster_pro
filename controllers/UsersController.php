@@ -381,7 +381,9 @@ class UsersController {
             } catch (Exception $e) {
                 if ($db->inTransaction()) $db->rollBack();
                 http_response_code(500);
-                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                error_log('Users AJAX operation failed: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'ไม่สามารถบันทึกข้อมูลผู้ใช้งานได้']);
             }
         } else {
             echo json_encode(['success' => false, 'message' => 'Invalid data']);
