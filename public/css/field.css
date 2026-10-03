@@ -175,3 +175,61 @@
 
   .rp-photo-preview { grid-template-columns: 1fr 1fr; }
 }
+
+
+/* Field follow-up / risk workflow */
+.rp-field-stat-danger {
+  border-color: color-mix(in srgb, #dc3545 28%, var(--rp-theme-border, #d8e4eb));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #dc3545 5%, var(--rp-theme-surface, #fff)), var(--rp-theme-surface, #fff));
+}
+
+.rp-field-stat-danger i,
+.rp-field-stat-danger strong {
+  color: #dc3545;
+}
+
+.rp-field-stat-warning {
+  border-color: color-mix(in srgb, #f59e0b 34%, var(--rp-theme-border, #d8e4eb));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #f59e0b 6%, var(--rp-theme-surface, #fff)), var(--rp-theme-surface, #fff));
+}
+
+.rp-field-stat-warning i,
+.rp-field-stat-warning strong {
+  color: #b45309;
+}
+
+.rp-referral-check {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  min-height: 100%;
+  padding: .9rem;
+  border: 1px solid var(--rp-theme-border, #d8e4eb);
+  border-radius: .85rem;
+  background: var(--rp-theme-surface-2, #f8fafc);
+}
+
+.rp-referral-check .form-check-input {
+  flex: 0 0 auto;
+  margin-left: 0;
+}
+
+.rp-field-list-card .table td:last-child {
+  min-width: 10rem;
+}
+
+.rp-field-list-card .table td:last-child .btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 639.98px) {
+  .rp-field-list-card .table td:last-child {
+    min-width: 0;
+  }
+
+  .rp-referral-check {
+    min-height: 3.25rem;
+  }
+}
