@@ -63,62 +63,91 @@ class StaffController {
     public function add() {
         $this->requireMutation();
         $this->checkAuth();
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $db = (new Database())->getConnection();
-            $userModel = new UserModel($db);
-            
-            $current_role = strtoupper($_SESSION['user']['role']);
-            $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR']);
 
-            $data = [
-                'hospital_id' => $is_global_admin ? ($_POST['hospital_id'] ?? null) : $_SESSION['user']['hospital_id'],
-                'name' => trim($_POST['name'] ?? ''),
-                'username' => trim($_POST['username'] ?? ''),
-                'password' => $newPassword,
-                'role' => strtoupper($_POST['role'] ?? 'STAFF'),
-                'pay_rate_id' => !empty($_POST['pay_rate_id']) ? $_POST['pay_rate_id'] : null,
-                'position' => trim($_POST['position'] ?? ''), 
-                'employee_type' => trim($_POST['employee_type'] ?? ''),
-                'start_date' => !empty($_POST['start_date']) ? $_POST['start_date'] : null,
-                'phone' => trim($_POST['phone'] ?? ''),
-                
-                // 🌟 เพิ่มการรับค่า 3 ช่องที่หายไป
-                'id_card' => trim($_POST['id_card'] ?? ''),
-                'position_number' => trim($_POST['position_number'] ?? ''),
-                'type' => trim($_POST['type'] ?? ''),
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            header("Location: index.php?c=staff");
+            exit;
+        }
 
-                'color_theme' => 'success'
-            ];
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
 
-            // ป้องกันการแอบอ้างสิทธิ์ (Privilege Escalation)
-            if (!$is_global_admin) {
-                // ผอ. และ ผู้จัดเวร ไม่สามารถตั้งค่าใครเป็นแอดมินส่วนกลางได้
-                if (in_array($data['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) {
-                    $data['role'] = 'STAFF'; 
-                }
-                // ผู้จัดเวร ไม่สามารถตั้งค่าใครเป็น ผอ. ได้
-                if ($current_role === 'SCHEDULER' && $data['role'] === 'DIRECTOR') {
-                    $data['role'] = 'STAFF';
-                }
+        $currentRole = strtoupper((string)($_SESSION['user']['role'] ?? 'STAFF'));
+        $isGlobalAdmin = in_array($currentRole, ['ADMIN', 'SUPERADMIN', 'HR'], true);
+
+        $name = trim((string)($_POST['name'] ?? ''));
+        $username = trim((string)($_POST['username'] ?? ''));
+        $newPassword = (string)($_POST['password'] ?? '');
+
+        if ($name === '' || $username === '') {
+            $_SESSION['error_msg'] = "กรุณากรอกชื่อและ Username ให้ครบถ้วน";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        if (mb_strlen($newPassword, 'UTF-8') < 8) {
+            $_SESSION['error_msg'] = "รหัสผ่านสำหรับบัญชีใหม่ต้องมีอย่างน้อย 8 ตัวอักษร";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        $data = [
+            'hospital_id' => $isGlobalAdmin
+                ? (!empty($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : null)
+                : (int)($_SESSION['user']['hospital_id'] ?? 0),
+            'name' => $name,
+            'username' => $username,
+            'password' => $newPassword,
+            'role' => strtoupper(trim((string)($_POST['role'] ?? 'STAFF'))),
+            'pay_rate_id' => !empty($_POST['pay_rate_id']) ? (int)$_POST['pay_rate_id'] : null,
+            'position' => trim((string)($_POST['position'] ?? '')),
+            'employee_type' => trim((string)($_POST['employee_type'] ?? 'ข้าราชการ/พนักงานท้องถิ่น')),
+            'start_date' => !empty($_POST['start_date']) ? $_POST['start_date'] : null,
+            'phone' => trim((string)($_POST['phone'] ?? '')),
+            'id_card' => trim((string)($_POST['id_card'] ?? '')),
+            'position_number' => trim((string)($_POST['position_number'] ?? '')),
+            'type' => trim((string)($_POST['type'] ?? '')),
+            'color_theme' => 'success',
+        ];
+
+        $allowedRoles = ['SUPERADMIN', 'ADMIN', 'HR', 'DIRECTOR', 'SCHEDULER', 'STAFF'];
+        if (!in_array($data['role'], $allowedRoles, true)) {
+            $data['role'] = 'STAFF';
+        }
+
+        if (!$isGlobalAdmin) {
+            if (in_array($data['role'], ['SUPERADMIN', 'ADMIN', 'HR'], true)) {
+                $data['role'] = 'STAFF';
             }
-
-            if (!empty($data['username']) && $userModel->checkUsernameExists($data['username'])) {
-                $_SESSION['error_msg'] = "Username นี้มีผู้ใช้งานแล้ว โปรดใช้ชื่ออื่น";
-            } else {
-                if ($userModel->addUser($data)) {
-                    // 🌟 บันทึก Log
-                    LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มบุคลากรภายในหน่วยงาน: " . $data['name']);
-                    $_SESSION['success_msg'] = "เพิ่มข้อมูลบุคลากรสำเร็จ";
-                } else {
-                    $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
-                }
+            if ($currentRole === 'SCHEDULER' && $data['role'] === 'DIRECTOR') {
+                $data['role'] = 'STAFF';
             }
         }
+
+        if ($currentRole !== 'SUPERADMIN' && $data['role'] === 'SUPERADMIN') {
+            $data['role'] = 'STAFF';
+        }
+
+        if ($userModel->checkUsernameExists($username)) {
+            $_SESSION['error_msg'] = "Username นี้มีผู้ใช้งานแล้ว โปรดใช้ชื่ออื่น";
+        } elseif (!empty($data['id_card']) && $userModel->checkDuplicateField('id_card', $data['id_card'])) {
+            $_SESSION['error_msg'] = "เลขบัตรประชาชนนี้มีอยู่ในระบบแล้ว";
+        } elseif ($userModel->addUser($data)) {
+            LogsController::addLog(
+                $db,
+                (int)$_SESSION['user']['id'],
+                LogsController::ACTION_CREATE,
+                "เพิ่มบุคลากรภายในหน่วยงาน: " . $data['name']
+            );
+            $_SESSION['success_msg'] = "เพิ่มข้อมูลบุคลากรสำเร็จ";
+        } else {
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
+        }
+
         header("Location: index.php?c=staff");
         exit;
     }
 
-    // 🌟 แก้ไขบุคลากร (ปรับปรุงสิทธิ์การเข้าถึงให้ ผอ.)
     public function edit() {
         $this->requireMutation();
         $this->checkAuth();
