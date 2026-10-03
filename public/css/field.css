@@ -1,0 +1,177 @@
+/* Field Work / Home Visit */
+.rp-field-page {
+  max-width: 100rem;
+  margin-inline: auto;
+}
+
+.rp-field-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--rp-theme-border, #d8e4eb);
+  border-radius: 1rem;
+  color: var(--rp-theme-text, #10212e);
+  background:
+    radial-gradient(circle at 94% 10%, rgba(45,212,191,.12), transparent 12rem),
+    var(--rp-theme-surface, #fff);
+}
+
+.rp-field-hero h2 { font-weight: 800; }
+.rp-field-hero p { color: var(--rp-theme-muted, #64748b); }
+.rp-field-eyebrow {
+  color: var(--rp-theme-primary, #0f6cbd);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.rp-network-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 2.4rem;
+  padding: .45rem .7rem;
+  border: 1px solid var(--rp-theme-border, #d8e4eb);
+  border-radius: 999px;
+  background: var(--rp-theme-surface-2, #f8fafc);
+  font-size: .82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rp-network-dot {
+  width: .55rem;
+  height: .55rem;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.rp-network-chip.is-online .rp-network-dot { background: #22c55e; }
+.rp-network-chip.is-offline .rp-network-dot { background: #f59e0b; }
+
+.rp-field-stat {
+  position: relative;
+  overflow: hidden;
+  min-height: 6rem;
+  padding: .85rem .95rem;
+  border: 1px solid var(--rp-theme-border, #d8e4eb);
+  border-radius: .9rem;
+  background: var(--rp-theme-surface, #fff);
+}
+.rp-field-stat span {
+  color: var(--rp-theme-muted, #64748b);
+  font-size: .78rem;
+  font-weight: 700;
+}
+.rp-field-stat strong {
+  display: block;
+  margin-top: .2rem;
+  color: var(--rp-theme-text, #10212e);
+  font-size: 1.6rem;
+}
+.rp-field-stat i {
+  position: absolute;
+  right: .8rem;
+  bottom: .7rem;
+  color: var(--rp-theme-primary, #0f6cbd);
+  font-size: 1.45rem;
+  opacity: .75;
+}
+
+.rp-field-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(22rem, .8fr);
+  gap: 1rem;
+  align-items: start;
+}
+.rp-field-form-card,
+.rp-field-list-card {
+  min-width: 0;
+}
+.rp-field-list-card {
+  position: sticky;
+  top: .25rem;
+}
+
+.rp-step-heading {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  margin-bottom: 1rem;
+}
+.rp-step-heading h5 { margin: 0; }
+.rp-step-heading p {
+  margin: .1rem 0 0;
+  color: var(--rp-theme-muted, #64748b);
+  font-size: .82rem;
+}
+.rp-step-icon {
+  display: grid;
+  place-items: center;
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: 0 0 2.7rem;
+  border: 1px solid var(--rp-theme-border, #d8e4eb);
+  border-radius: .8rem;
+  color: var(--rp-theme-primary, #0f6cbd);
+  background: var(--rp-theme-surface-2, #f8fafc);
+}
+
+.rp-location-box,
+.rp-consent-box {
+  padding: .9rem;
+  border: 1px solid var(--rp-theme-border, #d8e4eb);
+  border-radius: .85rem;
+  background: var(--rp-theme-surface-2, #f8fafc);
+}
+
+.rp-photo-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+}
+.rp-photo-preview img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  border: 1px solid var(--rp-theme-border, #d8e4eb);
+  border-radius: .7rem;
+}
+
+.rp-field-submit {
+  display: flex;
+  justify-content: flex-end;
+  gap: .6rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1199.98px) {
+  .rp-field-layout { grid-template-columns: 1fr; }
+  .rp-field-list-card { position: static; }
+}
+
+@media (max-width: 639.98px) {
+  .rp-field-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: .85rem;
+  }
+  .rp-network-chip { width: 100%; justify-content: center; }
+  .rp-field-stat { min-height: 5.3rem; padding: .75rem; }
+  .rp-field-stat strong { font-size: 1.35rem; }
+
+  .rp-field-page .form-control,
+  .rp-field-page .form-select,
+  .rp-field-page .btn:not(.btn-close) {
+    min-height: 3rem;
+    font-size: 1rem;
+  }
+
+  .rp-field-submit {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .rp-field-submit .btn { width: 100%; }
+
+  .rp-photo-preview { grid-template-columns: 1fr 1fr; }
+}
