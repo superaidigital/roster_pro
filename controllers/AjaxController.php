@@ -476,7 +476,8 @@ class AjaxController {
                 $_SESSION['success_msg'] = "อนุมัติตารางเวรเดือน {$month_name} เรียบร้อยแล้ว";
             }
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+            error_log('AjaxController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
 
         $redirect = (in_array($_SESSION['user']['role'], ['ADMIN', 'SUPERADMIN'])) ? "index.php?c=report&a=overview&month=".$month_year : "index.php?c=roster&month=".$month_year;
