@@ -198,7 +198,7 @@ foreach ($scanFiles as $file) {
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
     'save_signatures','update_order','process_approval','save_balance',
-    'process_new_year','read_all','test_line_notify'
+    'process_new_year','read_all','test_line_notify','complete_followup'
 ];
 $mutationAlternation = implode('|', array_map('preg_quote', $mutationActions));
 $getMutationPattern = '/<a\b[^>]+href=[\'"][^\'"]*index\.php\?[^\'"]*(?:&|&amp;)a=(' . $mutationAlternation . ')(?:&|&amp;|[\'"])/i';
