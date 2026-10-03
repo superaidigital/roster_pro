@@ -478,7 +478,7 @@ class UsersController {
         $output = fopen('php://output', 'w');
         fputs($output, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM สำหรับ Excel
         fputcsv($output, ['Hospital_ID', 'Name', 'Username', 'Password', 'ID_Card', 'Employee_Type', 'Position', 'Pos_Number', 'Phone', 'Role']);
-        fputcsv($output, ['0', 'นาย สมชาย ใจดี', 'somchai_test', '123456', '1100000000000', 'ข้าราชการ', 'พยาบาลวิชาชีพ', '1234', '0812345678', 'STAFF']);
+        fputcsv($output, ['0', 'นาย สมชาย ใจดี', 'somchai_test', '', '1100000000000', 'ข้าราชการ', 'พยาบาลวิชาชีพ', '1234', '0812345678', 'STAFF']);
         fclose($output);
         exit;
     }
@@ -506,7 +506,7 @@ class UsersController {
                     'hospital_id' => ($row[0] == '0' || empty($row[0])) ? null : (int)$row[0],
                     'name' => trim($row[1]),
                     'username' => $username,
-                    'password' => trim($row[3] ?? '123456'),
+                    'password' => $password,
                     'id_card' => trim($row[4] ?? ''),
                     'employee_type' => trim($row[5] ?? 'ข้าราชการ'),
                     'position' => trim($row[6] ?? ''), 
