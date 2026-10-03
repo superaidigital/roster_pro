@@ -166,12 +166,18 @@ $fieldRows = $fieldModel->getVisibleVisits($user1, ['risk_level' => 'HIGH'], 10)
 ok(count($fieldRows) === 1 && (int)$fieldRows[0]['id'] === $fieldVisitId, 'staff can filter own high-risk field visit');
 ok((int)$fieldRows[0]['referral_required'] === 1, 'referral flag preserved');
 
+$dueFollowUps = $fieldModel->getVisibleVisits($user1, ['followup' => 'due'], 10);
+ok(count($dueFollowUps) === 1 && (int)$dueFollowUps[0]['id'] === $fieldVisitId, 'due follow-up filter returns pending item');
+
 $fieldRowsOtherUser = $fieldModel->getVisibleVisits($user2, [], 10);
 ok(count($fieldRowsOtherUser) === 0, 'staff field visit scope prevents cross-user read');
 
 ok($fieldModel->markFollowUpDone($fieldVisitId, $user1), 'field follow-up marked done by owner');
 $fieldAfterFollowUp = $fieldModel->getVisibleVisitById($fieldVisitId, $user1);
 ok($fieldAfterFollowUp['follow_up_status'] === 'DONE', 'field follow-up completion persisted');
+
+$dueAfterCompletion = $fieldModel->getVisibleVisits($user1, ['followup' => 'due'], 10);
+ok(count($dueAfterCompletion) === 0, 'completed follow-up leaves due queue');
 
 $rosterModel = new RosterModel($db);
 ok($rosterModel->publishRoster($hospitalId, 2026, 10), 'RosterModel publishes via roster_status');
