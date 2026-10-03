@@ -129,6 +129,7 @@ $visitTypeLabels = [
                       data-rp-wizard="field"
                       data-field-user="<?= (int)$user['id'] ?>"
                       data-field-record="<?= (int)($editVisit['id'] ?? 0) ?>"
+                      data-field-draft-key="<?= htmlspecialchars((string)($_SESSION['field_draft_key'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
                       data-field-saved="<?= isset($_GET['saved']) ? '1' : '0' ?>">
                     <?= security_csrf_input() ?>
                     <input type="hidden" name="visit_id" value="<?= (int)($editVisit['id'] ?? 0) ?>">
