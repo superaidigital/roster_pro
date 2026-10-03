@@ -703,7 +703,7 @@ foreach($hospitals_list as $h) {
                         <div class="col-md-4">
                             <label class="form-label fw-bold text-primary">Password *</label>
                             <!-- ป้องกัน Auto-fill รหัสผ่าน -->
-                            <input type="password" name="password" class="form-control rounded-3 border-primary" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');" placeholder="ตั้งรหัสผ่าน" required minlength="4">
+                            <input type="password" name="password" class="form-control rounded-3 border-primary" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly');" placeholder="ตั้งรหัสผ่าน" required minlength="8">
                         </div>
                         
                         <div class="col-md-4">
