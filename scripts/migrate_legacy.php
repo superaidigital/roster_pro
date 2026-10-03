@@ -233,6 +233,23 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 
+    if ($db->query("SHOW TABLES LIKE 'field_visits'")->fetchColumn()) {
+        addColumnIfMissing($db, 'field_visits', 'risk_level', "VARCHAR(20) NOT NULL DEFAULT 'ROUTINE'");
+        addColumnIfMissing($db, 'field_visits', 'follow_up_date', "DATE NULL");
+        addColumnIfMissing($db, 'field_visits', 'follow_up_status', "VARCHAR(20) NOT NULL DEFAULT 'NONE'");
+        addColumnIfMissing($db, 'field_visits', 'referral_required', "TINYINT(1) NOT NULL DEFAULT 0");
+        addColumnIfMissing($db, 'field_visits', 'referral_note', "VARCHAR(500) NULL");
+
+        $db->exec(
+            "UPDATE field_visits
+             SET follow_up_status = CASE
+                 WHEN follow_up_date IS NULL THEN 'NONE'
+                 WHEN follow_up_status IS NULL OR follow_up_status = '' THEN 'PENDING'
+                 ELSE follow_up_status
+             END"
+        );
+    }
+
     $db->exec(
         "CREATE TABLE IF NOT EXISTS field_visit_photos (
             id BIGINT NOT NULL AUTO_INCREMENT,
