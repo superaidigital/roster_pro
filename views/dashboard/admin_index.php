@@ -109,9 +109,9 @@ $waiting_hospitals = $filtered_waiting;
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
 </style>
 
-<div class="container-fluid px-3 px-md-4 py-4 min-vh-100">
+<div class="container-fluid px-3 px-md-4 py-4 min-vh-100 rp-dashboard-page">
     
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end mb-4 gap-3">
+    <div class="rp-dashboard-hero d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
             <h3 class="fw-black text-dark mb-1">ภาพรวมระบบ (Executive Dashboard)</h3>
             <p class="text-muted mb-0" style="font-size: 14px;">ยินดีต้อนรับ, <span class="fw-bold text-primary"><?= htmlspecialchars($_SESSION['user']['name'] ?? 'ผู้ดูแลระบบ') ?></span></p>
