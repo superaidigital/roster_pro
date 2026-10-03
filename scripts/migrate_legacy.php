@@ -55,9 +55,35 @@ try {
     addColumnIfMissing($db, 'users', 'signature_path', "LONGTEXT NULL");
 
     // hospitals
+    addColumnIfMissing($db, 'hospitals', 'hospital_code', "VARCHAR(10) NULL");
+    addColumnIfMissing($db, 'hospitals', 'short_name', "VARCHAR(100) NULL");
     addColumnIfMissing($db, 'hospitals', 'is_active', "TINYINT(1) NOT NULL DEFAULT 1");
+    addColumnIfMissing($db, 'hospitals', 'address', "VARCHAR(255) NULL");
+    addColumnIfMissing($db, 'hospitals', 'sub_district', "VARCHAR(100) NULL");
+    addColumnIfMissing($db, 'hospitals', 'district', "VARCHAR(100) NULL");
+    addColumnIfMissing($db, 'hospitals', 'province', "VARCHAR(100) NULL");
+    addColumnIfMissing($db, 'hospitals', 'zipcode', "VARCHAR(10) NULL");
+    addColumnIfMissing($db, 'hospitals', 'latitude', "VARCHAR(50) NULL");
+    addColumnIfMissing($db, 'hospitals', 'longitude', "VARCHAR(50) NULL");
+    addColumnIfMissing($db, 'hospitals', 'hospital_size', "VARCHAR(10) DEFAULT 'S'");
+    addColumnIfMissing($db, 'hospitals', 'phone', "VARCHAR(50) NULL");
+    addColumnIfMissing($db, 'hospitals', 'morning_shift', "VARCHAR(50) DEFAULT '08:30 - 16:30'");
+    addColumnIfMissing($db, 'hospitals', 'afternoon_shift', "VARCHAR(50) DEFAULT '16:30 - 00:30'");
+    addColumnIfMissing($db, 'hospitals', 'night_shift', "VARCHAR(50) DEFAULT '00:30 - 08:30'");
+    addColumnIfMissing($db, 'hospitals', 'email', "VARCHAR(100) NULL");
+    addColumnIfMissing($db, 'hospitals', 'logo', "VARCHAR(255) NULL");
+    addColumnIfMissing($db, 'hospitals', 'director_name', "VARCHAR(255) NULL");
+    addColumnIfMissing($db, 'hospitals', 'shift_m_start', "TIME DEFAULT '08:00:00'");
+    addColumnIfMissing($db, 'hospitals', 'shift_m_end', "TIME DEFAULT '16:00:00'");
+    addColumnIfMissing($db, 'hospitals', 'shift_a_start', "TIME DEFAULT '16:00:00'");
+    addColumnIfMissing($db, 'hospitals', 'shift_a_end', "TIME DEFAULT '00:00:00'");
+    addColumnIfMissing($db, 'hospitals', 'shift_n_start', "TIME DEFAULT '00:00:00'");
+    addColumnIfMissing($db, 'hospitals', 'shift_n_end', "TIME DEFAULT '08:00:00'");
     addColumnIfMissing($db, 'hospitals', 'display_order', "INT NOT NULL DEFAULT 0");
     addColumnIfMissing($db, 'hospitals', 'deleted_at', "DATETIME NULL DEFAULT NULL");
+
+    // Fill short_name for legacy rows so dashboards have a label immediately.
+    $db->exec("UPDATE hospitals SET short_name = name WHERE (short_name IS NULL OR short_name = '')");
 
     // pay_rates
     if ($db->query("SHOW TABLES LIKE 'pay_rates'")->fetchColumn()) {
