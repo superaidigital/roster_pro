@@ -328,7 +328,7 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 1. Desktop Sidebar -->
 <!-- ========================================== -->
-<aside id="desktopSidebar" class="d-none d-md-flex flex-column h-100 bg-white">
+<aside id="desktopSidebar" class="rp-desktop-sidebar flex-column h-100 bg-white" aria-label="เมนูหลัก">
     <!-- Script ป้องกันการกระพริบของเมนูตอนโหลดหน้าเว็บ -->
     <script>
         if (localStorage.getItem('sidebarState') === 'collapsed') {
@@ -351,7 +351,7 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 2. Mobile Sidebar (Offcanvas) -->
 <!-- ========================================== -->
-<div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" style="width: 280px;">
+<div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" aria-label="เมนูหลักบนมือถือ">
     <div class="offcanvas-header border-bottom px-4 py-3">
         <h5 class="offcanvas-title fw-bold d-flex align-items-center text-primary">
             <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center me-2 shadow-sm" style="width: 32px; height: 32px;">
@@ -406,4 +406,4 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ========================================== -->
 <!-- 🌟 4. เปิดพื้นที่ Main Content (ส่วนแสดงผลข้อมูล) -->
 <!-- ========================================== -->
-<main class="flex-grow-1 position-relative overflow-y-auto custom-scrollbar" style="background-color: #f4f6f9; padding: 1.5rem; height: 100%;">
+<main class="app-main flex-grow-1 position-relative custom-scrollbar">
