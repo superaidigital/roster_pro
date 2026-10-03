@@ -157,6 +157,15 @@ $rpPageMap = [
 $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดการตารางปฏิบัติงาน', 'bi-window-stack'];
 ?>
 <body>
+<script id="rp-sidebar-prepaint-state">
+    try {
+        if (localStorage.getItem('sidebarState') === 'collapsed') {
+            document.body.classList.add('rp-sidebar-collapsed');
+        }
+    } catch (e) {
+        // Ignore storage restrictions and use the expanded layout.
+    }
+</script>
 <div id="rpGlobalProgress" class="rp-global-progress" role="progressbar" aria-label="สถานะการประมวลผล" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
     <div class="rp-global-progress-track">
         <div id="rpGlobalProgressBar" class="rp-global-progress-bar"></div>
