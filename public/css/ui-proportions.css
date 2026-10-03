@@ -116,6 +116,83 @@ body.rp-sidebar-collapsed .app-shell {
   margin-inline: auto !important;
 }
 
+
+/* Collapsed sidebar: icon-only, no vertical text wrapping */
+#desktopSidebar {
+  overflow-x: hidden !important;
+  transition:
+    width .22s ease,
+    min-width .22s ease,
+    max-width .22s ease;
+}
+
+#desktopSidebar .sidebar-text,
+#desktopSidebar .sidebar-heading,
+#desktopSidebar .dropdown-arrow,
+#desktopSidebar .rp-sidebar-brand-copy {
+  transition: opacity .12s ease;
+}
+
+#desktopSidebar.collapsed .sidebar-text,
+#desktopSidebar.collapsed .sidebar-heading,
+#desktopSidebar.collapsed .dropdown-arrow,
+#desktopSidebar.collapsed .rp-sidebar-brand-copy {
+  display: none !important;
+}
+
+#desktopSidebar.collapsed .leave-dropdown-container ul,
+#desktopSidebar.collapsed .hr-dropdown-container ul,
+#desktopSidebar.collapsed .collapse {
+  display: none !important;
+}
+
+#desktopSidebar.collapsed .rp-sidebar-brand {
+  justify-content: center !important;
+  gap: 0 !important;
+  padding-inline: .4rem !important;
+}
+
+#desktopSidebar.collapsed .sidebar-menu {
+  padding-inline: .4rem !important;
+}
+
+#desktopSidebar.collapsed .sidebar-menu .nav-item {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#desktopSidebar.collapsed .sidebar-menu .nav-link,
+#desktopSidebar.collapsed .rp-sidebar-footer .nav-link {
+  justify-content: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: .62rem .3rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+}
+
+#desktopSidebar.collapsed .sidebar-menu .nav-link i,
+#desktopSidebar.collapsed .rp-sidebar-footer .nav-link i {
+  width: 1.35rem !important;
+  min-width: 1.35rem !important;
+  flex: 0 0 1.35rem !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+#desktopSidebar.collapsed .rp-sidebar-footer {
+  padding-inline: .4rem !important;
+}
+
+body.rp-sidebar-collapsed .top-navbar,
+body.rp-sidebar-collapsed .app-shell {
+  transition:
+    left .22s ease,
+    width .22s ease,
+    margin-left .22s ease;
+}
+
 /* Header proportions */
 .nav-icon-btn {
   width: 2.35rem !important;
