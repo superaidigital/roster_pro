@@ -352,8 +352,8 @@ if (isset($_SESSION['user'])) {
         }
     </style>
 
-    <link rel="stylesheet" href="public/css/style.css?v=20261003-responsive-v1">
-    <script src="public/js/responsive.js?v=20261003-responsive-v1" defer></script>
+    <link rel="stylesheet" href="public/css/style.css?v=20261003-field-v2">
+    <script src="public/js/responsive.js?v=20261003-field-v2" defer></script>
 </head>
 <body>
 
