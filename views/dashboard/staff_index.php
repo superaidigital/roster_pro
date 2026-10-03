@@ -42,10 +42,10 @@ if ($roster_status == 'APPROVED') {
     .shift-box:hover { background-color: #eff6ff; border-left-color: #2563eb; }
 </style>
 
-<div class="container-fluid px-3 px-md-4 py-4 min-vh-100">
+<div class="container-fluid px-3 px-md-4 py-4 min-vh-100 rp-dashboard-page">
     
     <!-- 🌟 ส่วนหัว (Welcome) -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div class="rp-dashboard-hero d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div class="d-flex align-items-center gap-3">
             <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 60px; height: 60px;">
                 <i class="bi bi-person-heart fs-3"></i>
