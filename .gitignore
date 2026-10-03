@@ -21,3 +21,7 @@ Thumbs.db
 *.dump
 *.bak
 *.sql.gz
+public/uploads/Backup/
+public/uploads/backup/
+public/uploads/**/*.sql
+*.sql.zip
