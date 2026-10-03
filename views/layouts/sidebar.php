@@ -351,6 +351,20 @@ document.addEventListener('DOMContentLoaded', function() {
             );
         }
 
+        desktopSidebar.querySelectorAll('.sidebar-menu .nav-link, .rp-sidebar-footer .nav-link').forEach(link => {
+            const label = link.querySelector('.sidebar-text');
+            const text = label ? label.textContent.replace(/\s+/g, ' ').trim() : '';
+
+            if (collapsed && text) {
+                link.setAttribute('title', text);
+                if (!link.hasAttribute('aria-label')) {
+                    link.setAttribute('aria-label', text);
+                }
+            } else {
+                link.removeAttribute('title');
+            }
+        });
+
         if (collapsed) {
             ['leaveMenu', 'hrMenu'].forEach(menuId => {
                 const menuElement = document.getElementById(menuId);
