@@ -453,6 +453,7 @@ class FieldController {
         $filters = [
             'status' => in_array($_GET['status'] ?? '', ['DRAFT', 'COMPLETED'], true) ? $_GET['status'] : '',
             'risk_level' => in_array($_GET['risk_level'] ?? '', ['ROUTINE', 'WATCH', 'HIGH', 'URGENT'], true) ? $_GET['risk_level'] : '',
+            'followup' => in_array($_GET['followup'] ?? '', ['due', 'pending', 'done'], true) ? $_GET['followup'] : '',
             'date_from' => $this->validDate((string)($_GET['date_from'] ?? '')) ? $_GET['date_from'] : '',
             'date_to' => $this->validDate((string)($_GET['date_to'] ?? '')) ? $_GET['date_to'] : '',
             'q' => mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100, 'UTF-8'),
