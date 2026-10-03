@@ -328,7 +328,14 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 1. Desktop Sidebar -->
 <!-- ========================================== -->
-<aside id="desktopSidebar" class="rp-desktop-sidebar flex-column h-100 bg-white" aria-label="เมนูหลัก">
+<aside id="desktopSidebar" class="rp-desktop-sidebar flex-column h-100" aria-label="เมนูหลัก">
+    <a href="index.php?c=dashboard" class="rp-sidebar-brand text-decoration-none">
+        <span class="rp-sidebar-brand-mark"><i class="bi bi-heart-pulse-fill"></i></span>
+        <span class="rp-sidebar-brand-copy sidebar-text">
+            <strong>Roster Pro</strong>
+            <small>Primary Care Workspace</small>
+        </span>
+    </a>
     <!-- Script ป้องกันการกระพริบของเมนูตอนโหลดหน้าเว็บ -->
     <script>
         if (localStorage.getItem('sidebarState') === 'collapsed') {
@@ -341,7 +348,7 @@ if (!function_exists('renderSidebarMenu')) {
     </div>
     
     <!-- ปุ่มออกจากระบบ (ล่างสุด) -->
-    <div class="mt-auto p-3 border-top bg-white">
+    <div class="rp-sidebar-footer mt-auto p-3">
         <a href="index.php?c=auth&a=logout" class="nav-link d-flex align-items-center py-2 px-3 rounded-3 text-decoration-none" style="color: #ef4444; font-weight: bold;" onclick="return confirm('คุณต้องการออกจากระบบใช่หรือไม่?');" onmouseover="this.style.backgroundColor='#fef2f2';" onmouseout="this.style.backgroundColor='transparent';">
             <i class="bi bi-box-arrow-left me-2 fs-5" style="color: #ef4444;"></i> <span class="sidebar-text">ออกจากระบบ</span>
         </a>
@@ -352,13 +359,14 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- 🌟 2. Mobile Sidebar (Offcanvas) -->
 <!-- ========================================== -->
 <div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" aria-label="เมนูหลักบนมือถือ">
-    <div class="offcanvas-header border-bottom px-4 py-3">
-        <h5 class="offcanvas-title fw-bold d-flex align-items-center text-primary">
-            <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center me-2 shadow-sm" style="width: 32px; height: 32px;">
-                <i class="bi bi-calendar2-check-fill fs-6"></i>
-            </div>
-            Roster<span class="text-dark">Pro</span>
-        </h5>
+    <div class="offcanvas-header rp-mobile-sidebar-header px-4 py-3">
+        <div class="rp-mobile-sidebar-brand">
+            <span class="rp-sidebar-brand-mark"><i class="bi bi-heart-pulse-fill"></i></span>
+            <span>
+                <strong>Roster Pro</strong>
+                <small>Primary Care Workspace</small>
+            </span>
+        </div>
         <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body p-0 d-flex flex-column custom-scrollbar pb-4">
