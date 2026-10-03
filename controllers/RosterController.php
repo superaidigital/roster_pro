@@ -316,73 +316,61 @@ class RosterController {
         $this->checkAuth();
         header('Content-Type: application/json');
 
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $db = (new Database())->getConnection();
-            $hospital_id = !empty($_POST['hospital_id']) ? $_POST['hospital_id'] : 0;
-            $month_year = !empty($_POST['month']) ? $_POST['month'] : date('Y-m');
-            
-            // แปลงค่าให้เป็นตัวเลขหรือ null ป้องกัน Error ข้อมูลไม่ตรงประเภท
-            $creator_id = !empty($_POST['sig_creator_id']) ? (int)$_POST['sig_creator_id'] : null;
-            $reviewer_id = !empty($_POST['sig_reviewer_id']) ? (int)$_POST['sig_reviewer_id'] : null;
-            $director_id = !empty($_POST['sig_director_id']) ? (int)$_POST['sig_director_id'] : null;
+        $db = (new Database())->getConnection();
+        $hospital_id = isset($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : 0;
+        $month_year = !empty($_POST['month']) ? trim($_POST['month']) : date('Y-m');
+        $creator_id = !empty($_POST['sig_creator_id']) ? (int)$_POST['sig_creator_id'] : null;
+        $reviewer_id = !empty($_POST['sig_reviewer_id']) ? (int)$_POST['sig_reviewer_id'] : null;
+        $director_id = !empty($_POST['sig_director_id']) ? (int)$_POST['sig_director_id'] : null;
 
-            try {
-                // ตรวจสอบว่าตาราง roster_status มีข้อมูลของเดือนนี้หรือยัง
-                $stmtCheck = $db->prepare("SELECT id FROM roster_status WHERE hospital_id = ? AND month_year = ?");
-                $stmtCheck->execute([$hospital_id, $month_year]);
-                $exists = $stmtCheck->fetchColumn();
-
-                if ($exists) {
-                    $stmt = $db->prepare("UPDATE roster_status SET creator_id = ?, reviewer_id = ?, director_id = ? WHERE id = ?");
-                    $stmt->execute([$creator_id, $reviewer_id, $director_id, $exists]);
-                } else {
-                    $stmt = $db->prepare("INSERT INTO roster_status (hospital_id, month_year, status, creator_id, reviewer_id, director_id) VALUES (?, ?, 'DRAFT', ?, ?, ?)");
-                    $stmt->execute([$hospital_id, $month_year, $creator_id, $reviewer_id, $director_id]);
-                }
-                
-                LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "ตั้งค่าผู้ลงนามในตารางเวรเดือน {$month_year}");
-                echo json_encode(['success' => true]);
-                
-            } catch (Exception $e) {
-                // 🌟 Auto-Migration: ตรวจสอบและสร้างคอลัมน์ "ทีละตัว" ป้องกันปัญหา Duplicate Column
-                if (strpos($e->getMessage(), 'Unknown column') !== false) {
-                    try {
-                        $stmt_cols = $db->query("SHOW COLUMNS FROM roster_status");
-                        $columns = $stmt_cols->fetchAll(PDO::FETCH_COLUMN);
-
-                        if (!in_array('creator_id', $columns)) {
-                            $db->exec("ALTER TABLE roster_status ADD COLUMN creator_id INT NULL");
-                        }
-                        if (!in_array('reviewer_id', $columns)) {
-                            $db->exec("ALTER TABLE roster_status ADD COLUMN reviewer_id INT NULL");
-                        }
-                        if (!in_array('director_id', $columns)) {
-                            $db->exec("ALTER TABLE roster_status ADD COLUMN director_id INT NULL");
-                        }
-                        
-                        // หลังจากเพิ่มคอลัมน์แล้ว ลองอัปเดตข้อมูลซ้ำอีกครั้ง
-                        if ($exists) {
-                            $stmt = $db->prepare("UPDATE roster_status SET creator_id = ?, reviewer_id = ?, director_id = ? WHERE id = ?");
-                            $stmt->execute([$creator_id, $reviewer_id, $director_id, $exists]);
-                        } else {
-                            $stmt = $db->prepare("INSERT INTO roster_status (hospital_id, month_year, status, creator_id, reviewer_id, director_id) VALUES (?, ?, 'DRAFT', ?, ?, ?)");
-                            $stmt->execute([$hospital_id, $month_year, $creator_id, $reviewer_id, $director_id]);
-                        }
-                        echo json_encode(['success' => true]);
-                    } catch (Exception $ex) {
-                        echo json_encode(['success' => false, 'message' => 'Migration Error: ' . $ex->getMessage()]);
-                    }
-                } else {
-                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-                }
-            }
+        if ($hospital_id <= 0 || !preg_match('/^\d{4}-\d{2}$/', $month_year)) {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'message' => 'ข้อมูลเดือนหรือหน่วยบริการไม่ถูกต้อง']);
             exit;
         }
+
+        try {
+            $stmtCheck = $db->prepare(
+                "SELECT id FROM roster_status WHERE hospital_id = ? AND month_year = ?"
+            );
+            $stmtCheck->execute([$hospital_id, $month_year]);
+            $exists = $stmtCheck->fetchColumn();
+
+            if ($exists) {
+                $stmt = $db->prepare(
+                    "UPDATE roster_status
+                     SET creator_id = ?, reviewer_id = ?, director_id = ?
+                     WHERE id = ?"
+                );
+                $stmt->execute([$creator_id, $reviewer_id, $director_id, $exists]);
+            } else {
+                $stmt = $db->prepare(
+                    "INSERT INTO roster_status
+                        (hospital_id, month_year, status, creator_id, reviewer_id, director_id)
+                     VALUES (?, ?, 'DRAFT', ?, ?, ?)"
+                );
+                $stmt->execute([$hospital_id, $month_year, $creator_id, $reviewer_id, $director_id]);
+            }
+
+            LogsController::addLog(
+                $db,
+                $_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                "ตั้งค่าผู้ลงนามในตารางเวรเดือน {$month_year}"
+            );
+
+            echo json_encode(['success' => true]);
+        } catch (Throwable $e) {
+            error_log('Roster save_signatures failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'ไม่สามารถบันทึกผู้ลงนามได้ กรุณาตรวจสอบฐานข้อมูลและลองใหม่'
+            ]);
+        }
+        exit;
     }
 
-    // ====================================================
-    // 🌟 7. โหลดข้อมูลผู้ลงนามเดิม (เพื่อโชว์ใน Modal)
-    // ====================================================
     public function get_signatures() {
         $this->checkAuth();
         header('Content-Type: application/json');
