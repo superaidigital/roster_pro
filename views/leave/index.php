@@ -293,7 +293,31 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                         </td>
                                     </tr>
                                 <?php else: ?>
-                                    <?php foreach($my_history as $leave): ?>
+                                    <?php foreach($my_history as $leave):
+                                        $leave_progress_percent = 35;
+                                        $leave_progress_class = '';
+                                        $leave_progress_text = 'ส่งคำขอแล้ว';
+
+                                        if ($leave['status'] === 'PENDING') {
+                                            $leave_progress_percent = 60;
+                                            $leave_progress_class = 'is-warning';
+                                            $leave_progress_text = 'รอการพิจารณา';
+                                        } elseif ($leave['status'] === 'APPROVED') {
+                                            $leave_progress_percent = 100;
+                                            $leave_progress_text = 'อนุมัติเรียบร้อย';
+                                        } elseif ($leave['status'] === 'REJECTED') {
+                                            $leave_progress_percent = 100;
+                                            $leave_progress_class = 'is-danger';
+                                            $leave_progress_text = 'สิ้นสุดการพิจารณา';
+                                        } elseif ($leave['status'] === 'CANCEL_REQUESTED') {
+                                            $leave_progress_percent = 75;
+                                            $leave_progress_class = 'is-warning';
+                                            $leave_progress_text = 'รออนุมัติยกเลิก';
+                                        } elseif ($leave['status'] === 'CANCELLED') {
+                                            $leave_progress_percent = 100;
+                                            $leave_progress_text = 'ยกเลิกเรียบร้อย';
+                                        }
+                                    ?>
                                     <tr class="leave-row">
                                         <td class="ps-4 py-3 leave-type-cell">
                                             <div class="d-flex flex-wrap align-items-center mb-1">
@@ -326,6 +350,23 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                                 elseif ($leave['status'] == 'CANCEL_REQUESTED') { echo '<span class="badge bg-warning text-dark border border-warning d-block mb-2 py-1 px-2 rounded-pill w-100 shadow-sm"><i class="bi bi-exclamation-triangle-fill me-1"></i> รออนุมัติยกเลิก</span>'; }
                                                 else { echo '<span class="badge bg-light text-dark border d-block mb-2 py-1 px-2 rounded-pill w-100">สถานะไม่ทราบ</span>'; }
                                             ?>
+
+                                            <div class="mt-2 mb-2">
+                                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                                    <small class="text-muted fw-semibold">ความคืบหน้า</small>
+                                                    <small class="text-muted"><?= htmlspecialchars($leave_progress_text, ENT_QUOTES, 'UTF-8') ?></small>
+                                                </div>
+                                                <div class="rp-mini-progress <?= $leave_progress_class ?>"
+                                                     style="--rp-progress:<?= (int)$leave_progress_percent ?>%;"
+                                                     role="progressbar"
+                                                     aria-label="ความคืบหน้าใบลา"
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100"
+                                                     aria-valuenow="<?= (int)$leave_progress_percent ?>">
+                                                    <span></span>
+                                                </div>
+                                            </div>
+
                                             
                                             <!-- ปุ่มเครื่องมือ -->
                                             <div class="d-flex gap-2 justify-content-center">
