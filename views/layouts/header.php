@@ -117,7 +117,20 @@ if (isset($_SESSION['user'])) {
     <title><?= htmlspecialchars($app_name) ?> - <?= htmlspecialchars($app_subtitle) ?></title>
     
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0d6efd">
+    <meta name="theme-color" content="#f8fbfd">
+    <script id="rp-theme-prepaint">
+    (() => {
+      try {
+        const saved = localStorage.getItem('rp-theme');
+        const theme = saved === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      } catch (_) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-bs-theme', 'light');
+      }
+    })();
+    </script>
     <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -131,10 +144,14 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261004-stable-v12">
-    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-stable-v12">
-    <script src="public/js/responsive.js?v=20261004-stable-v12" defer></script>
-    <script src="public/js/progress.js?v=20261004-stable-v12" defer></script>
+<link rel="stylesheet" href="public/css/style.css?v=20261004-ux-v12">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ux-v12">
+    <link rel="stylesheet" href="public/css/themes.css?v=20261004-theme-v1">
+    <link rel="stylesheet" href="public/css/wizard.css?v=20261004-wizard-v1">
+    <script src="public/js/responsive.js?v=20261004-ux-v12" defer></script>
+    <script src="public/js/progress.js?v=20261004-ux-v12" defer></script>
+    <script src="public/js/theme.js?v=20261004-theme-v1" defer></script>
+    <script src="public/js/wizard.js?v=20261004-wizard-v1" defer></script>
 </head>
 <?php
 $rpController = strtolower(trim($_GET['c'] ?? 'dashboard'));
@@ -196,10 +213,19 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
         </div>
     </div>
 
-    <div class="d-flex align-items-center gap-1 gap-md-2">
+    <div class="rp-topbar-actions d-flex align-items-center gap-1 gap-md-2">
         <?php if(isset($_SESSION['user'])): ?>
         <span class="rp-system-online d-none d-xl-inline-flex">ออนไลน์</span>
         
+        <button type="button"
+                class="nav-icon-btn rp-theme-toggle"
+                data-rp-theme-toggle
+                aria-pressed="false"
+                aria-label="เปลี่ยนเป็นโหมดมืด"
+                title="โหมดมืด">
+            <i class="bi bi-moon-stars-fill" data-rp-theme-icon></i>
+        </button>
+
         <!-- 🔔 Notification Dropdown -->
         <div class="dropdown">
             <button class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false">
