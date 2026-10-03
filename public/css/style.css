@@ -1990,3 +1990,607 @@ body {
 .rp-mini-progress.is-danger > span {
   background: linear-gradient(90deg, #b91c1c, #ef4444);
 }
+
+
+/* ==========================================================================
+   Modern Clinical Workspace v10
+   A visually distinct, modern healthcare operations workspace
+   ========================================================================== */
+
+:root {
+  --rp-nav-bg: #0b1f2f;
+  --rp-nav-bg-2: #0f2b3d;
+  --rp-nav-text: #d7e4ec;
+  --rp-nav-muted: #89a1b3;
+  --rp-nav-active: #1cc8a0;
+  --rp-canvas: #eef4f7;
+  --rp-panel: #ffffff;
+  --rp-panel-soft: #f7fafc;
+  --rp-line: #dce6ed;
+  --rp-ink: #10212e;
+  --rp-ink-soft: #5c7180;
+  --rp-command-height: 4.85rem;
+}
+
+/* New application shell */
+.top-navbar {
+  min-height: var(--rp-command-height) !important;
+  padding: .7rem 1.1rem !important;
+  background: rgba(255,255,255,.96) !important;
+  border-bottom: 1px solid #dfe8ee !important;
+  box-shadow: 0 .2rem 1rem rgba(16,33,46,.045) !important;
+}
+
+.app-shell {
+  height: calc(100dvh - var(--rp-command-height));
+  background: var(--rp-canvas);
+}
+
+.app-main {
+  padding: clamp(1rem, 2vw, 1.6rem) !important;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(28,200,160,.05), transparent 24rem),
+    radial-gradient(circle at 0% 0%, rgba(15,108,189,.055), transparent 28rem),
+    var(--rp-canvas) !important;
+}
+
+/* Context command bar */
+.rp-page-context {
+  flex: 1 1 auto;
+  max-width: min(52rem, 65vw);
+}
+
+.rp-page-icon {
+  place-items: center;
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: 0 0 2.7rem;
+  border-radius: .85rem;
+  color: #0f6cbd;
+  background: linear-gradient(145deg, #edf7ff, #e7fbf5);
+  border: 1px solid #d7e8ef;
+  font-size: 1.08rem;
+}
+
+.rp-page-kicker {
+  color: #8093a0;
+  font-size: .63rem;
+  font-weight: 800;
+  letter-spacing: .095em;
+  line-height: 1.2;
+}
+
+.rp-page-title {
+  max-width: 100%;
+  color: #10212e;
+  font-size: clamp(1.05rem, 1.35vw, 1.28rem);
+  font-weight: 800;
+  letter-spacing: -.025em;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-page-subtitle {
+  margin-top: .12rem;
+  color: #617786;
+  font-size: .76rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-icon-btn {
+  color: #365366 !important;
+  background: #f5f8fa !important;
+  border: 1px solid #dfe8ee !important;
+  box-shadow: none !important;
+}
+
+.nav-icon-btn:hover {
+  color: #0f6cbd !important;
+  background: #edf6fb !important;
+  border-color: #cce0ec !important;
+}
+
+.profile-pill {
+  min-height: 2.8rem;
+  padding: .28rem .35rem .28rem .4rem;
+  border: 1px solid transparent;
+  border-radius: .9rem;
+}
+
+.profile-pill:hover {
+  background: #f5f8fa;
+  border-color: #e0e8ee;
+}
+
+.user-avatar {
+  background: linear-gradient(145deg, #0f6cbd, #0f766e) !important;
+  box-shadow: 0 .35rem .8rem rgba(15,108,189,.18);
+}
+
+.notif-badge {
+  border: 2px solid #fff;
+  box-shadow: none !important;
+}
+
+/* Dark clinical navigation */
+#desktopSidebar,
+.rp-desktop-sidebar {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(28,200,160,.12), transparent 13rem),
+    linear-gradient(180deg, var(--rp-nav-bg-2) 0%, var(--rp-nav-bg) 100%) !important;
+  border-right: 0 !important;
+  box-shadow: .4rem 0 1.5rem rgba(11,31,47,.08);
+}
+
+.rp-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  min-height: 5.2rem;
+  padding: 1rem 1rem .9rem;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.rp-sidebar-brand:hover {
+  background: rgba(255,255,255,.025);
+}
+
+.rp-sidebar-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  flex: 0 0 2.55rem;
+  border-radius: .82rem;
+  color: #07372d;
+  background: linear-gradient(145deg, #5eead4, #2dd4bf);
+  box-shadow: 0 .4rem 1rem rgba(45,212,191,.18);
+}
+
+.rp-sidebar-brand-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.rp-sidebar-brand-copy strong {
+  color: #fff;
+  font-size: 1rem;
+  letter-spacing: -.02em;
+}
+
+.rp-sidebar-brand-copy small {
+  color: #90a8b8;
+  margin-top: .05rem;
+  font-size: .62rem;
+  letter-spacing: .035em;
+  white-space: nowrap;
+}
+
+.sidebar-menu {
+  padding: .85rem .7rem 1rem !important;
+}
+
+.sidebar-heading {
+  color: #6f899b !important;
+  padding: 1rem .8rem .35rem !important;
+  font-size: .63rem !important;
+  letter-spacing: .085em !important;
+}
+
+.sidebar-menu .nav-link {
+  min-height: 2.9rem;
+  margin: .08rem 0;
+  padding: .68rem .72rem !important;
+  color: var(--rp-nav-text) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: .72rem !important;
+  font-size: .89rem;
+}
+
+.sidebar-menu .nav-link i {
+  color: #8fb0c1 !important;
+  font-size: 1.05rem !important;
+}
+
+.sidebar-menu .nav-link:hover {
+  color: #fff !important;
+  background: rgba(255,255,255,.065) !important;
+  border-color: rgba(255,255,255,.045) !important;
+}
+
+.sidebar-menu .nav-link:hover i {
+  color: #5eead4 !important;
+  transform: none !important;
+}
+
+.sidebar-menu .nav-link.active {
+  color: #fff !important;
+  background: linear-gradient(90deg, rgba(28,200,160,.18), rgba(15,108,189,.12)) !important;
+  border-color: rgba(94,234,212,.18) !important;
+  box-shadow: inset .18rem 0 0 var(--rp-nav-active) !important;
+}
+
+.sidebar-menu .nav-link.active i {
+  color: #5eead4 !important;
+}
+
+.sidebar-menu .submenu-item {
+  color: #abc0cd !important;
+  padding-left: 2.7rem !important;
+  font-size: .82rem;
+}
+
+.sidebar-menu .submenu-item.active {
+  color: #7cebd4 !important;
+}
+
+.rp-sidebar-footer {
+  border-top: 1px solid rgba(255,255,255,.08) !important;
+  background: rgba(0,0,0,.08) !important;
+}
+
+.rp-sidebar-footer .nav-link {
+  color: #fecaca !important;
+}
+
+.rp-sidebar-footer .nav-link:hover {
+  color: #fff !important;
+  background: rgba(239,68,68,.12) !important;
+}
+
+#desktopSidebar.collapsed .rp-sidebar-brand {
+  justify-content: center;
+  padding-inline: .6rem;
+}
+
+#desktopSidebar.collapsed .rp-sidebar-brand-mark {
+  width: 2.45rem;
+  height: 2.45rem;
+}
+
+/* Mobile dark navigation */
+#mobileSidebar {
+  background:
+    radial-gradient(circle at 15% 0%, rgba(28,200,160,.13), transparent 14rem),
+    linear-gradient(180deg, var(--rp-nav-bg-2), var(--rp-nav-bg)) !important;
+  color: #fff;
+  border: 0 !important;
+}
+
+.rp-mobile-sidebar-header {
+  min-height: 4.8rem;
+  border-bottom: 1px solid rgba(255,255,255,.08) !important;
+}
+
+.rp-mobile-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  min-width: 0;
+}
+
+.rp-mobile-sidebar-brand > span:last-child {
+  display: grid;
+}
+
+.rp-mobile-sidebar-brand strong {
+  color: #fff;
+  font-size: 1rem;
+}
+
+.rp-mobile-sidebar-brand small {
+  color: #91a9b8;
+  font-size: .64rem;
+}
+
+#mobileSidebar .btn-close {
+  filter: invert(1) grayscale(1);
+  opacity: .8;
+}
+
+/* Content panels - clean SaaS look */
+.app-main .card,
+.app-main .card-modern,
+.users-hero,
+.users-filter-card,
+.users-table-card {
+  border: 1px solid #dce6ed !important;
+  border-radius: 1rem !important;
+  background: #fff !important;
+  box-shadow: 0 .35rem 1.2rem rgba(16,33,46,.045) !important;
+}
+
+.app-main .card:hover,
+.app-main .card-modern:hover {
+  box-shadow: 0 .55rem 1.5rem rgba(16,33,46,.065) !important;
+}
+
+.app-main .card-header {
+  min-height: 3.6rem;
+  padding: .85rem 1rem !important;
+  background: #fff !important;
+  border-bottom: 1px solid #e5edf2 !important;
+}
+
+.app-main .card-footer {
+  background: #fafcfd !important;
+  border-top: 1px solid #e6eef3 !important;
+}
+
+/* KPI / dashboards */
+.dashboard-card,
+.staff-card,
+.kpi-card,
+.card-stat {
+  border: 1px solid #dce6ed !important;
+  border-radius: 1rem !important;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #fff 0%, #fbfdfe 100%) !important;
+}
+
+.dashboard-card::before,
+.staff-card::before,
+.kpi-card::before,
+.card-stat::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: .22rem;
+  background: linear-gradient(180deg, #0f6cbd, #20b7a1);
+  opacity: .8;
+}
+
+.dashboard-card .icon-circle,
+.staff-card .icon-circle {
+  border-radius: .78rem !important;
+  box-shadow: none !important;
+}
+
+.quick-action-btn {
+  border: 1px solid #dce6ed !important;
+  border-radius: .9rem !important;
+  color: #244356 !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.quick-action-btn:hover {
+  color: #0b5a91 !important;
+  border-color: #bad5e5 !important;
+  background: #f4fafe !important;
+}
+
+/* Modern forms */
+.form-label {
+  color: #344d5e !important;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+.form-control,
+.form-select,
+.select2-container .select2-selection {
+  border: 1px solid #cad8e2 !important;
+  border-radius: .7rem !important;
+  background: #fff !important;
+  color: #132936 !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #0f6cbd !important;
+  box-shadow: 0 0 0 .2rem rgba(15,108,189,.12) !important;
+}
+
+.input-group-text {
+  background: #f6f9fb !important;
+  border-color: #cad8e2 !important;
+}
+
+/* Buttons - less Bootstrap, more product UI */
+.btn {
+  border-radius: .7rem !important;
+  font-weight: 700;
+  letter-spacing: -.005em;
+}
+
+.btn-primary {
+  background: #0f6cbd !important;
+  border-color: #0f6cbd !important;
+  box-shadow: none !important;
+}
+
+.btn-primary:hover {
+  background: #0b5a9d !important;
+  border-color: #0b5a9d !important;
+}
+
+.btn-success {
+  background: #12805c !important;
+  border-color: #12805c !important;
+  box-shadow: none !important;
+}
+
+.btn-danger {
+  background: #c0393b !important;
+  border-color: #c0393b !important;
+  box-shadow: none !important;
+}
+
+.btn-warning {
+  background: #f5c451 !important;
+  border-color: #e7b23d !important;
+  color: #49350b !important;
+  box-shadow: none !important;
+}
+
+.btn-light,
+.btn-outline-secondary {
+  color: #3b5566 !important;
+  background: #fff !important;
+  border-color: #d5e0e7 !important;
+}
+
+/* Tables */
+.table {
+  --bs-table-bg: transparent;
+}
+
+.table thead th {
+  padding-top: .8rem !important;
+  padding-bottom: .8rem !important;
+  color: #526b7a !important;
+  background: #f6f9fb !important;
+  border-bottom: 1px solid #dce6ed !important;
+  font-size: .76rem !important;
+  font-weight: 800 !important;
+  letter-spacing: .02em;
+}
+
+.table tbody td {
+  color: #203846;
+  border-bottom: 1px solid #edf2f5 !important;
+}
+
+.table-hover tbody tr:hover td {
+  background: #f8fbfc !important;
+}
+
+/* Modals */
+.modal-content {
+  border: 1px solid #cfdee7 !important;
+  border-radius: 1.1rem !important;
+  box-shadow: 0 1.8rem 5rem rgba(11,31,47,.22) !important;
+}
+
+.modal-header {
+  min-height: 4rem;
+  background: #fff !important;
+}
+
+.modal-title {
+  color: #172f3d;
+  font-weight: 800 !important;
+}
+
+/* Dropdowns */
+.dropdown-menu {
+  border: 1px solid #d8e4eb !important;
+  border-radius: .9rem !important;
+  box-shadow: 0 .8rem 2.5rem rgba(16,33,46,.12) !important;
+}
+
+.dropdown-item {
+  border-radius: .55rem;
+}
+
+.dropdown-menu > li {
+  padding-inline: .35rem;
+}
+
+/* Progress visual refresh */
+.rp-global-progress-bar {
+  background: linear-gradient(90deg, #0f6cbd, #10b981, #2dd4bf) !important;
+}
+
+.rp-workflow-card {
+  border: 1px solid #d9e5ec !important;
+  background: #fff !important;
+}
+
+.rp-workflow-dot {
+  border-color: #c7d7e1;
+}
+
+.rp-mini-progress {
+  background: #e2ebf0;
+}
+
+/* Users redesign aligns with global system */
+.users-hero {
+  background:
+    linear-gradient(135deg, #ffffff 0%, #f3f9fc 100%) !important;
+}
+
+.users-hero__icon {
+  color: #0f6cbd !important;
+  background: #eaf5fb !important;
+  border-color: #d3e6f1 !important;
+}
+
+.users-filter-card {
+  background: #fbfdfe !important;
+}
+
+/* Touch and compact behavior */
+@media (max-width: 1023.98px) {
+  :root {
+    --rp-command-height: 4.35rem;
+  }
+
+  .top-navbar {
+    min-height: var(--rp-command-height) !important;
+  }
+
+  .app-shell {
+    height: auto !important;
+    min-height: calc(100dvh - var(--rp-command-height));
+  }
+
+  .rp-page-context {
+    max-width: calc(100vw - 10rem);
+  }
+
+  .rp-page-title {
+    font-size: 1.02rem;
+  }
+}
+
+@media (max-width: 639.98px) {
+  :root {
+    --rp-command-height: 4rem;
+  }
+
+  .top-navbar {
+    padding-inline: .65rem !important;
+  }
+
+  .rp-page-context {
+    max-width: calc(100vw - 8.4rem);
+  }
+
+  .rp-page-kicker,
+  .rp-page-subtitle {
+    display: none !important;
+  }
+
+  .rp-page-title {
+    font-size: .98rem;
+  }
+
+  .app-main {
+    padding: .72rem !important;
+  }
+
+  .app-main .card,
+  .app-main .card-modern,
+  .users-hero,
+  .users-filter-card,
+  .users-table-card {
+    border-radius: .85rem !important;
+  }
+
+  .dashboard-card,
+  .staff-card,
+  .kpi-card,
+  .card-stat {
+    border-radius: .85rem !important;
+  }
+}
