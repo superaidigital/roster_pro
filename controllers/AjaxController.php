@@ -209,7 +209,9 @@ class AjaxController {
                 }
                 exit;
             } catch (Exception $e) {
-                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); exit;
+                error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']); exit;
             }
         }
         echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
@@ -252,7 +254,9 @@ class AjaxController {
                 echo json_encode(['status' => 'success', 'message' => 'บันทึกลำดับเรียบร้อยแล้ว']);
             } catch (PDOException $e) {
                 $db->rollBack();
-                echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+                error_log('Ajax database operation failed: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่']);
             }
         } else {
             echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ถูกต้อง']);
@@ -317,7 +321,9 @@ class AjaxController {
             LogsController::addLog($db, $_SESSION['user']['id'], 'CREATE', "คัดลอกเวรจากเดือน {$prev_month} ไปยังเดือน {$target_month}");
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
         }
         exit;
     }
@@ -724,7 +730,9 @@ class AjaxController {
             echo json_encode(['status' => 'success', 'warnings' => array_unique($all_issues), 'has_error' => (count($errors) > 0)]);
             
         } catch (Exception $e) {
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
         }
         exit;
     }
@@ -854,7 +862,9 @@ class AjaxController {
 
         } catch (Exception $e) {
             $db->rollBack();
-            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+            error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
         }
         exit;
     }
