@@ -182,7 +182,13 @@ class StaffController {
                 $data['username'] = trim($_POST['username']);
             }
             if (!empty($_POST['password'])) {
-                $data['password'] = $_POST['password'];
+                $editPassword = (string)$_POST['password'];
+                if (mb_strlen($editPassword, 'UTF-8') < 8) {
+                    $_SESSION['error_msg'] = "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร";
+                    header("Location: index.php?c=staff");
+                    exit;
+                }
+                $data['password'] = $editPassword;
             }
 
             try {
