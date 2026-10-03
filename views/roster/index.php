@@ -105,7 +105,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     .today-column { background-color: #f0fdf4 !important; border-left: 1px solid #bbf7d0 !important; border-right: 1px solid #bbf7d0 !important; }
     .holiday-column { background-color: #fff1f2 !important; } /* 🌟 พื้นหลังสีแดงอ่อนๆ สำหรับวันหยุด */
 
-    @media (min-width: 992px) { .sticky-sidebar { position: sticky; top: 15px; align-self: flex-start; height: calc(100vh - 110px); overflow: hidden; } }
+    @media (min-width: 992px) { .sticky-sidebar { position: sticky; top: 15px; align-self: flex-start; height: calc(100dvh - var(--rp-header-h, 4.5rem) - 2rem); overflow: hidden; } }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
@@ -136,7 +136,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <input type="hidden" name="a" value="index">
                     
                     <?php if ($isAdmin): ?>
-                    <div class="dropdown shadow-sm" style="width: 220px;">
+                    <div class="dropdown shadow-sm" style="width: 12rem;">
                         <button class="btn d-flex justify-content-between align-items-center bg-white border border-secondary border-opacity-25 w-100 rounded-pill px-3" type="button" id="hospDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="true" style="height: 40px;">
                             <div class="d-flex align-items-center gap-2 text-truncate" style="min-width: 0;">
                                 <i class="bi bi-hospital text-danger flex-shrink-0"></i>
@@ -373,10 +373,10 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                 <div class="card card-modern overflow-hidden mb-4 flex-grow-1">
                     <div class="card-body p-0 d-flex flex-column">
                         <div class="table-responsive flex-grow-1 custom-scrollbar" style="max-height: 70vh;">
-                            <table class="table table-bordered table-hover table-roster mb-0 text-center" id="rosterTable" style="min-width: 1000px;">
+                            <table class="table table-bordered table-hover table-roster mb-0 text-center" id="rosterTable" style="min-width: 56rem;">
                                 <thead class="sticky-top" style="z-index: 10;">
                                     <tr>
-                                        <th rowspan="2" class="align-middle shadow-sm bg-white" style="min-width: 220px; left: 0; position: sticky; z-index: 11; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
+                                        <th rowspan="2" class="align-middle shadow-sm bg-white" style="min-width: 12rem; left: 0; position: sticky; z-index: 11; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
                                         <th colspan="<?= $days_in_month ?>" class="bg-light border-bottom text-dark">วันที่ปฏิบัติงาน เดือน <?= $display_month_text ?></th>
                                     </tr>
                                     <tr>
