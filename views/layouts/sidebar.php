@@ -389,6 +389,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     syncSidebarState(localStorage.getItem('sidebarState') === 'collapsed');
 
+    const syncSidebarMode = () => {
+        if (window.innerWidth < 1024) {
+            document.body.classList.remove('rp-sidebar-collapsed');
+        } else {
+            document.body.classList.toggle('rp-sidebar-collapsed', desktopSidebar?.classList.contains('collapsed'));
+        }
+    };
+
+    window.addEventListener('resize', syncSidebarMode);
+    syncSidebarMode();
+
     if (toggleBtn && desktopSidebar) {
         toggleBtn.addEventListener('click', function(e) {
             e.preventDefault();
