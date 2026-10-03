@@ -108,6 +108,16 @@ class FieldVisitModel {
             $params[':risk_level'] = $filters['risk_level'];
         }
 
+        if (!empty($filters['followup'])) {
+            if ($filters['followup'] === 'due') {
+                $where[] = "fv.follow_up_status = 'PENDING' AND fv.follow_up_date IS NOT NULL AND fv.follow_up_date <= CURDATE()";
+            } elseif ($filters['followup'] === 'pending') {
+                $where[] = "fv.follow_up_status = 'PENDING'";
+            } elseif ($filters['followup'] === 'done') {
+                $where[] = "fv.follow_up_status = 'DONE'";
+            }
+        }
+
         if (!empty($filters['date_from'])) {
             $where[] = 'fv.visit_date >= :date_from';
             $params[':date_from'] = $filters['date_from'];
