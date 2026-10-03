@@ -354,7 +354,9 @@ class StaffController {
                 }
             } catch (Exception $e) {
                 // กรณีที่คอลัมน์ show_in_roster ยังไม่มีในฐานข้อมูล จะส่ง Error กลับไป
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                error_log('Staff operation failed: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'ไม่สามารถอัปเดตข้อมูลบุคลากรได้']);
             }
             exit;
         }
