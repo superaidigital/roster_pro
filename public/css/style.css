@@ -844,3 +844,214 @@ iframe,
     transition-duration: .01ms !important;
   }
 }
+
+
+/* ==========================================================================
+   Roster Pro application-specific responsive rules
+   ========================================================================== */
+
+body.rp-menu-open {
+  overflow: hidden !important;
+}
+
+.dashboard-card,
+.kpi-card,
+.card-modern,
+.card-stat,
+.hosp-card,
+.month-card {
+  min-width: 0;
+}
+
+.dashboard-card .card-body,
+.kpi-card .card-body,
+.card-modern .card-body,
+.card-stat .card-body {
+  min-width: 0;
+}
+
+.chart-container {
+  width: 100% !important;
+  height: clamp(13rem, 24vw, 17rem) !important;
+  min-height: 0;
+}
+
+.quick-action-btn {
+  min-width: 0;
+  height: 100%;
+}
+
+.search-filter-group {
+  max-width: 100%;
+}
+
+.search-filter-group form,
+.search-filter-group > div {
+  min-width: 0;
+}
+
+.calendar-scroll-shell {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.calendar-grid-header,
+.calendar-grid-body {
+  width: 100%;
+  min-width: 0;
+}
+
+#rosterTable {
+  width: max-content;
+  min-width: 100% !important;
+}
+
+#rosterTable th,
+#rosterTable td {
+  white-space: nowrap;
+}
+
+#rosterTable th:first-child,
+#rosterTable td:first-child {
+  max-width: 18rem;
+  white-space: normal;
+}
+
+#tableViewWrapper,
+#leaveHistoryTable,
+#overviewTable {
+  max-width: 100%;
+}
+
+.rp-action-container {
+  min-width: 0;
+}
+
+@media (max-width: 1023.98px) {
+  .chart-container {
+    height: clamp(12rem, 36vw, 16rem) !important;
+  }
+
+  .dashboard-card:hover,
+  .kpi-card:hover,
+  .card-modern:hover,
+  .card-stat:hover,
+  .hosp-card:hover,
+  .month-card:hover,
+  .quick-action-btn:hover {
+    transform: none !important;
+  }
+
+  .search-filter-group {
+    border-radius: 1rem !important;
+  }
+
+  #rosterTable {
+    min-width: max(56rem, 100%) !important;
+  }
+
+  .sticky-sidebar {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .chart-container {
+    height: 12rem !important;
+  }
+
+  .quick-action-btn {
+    padding: .75rem .55rem !important;
+    font-size: .85rem;
+  }
+
+  .quick-action-btn i {
+    font-size: 1.25rem !important;
+    margin-bottom: .25rem !important;
+  }
+
+  .search-filter-group {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch !important;
+    padding: .4rem;
+    overflow: visible !important;
+  }
+
+  .search-filter-group input,
+  .search-filter-group select,
+  .search-filter-group .form-control,
+  .search-filter-group .form-select {
+    width: 100% !important;
+    min-height: 2.5rem;
+    border-radius: .65rem !important;
+  }
+
+  .calendar-scroll-shell {
+    margin-inline: 0;
+    border-radius: 1rem;
+  }
+
+  .calendar-grid-header,
+  .calendar-grid-body {
+    min-width: 42rem;
+  }
+
+  .calendar-grid-header {
+    font-size: .72rem !important;
+  }
+
+  .calendar-cell {
+    min-height: 5.75rem !important;
+    padding: .35rem !important;
+  }
+
+  .event-badge {
+    font-size: .66rem !important;
+  }
+
+  #rosterTable {
+    min-width: 62rem !important;
+  }
+
+  #rosterTable th,
+  #rosterTable td {
+    padding: .45rem .35rem !important;
+    font-size: .78rem !important;
+  }
+
+  #rosterTable th:first-child,
+  #rosterTable td:first-child {
+    min-width: 10.5rem !important;
+    max-width: 10.5rem !important;
+  }
+
+  #tableViewWrapper .table-modern,
+  #leaveHistoryTable {
+    min-width: 42rem;
+  }
+
+  .status-badge {
+    white-space: nowrap;
+  }
+
+  .rp-action-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem;
+  }
+
+  .rp-action-container > .btn,
+  .rp-action-container > form,
+  .rp-action-container > a {
+    width: 100%;
+    margin: 0 !important;
+  }
+
+  .rp-action-container > form > .btn {
+    width: 100%;
+  }
+}
