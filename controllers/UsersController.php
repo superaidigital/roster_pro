@@ -96,45 +96,74 @@ class UsersController {
     public function add() {
         $this->requireMutation();
         $this->checkAuth();
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $db = (new Database())->getConnection();
-            $userModel = new UserModel($db);
-            
-            $data = [
-                'hospital_id' => !empty($_POST['hospital_id']) ? $_POST['hospital_id'] : null,
-                'name' => trim($_POST['name'] ?? ''),
-                'username' => trim($_POST['username'] ?? ''),
-                'password' => $_POST['password'] ?? '',
-                'role' => strtoupper($_POST['role'] ?? 'STAFF'),
-                'pay_rate_id' => !empty($_POST['pay_rate_id']) ? $_POST['pay_rate_id'] : null,
-                'position' => trim($_POST['position'] ?? ''),
-                'type' => trim($_POST['type'] ?? ''),
-                'employee_type' => trim($_POST['employee_type'] ?? ''),
-                'id_card' => trim($_POST['id_card'] ?? ''),
-                'position_number' => trim($_POST['position_number'] ?? ''),
-                'start_date' => !empty($_POST['start_date']) ? $_POST['start_date'] : null,
-                'phone' => trim($_POST['phone'] ?? ''),
-                'color_theme' => $_POST['color_theme'] ?? 'primary'
-            ];
 
-            // ป้องกันการแอบอ้างสิทธิ์ SUPERADMIN
-            if (strtoupper($_SESSION['user']['role']) !== 'SUPERADMIN' && $data['role'] === 'SUPERADMIN') {
-                $data['role'] = 'STAFF'; 
-            }
-
-            if ($userModel->checkUsernameExists($data['username'])) {
-                $_SESSION['error_msg'] = "Username นี้มีผู้ใช้งานแล้ว โปรดใช้ชื่ออื่น";
-            } elseif (!empty($data['id_card']) && $userModel->checkDuplicateField('id_card', $data['id_card'])) {
-                $_SESSION['error_msg'] = "เลขบัตรประชาชนนี้มีอยู่ในระบบแล้ว";
-            } else {
-                if ($userModel->addUser($data)) {
-                    LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มบุคลากรใหม่: " . $data['name']);
-                    $_SESSION['success_msg'] = "เพิ่มข้อมูลบุคลากรสำเร็จ";
-                } else {
-                    $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
-                }
-            }
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            header("Location: index.php?c=users");
+            exit;
         }
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+
+        $name = trim((string)($_POST['name'] ?? ''));
+        $username = trim((string)($_POST['username'] ?? ''));
+        $password = (string)($_POST['password'] ?? '');
+        $currentRole = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+
+        if ($name === '' || $username === '') {
+            $_SESSION['error_msg'] = "กรุณากรอกชื่อและ Username ให้ครบถ้วน";
+            header("Location: index.php?c=users");
+            exit;
+        }
+
+        if (mb_strlen($password, 'UTF-8') < 8) {
+            $_SESSION['error_msg'] = "รหัสผ่านสำหรับบัญชีใหม่ต้องมีอย่างน้อย 8 ตัวอักษร";
+            header("Location: index.php?c=users");
+            exit;
+        }
+
+        $role = strtoupper(trim((string)($_POST['role'] ?? 'STAFF')));
+        $allowedRoles = ['SUPERADMIN', 'ADMIN', 'DIRECTOR', 'SCHEDULER', 'STAFF', 'HR'];
+        if (!in_array($role, $allowedRoles, true)) {
+            $role = 'STAFF';
+        }
+        if ($currentRole !== 'SUPERADMIN' && $role === 'SUPERADMIN') {
+            $role = 'STAFF';
+        }
+
+        $data = [
+            'hospital_id' => !empty($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : null,
+            'name' => $name,
+            'username' => $username,
+            'password' => $password,
+            'role' => $role,
+            'pay_rate_id' => !empty($_POST['pay_rate_id']) ? (int)$_POST['pay_rate_id'] : null,
+            'position' => trim((string)($_POST['position'] ?? '')),
+            'type' => trim((string)($_POST['type'] ?? '')),
+            'employee_type' => trim((string)($_POST['employee_type'] ?? 'ข้าราชการ/พนักงานท้องถิ่น')),
+            'id_card' => trim((string)($_POST['id_card'] ?? '')),
+            'position_number' => trim((string)($_POST['position_number'] ?? '')),
+            'start_date' => !empty($_POST['start_date']) ? $_POST['start_date'] : null,
+            'phone' => trim((string)($_POST['phone'] ?? '')),
+            'color_theme' => trim((string)($_POST['color_theme'] ?? 'primary')),
+        ];
+
+        if ($userModel->checkUsernameExists($username)) {
+            $_SESSION['error_msg'] = "Username นี้มีผู้ใช้งานแล้ว โปรดใช้ชื่ออื่น";
+        } elseif (!empty($data['id_card']) && $userModel->checkDuplicateField('id_card', $data['id_card'])) {
+            $_SESSION['error_msg'] = "เลขบัตรประชาชนนี้มีอยู่ในระบบแล้ว";
+        } elseif ($userModel->addUser($data)) {
+            LogsController::addLog(
+                $db,
+                (int)$_SESSION['user']['id'],
+                LogsController::ACTION_CREATE,
+                "เพิ่มบุคลากรใหม่: " . $data['name']
+            );
+            $_SESSION['success_msg'] = "เพิ่มข้อมูลบุคลากรสำเร็จ";
+        } else {
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูล";
+        }
+
         header("Location: index.php?c=users");
         exit;
     }
@@ -471,14 +500,35 @@ class UsersController {
     public function download_template() {
         $this->checkAuth();
         $db = (new Database())->getConnection();
-        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "ดาวน์โหลดแม่แบบนำเข้าบุคลากร (CSV)");
-        
-        header('Content-Type: text/csv; charset=utf-8');
+
+        LogsController::addLog(
+            $db,
+            (int)$_SESSION['user']['id'],
+            LogsController::ACTION_EXPORT,
+            "ดาวน์โหลดแม่แบบนำเข้าบุคลากร (CSV)"
+        );
+
+        header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename=template_import_users.csv');
-        $output = fopen('php://output', 'w');
-        fputs($output, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM สำหรับ Excel
-        fputcsv($output, ['Hospital_ID', 'Name', 'Username', 'Password', 'ID_Card', 'Employee_Type', 'Position', 'Pos_Number', 'Phone', 'Role']);
-        fputcsv($output, ['0', 'นาย สมชาย ใจดี', 'somchai_test', '', '1100000000000', 'ข้าราชการ', 'พยาบาลวิชาชีพ', '1234', '0812345678', 'STAFF']);
+
+        $output = fopen('php://output', 'wb');
+        fwrite($output, "\xEF\xBB\xBF");
+        fputcsv($output, [
+            'Hospital_ID', 'Name', 'Username', 'Password', 'ID_Card',
+            'Employee_Type', 'Position', 'Pos_Number', 'Phone', 'Role'
+        ]);
+        fputcsv($output, [
+            '0',
+            'นาย ตัวอย่าง ใจดี',
+            'user_example',
+            '',
+            '',
+            'ข้าราชการ/พนักงานท้องถิ่น',
+            'พยาบาลวิชาชีพ',
+            '',
+            '0812345678',
+            'STAFF'
+        ]);
         fclose($output);
         exit;
     }
@@ -486,42 +536,161 @@ class UsersController {
     public function import() {
         $this->requireMutation();
         $this->checkAuth();
-        if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['import_file'])) {
-            $db = (new Database())->getConnection();
-            $userModel = new UserModel($db);
-            $handle = fopen($_FILES['import_file']['tmp_name'], "r");
-            
-            $bom = fread($handle, 3);
-            if ($bom !== "\xEF\xBB\xBF") rewind($handle);
-            fgetcsv($handle); 
-            
-            $ok = 0; $fail = 0;
-            while (($row = fgetcsv($handle)) !== FALSE) {
-                if (empty($row[1]) || empty($row[2])) continue;
 
-                $username = trim($row[2]);
-                if ($userModel->checkUsernameExists($username)) { $fail++; continue; }
-
-                $importData = [
-                    'hospital_id' => ($row[0] == '0' || empty($row[0])) ? null : (int)$row[0],
-                    'name' => trim($row[1]),
-                    'username' => $username,
-                    'password' => $password,
-                    'id_card' => trim($row[4] ?? ''),
-                    'employee_type' => trim($row[5] ?? 'ข้าราชการ'),
-                    'position' => trim($row[6] ?? ''), 
-                    'position_number' => trim($row[7] ?? ''),
-                    'phone' => trim($row[8] ?? ''),
-                    'role' => strtoupper(trim($row[9] ?? 'STAFF')),
-                    'color_theme' => 'primary'
-                ];
-
-                if ($userModel->addUser($importData)) $ok++; else $fail++;
-            }
-            fclose($handle);
-            $_SESSION['success_msg'] = "นำเข้าสำเร็จ $ok รายการ, ข้าม/ผิดพลาด $fail รายการ";
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_IMPORT, "นำเข้าบุคลากรผ่าน CSV สำเร็จ $ok คน");
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST' || empty($_FILES['import_file'])) {
+            header("Location: index.php?c=users");
+            exit;
         }
+
+        $file = $_FILES['import_file'];
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'] ?? '')) {
+            $_SESSION['error_msg'] = "ไม่สามารถอ่านไฟล์ CSV ที่อัปโหลดได้";
+            header("Location: index.php?c=users");
+            exit;
+        }
+
+        if ((int)($file['size'] ?? 0) > 2 * 1024 * 1024) {
+            $_SESSION['error_msg'] = "ไฟล์ CSV ต้องมีขนาดไม่เกิน 2 MB";
+            header("Location: index.php?c=users");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+        $handle = fopen($file['tmp_name'], 'rb');
+
+        if ($handle === false) {
+            $_SESSION['error_msg'] = "ไม่สามารถเปิดไฟล์ CSV ได้";
+            header("Location: index.php?c=users");
+            exit;
+        }
+
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
+
+        $header = fgetcsv($handle);
+        $expected = [
+            'Hospital_ID','Name','Username','Password','ID_Card',
+            'Employee_Type','Position','Pos_Number','Phone','Role'
+        ];
+        $normalizedHeader = array_map(static fn($v) => trim((string)$v), is_array($header) ? $header : []);
+
+        if ($normalizedHeader !== $expected) {
+            fclose($handle);
+            $_SESSION['error_msg'] = "รูปแบบ CSV ไม่ถูกต้อง กรุณาดาวน์โหลดแม่แบบล่าสุด";
+            header("Location: index.php?c=users");
+            exit;
+        }
+
+        $currentRole = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        $allowedRoles = ['SUPERADMIN', 'ADMIN', 'DIRECTOR', 'SCHEDULER', 'STAFF', 'HR'];
+        $ok = 0;
+        $fail = 0;
+        $failReasons = [];
+        $rowNo = 1;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNo++;
+            if (!array_filter($row, static fn($value) => trim((string)$value) !== '')) {
+                continue;
+            }
+
+            if (count($row) < 10) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: จำนวนคอลัมน์ไม่ครบ";
+                continue;
+            }
+
+            $name = trim((string)$row[1]);
+            $username = trim((string)$row[2]);
+            $password = (string)$row[3];
+            $role = strtoupper(trim((string)$row[9]));
+
+            if ($name === '' || $username === '') {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: ชื่อหรือ Username ว่าง";
+                continue;
+            }
+
+            if (mb_strlen($password, 'UTF-8') < 8) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: Password ต้องอย่างน้อย 8 ตัวอักษร";
+                continue;
+            }
+
+            if (!in_array($role, $allowedRoles, true)) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: Role ไม่ถูกต้อง";
+                continue;
+            }
+
+            if ($currentRole !== 'SUPERADMIN' && $role === 'SUPERADMIN') {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: ไม่มีสิทธิ์สร้าง SUPERADMIN";
+                continue;
+            }
+
+            if ($userModel->checkUsernameExists($username)) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: Username ซ้ำ ({$username})";
+                continue;
+            }
+
+            $idCard = trim((string)$row[4]);
+            if ($idCard !== '' && $userModel->checkDuplicateField('id_card', $idCard)) {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: เลขบัตรประชาชนซ้ำ";
+                continue;
+            }
+
+            $hospitalIdRaw = trim((string)$row[0]);
+            $hospitalId = ($hospitalIdRaw === '' || $hospitalIdRaw === '0') ? null : (int)$hospitalIdRaw;
+
+            $data = [
+                'hospital_id' => $hospitalId,
+                'name' => $name,
+                'username' => $username,
+                'password' => $password,
+                'id_card' => $idCard,
+                'employee_type' => trim((string)$row[5]) ?: 'ข้าราชการ/พนักงานท้องถิ่น',
+                'position' => trim((string)$row[6]),
+                'position_number' => trim((string)$row[7]),
+                'phone' => trim((string)$row[8]),
+                'role' => $role,
+                'type' => '',
+                'pay_rate_id' => null,
+                'start_date' => null,
+                'color_theme' => 'primary',
+            ];
+
+            if ($userModel->addUser($data)) {
+                $ok++;
+            } else {
+                $fail++;
+                $failReasons[] = "แถว {$rowNo}: บันทึกไม่สำเร็จ";
+            }
+        }
+
+        fclose($handle);
+
+        $summary = "นำเข้าสำเร็จ {$ok} รายการ, ข้าม/ผิดพลาด {$fail} รายการ";
+        LogsController::addLog(
+            $db,
+            (int)$_SESSION['user']['id'],
+            LogsController::ACTION_IMPORT,
+            $summary
+        );
+
+        if ($fail > 0) {
+            $_SESSION['error_msg'] = $summary . (!empty($failReasons)
+                ? " — " . implode('; ', array_slice($failReasons, 0, 3))
+                : '');
+        } else {
+            $_SESSION['success_msg'] = $summary;
+        }
+
         header("Location: index.php?c=users");
         exit;
     }
