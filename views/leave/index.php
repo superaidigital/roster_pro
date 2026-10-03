@@ -52,7 +52,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     /* ========================================== */
     .card-modern {
         border: none;
-        border-radius: 1.25rem;
+        border-radius: 1rem;
         box-shadow: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.04);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         background: #ffffff;
@@ -79,8 +79,8 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     .card-stat.border-warning { border-left-color: #f59e0b; }
     .card-stat.border-success { border-left-color: #10b981; }
 
-    .icon-box { width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
-    .icon-box-sm { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    .icon-box { width: 2.65rem; height: 2.65rem; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+    .icon-box-sm { width: 2.25rem; height: 2.25rem; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
     .progress-thin { height: 8px; border-radius: 4px; background-color: #f1f5f9; overflow: hidden; }
 
     .input-group-modern { border: 1px solid #e2e8f0; border-radius: 0.75rem; transition: all 0.2s; background-color: #f8fafc; overflow: hidden; }
