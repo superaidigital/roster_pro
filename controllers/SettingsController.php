@@ -891,9 +891,13 @@ class SettingsController {
             $db->exec("SET FOREIGN_KEY_CHECKS=0;");
 
             $tables_to_clear = [
-                'shifts', 'rosters', 'roster_details', 'roster_status', 
-                'leaves', 'leave_requests', 'shift_swaps', 'logs', 
-                'system_logs', 'notifications'
+                'shifts',
+                'roster_status',
+                'leave_requests',
+                'shift_swaps',
+                'logs',
+                'system_logs',
+                'notifications'
             ];
 
             foreach ($tables_to_clear as $table) {
