@@ -8,40 +8,10 @@ class SwapModel {
     public function __construct($db) {
         $this->conn = $db;
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->checkAndCreateTable();
-    }
+}
 
     // 🌟 ระบบสร้างตารางอัตโนมัติ (ปรับปรุง: เพิ่ม Index เพื่อความเร็วในการค้นหา)
-    private function checkAndCreateTable() {
-        $query = "
-            CREATE TABLE IF NOT EXISTS `" . $this->table_name . "` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `hospital_id` INT NOT NULL,
-                `requestor_id` INT NOT NULL,
-                `requestor_date` DATE NOT NULL,
-                `requestor_shift` VARCHAR(50) NOT NULL,
-                `target_user_id` INT NOT NULL,
-                `target_date` DATE NOT NULL,
-                `target_shift` VARCHAR(50) NOT NULL,
-                `reason` TEXT NULL,
-                `status` ENUM('PENDING_TARGET', 'PENDING_DIRECTOR', 'APPROVED', 'REJECTED') DEFAULT 'PENDING_TARGET',
-                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                INDEX (`hospital_id`),
-                INDEX (`requestor_id`),
-                INDEX (`target_user_id`),
-                INDEX (`status`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        ";
-        try {
-            $this->conn->exec($query);
-        } catch (PDOException $e) {
-            error_log("Swap Table Creation Error: " . $e->getMessage());
-        }
-    }
-
-    // 🌟 1. ดึงรายการแลกเวรทั้งหมดใน รพ.สต. (แยกตาม Role)
-    public function getSwaps($hospital_id, $user_id, $role) {
+public function getSwaps($hospital_id, $user_id, $role) {
         $query = "
             SELECT s.*, 
                    u1.name as requestor_name, u1.color_theme as req_color,
@@ -254,4 +224,3 @@ class SwapModel {
         }
     }
 }
-?>
