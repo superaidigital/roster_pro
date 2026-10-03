@@ -1,4 +1,12 @@
 <?php
+$exportParams = array_filter([
+    'status' => $filters['status'] ?? '',
+    'date_from' => $filters['date_from'] ?? '',
+    'date_to' => $filters['date_to'] ?? '',
+    'q' => $filters['q'] ?? '',
+], static fn($value) => $value !== '');
+$exportUrl = 'index.php?c=field&a=export_csv' . ($exportParams ? '&' . http_build_query($exportParams) : '');
+
 $visitTypeLabels = [
     'HOME_VISIT' => 'เยี่ยมบ้านทั่วไป',
     'CHRONIC_FOLLOWUP' => 'ติดตามโรคเรื้อรัง',
@@ -273,7 +281,7 @@ $visitTypeLabels = [
                         <small class="text-muted">ข้อมูลที่คุณมีสิทธิ์เข้าถึงตามบทบาทและหน่วยบริการ</small>
                     </div>
                     <a class="btn btn-outline-success btn-sm"
-                       href="index.php?c=field&a=export_csv<?= !empty($_SERVER['QUERY_STRING']) ? '&' . htmlspecialchars(preg_replace('/(?:^|&)c=[^&]*/', '', $_SERVER['QUERY_STRING']), ENT_QUOTES, 'UTF-8') : '' ?>">
+                       href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>">
                         <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
                     </a>
                 </div>
