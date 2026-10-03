@@ -112,7 +112,7 @@ if (isset($_SESSION['user'])) {
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <!-- 🌟 ดึงชื่อแอปมาแสดงที่ชื่อแท็บเบราว์เซอร์ -->
     <title><?= htmlspecialchars($app_name) ?> - <?= htmlspecialchars($app_subtitle) ?></title>
     
@@ -352,16 +352,18 @@ if (isset($_SESSION['user'])) {
         }
     </style>
 
+    <link rel="stylesheet" href="public/css/style.css?v=20261003-responsive-v1">
+    <script src="public/js/responsive.js?v=20261003-responsive-v1" defer></script>
 </head>
 <body>
 
 <!-- 🌟 1. Top Navbar -->
 <nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4">
     <div class="d-flex align-items-center gap-2 gap-md-3">
-        <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+        <button class="nav-icon-btn rp-mobile-menu-btn" id="mobileSidebarToggleBtn" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูนำทาง">
             <i class="bi bi-list fs-4"></i>
         </button>
-        <button class="nav-icon-btn d-none d-md-flex" id="sidebarToggleBtn" type="button">
+        <button class="nav-icon-btn rp-desktop-menu-btn" id="sidebarToggleBtn" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง">
             <i class="bi bi-list fs-4"></i>
         </button>
         
@@ -606,5 +608,5 @@ if (isset($_SESSION['user'])) {
 </script>
 
 <!-- 🌟 2. Layout Wrapper: ล็อกความสูงเพื่อป้องกันเลย์เอาท์แตก -->
-<div class="d-flex w-100 overflow-hidden" style="height: calc(100vh - 70px);">
+<div class="app-shell">
     <!-- 💡 ไฟล์ sidebar.php จะถูกแทรกต่อจากบรรทัดนี้ -->
