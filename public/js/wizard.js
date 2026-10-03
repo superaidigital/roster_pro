@@ -106,19 +106,27 @@
     return wrapper;
   }
 
-  function validateStep(step) {
+  function firstInvalidControl(step) {
     const controls = Array.from(step.querySelectorAll('input, select, textarea'))
       .filter((control) => !control.disabled && control.type !== 'hidden');
 
-    for (const control of controls) {
-      if (typeof control.checkValidity === 'function' && !control.checkValidity()) {
-        control.reportValidity();
-        control.focus({ preventScroll: true });
-        control.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return false;
-      }
-    }
-    return true;
+    return controls.find((control) =>
+      typeof control.checkValidity === 'function' && !control.checkValidity()
+    ) || null;
+  }
+
+  function reportInvalid(control) {
+    if (!control) return;
+    if (typeof control.reportValidity === 'function') control.reportValidity();
+    control.focus({ preventScroll: true });
+    control.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function validateStep(step) {
+    const invalid = firstInvalidControl(step);
+    if (!invalid) return true;
+    reportInvalid(invalid);
+    return false;
   }
 
   function addNavigation(step, index, total) {
@@ -156,7 +164,10 @@
     form.dataset.rpWizardReady = '1';
     form.classList.add('rp-wizard-ready');
 
+    form.noValidate = true;
+
     const progress = createProgressUI(steps);
+    progress.style.setProperty('--rp-step-count', String(steps.length));
     const firstStep = steps[0];
     form.insertBefore(progress, firstStep);
 
@@ -215,9 +226,11 @@
 
     form.addEventListener('submit', (event) => {
       for (let index = 0; index < steps.length; index += 1) {
-        if (!validateStep(steps[index])) {
+        const invalid = firstInvalidControl(steps[index]);
+        if (invalid) {
           event.preventDefault();
           render(index);
+          window.setTimeout(() => reportInvalid(invalid), 0);
           return;
         }
       }
