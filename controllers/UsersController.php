@@ -196,6 +196,12 @@ class UsersController {
                 'password' => !empty($_POST['password']) ? $_POST['password'] : null
             ];
 
+            if (!empty($data['password']) && mb_strlen((string)$data['password'], 'UTF-8') < 8) {
+                $_SESSION['error_msg'] = "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร";
+                header("Location: index.php?c=users");
+                exit;
+            }
+
             try {
                 // 🌟 แก้ไข: ดึงข้อมูลโดยตรงเพื่อป้องกันปัญหา UserModel ซ่อนบัญชีที่ถูกระงับ
                 $stmtCheck = $db->prepare("SELECT id, role, hospital_id, name FROM users WHERE id = ?");
