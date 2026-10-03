@@ -162,8 +162,7 @@ class ProfileController {
         require_once 'views/profile/schedule.php';
         echo "</main></div></body></html>";
     }
-}
-?>
+
     public function save_profile() {
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -387,4 +386,3 @@ class ProfileController {
         }
     }
 }
-?>
