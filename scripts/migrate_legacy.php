@@ -133,6 +133,69 @@ try {
         addColumnIfMissing($db, 'pay_rates', 'display_order', "INT NOT NULL DEFAULT 0");
     }
 
+    // notification + shift swap compatibility
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS notifications (
+            id INT NOT NULL AUTO_INCREMENT,
+            user_id INT NOT NULL,
+            type VARCHAR(50) DEFAULT 'INFO',
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            link VARCHAR(255) NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_notifications_user (user_id),
+            KEY idx_notifications_read (is_read)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    $db->exec(
+        "CREATE TABLE IF NOT EXISTS shift_swaps (
+            id INT NOT NULL AUTO_INCREMENT,
+            hospital_id INT NOT NULL,
+            requestor_id INT NOT NULL,
+            requestor_date DATE NOT NULL,
+            requestor_shift VARCHAR(50) NOT NULL,
+            target_user_id INT NOT NULL,
+            target_date DATE NOT NULL,
+            target_shift VARCHAR(50) NOT NULL,
+            reason TEXT NULL,
+            status VARCHAR(50) NOT NULL DEFAULT 'PENDING_TARGET',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_swap_hospital (hospital_id),
+            KEY idx_swap_requestor (requestor_id),
+            KEY idx_swap_target (target_user_id),
+            KEY idx_swap_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    echo "ENSURE notifications + shift_swaps tables\n";
+
+    if ($db->query("SHOW TABLES LIKE 'notifications'")->fetchColumn()) {
+        addColumnIfMissing($db, 'notifications', 'type', "VARCHAR(50) DEFAULT 'INFO'");
+        addColumnIfMissing($db, 'notifications', 'title', "VARCHAR(255) NULL");
+        addColumnIfMissing($db, 'notifications', 'message', "TEXT NULL");
+        addColumnIfMissing($db, 'notifications', 'link', "VARCHAR(255) NULL");
+        addColumnIfMissing($db, 'notifications', 'is_read', "TINYINT(1) DEFAULT 0");
+        addColumnIfMissing($db, 'notifications', 'created_at', "TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP");
+    }
+
+    if ($db->query("SHOW TABLES LIKE 'shift_swaps'")->fetchColumn()) {
+        addColumnIfMissing($db, 'shift_swaps', 'hospital_id', "INT NULL");
+        addColumnIfMissing($db, 'shift_swaps', 'requestor_id', "INT NULL");
+        addColumnIfMissing($db, 'shift_swaps', 'requestor_date', "DATE NULL");
+        addColumnIfMissing($db, 'shift_swaps', 'requestor_shift', "VARCHAR(50) NULL");
+        addColumnIfMissing($db, 'shift_swaps', 'target_user_id', "INT NULL");
+        addColumnIfMissing($db, 'shift_swaps', 'target_date', "DATE NULL");
+        addColumnIfMissing($db, 'shift_swaps', 'target_shift', "VARCHAR(50) NULL");
+        addColumnIfMissing($db, 'shift_swaps', 'reason', "TEXT NULL");
+        addColumnIfMissing($db, 'shift_swaps', 'status', "VARCHAR(50) DEFAULT 'PENDING_TARGET'");
+        addColumnIfMissing($db, 'shift_swaps', 'created_at', "TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP");
+        addColumnIfMissing($db, 'shift_swaps', 'updated_at', "TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    }
+
     // field visit / community work
     $db->exec(
         "CREATE TABLE IF NOT EXISTS field_visits (
