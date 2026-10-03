@@ -233,3 +233,15 @@
     min-height: 3.25rem;
   }
 }
+
+
+.rp-field-stat-link {
+  display: block;
+  color: inherit;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.rp-field-stat-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 .5rem 1.25rem rgba(15, 23, 42, .08);
+}
