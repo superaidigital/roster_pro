@@ -2594,3 +2594,92 @@ body {
     border-radius: .85rem !important;
   }
 }
+
+
+/* Modern dashboard workspace */
+.rp-dashboard-page {
+  max-width: 100rem;
+  margin-inline: auto;
+}
+
+.rp-dashboard-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid #d9e5ec;
+  border-radius: 1.05rem;
+  background:
+    radial-gradient(circle at 92% 10%, rgba(45,212,191,.12), transparent 12rem),
+    linear-gradient(135deg, #ffffff 0%, #f4f9fc 100%);
+  box-shadow: 0 .45rem 1.4rem rgba(16,33,46,.05);
+}
+
+.rp-dashboard-hero::after {
+  content: '';
+  position: absolute;
+  width: 11rem;
+  height: 11rem;
+  right: -5rem;
+  bottom: -6.5rem;
+  border: 1px solid rgba(15,108,189,.08);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2rem rgba(15,108,189,.025);
+  pointer-events: none;
+}
+
+.rp-dashboard-hero h3 {
+  color: #10212e !important;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  letter-spacing: -.03em;
+}
+
+.rp-dashboard-hero .rounded-pill {
+  border-radius: .72rem !important;
+}
+
+.rp-dashboard-page .row.g-3 > [class*="col-"] {
+  min-width: 0;
+}
+
+.rp-dashboard-page .dashboard-card .card-body,
+.rp-dashboard-page .staff-card .card-body {
+  min-height: 6rem;
+}
+
+.rp-dashboard-page .dashboard-card h3,
+.rp-dashboard-page .staff-card h3 {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  letter-spacing: -.035em;
+}
+
+.rp-dashboard-page .icon-circle {
+  width: 2.8rem !important;
+  height: 2.8rem !important;
+  border-radius: .8rem !important;
+}
+
+.rp-dashboard-page .quick-action-btn {
+  min-height: 6.1rem;
+  padding: .85rem .7rem !important;
+  gap: .45rem;
+}
+
+.rp-dashboard-page .quick-action-btn i {
+  font-size: 1.45rem !important;
+}
+
+@media (max-width: 639.98px) {
+  .rp-dashboard-hero {
+    padding: .9rem;
+    border-radius: .9rem;
+  }
+
+  .rp-dashboard-page .quick-action-btn {
+    min-height: 5.6rem;
+  }
+
+  .rp-dashboard-page .dashboard-card .card-body,
+  .rp-dashboard-page .staff-card .card-body {
+    min-height: 5.4rem;
+  }
+}
