@@ -153,6 +153,11 @@ class FieldController {
 
     public function index(): void {
         $user = $this->currentUser();
+
+        if (empty($_SESSION['field_draft_key'])) {
+            $_SESSION['field_draft_key'] = base64_encode(random_bytes(32));
+        }
+
         $db = (new Database())->getConnection();
         $model = new FieldVisitModel($db);
 
