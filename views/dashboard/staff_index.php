@@ -26,19 +26,7 @@ if ($roster_status == 'APPROVED') {
 ?>
 
 <style>
-    body { background-color: #f4f6f9; font-family: 'Sarabun', sans-serif; }
-    
-    .staff-card {
-        border: none; border-radius: 1.25rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        transition: transform 0.2s ease, box-shadow 0.2s ease; background: #fff; overflow: hidden;
-    }
-    .staff-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
-    
-    .quick-action-btn { transition: all 0.2s; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 1rem; color: #475569; font-weight: 600; text-align: center; padding: 20px 10px; text-decoration: none; display: block; }
-    .quick-action-btn i { font-size: 32px; display: block; margin-bottom: 10px; }
-    .quick-action-btn:hover { background: #fff; border-color: #3b82f6; color: #3b82f6; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.1); transform: translateY(-2px); }
-
-    .shift-box { border-left: 4px solid #3b82f6; background-color: #f8fafc; border-radius: 0.5rem; transition: background-color 0.2s; }
+.shift-box { border-left: 4px solid #3b82f6; background-color: #f8fafc; border-radius: 0.5rem; transition: background-color 0.2s; }
     .shift-box:hover { background-color: #eff6ff; border-left-color: #2563eb; }
 </style>
 
