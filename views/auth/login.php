@@ -32,11 +32,11 @@
     <!-- นำเข้าฟอนต์ Noto Sans Thai -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         body {
-            font-family: 'Noto Sans Thai', sans-serif;
+            font-family: 'Sarabun', sans-serif;
             background:
                 radial-gradient(circle at 10% 10%, rgba(15,108,189,.12), transparent 28rem),
                 linear-gradient(160deg, #f8fbfd 0%, #edf6f8 100%);
