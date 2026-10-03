@@ -277,7 +277,8 @@ class SettingsController {
             if ($db->inTransaction()) {
                 $db->rollBack();
             }
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+            error_log("Settings update failed: " . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถบันทึกการตั้งค่าได้ กรุณาลองใหม่อีกครั้ง";
         }
 
         header("Location: index.php?c=settings&a=system");
@@ -305,8 +306,8 @@ class SettingsController {
                 "Authorization: Bearer " . $token
             ]);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             $result = curl_exec($ch);
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -861,7 +862,9 @@ class SettingsController {
             }
 
         } catch (Exception $e) {
-            echo "Cron Backup Error: " . $e->getMessage();
+            error_log("Cron backup failed: " . $e->getMessage());
+            http_response_code(500);
+            echo "Cron Backup Error";
         }
         exit;
     }
@@ -915,7 +918,8 @@ class SettingsController {
 
         } catch (Exception $e) {
             $db->exec("SET FOREIGN_KEY_CHECKS=1;"); 
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการล้างข้อมูล: " . $e->getMessage();
+            error_log("Factory reset failed: " . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถล้างข้อมูลระบบได้ กรุณาตรวจสอบ Log และลองใหม่";
         }
 
         header("Location: index.php?c=settings&a=system");
