@@ -27,6 +27,8 @@ $required = [
     'leave_quotas' => ['id','leave_type','max_days','calculation_type'],
     'notifications' => ['id','user_id','type','title','message','link','is_read'],
     'logs' => ['id','user_id','action','details','ip_address','created_at'],
+    'field_visits' => ['id','hospital_id','created_by','visit_date','patient_ref','visit_type','status','latitude','longitude','photo_consent','created_at','updated_at'],
+    'field_visit_photos' => ['id','field_visit_id','stored_path','original_name','mime_type','file_size','created_at'],
 ];
 
 $errors = [];
