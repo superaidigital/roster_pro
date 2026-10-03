@@ -2,6 +2,7 @@
 $exportParams = array_filter([
     'status' => $filters['status'] ?? '',
     'risk_level' => $filters['risk_level'] ?? '',
+    'followup' => $filters['followup'] ?? '',
     'date_from' => $filters['date_from'] ?? '',
     'date_to' => $filters['date_to'] ?? '',
     'q' => $filters['q'] ?? '',
@@ -92,11 +93,12 @@ $visitTypeLabels = [
             </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <div class="rp-field-stat rp-field-stat-warning">
+            <a class="rp-field-stat rp-field-stat-warning rp-field-stat-link text-decoration-none"
+               href="index.php?c=field&followup=due">
                 <span>ติดตามถึงกำหนด</span>
                 <strong><?= number_format($summary['followup_due_count'] ?? 0) ?></strong>
                 <i class="bi bi-calendar2-event-fill"></i>
-            </div>
+            </a>
         </div>
     </div>
 
