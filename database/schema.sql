@@ -500,6 +500,11 @@ CREATE TABLE `field_visits` (
   `symptoms` text DEFAULT NULL,
   `assessment` text DEFAULT NULL,
   `care_plan` text DEFAULT NULL,
+  `risk_level` varchar(20) NOT NULL DEFAULT 'ROUTINE',
+  `follow_up_date` date DEFAULT NULL,
+  `follow_up_status` varchar(20) NOT NULL DEFAULT 'NONE',
+  `referral_required` tinyint(1) NOT NULL DEFAULT 0,
+  `referral_note` varchar(500) DEFAULT NULL,
   `latitude` decimal(10,7) DEFAULT NULL,
   `longitude` decimal(10,7) DEFAULT NULL,
   `accuracy_m` decimal(10,2) DEFAULT NULL,
@@ -671,7 +676,9 @@ ALTER TABLE `field_visits`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_field_hospital_date` (`hospital_id`,`visit_date`),
   ADD KEY `idx_field_creator_date` (`created_by`,`visit_date`),
-  ADD KEY `idx_field_status` (`status`);
+  ADD KEY `idx_field_status` (`status`),
+  ADD KEY `idx_field_risk` (`risk_level`),
+  ADD KEY `idx_field_followup` (`follow_up_status`,`follow_up_date`);
 
 --
 -- Indexes for table `field_visit_photos`
