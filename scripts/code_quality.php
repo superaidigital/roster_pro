@@ -120,6 +120,7 @@ foreach ($scanFiles as $file) {
         '/\broster_details\b/i' => 'legacy roster_details table reference',
         '/\brequest_user_id\b/i' => 'legacy request_user_id column reference',
         '/\?>\s*public\s+function\b/s' => 'PHP class method appears after closing PHP tag',
+        '/\b(?:ALTER|CREATE|DROP)\s+TABLE\b/i' => 'runtime schema DDL found in controller/model; use migrations instead',
     ];
 
     foreach ($forbidden as $pattern => $description) {
