@@ -9,50 +9,7 @@ class UserModel {
         $this->conn = $db;
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 }
-
-    /**
-     * 🌟 ระบบ Auto-Migration (อัปเดตโครงสร้างฐานข้อมูลอัตโนมัติ)
-     */
-    private function checkAndCreateColumns() {
-        try {
-            $stmt = $this->conn->query("SHOW COLUMNS FROM " . $this->table_name);
-            $existing_columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-            $required_columns = [
-                'phone' => 'VARCHAR(20) NULL',
-                'type' => 'VARCHAR(100) NULL', 
-                'position' => 'VARCHAR(255) NULL',
-                'color_theme' => "VARCHAR(20) DEFAULT 'primary'",
-                'employee_type' => "VARCHAR(100) DEFAULT 'ข้าราชการ/พนักงานท้องถิ่น'",
-                'start_date' => 'DATE NULL',
-                'sort_order' => 'INT DEFAULT 0',
-                'id_card' => 'VARCHAR(13) NULL',
-                'position_number' => 'VARCHAR(50) NULL',
-                'pay_rate_id' => 'INT NULL',
-                'is_active' => "TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Active, 0=Suspended'",
-                'display_order' => "INT(11) DEFAULT 0",
-                'deleted_at' => "DATETIME NULL DEFAULT NULL COMMENT 'เวลาที่ถูกลบ (Soft Delete)'",
-                'show_in_roster' => "TINYINT(1) DEFAULT 1 COMMENT '1=Show in roster, 0=Hide'",
-                // 🌟 เพิ่มคอลัมน์ Signature Path สำหรับเก็บลายเซ็นอิเล็กทรอนิกส์ (Base64)
-                'signature_path' => "LONGTEXT NULL COMMENT 'เก็บลายมือชื่ออิเล็กทรอนิกส์ (Base64)'"
-            ];
-
-            $columns_to_add = [];
-            foreach ($required_columns as $column_name => $column_type) {
-                if (!in_array($column_name, $existing_columns)) {
-                    $columns_to_add[] = "ADD COLUMN `$column_name` $column_type";
-                }
-            }
-
-            if (!empty($columns_to_add)) {
-                $alter_query = "ALTER TABLE `" . $this->table_name . "` " . implode(', ', $columns_to_add);
-                $this->conn->exec($alter_query);
-                error_log("Auto-migrated columns in users table: " . implode(', ', array_keys($columns_to_add)));
-            }
-        } catch (PDOException $e) {
-            error_log("User Auto-migration failed: " . $e->getMessage());
-        }
-    }
+    // Database schema changes are handled only by database migrations.
 
     // ====================================================
     // 🌟 1. ระบบเข้าสู่ระบบ (ห้ามคนที่ถูกลบเข้าระบบ)
@@ -293,4 +250,3 @@ class UserModel {
         }
     }
 }
-?>
