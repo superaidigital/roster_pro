@@ -5,15 +5,29 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>เข้าสู่ระบบ | Roster Pro</title>
+    <meta name="theme-color" content="#f8fbfd">
+    <script id="rp-theme-prepaint">
+    (() => {
+      try {
+        const saved = localStorage.getItem('rp-theme');
+        const theme = saved === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      } catch (_) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-bs-theme', 'light');
+      }
+    })();
+    </script>
     
     <!-- นำเข้า Bootstrap และ Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="public/css/style.css?v=20261004-stable-v12">
-    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-stable-v12">
-    <script src="public/js/progress.js?v=20261004-stable-v12" defer></script>
+    <link rel="stylesheet" href="public/css/style.css?v=20261004-ux-v12">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ux-v12">
+    <script src="public/js/progress.js?v=20261004-ux-v12" defer></script>
     
     <!-- นำเข้าฟอนต์ Noto Sans Thai -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -225,8 +239,26 @@
     }
 }
 </style>
+    <link rel="stylesheet" href="public/css/themes.css?v=20261004-theme-v2">
+    <script src="public/js/theme.js?v=20261004-theme-v2" defer></script>
 </head>
 <body>
+<button type="button"
+        class="nav-icon-btn rp-theme-toggle rp-login-theme-toggle"
+        data-rp-theme-toggle
+        aria-pressed="false"
+        aria-label="เปลี่ยนเป็นโหมดมืด"
+        title="โหมดมืด">
+    <i class="bi bi-moon-stars-fill" data-rp-theme-icon></i>
+</button>
+
+<div id="rpGlobalProgress" class="rp-global-progress" role="progressbar" aria-label="สถานะการประมวลผล" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="rp-global-progress-track">
+        <div id="rpGlobalProgressBar" class="rp-global-progress-bar"></div>
+    </div>
+    <div id="rpGlobalProgressLabel" class="rp-global-progress-label" aria-hidden="true"></div>
+</div>
+<div id="rpProgressLive" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
 <div class="login-container">
     <div class="row g-0 w-100">
