@@ -532,7 +532,8 @@ class SettingsController {
             $stmt = $db->query("SELECT * FROM system_menus ORDER BY display_order ASC, id ASC");
             $menus = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "ไม่สามารถดึงข้อมูลเมนูได้: " . $e->getMessage();
+            error_log('SettingsController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
 
         require_once 'views/layouts/header.php';
@@ -584,7 +585,8 @@ class SettingsController {
                 if ($db->inTransaction()) {
                     $db->rollBack();
                 }
-                $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึก: " . $e->getMessage();
+                error_log('SettingsController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
             }
         } else {
             $_SESSION['error_msg'] = "ไม่มีข้อมูลส่งมาบันทึก";
@@ -728,7 +730,8 @@ class SettingsController {
             exit;
 
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการสำรองข้อมูล: " . $e->getMessage();
+            error_log('SettingsController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
             header("Location: index.php?c=settings&a=backup");
             exit;
         }
@@ -765,7 +768,8 @@ class SettingsController {
             }
 
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+            error_log('SettingsController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
 
         header("Location: index.php?c=settings&a=backup");
