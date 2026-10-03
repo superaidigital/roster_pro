@@ -93,6 +93,55 @@
     });
   }
 
+  function enhanceStackedTables() {
+    document.querySelectorAll('table.table').forEach((table) => {
+      if (
+        table.classList.contains('table-roster') ||
+        table.dataset.mobileView === 'scroll' ||
+        table.closest('.calendar-scroll-shell')
+      ) {
+        table.classList.add('rp-scroll-table');
+        return;
+      }
+
+      const headRows = table.querySelectorAll('thead tr');
+      const firstHead = headRows[0];
+      if (!firstHead || headRows.length > 1) {
+        table.classList.add('rp-scroll-table');
+        return;
+      }
+
+      const headers = Array.from(firstHead.querySelectorAll('th')).map((th) =>
+        th.textContent.replace(/\s+/g, ' ').trim()
+      );
+
+      if (!headers.length || headers.length > 9) {
+        table.classList.add('rp-scroll-table');
+        return;
+      }
+
+      table.classList.add('rp-stack-table');
+
+      table.querySelectorAll('tbody tr').forEach((row) => {
+        const cells = Array.from(row.children).filter((cell) => cell.tagName === 'TD');
+        if (!cells.length) return;
+
+        const isEmptyState = cells.length === 1 && Number(cells[0].getAttribute('colspan') || 1) > 1;
+        if (isEmptyState) {
+          row.classList.add('rp-empty-row');
+          return;
+        }
+
+        cells.forEach((cell, index) => {
+          if (!cell.dataset.label) {
+            const label = headers[index] || 'ข้อมูล';
+            cell.dataset.label = label;
+          }
+        });
+      });
+    });
+  }
+
   function enhanceMedia() {
     document.querySelectorAll('img').forEach((img) => {
       if (!img.hasAttribute('decoding')) img.decoding = 'async';
@@ -110,6 +159,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     enhanceMobileNavigation();
     enhanceTables();
+    enhanceStackedTables();
     enhanceMedia();
     markActionGroups();
   });
