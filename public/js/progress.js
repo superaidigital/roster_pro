@@ -111,7 +111,7 @@
           start('กำลังเปิดหน้า...');
         }
       } catch (_) {}
-    }, true);
+    });
 
     window.addEventListener('pageshow', () => {
       activeRequests = 1;
@@ -134,7 +134,7 @@
       form.classList.add('rp-form-submitting');
       form.setAttribute('aria-busy', 'true');
       start(form.dataset.progressLabel || 'กำลังบันทึกข้อมูล...');
-    }, true);
+    });
   }
 
   function enhanceFetch() {
