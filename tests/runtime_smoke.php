@@ -115,7 +115,7 @@ ok($notificationModel->markAsRead((int)$notif[0]['id'], $uid1), 'notification ma
 ok((int)$notificationModel->getUnreadCount($uid1) === 0, 'notification unread count cleared');
 
 $fieldModel = new FieldVisitModel($db);
-$fieldVisitId = $fieldModel->createVisit([
+$fieldData = [
     'hospital_id' => $hospitalId,
     'created_by' => $uid1,
     'visit_date' => '2026-10-20',
@@ -134,23 +134,44 @@ $fieldVisitId = $fieldModel->createVisit([
     'symptoms' => 'Smoke test only',
     'assessment' => 'Synthetic assessment',
     'care_plan' => 'Synthetic plan',
+    'risk_level' => 'HIGH',
+    'follow_up_date' => date('Y-m-d'),
+    'follow_up_status' => 'PENDING',
+    'referral_required' => 1,
+    'referral_note' => 'Synthetic referral note',
     'latitude' => 15.0,
     'longitude' => 104.0,
     'accuracy_m' => 8.0,
     'address_note' => 'Synthetic location',
     'photo_consent' => 0,
-    'status' => 'COMPLETED',
-]);
-ok($fieldVisitId > 0, 'field visit created');
+    'status' => 'DRAFT',
+];
+
+$fieldVisitId = $fieldModel->createVisit($fieldData);
+ok($fieldVisitId > 0, 'field visit draft created');
+
+$fieldDraft = $fieldModel->getVisibleVisitById($fieldVisitId, $user1);
+ok(is_array($fieldDraft) && $fieldDraft['status'] === 'DRAFT', 'field draft visible to creator');
+
+$fieldData['assessment'] = 'Updated synthetic assessment';
+$fieldData['status'] = 'COMPLETED';
+ok($fieldModel->updateDraft($fieldVisitId, $fieldData, $user1), 'field draft updated and completed');
 
 $fieldSummary = $fieldModel->getSummary($user1);
 ok($fieldSummary['completed_count'] === 1, 'field visit summary scoped to staff user');
+ok($fieldSummary['high_risk_count'] === 1, 'high-risk field visit counted');
+ok($fieldSummary['followup_due_count'] === 1, 'due follow-up field visit counted');
 
-$fieldRows = $fieldModel->getVisibleVisits($user1, [], 10);
-ok(count($fieldRows) === 1 && (int)$fieldRows[0]['id'] === $fieldVisitId, 'staff can read own field visit');
+$fieldRows = $fieldModel->getVisibleVisits($user1, ['risk_level' => 'HIGH'], 10);
+ok(count($fieldRows) === 1 && (int)$fieldRows[0]['id'] === $fieldVisitId, 'staff can filter own high-risk field visit');
+ok((int)$fieldRows[0]['referral_required'] === 1, 'referral flag preserved');
 
 $fieldRowsOtherUser = $fieldModel->getVisibleVisits($user2, [], 10);
 ok(count($fieldRowsOtherUser) === 0, 'staff field visit scope prevents cross-user read');
+
+ok($fieldModel->markFollowUpDone($fieldVisitId, $user1), 'field follow-up marked done by owner');
+$fieldAfterFollowUp = $fieldModel->getVisibleVisitById($fieldVisitId, $user1);
+ok($fieldAfterFollowUp['follow_up_status'] === 'DONE', 'field follow-up completion persisted');
 
 $rosterModel = new RosterModel($db);
 ok($rosterModel->publishRoster($hospitalId, 2026, 10), 'RosterModel publishes via roster_status');
