@@ -22,6 +22,11 @@ jobs:
           php-version: '8.2'
           coverage: none
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Schema contract
         run: php scripts/schema_contract.php
 
@@ -41,6 +46,24 @@ jobs:
           for file in "${files[@]}"; do
             echo "Linting $file"
             if ! php -l "$file"; then
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      - name: Lint JavaScript files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find public/js -type f -name '*.js' -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No JavaScript files found."
+            exit 0
+          fi
+          failed=0
+          for file in "${files[@]}"; do
+            echo "Checking $file"
+            if ! node --check "$file"; then
               failed=1
             fi
           done
