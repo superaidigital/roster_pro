@@ -4,9 +4,9 @@
    ========================================================================== */
 
 :root {
-  --rp-header-h: 4.5rem;
-  --rp-sidebar-w: 15.75rem;
-  --rp-sidebar-collapsed-w: 4.75rem;
+  --rp-header-h: 4rem;
+  --rp-sidebar-w: 14.75rem;
+  --rp-sidebar-collapsed-w: 4.5rem;
   --rp-content-max: 96rem;
 
   --rp-control-h: 2.75rem;
@@ -36,37 +36,72 @@ body {
 }
 
 .top-navbar {
+  position: fixed !important;
+  top: 0;
+  right: 0;
+  left: var(--rp-sidebar-w);
+  z-index: 1050;
+  width: auto !important;
+  min-width: 0 !important;
   min-height: var(--rp-header-h) !important;
   height: var(--rp-header-h) !important;
-  padding: .55rem 1rem !important;
+  padding: .45rem .85rem !important;
+}
+
+.rp-topbar-left {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  overflow: hidden;
+}
+
+.rp-topbar-actions {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 45%;
 }
 
 .app-shell {
-  width: 100% !important;
+  display: block !important;
+  width: calc(100% - var(--rp-sidebar-w)) !important;
   min-width: 0 !important;
   height: calc(100dvh - var(--rp-header-h)) !important;
+  margin-left: var(--rp-sidebar-w) !important;
+  padding-top: var(--rp-header-h);
 }
 
 .rp-desktop-sidebar,
 #desktopSidebar {
-  flex: 0 0 var(--rp-sidebar-w) !important;
+  position: fixed !important;
+  inset: 0 auto 0 0;
+  z-index: 1060;
+  display: flex !important;
+  flex-direction: column !important;
   width: var(--rp-sidebar-w) !important;
   min-width: var(--rp-sidebar-w) !important;
   max-width: var(--rp-sidebar-w) !important;
+  height: 100dvh !important;
 }
 
 .rp-desktop-sidebar.collapsed,
 #desktopSidebar.collapsed {
-  flex-basis: var(--rp-sidebar-collapsed-w) !important;
   width: var(--rp-sidebar-collapsed-w) !important;
   min-width: var(--rp-sidebar-collapsed-w) !important;
   max-width: var(--rp-sidebar-collapsed-w) !important;
 }
 
+body.rp-sidebar-collapsed .top-navbar {
+  left: var(--rp-sidebar-collapsed-w) !important;
+}
+
+body.rp-sidebar-collapsed .app-shell {
+  width: calc(100% - var(--rp-sidebar-collapsed-w)) !important;
+  margin-left: var(--rp-sidebar-collapsed-w) !important;
+}
+
 .app-main {
   min-width: 0 !important;
   width: 100% !important;
-  height: 100% !important;
+  height: calc(100dvh - var(--rp-header-h)) !important;
   padding: var(--rp-space-page) !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
@@ -82,17 +117,17 @@ body {
 
 /* Header proportions */
 .nav-icon-btn {
-  width: 2.5rem !important;
-  height: 2.5rem !important;
-  min-height: 2.5rem !important;
+  width: 2.35rem !important;
+  height: 2.35rem !important;
+  min-height: 2.35rem !important;
   padding: 0 !important;
   border-radius: .72rem !important;
 }
 
 .user-avatar {
-  width: 2.3rem !important;
-  height: 2.3rem !important;
-  flex: 0 0 2.3rem !important;
+  width: 2.2rem !important;
+  height: 2.2rem !important;
+  flex: 0 0 2.2rem !important;
   font-size: .95rem !important;
 }
 
@@ -102,9 +137,9 @@ body {
 }
 
 .rp-page-icon {
-  width: 2.5rem !important;
-  height: 2.5rem !important;
-  flex-basis: 2.5rem !important;
+  width: 2.35rem !important;
+  height: 2.35rem !important;
+  flex-basis: 2.35rem !important;
   border-radius: .75rem !important;
 }
 
@@ -431,9 +466,18 @@ textarea.form-control {
     --rp-space-page: 1rem;
   }
 
-  .app-shell {
+  .top-navbar {
+    left: 0 !important;
+    width: 100% !important;
+  }
+
+  .app-shell,
+  body.rp-sidebar-collapsed .app-shell {
+    width: 100% !important;
     height: auto !important;
     min-height: calc(100dvh - var(--rp-header-h)) !important;
+    margin-left: 0 !important;
+    padding-top: var(--rp-header-h);
   }
 
   .app-main {
@@ -552,5 +596,46 @@ textarea.form-control {
 
   .app-main {
     padding: 1.5rem 1.75rem !important;
+  }
+}
+
+
+/* Desktop compact header for 1024-1439px */
+@media (min-width: 1024px) and (max-width: 1439.98px) {
+  .rp-page-kicker {
+    display: none !important;
+  }
+
+  .rp-page-subtitle {
+    max-width: 28rem;
+    font-size: .72rem !important;
+  }
+
+  .rp-profile-meta,
+  .rp-profile-chevron,
+  .rp-system-online,
+  .top-navbar .vr {
+    display: none !important;
+  }
+
+  .profile-pill {
+    padding: .2rem !important;
+    min-height: 2.35rem !important;
+  }
+
+  .rp-topbar-actions {
+    max-width: 10rem;
+  }
+}
+
+/* Wide desktop can show full profile metadata */
+@media (min-width: 1440px) {
+  .rp-profile-meta,
+  .rp-profile-chevron {
+    display: block !important;
+  }
+
+  .rp-system-online {
+    display: inline-flex !important;
   }
 }
