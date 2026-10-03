@@ -25,6 +25,9 @@ jobs:
       - name: Schema contract
         run: php scripts/schema_contract.php
 
+      - name: Code quality audit
+        run: php scripts/code_quality.php
+
       - name: Lint PHP files
         shell: bash
         run: |
