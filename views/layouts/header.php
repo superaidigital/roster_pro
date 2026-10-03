@@ -352,9 +352,9 @@ if (isset($_SESSION['user'])) {
         }
     </style>
 
-    <link rel="stylesheet" href="public/css/style.css?v=20261003-ui-v8">
-    <script src="public/js/responsive.js?v=20261003-ui-v8" defer></script>
-    <script src="public/js/progress.js?v=20261003-ui-v8" defer></script>
+    <link rel="stylesheet" href="public/css/style.css?v=20261003-ui-v9">
+    <script src="public/js/responsive.js?v=20261003-ui-v9" defer></script>
+    <script src="public/js/progress.js?v=20261003-ui-v9" defer></script>
 </head>
 <body>
 <div id="rpGlobalProgress" class="rp-global-progress" role="progressbar" aria-label="สถานะการประมวลผล" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
