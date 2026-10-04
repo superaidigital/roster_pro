@@ -36,6 +36,46 @@ class StaffController {
         }
     }
 
+    private function canManageTargetUser(array $target): bool {
+        $currentRole = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        $currentHospitalId = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $targetRole = strtoupper((string)($target['role'] ?? 'STAFF'));
+        $targetHospitalId = (int)($target['hospital_id'] ?? 0);
+
+        if (in_array($currentRole, ['SUPERADMIN', 'ADMIN', 'HR'], true)) {
+            return $targetRole !== 'SUPERADMIN' || $currentRole === 'SUPERADMIN';
+        }
+
+        if (!in_array($currentRole, ['SCHEDULER', 'DIRECTOR'], true)
+            || $currentHospitalId <= 0
+            || $targetHospitalId !== $currentHospitalId) {
+            return false;
+        }
+
+        if ($currentRole === 'SCHEDULER') {
+            return !in_array($targetRole, ['SUPERADMIN', 'ADMIN', 'HR', 'DIRECTOR'], true);
+        }
+
+        return !in_array($targetRole, ['SUPERADMIN', 'ADMIN', 'HR'], true);
+    }
+
+    private function rejectUnauthorizedTarget(bool $json = false): void {
+        http_response_code(403);
+        if ($json) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'คุณไม่มีสิทธิ์จัดการบุคลากรรายนี้'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $_SESSION['error_msg'] = "ปฏิเสธ: คุณไม่มีสิทธิ์จัดการบุคลากรรายนี้";
+        header("Location: index.php?c=staff");
+        exit;
+    }
+
+
     // หน้าหลัก
     public function index() {
         $this->checkAuth();
@@ -207,6 +247,19 @@ class StaffController {
                     exit;
                 }
 
+                
+                if (!$this->canManageTargetUser($existing_user)) {
+                    $this->rejectUnauthorizedTarget();
+                }
+
+                $allowedRoles = ['SUPERADMIN', 'ADMIN', 'HR', 'DIRECTOR', 'SCHEDULER', 'STAFF'];
+                if (!in_array($data['role'], $allowedRoles, true)) {
+                    $data['role'] = $existing_user['role'];
+                }
+                if ($current_role !== 'SUPERADMIN' && $data['role'] === 'SUPERADMIN') {
+                    $data['role'] = $existing_user['role'];
+                }
+
                 $can_edit = true;
                 
                 // ตรวจสอบสิทธิ์เฉพาะผู้ที่ไม่ใช่แอดมินส่วนกลาง
@@ -264,6 +317,11 @@ class StaffController {
                     exit;
                 }
 
+                
+                if (!$this->canManageTargetUser($target)) {
+                    $this->rejectUnauthorizedTarget();
+                }
+
                 $can_delete = true;
                 if (!$is_global_admin) {
                     if ($current_role === 'SCHEDULER' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) $can_delete = false;
@@ -308,9 +366,8 @@ class StaffController {
                         $target = $userModel->getUserById($id);
                         $can_delete = true;
                         
-                        if (!$is_global_admin && $target) {
-                            if ($current_role === 'SCHEDULER' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) $can_delete = false;
-                            if ($current_role === 'DIRECTOR' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) $can_delete = false;
+                        if (!$target || !$this->canManageTargetUser($target)) {
+                            $can_delete = false;
                         }
 
                         if ($can_delete && $userModel->deleteUser($id)) {
@@ -346,6 +403,10 @@ class StaffController {
 
             if ($id != $_SESSION['user']['id']) {
                 $target = $userModel->getUserById($id);
+                if (!$target || !$this->canManageTargetUser($target)) {
+                    $this->rejectUnauthorizedTarget();
+                }
+
                 $can_toggle = true;
                 
                 if (!$is_global_admin && $target) {
@@ -379,8 +440,14 @@ class StaffController {
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
-            $id = $_POST['id'] ?? 0;
+            $id = (int)($_POST['id'] ?? 0);
             $status = (int)($_POST['status'] ?? 1);
+            $userModel = new UserModel($db);
+            $target = $userModel->getUserById($id);
+
+            if (!$target || !$this->canManageTargetUser($target)) {
+                $this->rejectUnauthorizedTarget(true);
+            }
 
             try {
                 // บันทึกลงฐานข้อมูล (คอลัมน์ show_in_roster)
@@ -420,11 +487,17 @@ class StaffController {
 
         if (isset($data['order']) && is_array($data['order'])) {
             $db = (new Database())->getConnection();
+            $userModel = new UserModel($db);
             try {
                 $db->beginTransaction();
                 $stmt = $db->prepare("UPDATE users SET display_order = ? WHERE id = ?");
                 foreach ($data['order'] as $item) {
-                    $stmt->execute([$item['order'], $item['id']]);
+                    $targetId = (int)($item['id'] ?? 0);
+                    $target = $userModel->getUserById($targetId);
+                    if (!$target || !$this->canManageTargetUser($target)) {
+                        throw new RuntimeException('Unauthorized staff ordering target');
+                    }
+                    $stmt->execute([(int)($item['order'] ?? 0), $targetId]);
                 }
                 
                 // 🌟 บันทึก Log
@@ -637,11 +710,30 @@ class StaffController {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
             
-            $user_id = $_POST['user_id'] ?? 0;
-            $signature_base64 = $_POST['signature_base64'] ?? '';
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $signature_base64 = (string)($_POST['signature_base64'] ?? '');
+            $target = $userModel->getUserById($user_id);
 
-            if(empty($user_id) || empty($signature_base64)) {
-                echo json_encode(['success' => false, 'message' => 'ข้อมูลไม่ครบถ้วน']);
+            if (!$target || !$this->canManageTargetUser($target)) {
+                $this->rejectUnauthorizedTarget(true);
+            }
+
+            if ($signature_base64 === '' || strlen($signature_base64) > 750000) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => 'ข้อมูลลายเซ็นไม่ถูกต้องหรือมีขนาดใหญ่เกินไป'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            if (!preg_match('#^data:image/png;base64,([A-Za-z0-9+/=\\r\\n]+)$#', $signature_base64, $matches)) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => 'รองรับเฉพาะลายเซ็นรูปแบบ PNG จากระบบ'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            $decodedSignature = base64_decode(preg_replace('/\\s+/', '', $matches[1]), true);
+            if ($decodedSignature === false || strlen($decodedSignature) > 512000) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'message' => 'ไฟล์ลายเซ็นไม่ถูกต้องหรือมีขนาดใหญ่เกินไป'], JSON_UNESCAPED_UNICODE);
                 exit;
             }
 
