@@ -7,11 +7,7 @@ class HospitalModel {
 
     public function __construct($db) {
         $this->conn = $db;
-        $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        
-        // 🌟 เรียกใช้ฟังก์ชันตรวจสอบและเพิ่มคอลัมน์
-        $this->checkAndCreateColumns();
-    }
+        $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);}
 
     public function getHospitalLogo($hospitalData) {
         if (!empty($hospitalData['logo']) && file_exists($hospitalData['logo'])) {
