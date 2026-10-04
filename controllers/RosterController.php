@@ -51,7 +51,11 @@ class RosterController {
             $hospital_id = $_GET['hospital_id'];
         }
         
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+        $selected_month = trim((string)($_GET['month'] ?? date('Y-m')));
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $selected_month)) {
+            $selected_month = date('Y-m');
+            $_SESSION['error_msg'] = 'รูปแบบเดือนไม่ถูกต้อง ระบบจึงแสดงเดือนปัจจุบันแทน';
+        }
 
         // 🏥 1. ดึงรายชื่อหน่วยบริการทั้งหมด
         $stmt_hosp = $db->query("SELECT id, name FROM hospitals WHERE is_active = 1 AND name NOT LIKE '%ส่วนกลาง%' ORDER BY id ASC");
@@ -139,7 +143,10 @@ class RosterController {
         if (in_array($_SESSION['user']['role'], ['ADMIN', 'SUPERADMIN']) && isset($_GET['hospital_id'])) {
             $hospital_id = $_GET['hospital_id'];
         }
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+        $selected_month = trim((string)($_GET['month'] ?? date('Y-m')));
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $selected_month)) {
+            $selected_month = date('Y-m');
+        }
         
         // ดึงข้อมูลวันที่ไทยและจำนวนวันในเดือน
         $exp = explode('-', $selected_month);
