@@ -8,6 +8,7 @@ require_once 'models/NotificationModel.php';
 require_once 'models/UserModel.php';
 require_once 'models/LeaveModel.php';
 require_once 'models/RosterSnapshotModel.php';
+require_once 'models/RosterAuditModel.php';
 require_once 'controllers/LogsController.php'; // 🌟 นำเข้า Logs Controller
 
 class AjaxController {
@@ -270,6 +271,16 @@ class AjaxController {
         try {
             $db->beginTransaction();
 
+            $stmtBefore = $db->prepare(
+                "SELECT shift_type FROM shifts WHERE user_id = ? AND shift_date = ? AND hospital_id = ? ORDER BY id ASC"
+            );
+            $stmtBefore->execute([$user_id, $date, $hospital_id]);
+            $beforeTypes = array_values(array_filter(
+                array_map('strval', $stmtBefore->fetchAll(PDO::FETCH_COLUMN)),
+                static fn(string $value): bool => $value !== ''
+            ));
+            $beforeShift = $beforeTypes ? implode('/', $beforeTypes) : null;
+
             $stmt = $db->prepare("DELETE FROM shifts WHERE user_id = ? AND shift_date = ? AND hospital_id = ?");
             $stmt->execute([$user_id, $date, $hospital_id]);
 
@@ -282,10 +293,40 @@ class AjaxController {
                 }
 
                 LogsController::addLog($db, $_SESSION['user']['id'], 'UPDATE', "จัดเวร '{$canonical_shift}' ให้ผู้ใช้ ID:{$user_id} วันที่ {$date}");
+
+                $auditModel = new RosterAuditModel($db);
+                $auditModel->record(
+                    $hospital_id,
+                    $month_year,
+                    (int)$_SESSION['user']['id'],
+                    'SHIFT_SET',
+                    ['shift_type' => $beforeShift],
+                    ['shift_type' => $canonical_shift],
+                    ['source' => 'ROSTER_BOARD'],
+                    $user_id,
+                    $date,
+                    'SHIFT'
+                );
+
                 $db->commit();
                 echo json_encode(['status' => 'success', 'shift_id' => $last_id, 'shift_type' => $canonical_shift], JSON_UNESCAPED_UNICODE);
             } else {
                 LogsController::addLog($db, $_SESSION['user']['id'], 'DELETE', "ลบเวรของผู้ใช้ ID:{$user_id} ในวันที่ {$date}");
+
+                $auditModel = new RosterAuditModel($db);
+                $auditModel->record(
+                    $hospital_id,
+                    $month_year,
+                    (int)$_SESSION['user']['id'],
+                    'SHIFT_DELETE',
+                    ['shift_type' => $beforeShift],
+                    ['shift_type' => null],
+                    ['source' => 'ROSTER_BOARD'],
+                    $user_id,
+                    $date,
+                    'SHIFT'
+                );
+
                 $db->commit();
                 echo json_encode(['status' => 'success', 'message' => 'Deleted'], JSON_UNESCAPED_UNICODE);
             }
