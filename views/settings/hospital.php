@@ -83,6 +83,7 @@ list($n_start, $n_end) = getShiftTimes($hospital['night_shift'] ?? '', '00:00', 
     <?php endif; ?>
 
     <form action="index.php?c=settings&a=save_hospital" method="POST" enctype="multipart/form-data" id="hospitalSettingsForm">
+                            <?= security_csrf_input() ?>
         <!-- Hidden Inputs -->
         <input type="hidden" name="id" value="<?= htmlspecialchars($hospital['id'] ?? '') ?>">
         <?php if(isset($_GET['id'])): ?>
