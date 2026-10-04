@@ -299,59 +299,78 @@ class AjaxController {
         $this->requireAjaxMutation();
         error_reporting(0);
         header('Content-Type: application/json');
-        if (!isset($_SESSION['user'])) { echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit; }
 
         $data = json_decode(file_get_contents("php://input"));
-        $target_month = $data->target_month ?? '';
-        
-        // 🌟 รองรับ Admin ส่วนกลางระบุ Hospital ID
-        $hospital_id = $_SESSION['user']['hospital_id'];
-        if (isset($data->hosp_id) && $data->hosp_id !== '' && in_array(strtoupper($_SESSION['user']['role']), ['ADMIN', 'SUPERADMIN'])) {
-            $hospital_id = $data->hosp_id;
+        $target_month = trim((string)($data->target_month ?? ''));
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+
+        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        if (isset($data->hosp_id) && $data->hosp_id !== '' && in_array($role, ['ADMIN', 'SUPERADMIN'], true)) {
+            $hospital_id = (int)$data->hosp_id;
         }
 
-        if(empty($target_month)) { echo json_encode(['status' => 'error', 'message' => 'ไม่มีข้อมูลเดือน']); exit; }
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $target_month) || $hospital_id <= 0) {
+            echo json_encode(['status' => 'error', 'message' => 'ข้อมูลเดือนหรือหน่วยบริการไม่ถูกต้อง']);
+            exit;
+        }
+
         if (!$this->canEditRoster($hospital_id, $target_month)) {
-            echo json_encode(['status' => 'error', 'message' => '⛔ คุณไม่มีสิทธิ์จัดการ หรือตารางเดือนนี้ถูกล็อคแล้ว']); exit;
+            echo json_encode(['status' => 'error', 'message' => '⛔ คุณไม่มีสิทธิ์จัดการ หรือตารางเดือนนี้ถูกล็อคแล้ว']);
+            exit;
         }
 
         $db = (new Database())->getConnection();
-        
         $prev_month = date('Y-m', strtotime($target_month . '-01 -1 month'));
-        
-        try {
-            $start_curr = $target_month . '-01';
-            $end_curr = date('Y-m-t', strtotime($start_curr));
-            $stmt_del = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
-            $stmt_del->execute([$hospital_id, $start_curr, $end_curr]);
 
+        try {
             $start_prev = $prev_month . '-01';
             $end_prev = date('Y-m-t', strtotime($start_prev));
             $stmt_get = $db->prepare("SELECT user_id, shift_date, shift_type FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
             $stmt_get->execute([$hospital_id, $start_prev, $end_prev]);
             $prev_shifts = $stmt_get->fetchAll(PDO::FETCH_ASSOC);
 
-            if(empty($prev_shifts)) {
-                echo json_encode(['status' => 'error', 'message' => 'ไม่มีข้อมูลตารางเวรในเดือนก่อนหน้า']); exit;
+            // Important: never delete the current month until source data is confirmed.
+            if (empty($prev_shifts)) {
+                echo json_encode(['status' => 'error', 'message' => 'ไม่มีข้อมูลตารางเวรในเดือนก่อนหน้า จึงไม่ได้เปลี่ยนแปลงตารางเดือนปัจจุบัน']);
+                exit;
             }
+
+            $db->beginTransaction();
+
+            $start_curr = $target_month . '-01';
+            $end_curr = date('Y-m-t', strtotime($start_curr));
+            $stmt_del = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
+            $stmt_del->execute([$hospital_id, $start_curr, $end_curr]);
 
             $stmt_in = $db->prepare("INSERT INTO shifts (user_id, hospital_id, shift_date, shift_type) VALUES (?, ?, ?, ?)");
             $days_in_curr = (int)date('t', strtotime($start_curr));
+            $copied = 0;
 
             foreach ($prev_shifts as $ps) {
                 $day_num = (int)date('d', strtotime($ps['shift_date']));
                 if ($day_num <= $days_in_curr) {
-                    $new_date = $target_month . '-' . str_pad($day_num, 2, '0', STR_PAD_LEFT);
-                    $stmt_in->execute([$ps['user_id'], $hospital_id, $new_date, $ps['shift_type']]);
+                    $new_date = $target_month . '-' . str_pad((string)$day_num, 2, '0', STR_PAD_LEFT);
+                    $stmt_in->execute([(int)$ps['user_id'], $hospital_id, $new_date, $ps['shift_type']]);
+                    $copied++;
                 }
             }
 
-            LogsController::addLog($db, $_SESSION['user']['id'], 'CREATE', "คัดลอกเวรจากเดือน {$prev_month} ไปยังเดือน {$target_month}");
-            echo json_encode(['status' => 'success']);
+            LogsController::addLog(
+                $db,
+                $_SESSION['user']['id'],
+                'CREATE',
+                "คัดลอกเวรจากเดือน {$prev_month} ไปยังเดือน {$target_month} จำนวน {$copied} รายการ"
+            );
+
+            $db->commit();
+            echo json_encode(['status' => 'success', 'copied' => $copied]);
         } catch (Exception $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             error_log('Ajax operation failed: ' . $e->getMessage());
             http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถคัดลอกตารางได้ กรุณาลองใหม่']);
         }
         exit;
     }
@@ -623,7 +642,10 @@ class AjaxController {
                 $this->sendLineNotify($db, "\n🔓 มีคำขอปลดล็อคตารางเวร\nหน่วยบริการ: {$hospital_name}\nเดือน: {$month_text}\nโปรดเข้าสู่ระบบเพื่อพิจารณาอนุมัติครับ");
             }
 
-        } catch (Exception $e) {}
+        } catch (Exception $e) {
+            error_log('AjaxController request_edit error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = 'ไม่สามารถส่งคำขอแก้ไขตารางเวรได้ กรุณาลองใหม่';
+        }
 
         header("Location: index.php?c=roster&month=" . urlencode($month_year));
         exit;
@@ -692,7 +714,13 @@ class AjaxController {
         if (!isset($_SESSION['user'])) { echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit; }
 
         $db = (new Database())->getConnection();
-        $month_year = $_GET['month'] ?? date('Y-m');
+        $month_year = trim((string)($_GET['month'] ?? date('Y-m')));
+
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month_year)) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'รูปแบบเดือนไม่ถูกต้อง']);
+            exit;
+        }
         
         $hospital_id = $_SESSION['user']['hospital_id'];
         if (isset($_GET['hosp_id']) && $_GET['hosp_id'] !== '' && in_array(strtoupper($_SESSION['user']['role']), ['ADMIN', 'SUPERADMIN'])) {
@@ -857,7 +885,10 @@ class AjaxController {
             $hospital_id = $data->hosp_id;
         }
 
-        if (empty($month_year)) { echo json_encode(['status' => 'error', 'message' => 'ไม่ระบุเดือน']); exit; }
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', (string)$month_year)) {
+            echo json_encode(['status' => 'error', 'message' => 'รูปแบบเดือนไม่ถูกต้อง']);
+            exit;
+        }
         if (!$this->canEditRoster($hospital_id, $month_year)) {
             echo json_encode(['status' => 'error', 'message' => 'ตารางเดือนนี้ถูกล็อคแล้ว ไม่สามารถจัดเวรอัตโนมัติได้']); exit;
         }
@@ -870,7 +901,16 @@ class AjaxController {
             $start_date = $month_year . '-01';
             $max_days = (int)date('t', strtotime($start_date));
 
-            $stmt_users = $db->prepare("SELECT id, type, employee_type FROM users WHERE hospital_id = ?");
+            $stmt_users = $db->prepare("
+                SELECT id, type, employee_type
+                FROM users
+                WHERE hospital_id = ?
+                  AND role NOT IN ('SUPERADMIN', 'ADMIN')
+                  AND is_deleted = 0
+                  AND is_active = 1
+                  AND (show_in_roster = 1 OR show_in_roster IS NULL)
+                ORDER BY display_order ASC, name ASC
+            ");
             $stmt_users->execute([$hospital_id]);
             $users = $stmt_users->fetchAll(PDO::FETCH_ASSOC);
 
@@ -962,7 +1002,9 @@ class AjaxController {
             echo json_encode(['status' => 'success', 'message' => "ดำเนินการจัดเวรตามกฎสำเร็จ (เพิ่ม $added_count กะ)", 'added' => $added_count]);
 
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             error_log('Ajax operation failed: ' . $e->getMessage());
             http_response_code(500);
             echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
