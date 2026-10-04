@@ -450,17 +450,20 @@ class AjaxController {
 
             $db->beginTransaction();
 
+            $start_curr = $target_month . '-01';
+            $end_curr = date('Y-m-t', strtotime($start_curr));
+            $beforeCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
+            $beforeCountStmt->execute([$hospital_id, $start_curr, $end_curr]);
+            $beforeCopyCount = (int)$beforeCountStmt->fetchColumn();
+
             $snapshotModel = new RosterSnapshotModel($db);
-            $snapshotModel->createSnapshot(
+            $snapshotId = $snapshotModel->createSnapshot(
                 $hospital_id,
                 $target_month,
                 (int)$_SESSION['user']['id'],
                 'BEFORE_COPY',
                 "สำรองก่อนคัดลอกจากเดือน {$prev_month}"
             );
-
-            $start_curr = $target_month . '-01';
-            $end_curr = date('Y-m-t', strtotime($start_curr));
             $stmt_del = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
             $stmt_del->execute([$hospital_id, $start_curr, $end_curr]);
 
@@ -482,6 +485,20 @@ class AjaxController {
                 $_SESSION['user']['id'],
                 'CREATE',
                 "คัดลอกเวรจากเดือน {$prev_month} ไปยังเดือน {$target_month} จำนวน {$copied} รายการ"
+            );
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospital_id,
+                $target_month,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_COPY_PREVIOUS',
+                ['shift_count' => $beforeCopyCount],
+                ['shift_count' => $copied],
+                ['source_month' => $prev_month, 'snapshot_id' => $snapshotId],
+                null,
+                null,
+                'ROSTER'
             );
 
             $db->commit();
