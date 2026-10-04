@@ -20,6 +20,68 @@ class ProfileController {
         }
     }
 
+
+    private function canManageProfile(int $targetUserId): bool {
+        security_start_session();
+
+        if (!isset($_SESSION['user']) || $targetUserId <= 0) {
+            return false;
+        }
+
+        $currentUserId = (int)($_SESSION['user']['id'] ?? 0);
+        $currentRole = strtoupper((string)($_SESSION['user']['role'] ?? 'STAFF'));
+
+        if ($targetUserId === $currentUserId) {
+            return true;
+        }
+
+        return in_array($currentRole, ['SUPERADMIN', 'ADMIN', 'HR', 'DIRECTOR'], true);
+    }
+
+    private function requirePostAndCsrf(): void {
+        security_start_session();
+
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่";
+            header("Location: index.php?c=profile");
+            exit;
+        }
+    }
+
+    private function requireProfileManagePermission(int $targetUserId): void {
+        security_start_session();
+
+        $currentUserId = (int)($_SESSION['user']['id'] ?? 0);
+        $currentRole = strtoupper((string)($_SESSION['user']['role'] ?? 'STAFF'));
+
+        $allowed = $targetUserId > 0 && (
+            $targetUserId === $currentUserId
+            || in_array($currentRole, ['SUPERADMIN', 'ADMIN', 'HR'], true)
+        );
+
+        if (!$allowed && $currentRole === 'DIRECTOR' && $targetUserId > 0) {
+            $db = (new Database())->getConnection();
+            $stmt = $db->prepare("SELECT hospital_id FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1");
+            $stmt->execute([$targetUserId]);
+            $targetHospitalId = $stmt->fetchColumn();
+            $allowed = $targetHospitalId !== false
+                && (int)$targetHospitalId === (int)($_SESSION['user']['hospital_id'] ?? 0);
+        }
+
+        if (!$allowed) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์แก้ไขข้อมูลบุคลากรรายนี้";
+            header("Location: index.php?c=profile&id=" . $currentUserId);
+            exit;
+        }
+    }
+
     // ====================================================
     // 🌟 1. โหลดหน้า Dashboard แฟ้มประวัติ (Profile View)
     // ====================================================
@@ -31,7 +93,7 @@ class ProfileController {
         $profileModel = new ProfileModel($db);
 
         // ตรวจสอบว่าจะดูประวัติใคร (ถ้าไม่ส่ง id มา ให้ดึงของตัวเอง)
-        $target_user_id = isset($_POST['id']) ? (int)$_POST['id'] : $_SESSION['user']['id'];
+        $target_user_id = isset($_GET['id']) ? (int)$_GET['id'] : (isset($_POST['id']) ? (int)$_POST['id'] : (int)$_SESSION['user']['id']);
         
         // ดึงข้อมูลพื้นฐานจากระบบ
         $target_user = $userModel->getUserById($target_user_id);
@@ -242,7 +304,11 @@ class ProfileController {
 
     public function delete_education() {
         $this->checkAuth();
-        if (isset($_POST['id']) && isset($_POST['user_id'])) {
+        $this->requirePostAndCsrf();
+
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $this->requireProfileManagePermission($targetUserId);
+if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
@@ -290,7 +356,11 @@ class ProfileController {
 
     public function delete_license() {
         $this->checkAuth();
-        if (isset($_POST['id']) && isset($_POST['user_id'])) {
+        $this->requirePostAndCsrf();
+
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $this->requireProfileManagePermission($targetUserId);
+if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             
@@ -335,7 +405,11 @@ class ProfileController {
 
     public function delete_work() {
         $this->checkAuth();
-        if (isset($_POST['id']) && isset($_POST['user_id'])) {
+        $this->requirePostAndCsrf();
+
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $this->requireProfileManagePermission($targetUserId);
+if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             $profileModel->deleteWorkHistory($_POST['id'], $_POST['user_id']);
@@ -376,7 +450,11 @@ class ProfileController {
 
     public function delete_training() {
         $this->checkAuth();
-        if (isset($_POST['id']) && isset($_POST['user_id'])) {
+        $this->requirePostAndCsrf();
+
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $this->requireProfileManagePermission($targetUserId);
+if (isset($_POST['id']) && isset($_POST['user_id'])) {
             $db = (new Database())->getConnection();
             $profileModel = new ProfileModel($db);
             $profileModel->deleteTraining($_POST['id'], $_POST['user_id']);
