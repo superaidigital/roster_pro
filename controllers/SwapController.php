@@ -57,45 +57,124 @@ class SwapController {
     public function create() {
         $this->requireMutation();
         $this->checkAuth();
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $db = (new Database())->getConnection();
-            $swapModel = new SwapModel($db);
 
-            $data = [
-                'hospital_id' => $_SESSION['user']['hospital_id'],
-                'requestor_id' => $_SESSION['user']['id'],
-                'requestor_date' => $_POST['requestor_date'],
-                'requestor_shift' => $_POST['requestor_shift'],
-                'target_user_id' => $_POST['target_user_id'],
-                'target_date' => $_POST['target_date'],
-                'target_shift' => $_POST['target_shift'],
-                'reason' => trim($_POST['reason'])
-            ];
+        $db = (new Database())->getConnection();
+        $swapModel = new SwapModel($db);
 
-            if ($data['requestor_id'] == $data['target_user_id']) {
-                $_SESSION['error_msg'] = "ไม่สามารถขอแลกเวรกับตัวเองได้";
-            } else if ($swapModel->createRequest($data)) {
-                $_SESSION['success_msg'] = "ส่งคำขอแลกเวรเรียบร้อยแล้ว รอการยืนยันจากเพื่อนร่วมงาน";
+        $hospitalId = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $requestorId = (int)($_SESSION['user']['id'] ?? 0);
+        $requestorDate = trim((string)($_POST['requestor_date'] ?? ''));
+        $requestorShift = trim((string)($_POST['requestor_shift'] ?? ''));
+        $targetUserId = (int)($_POST['target_user_id'] ?? 0);
+        $targetDate = trim((string)($_POST['target_date'] ?? ''));
+        $targetShift = trim((string)($_POST['target_shift'] ?? ''));
+        $reason = trim((string)($_POST['reason'] ?? ''));
 
-                // 🔔 ส่งแจ้งเตือนหา "เพื่อน" ที่ถูกขอแลกเวร
-                if (class_exists('NotificationModel')) {
-                    $notifModel = new NotificationModel($db);
-                    $req_name = explode(' ', $_SESSION['user']['name'])[0];
-                    $tar_date_th = date('d/m/Y', strtotime($data['target_date']));
-                    
-                    $notifModel->addNotification(
-                        $data['target_user_id'],
-                        'SWAP',
-                        'มีคำขอแลกเวรใหม่',
-                        "คุณ {$req_name} ส่งคำขอแลกเวรกับคุณ ในวันที่ {$tar_date_th} โปรดตรวจสอบรายละเอียด",
-                        'index.php?c=swap'
-                    );
-                }
+        $isValidDate = static function (string $date): bool {
+            $obj = DateTime::createFromFormat('Y-m-d', $date);
+            return $obj && $obj->format('Y-m-d') === $date;
+        };
 
-            } else {
-                $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกคำขอ (คุณอาจจะกำลังกดส่งคำขอซ้ำซ้อน)";
-            }
+        if ($hospitalId <= 0 || $requestorId <= 0 || $targetUserId <= 0
+            || !$isValidDate($requestorDate) || !$isValidDate($targetDate)) {
+            $_SESSION['error_msg'] = "ข้อมูลการขอแลกเวรไม่ครบถ้วนหรือวันที่ไม่ถูกต้อง";
+            header("Location: index.php?c=swap&a=index");
+            exit;
         }
+
+        if ($requestorId === $targetUserId) {
+            $_SESSION['error_msg'] = "ไม่สามารถขอแลกเวรกับตัวเองได้";
+            header("Location: index.php?c=swap&a=index");
+            exit;
+        }
+
+        if ($reason === '' || mb_strlen($reason, 'UTF-8') > 500) {
+            $_SESSION['error_msg'] = "กรุณาระบุเหตุผลการแลกเวรไม่เกิน 500 ตัวอักษร";
+            header("Location: index.php?c=swap&a=index");
+            exit;
+        }
+
+        // เป้าหมายต้องเป็นบุคลากรที่ยังใช้งานและสังกัดหน่วยเดียวกันเท่านั้น
+        $stmtTarget = $db->prepare("
+            SELECT id
+            FROM users
+            WHERE id = ?
+              AND hospital_id = ?
+              AND is_active = 1
+              AND is_deleted = 0
+              AND role NOT IN ('ADMIN', 'SUPERADMIN')
+            LIMIT 1
+        ");
+        $stmtTarget->execute([$targetUserId, $hospitalId]);
+        if (!$stmtTarget->fetchColumn()) {
+            $_SESSION['error_msg'] = "เลือกแลกเวรได้เฉพาะบุคลากรที่อยู่ในสังกัดเดียวกัน";
+            header("Location: index.php?c=swap&a=index");
+            exit;
+        }
+
+        // อย่าเชื่อค่ากะจาก hidden inputs: ต้องตรงกับตารางเวรจริงทั้งสองฝ่าย
+        $stmtShift = $db->prepare("
+            SELECT shift_type
+            FROM shifts
+            WHERE hospital_id = ? AND user_id = ? AND shift_date = ?
+            LIMIT 1
+        ");
+
+        $stmtShift->execute([$hospitalId, $requestorId, $requestorDate]);
+        $actualRequestorShift = $stmtShift->fetchColumn();
+
+        $stmtShift->execute([$hospitalId, $targetUserId, $targetDate]);
+        $actualTargetShift = $stmtShift->fetchColumn();
+
+        if ($actualRequestorShift === false || $actualTargetShift === false) {
+            $_SESSION['error_msg'] = "ไม่พบเวรต้นทางหรือเวรของผู้ที่ต้องการแลก กรุณารีเฟรชข้อมูลแล้วลองใหม่";
+            header("Location: index.php?c=swap&a=index");
+            exit;
+        }
+
+        if ($requestorShift !== '' && !hash_equals((string)$actualRequestorShift, $requestorShift)) {
+            $_SESSION['error_msg'] = "ข้อมูลเวรของคุณมีการเปลี่ยนแปลง กรุณารีเฟรชแล้วลองใหม่";
+            header("Location: index.php?c=swap&a=index");
+            exit;
+        }
+        if ($targetShift !== '' && !hash_equals((string)$actualTargetShift, $targetShift)) {
+            $_SESSION['error_msg'] = "ข้อมูลเวรของผู้ที่ต้องการแลกมีการเปลี่ยนแปลง กรุณารีเฟรชแล้วลองใหม่";
+            header("Location: index.php?c=swap&a=index");
+            exit;
+        }
+
+        $data = [
+            'hospital_id' => $hospitalId,
+            'requestor_id' => $requestorId,
+            'requestor_date' => $requestorDate,
+            'requestor_shift' => (string)$actualRequestorShift,
+            'target_user_id' => $targetUserId,
+            'target_date' => $targetDate,
+            'target_shift' => (string)$actualTargetShift,
+            'reason' => $reason,
+        ];
+
+        if ($swapModel->createRequest($data)) {
+            $_SESSION['success_msg'] = "ส่งคำขอแลกเวรเรียบร้อยแล้ว รอการยืนยันจากเพื่อนร่วมงาน";
+
+            if (class_exists('NotificationModel')) {
+                $notifModel = new NotificationModel($db);
+                $reqName = trim((string)($_SESSION['user']['name'] ?? 'เพื่อนร่วมงาน'));
+                $reqName = preg_split('/\s+/', $reqName)[0] ?? $reqName;
+                $targetDateTh = date('d/m/Y', strtotime($targetDate));
+
+                $notifModel->addNotification(
+                    $targetUserId,
+                    'SWAP',
+                    'มีคำขอแลกเวรใหม่',
+                    "คุณ {$reqName} ส่งคำขอแลกเวรกับคุณ ในวันที่ {$targetDateTh} โปรดตรวจสอบรายละเอียด",
+                    'index.php?c=swap'
+                );
+            }
+        } else {
+            $_SESSION['error_msg'] = "บันทึกคำขอไม่สำเร็จ หรือมีคำขอแลกเวรนี้อยู่ระหว่างดำเนินการแล้ว";
+        }
+
         header("Location: index.php?c=swap&a=index");
         exit;
     }
