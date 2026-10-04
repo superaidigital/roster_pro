@@ -962,3 +962,202 @@ table,
   font-family: "Sarabun", "Noto Sans Thai", Tahoma, sans-serif !important;
   font-weight: 700;
 }
+
+
+/* ==========================================================================
+   Topbar and sidebar stabilization v16
+   Prevents action overlap and collapsed-sidebar text artifacts.
+   ========================================================================== */
+
+.top-navbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center !important;
+  column-gap: .75rem;
+}
+
+.rp-topbar-left {
+  display: flex !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.rp-page-context {
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: hidden;
+}
+
+.rp-page-context > .min-w-0 {
+  min-width: 0 !important;
+}
+
+.rp-page-title,
+.rp-page-subtitle,
+.rp-page-kicker {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-topbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: max-content !important;
+  gap: .4rem !important;
+}
+
+.rp-user-menu {
+  flex: 0 0 auto;
+}
+
+.rp-user-menu-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  min-width: 2.45rem;
+  padding: .1rem;
+  border: 1px solid var(--rp-theme-border, #d8e2ea);
+  border-radius: .78rem;
+  color: var(--rp-theme-text, #10212e);
+  background: var(--rp-theme-surface-2, #f7fafc);
+  cursor: pointer;
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.rp-user-menu-btn:hover,
+.rp-user-menu-btn[aria-expanded="true"] {
+  background: var(--rp-theme-hover, #edf5f8);
+  border-color: color-mix(in srgb, var(--rp-theme-primary, #0f6cbd) 35%, var(--rp-theme-border, #d8e2ea));
+  box-shadow: 0 0 0 .18rem color-mix(in srgb, var(--rp-theme-primary, #0f6cbd) 10%, transparent);
+}
+
+.rp-user-dropdown {
+  width: min(18rem, calc(100vw - 1rem));
+}
+
+.rp-user-summary {
+  min-width: 0;
+}
+
+.rp-user-avatar-lg {
+  width: 2.65rem !important;
+  height: 2.65rem !important;
+  flex-basis: 2.65rem !important;
+}
+
+#desktopSidebar.collapsed .sidebar-text,
+#desktopSidebar.collapsed .sidebar-heading,
+#desktopSidebar.collapsed .dropdown-arrow,
+#desktopSidebar.collapsed .rp-sidebar-brand-copy,
+body.rp-sidebar-collapsed #desktopSidebar .sidebar-text,
+body.rp-sidebar-collapsed #desktopSidebar .sidebar-heading,
+body.rp-sidebar-collapsed #desktopSidebar .dropdown-arrow,
+body.rp-sidebar-collapsed #desktopSidebar .rp-sidebar-brand-copy {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+#desktopSidebar.collapsed .sidebar-menu .nav-link,
+body.rp-sidebar-collapsed #desktopSidebar .sidebar-menu .nav-link {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 0 !important;
+  white-space: nowrap !important;
+  writing-mode: horizontal-tb !important;
+  padding-inline: .25rem !important;
+}
+
+#desktopSidebar.collapsed .sidebar-menu .nav-link i,
+body.rp-sidebar-collapsed #desktopSidebar .sidebar-menu .nav-link i {
+  display: block !important;
+  flex: 0 0 1.4rem !important;
+  width: 1.4rem !important;
+  min-width: 1.4rem !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .rp-system-online {
+    display: none !important;
+  }
+
+  .rp-page-kicker,
+  .rp-page-subtitle {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1280px) and (max-width: 1439.98px) {
+  .rp-system-online {
+    display: none !important;
+  }
+
+  .rp-page-kicker {
+    display: none !important;
+  }
+
+  .rp-page-subtitle {
+    max-width: min(35vw, 28rem);
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .top-navbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .rp-topbar-actions {
+    min-width: max-content !important;
+  }
+
+  .rp-system-online {
+    display: none !important;
+  }
+}
+
+@media (max-width: 639.98px) {
+  .top-navbar {
+    column-gap: .35rem;
+  }
+
+  .rp-topbar-left {
+    gap: .35rem !important;
+  }
+
+  .rp-page-icon,
+  .rp-page-kicker,
+  .rp-page-subtitle {
+    display: none !important;
+  }
+
+  .rp-page-title {
+    font-size: .94rem !important;
+  }
+
+  .rp-topbar-actions {
+    gap: .25rem !important;
+  }
+
+  .rp-user-menu-btn,
+  .nav-icon-btn,
+  .rp-theme-toggle {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+    min-width: 2.75rem !important;
+    min-height: 2.75rem !important;
+  }
+}
