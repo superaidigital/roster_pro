@@ -80,6 +80,12 @@ class AjaxController {
             return false;
         }
 
+        $hospital_id = (int)$hospital_id;
+        $month_year = trim((string)$month_year);
+        if ($hospital_id <= 0 || !preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month_year)) {
+            return false;
+        }
+
         $db = (new Database())->getConnection();
         $shiftModel = new ShiftModel($db);
         $status = strtoupper((string)$shiftModel->getRosterStatus($hospital_id, $month_year));
