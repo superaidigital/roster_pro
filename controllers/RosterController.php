@@ -6,6 +6,23 @@ require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 
 class RosterController {
+
+    private function requireMutation(): void {
+        security_start_session();
+
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่";
+            header("Location: index.php?c=roster");
+            exit;
+        }
+    }
+
     
     // ====================================================
     // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน
