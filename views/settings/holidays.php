@@ -169,11 +169,13 @@ function formatDateThai($dateString) {
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-center">
-                                            <a href="index.php?c=settings&a=delete_holiday&id=<?= $h['id'] ?>" 
-                                               class="btn btn-sm btn-outline-danger rounded-circle" 
-                                               onclick="return confirm('ยืนยันการลบวันหยุดนี้?');" title="ลบ">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
+                                            <form action="index.php?c=settings&a=delete_holiday" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบวันหยุดนี้?');">
+                                                <?= security_csrf_input() ?>
+                                                <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle" title="ลบ" aria-label="ลบวันหยุด">
+                                                    <i class="bi bi-trash" aria-hidden="true"></i>
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
