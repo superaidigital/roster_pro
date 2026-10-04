@@ -1182,6 +1182,64 @@ class AjaxController {
         echo json_encode(['status' => 'success', 'count' => $count, 'data' => $notifications]); exit;
     }
 
+    public function read_notif() {
+        $this->requireAjaxMutation();
+        $payload = json_decode((string)file_get_contents('php://input'), true);
+        $id = (int)($payload['id'] ?? $_POST['id'] ?? 0);
+        $userId = (int)($_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0);
+
+        if ($id <= 0 || $userId <= 0) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'ข้อมูลการแจ้งเตือนไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+        $result = $notificationModel->markAsRead($id, $userId);
+        echo json_encode(['status' => $result ? 'success' : 'error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    public function read_all_notif() {
+        $this->requireAjaxMutation();
+        $userId = (int)($_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0);
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+        $result = $notificationModel->markAllAsRead($userId);
+        echo json_encode(['status' => $result ? 'success' : 'error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    public function delete_notif() {
+        $this->requireAjaxMutation();
+        $payload = json_decode((string)file_get_contents('php://input'), true);
+        $id = (int)($payload['id'] ?? $_POST['id'] ?? 0);
+        $userId = (int)($_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0);
+
+        if ($id <= 0 || $userId <= 0) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'ข้อมูลการแจ้งเตือนไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+        $result = $notificationModel->deleteNotification($id, $userId);
+        echo json_encode(['status' => $result ? 'success' : 'error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    public function delete_all_notif() {
+        $this->requireAjaxMutation();
+        $userId = (int)($_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0);
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+        $result = $notificationModel->deleteAllForUser($userId);
+        echo json_encode(['status' => $result ? 'success' : 'error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     public function markNotificationAsRead() {
         $this->requireAjaxMutation();
         error_reporting(0); header('Content-Type: application/json');
