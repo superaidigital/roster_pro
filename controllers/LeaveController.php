@@ -88,7 +88,10 @@ $leaveModel = class_exists('LeaveModel') ? new LeaveModel($db) : null;
         $role = $_SESSION['user']['role'];
         $budget_year = $this->getCurrentBudgetYear();
         
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+        $selected_month = trim((string)($_GET['month'] ?? date('Y-m')));
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $selected_month)) {
+            $selected_month = date('Y-m');
+        }
 
         $stmt_emp = $db->prepare("SELECT employee_type FROM users WHERE id = ?");
         $stmt_emp->execute([$user_id]);
@@ -135,12 +138,29 @@ $leaveModel = new LeaveModel($db);
             $role = $_SESSION['user']['role'];
             $budget_year = $this->getCurrentBudgetYear();
             
-            $leave_type_id = $_POST['leave_type_id'];
-            $start_date = $_POST['start_date'];
-            $end_date = $_POST['end_date'];
-            $reason = $_POST['reason'];
+            $leave_type_id = (int)($_POST['leave_type_id'] ?? 0);
+            $start_date = trim((string)($_POST['start_date'] ?? ''));
+            $end_date = trim((string)($_POST['end_date'] ?? ''));
+            $reason = trim((string)($_POST['reason'] ?? ''));
 
-            if (strtotime($start_date) > strtotime($end_date)) {
+            $startObj = DateTime::createFromFormat('Y-m-d', $start_date);
+            $endObj = DateTime::createFromFormat('Y-m-d', $end_date);
+            $validStart = $startObj && $startObj->format('Y-m-d') === $start_date;
+            $validEnd = $endObj && $endObj->format('Y-m-d') === $end_date;
+
+            if ($leave_type_id <= 0 || !$validStart || !$validEnd) {
+                $_SESSION['error_msg'] = "ข้อมูลประเภทการลาหรือวันที่ลาไม่ถูกต้อง";
+                header("Location: index.php?c=leave&a=index");
+                exit;
+            }
+
+            if ($reason === '' || mb_strlen($reason, 'UTF-8') > 1000) {
+                $_SESSION['error_msg'] = "กรุณาระบุเหตุผลการลาไม่เกิน 1,000 ตัวอักษร";
+                header("Location: index.php?c=leave&a=index");
+                exit;
+            }
+
+            if ($startObj > $endObj) {
                 $_SESSION['error_msg'] = "วันที่สิ้นสุดการลา ต้องไม่น้อยกว่าวันที่เริ่มต้น";
                 header("Location: index.php?c=leave&a=index"); exit;
             }
@@ -249,36 +269,75 @@ $leaveModel = new LeaveModel($db);
                 header("Location: index.php?c=leave&a=index"); exit;
             }
 
-            $has_med_cert = 0; $med_cert_path = null;
+            $has_med_cert = 0;
+            $med_cert_path = null;
+
             if ($leave_name === 'ลาป่วย') {
-                if ($actual_working_days >= 3 && empty($_FILES['med_cert_file']['name'])) {
+                $upload = $_FILES['med_cert_file'] ?? null;
+                $hasUpload = is_array($upload)
+                    && (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+
+                if ($actual_working_days >= 3 && !$hasUpload) {
                     $_SESSION['error_msg'] = "การลาป่วยติดต่อกัน 3 วันทำการขึ้นไป ต้องอัปโหลดไฟล์ใบรับรองแพทย์ด้วย";
-                    header("Location: index.php?c=leave&a=index"); exit;
+                    header("Location: index.php?c=leave&a=index");
+                    exit;
                 }
 
-                if (!empty($_FILES['med_cert_file']['name']) && $_FILES['med_cert_file']['error'] == 0) {
-                    $allowed_ext = ['jpg', 'jpeg', 'png', 'pdf'];
-                    $file_name = $_FILES['med_cert_file']['name'];
-                    $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+                if ($hasUpload) {
+                    $uploadError = (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE);
+                    $tmpName = (string)($upload['tmp_name'] ?? '');
+                    $size = (int)($upload['size'] ?? 0);
 
-                    if (in_array($file_ext, $allowed_ext)) {
-                        $upload_dir = 'uploads/med_certs/';
-                        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-                        
-                        $new_name = uniqid('cert_' . $user_id . '_') . '.' . $file_ext;
-                        $target_file = $upload_dir . $new_name;
-
-                        if (move_uploaded_file($_FILES['med_cert_file']['tmp_name'], $target_file)) {
-                            $has_med_cert = 1;
-                            $med_cert_path = $target_file;
-                        } else {
-                            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการอัปโหลดไฟล์ใบรับรองแพทย์";
-                            header("Location: index.php?c=leave&a=index"); exit;
-                        }
-                    } else {
-                        $_SESSION['error_msg'] = "ไฟล์ใบรับรองแพทย์ต้องเป็นนามสกุล JPG, PNG หรือ PDF เท่านั้น";
-                        header("Location: index.php?c=leave&a=index"); exit;
+                    if ($uploadError !== UPLOAD_ERR_OK || $tmpName === '' || !is_uploaded_file($tmpName)) {
+                        $_SESSION['error_msg'] = "อัปโหลดใบรับรองแพทย์ไม่สำเร็จ กรุณาลองใหม่";
+                        header("Location: index.php?c=leave&a=index");
+                        exit;
                     }
+
+                    if ($size <= 0 || $size > 5 * 1024 * 1024) {
+                        $_SESSION['error_msg'] = "ไฟล์ใบรับรองแพทย์ต้องมีขนาดไม่เกิน 5 MB";
+                        header("Location: index.php?c=leave&a=index");
+                        exit;
+                    }
+
+                    $finfo = new finfo(FILEINFO_MIME_TYPE);
+                    $mime = (string)$finfo->file($tmpName);
+                    $allowedMime = [
+                        'image/jpeg' => 'jpg',
+                        'image/png' => 'png',
+                        'application/pdf' => 'pdf',
+                    ];
+
+                    if (!isset($allowedMime[$mime])) {
+                        $_SESSION['error_msg'] = "รองรับใบรับรองแพทย์เฉพาะ JPG, PNG หรือ PDF เท่านั้น";
+                        header("Location: index.php?c=leave&a=index");
+                        exit;
+                    }
+
+                    $upload_dir = 'uploads/med_certs/';
+                    if (!is_dir($upload_dir) && !mkdir($upload_dir, 0750, true) && !is_dir($upload_dir)) {
+                        $_SESSION['error_msg'] = "ไม่สามารถเตรียมพื้นที่จัดเก็บใบรับรองแพทย์ได้";
+                        header("Location: index.php?c=leave&a=index");
+                        exit;
+                    }
+
+                    try {
+                        $randomName = bin2hex(random_bytes(16));
+                    } catch (Throwable $e) {
+                        $randomName = hash('sha256', uniqid((string)$user_id, true));
+                    }
+
+                    $new_name = 'cert_' . $user_id . '_' . $randomName . '.' . $allowedMime[$mime];
+                    $target_file = $upload_dir . $new_name;
+
+                    if (!move_uploaded_file($tmpName, $target_file)) {
+                        $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการอัปโหลดไฟล์ใบรับรองแพทย์";
+                        header("Location: index.php?c=leave&a=index");
+                        exit;
+                    }
+
+                    $has_med_cert = 1;
+                    $med_cert_path = $target_file;
                 }
             }
 
@@ -301,6 +360,9 @@ $leaveModel = new LeaveModel($db);
                 $this->sendLineNotify($db, "\n📝 ใบลาใหม่รออนุมัติ\nจาก: {$user_name}\nประเภท: {$leave_name}\nจำนวน: {$actual_working_days} วัน");
 
             } else {
+                if ($med_cert_path && is_file($med_cert_path)) {
+                    @unlink($med_cert_path);
+                }
                 $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงระบบ";
             }
         }
