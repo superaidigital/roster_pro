@@ -31,6 +31,11 @@ try {
         if (in_array($role, $roles_array)) {
             
             // 3. หาส่วนลิงก์ (รองรับทุกชื่อคอลัมน์ที่อาจจะมีในฐานข้อมูล)
+            $menu_controller = strtolower(trim((string)($menu['controller'] ?? '')));
+            if ($menu_controller !== '') {
+                $allowed_controllers[] = $menu_controller;
+            }
+
             $link = $menu['path'] ?? $menu['menu_link'] ?? $menu['url'] ?? $menu['menu_url'] ?? $menu['link'] ?? $menu['route'] ?? '';
             $link = strtolower(trim($link));
             
@@ -105,14 +110,34 @@ if (!function_exists('renderSidebarMenu')) {
                 </a>
             </li>
             <?php endif; ?>
-
-            <?php if (in_array('field', $allowed_controllers)): ?>
+            <?php if (in_array('field', $allowed_controllers, true)): ?>
             <li class="sidebar-heading mt-2">งานภาคสนาม</li>
-            <li class="nav-item">
-                <a class="nav-link <?= ($c == 'field') ? 'active' : '' ?>" href="index.php?c=field">
-                    <i class="bi bi-house-heart-fill text-success"></i>
-                    <span class="sidebar-text">เยี่ยมบ้าน / งานชุมชน</span>
+            <li class="nav-item field-dropdown-container">
+                <a class="nav-link <?= ($c == 'field') ? '' : 'collapsed' ?> d-flex justify-content-between align-items-center"
+                   data-bs-toggle="collapse"
+                   href="#fieldMenu"
+                   role="button"
+                   aria-expanded="<?= ($c == 'field') ? 'true' : 'false' ?>">
+                    <div>
+                        <i class="bi bi-house-heart-fill text-success"></i>
+                        <span class="sidebar-text">เยี่ยมบ้าน / งานชุมชน</span>
+                    </div>
+                    <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
                 </a>
+                <div class="collapse <?= ($c == 'field') ? 'show' : '' ?>" id="fieldMenu">
+                    <ul class="sidebar-menu pb-0 mt-1 mb-2 p-0 position-relative" style="gap:2px;">
+                        <li class="nav-item">
+                            <a class="nav-link submenu-item <?= ($c == 'field' && $a == 'index') ? 'active' : '' ?>" href="index.php?c=field">
+                                บันทึก / รายการเยี่ยมบ้าน
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link submenu-item <?= ($c == 'field' && $a == 'followups') ? 'active' : '' ?>" href="index.php?c=field&a=followups">
+                                คิวติดตาม
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </li>
             <?php endif; ?>
 
@@ -376,7 +401,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         if (collapsed) {
-            ['leaveMenu', 'hrMenu'].forEach(menuId => {
+            ['fieldMenu', 'leaveMenu', 'hrMenu'].forEach(menuId => {
                 const menuElement = document.getElementById(menuId);
 
                 if (menuElement && menuElement.classList.contains('show')) {
