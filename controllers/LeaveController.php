@@ -314,7 +314,7 @@ $leaveModel = new LeaveModel($db);
                         exit;
                     }
 
-                    $upload_dir = 'uploads/med_certs/';
+                    $upload_dir = 'storage/private/med_certs/';
                     if (!is_dir($upload_dir) && !mkdir($upload_dir, 0750, true) && !is_dir($upload_dir)) {
                         $_SESSION['error_msg'] = "ไม่สามารถเตรียมพื้นที่จัดเก็บใบรับรองแพทย์ได้";
                         header("Location: index.php?c=leave&a=index");
@@ -367,6 +367,97 @@ $leaveModel = new LeaveModel($db);
             }
         }
         header("Location: index.php?c=leave&a=index"); exit;
+    }
+
+    // ==========================================
+    // 🔒 ดูใบรับรองแพทย์ผ่าน Authorization เท่านั้น
+    // ==========================================
+    public function medical_certificate() {
+        security_start_session();
+
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        $leaveId = (int)($_GET['id'] ?? 0);
+        if ($leaveId <= 0) {
+            http_response_code(404);
+            exit('File not found.');
+        }
+
+        $db = (new Database())->getConnection();
+        $stmt = $db->prepare("
+            SELECT lr.id, lr.user_id, lr.med_cert_path, u.hospital_id
+            FROM leave_requests lr
+            JOIN users u ON u.id = lr.user_id
+            WHERE lr.id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$leaveId]);
+        $leave = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$leave || empty($leave['med_cert_path'])) {
+            http_response_code(404);
+            exit('File not found.');
+        }
+
+        $viewerId = (int)($_SESSION['user']['id'] ?? 0);
+        $viewerRole = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        $viewerHospital = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $ownerId = (int)$leave['user_id'];
+        $ownerHospital = (int)$leave['hospital_id'];
+
+        $canView = $viewerId === $ownerId;
+        if (in_array($viewerRole, ['DIRECTOR', 'SCHEDULER'], true) && $viewerHospital === $ownerHospital) {
+            $canView = true;
+        }
+        if (in_array($viewerRole, ['ADMIN', 'SUPERADMIN', 'HR'], true)) {
+            $canView = true;
+        }
+
+        if (!$canView) {
+            http_response_code(403);
+            exit('Forbidden.');
+        }
+
+        $storedPath = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, (string)$leave['med_cert_path']);
+        $allowedRoots = [
+            realpath('storage/private/med_certs'),
+            realpath('uploads/med_certs'),
+        ];
+
+        $realFile = realpath($storedPath);
+        $pathAllowed = false;
+        if ($realFile !== false) {
+            foreach ($allowedRoots as $root) {
+                if ($root !== false && ($realFile === $root || str_starts_with($realFile, $root . DIRECTORY_SEPARATOR))) {
+                    $pathAllowed = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$pathAllowed || !is_file($realFile) || !is_readable($realFile)) {
+            http_response_code(404);
+            exit('File not found.');
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = (string)$finfo->file($realFile);
+        $allowedMime = ['image/jpeg', 'image/png', 'application/pdf'];
+        if (!in_array($mime, $allowedMime, true)) {
+            http_response_code(415);
+            exit('Unsupported file type.');
+        }
+
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . filesize($realFile));
+        header('Content-Disposition: inline; filename="medical-certificate-' . $leaveId . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store, max-age=0');
+        readfile($realFile);
+        exit;
     }
 
     // ==========================================
