@@ -4,6 +4,7 @@
 require_once 'config/database.php';
 require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
+require_once 'models/RosterSnapshotModel.php';
 
 class RosterController {
 
@@ -38,6 +39,19 @@ class RosterController {
     // ====================================================
     // 🌟 1. โหลดหน้าจอกระดานตารางเวรหลัก (Roster Board)
     // ====================================================
+    private function resolveTargetHospitalId(?int $requestedHospitalId = null): int {
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        if (in_array($role, ['ADMIN', 'SUPERADMIN'], true) && ($requestedHospitalId ?? 0) > 0) {
+            return (int)$requestedHospitalId;
+        }
+        return (int)($_SESSION['user']['hospital_id'] ?? 0);
+    }
+
+    private function canManageRosterVersions(): bool {
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        return in_array($role, ['SCHEDULER', 'DIRECTOR', 'ADMIN', 'SUPERADMIN'], true);
+    }
+
     public function index() {
         $this->checkAuth();
         $db = (new Database())->getConnection();
@@ -130,6 +144,16 @@ class RosterController {
         // 🏖️ 7. ดึงวันหยุดนักขัตฤกษ์
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
+
+        $roster_snapshots = [];
+        if ($hosp_id_safe > 0) {
+            try {
+                $snapshotModel = new RosterSnapshotModel($db);
+                $roster_snapshots = $snapshotModel->listSnapshots($hosp_id_safe, $selected_month, 12);
+            } catch (Throwable $e) {
+                error_log('Roster snapshot list failed: ' . $e->getMessage());
+            }
+        }
 
         // โหลด View หน้ากระดานจัดเวร
         require_once 'views/layouts/header.php';
