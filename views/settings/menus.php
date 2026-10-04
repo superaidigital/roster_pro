@@ -66,6 +66,7 @@ $system_roles = [
     </div>
 
     <form action="index.php?c=settings&a=save_menus" method="POST" id="menuForm">
+                            <?= security_csrf_input() ?>
         <div class="card card-modern overflow-hidden">
             <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="bi bi-grid-3x3-gap text-primary me-2"></i>ตารางกำหนดสิทธิ์เมนูระบบ</h6>
