@@ -11,6 +11,22 @@ require_once 'controllers/LogsController.php'; // 🌟 ระบบ Log
 
 class LeaveController {
 
+    private function requireMutation(): void {
+        security_start_session();
+
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่";
+            header("Location: index.php?c=leave");
+            exit;
+        }
+    }
+
     // ==========================================
     // 🌟 ฟังก์ชันช่วยเหลือ (Helper Functions)
     // ==========================================
@@ -110,9 +126,7 @@ $leaveModel = class_exists('LeaveModel') ? new LeaveModel($db) : null;
         $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
-            $this->autoPatchDatabase($db); 
-            
-            $leaveModel = new LeaveModel($db);
+$leaveModel = new LeaveModel($db);
             $notifModel = new NotificationModel($db);
             
             $user_id = $_SESSION['user']['id'];
@@ -300,9 +314,7 @@ $leaveModel = class_exists('LeaveModel') ? new LeaveModel($db) : null;
         $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_id'])) {
             $db = (new Database())->getConnection();
-            $this->autoPatchDatabase($db);
-            
-            $notifModel = new NotificationModel($db);
+$notifModel = new NotificationModel($db);
             
             $request_id = $_POST['request_id'];
             $user_id = $_SESSION['user']['id'];
@@ -356,9 +368,7 @@ $leaveModel = class_exists('LeaveModel') ? new LeaveModel($db) : null;
             header("Location: index.php?c=leave"); exit;
         }
         $db = (new Database())->getConnection();
-        $this->autoPatchDatabase($db);
-        
-        $role = $_SESSION['user']['role'];
+$role = $_SESSION['user']['role'];
         $hospital_id = $_SESSION['user']['hospital_id'];
 
         $query = "SELECT lr.*, lq.leave_type, u.name as user_name, u.employee_type, h.name as hospital_name
@@ -390,10 +400,8 @@ $leaveModel = class_exists('LeaveModel') ? new LeaveModel($db) : null;
     public function process_approval() {
         $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && isset($_POST['request_id'])) {
-            $db = (new Database())->getConnection(); 
-            $this->autoPatchDatabase($db);
-            
-            $notifModel = new NotificationModel($db);
+            $db = (new Database())->getConnection();
+$notifModel = new NotificationModel($db);
 
             $request_id = $_POST['request_id']; 
             $action = $_POST['action']; 
