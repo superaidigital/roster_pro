@@ -345,8 +345,8 @@ foreach ($roster_coverage as $coverage) {
                     <div class="rp-roster-kpi-icon"><i class="bi bi-people-fill"></i></div>
                     <div class="min-w-0">
                         <div class="rp-roster-kpi-value" id="kpiStaffCount"><?= number_format($roster_kpi_staff_count) ?></div>
-                        <div class="rp-roster-kpi-label">บุคลากรในตาราง</div>
-                        <div class="rp-roster-kpi-sub">รวมผู้ช่วยราชการที่มีเวร</div>
+                        <div class="rp-roster-kpi-label">บุคลากรในสังกัด</div>
+                        <div class="rp-roster-kpi-sub">เฉพาะหน่วยบริการที่เลือก</div>
                     </div>
                 </div>
             </div>
@@ -553,7 +553,6 @@ foreach ($roster_coverage as $coverage) {
                                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill rp-roster-filter-btn" data-roster-filter="empty"><i class="bi bi-calendar-x me-1"></i>ยังไม่มีเวร</button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill rp-roster-filter-btn" data-roster-filter="night"><i class="bi bi-moon-stars me-1"></i>มีเวรดึก</button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill rp-roster-filter-btn" data-roster-filter="leave"><i class="bi bi-calendar2-minus me-1"></i>มีวันลา</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill rp-roster-filter-btn" data-roster-filter="external"><i class="bi bi-arrow-left-right me-1"></i>ช่วยราชการ</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger rounded-pill rp-roster-filter-btn" data-roster-filter="fatigue"><i class="bi bi-heart-pulse me-1"></i>จุดเสี่ยง</button>
                                 </div>
 
@@ -630,8 +629,7 @@ foreach ($roster_coverage as $coverage) {
                                             </td>
                                         </tr>
                                     <?php else: ?>
-                                        <?php foreach ($all_staff_for_sidebar as $staff): 
-                                            $is_external = (isset($staff['hospital_id']) && $staff['hospital_id'] != ($hospital_id??0));
+                                        <?php foreach ($all_staff_for_sidebar as $staff):
                                             $has_shift = false;
                                             $my_shifts = [];
                                             
@@ -645,7 +643,7 @@ foreach ($roster_coverage as $coverage) {
                                                 }
                                             }
                                             
-                                            $is_visible = (!$is_external || $has_shift);
+                                            $is_visible = true;
 
                                             // ข้อมูลวันลา
                                             $my_leaves_on_days = [];
@@ -671,25 +669,20 @@ foreach ($roster_coverage as $coverage) {
                                             }
                                         ?>
                                         <!-- 🌟 แนบ data-id ไว้ให้ SortableJS -->
-                                        <tr class="roster-staff-row" id="row-staff-<?= htmlspecialchars($staff['id']) ?>" data-id="<?= htmlspecialchars($staff['id']) ?>" data-is-external="<?= $is_external ? 'true' : 'false' ?>" style="<?= $is_visible ? '' : 'display: none;' ?>">
-                                            <td class="text-start px-3 shadow-sm bg-white" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0; <?php if($is_external) echo 'background-color: #fef2f2 !important;'; ?>">
+                                        <tr class="roster-staff-row" id="row-staff-<?= htmlspecialchars($staff['id']) ?>" data-id="<?= htmlspecialchars($staff['id']) ?>">
+                                            <td class="text-start px-3 shadow-sm bg-white" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0;">
                                                 <div class="fw-bold text-dark d-flex align-items-center justify-content-between">
                                                     <div class="d-flex align-items-center text-truncate pe-2">
-                                                        <?php if ($canEdit && !$is_external): ?>
+                                                        <?php if ($canEdit): ?>
                                                             <i class="bi bi-grip-vertical text-muted drag-handle me-1 flex-shrink-0" style="cursor: grab;" title="ลากเพื่อสลับตำแหน่ง"></i>
                                                         <?php endif; ?>
                                                         <span class="text-truncate" style="font-size: 14.5px;"><?= htmlspecialchars($staff['name']) ?></span>
                                                     </div>
                                                     <div class="d-flex align-items-center flex-shrink-0">
-                                                        <?php if ($is_external): ?>
-                                                            <span class="badge bg-danger ms-1" style="font-size: 9px;">ช่วยราชการ</span>
-                                                        <?php endif; ?>
-                                                        <?php if ($canEdit): ?>
-                                                            <i class="bi bi-person-x-fill text-danger ms-2 btn-remove-staff" style="cursor: pointer; font-size: 14px;" title="นำออกจากตารางเวร" onclick="removeStaffFromRoster('<?= $staff['id'] ?>', '<?= htmlspecialchars($staff['name'], ENT_QUOTES) ?>')"></i>
-                                                        <?php endif; ?>
+                                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 9px;">ในสังกัด</span>
                                                     </div>
                                                 </div>
-                                                <div class="text-muted text-truncate <?= ($canEdit && !$is_external) ? 'ms-4' : '' ?>" style="font-size: 11px;">
+                                                <div class="text-muted text-truncate <?= $canEdit ? 'ms-4' : '' ?>" style="font-size: 11px;">
                                                     <?= htmlspecialchars($staff['type']) ?>
                                                     <?php if(empty($staff['pay_rate_id'])): ?>
                                                         <span class="text-danger fw-bold ms-1" title="ยังไม่จัดกลุ่ม"><i class="bi bi-exclamation-triangle-fill"></i></span>
@@ -760,16 +753,6 @@ foreach ($roster_coverage as $coverage) {
                                         <?php endforeach; ?>
                                     <?php endif; ?>
                                     
-                                    <!-- 🌟 Drop Zone สำหรับลากคนนอกมาลงตาราง -->
-                                    <?php if ($canEdit): ?>
-                                    <tr id="dropZoneRow" ondragover="allowDrop(event)" ondrop="dropStaff(event)" ondragleave="dragLeave(event)" class="bg-light bg-opacity-75">
-                                        <td colspan="<?= $days_in_month + 1 ?>" class="py-4 text-center text-primary" style="border: 2px dashed #a5b4fc; transition: all 0.2s;">
-                                            <i class="bi bi-person-down fs-3 d-block mb-1 opacity-75"></i>
-                                            <span class="fw-bold fs-6">ลากรายชื่อเจ้าหน้าที่จากแถบด้านขวามาวางที่บริเวณนี้</span>
-                                            <div class="text-muted mt-1" style="font-size: 12px;">เพื่อเพิ่มผู้ปฏิบัติงานนอกสังกัด ลงในตารางเวรเดือนนี้</div>
-                                        </td>
-                                    </tr>
-                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -821,17 +804,10 @@ foreach ($roster_coverage as $coverage) {
                     <div class="p-3 border-bottom bg-light <?= $canEdit ? 'rounded-top-4' : '' ?>">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="fw-bold <?= !$canEdit ? 'text-muted' : 'text-dark' ?> mb-0 d-flex align-items-center">
-                                <i class="bi bi-people-fill <?= !$canEdit ? 'text-muted' : 'text-primary' ?> me-2"></i> <?= $canEdit ? 'เลือกบุคลากรเข้าเวร' : 'รายชื่อ/สถิติบุคลากร' ?>
+                                <i class="bi bi-people-fill <?= !$canEdit ? 'text-muted' : 'text-primary' ?> me-2"></i> บุคลากรในสังกัด
                             </h6>
                         </div>
                         
-                        <div class="mb-2">
-                            <select id="staffHospitalFilter" class="form-select form-select-sm shadow-sm border-primary border-opacity-25 font-monospace fw-bold text-primary rounded-3">
-                                <option value="own" selected>🔹 บุคลากรในสังกัด รพ.สต.</option>
-                                <option value="external">🔸 บุคลากรช่วยราชการ</option>
-                            </select>
-                        </div>
-
                         <div class="input-group input-group-sm input-group-modern mt-2">
                             <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
                             <input type="text" id="staffSearch" class="form-control" placeholder="ค้นหาชื่อ หรือตำแหน่ง...">
@@ -840,19 +816,14 @@ foreach ($roster_coverage as $coverage) {
                     
                     <div class="flex-grow-1 overflow-auto p-3 bg-light custom-scrollbar rounded-bottom-4" id="staffListContainer">
                         <?php 
-                        foreach ($all_staff_for_sidebar as $staff): 
-                            $is_external = (isset($staff['hospital_id']) && $staff['hospital_id'] != ($hospital_id??0));
+                        foreach ($all_staff_for_sidebar as $staff):
                             $bs_color = getBsColor($staff['color_theme']);
                         ?>
                         <!-- 🌟 แนบ pay_rate_id ไว้เผื่อดึงผ่าน JS -->
-                        <div class="card mb-2 shadow-sm border-0 rounded-3 staff-card draggable-staff" 
-                             draggable="<?= $canEdit ? 'true' : 'false' ?>"
-                             <?= $canEdit ? 'ondragstart="drag(event)"' : '' ?>
-                             style="<?= $is_external ? 'display: none;' : '' ?>"
-                             data-userid="<?= $staff['id'] ?>" 
+                        <div class="card mb-2 shadow-sm border-0 rounded-3 staff-card"
+                             data-userid="<?= $staff['id'] ?>"
                              data-username="<?= htmlspecialchars($staff['name']) ?>"
-                             data-payrateid="<?= $staff['pay_rate_id'] ?? '' ?>"
-                             data-is-external="<?= $is_external ? 'true' : 'false' ?>">
+                             data-payrateid="<?= $staff['pay_rate_id'] ?? '' ?>">
                             
                             <div class="card-body p-2 d-flex align-items-center">
                                 <div class="bg-<?= $bs_color ?> bg-opacity-10 text-<?= $bs_color ?> rounded-circle d-flex justify-content-center align-items-center fw-bold me-3 flex-shrink-0" style="width: 38px; height: 38px; font-size:15px;">
@@ -864,9 +835,6 @@ foreach ($roster_coverage as $coverage) {
                                     </h6>
                                     <div class="text-muted text-truncate staff-position" style="font-size: 11px;" title="<?= htmlspecialchars($staff['type']) ?>">
                                         <?= htmlspecialchars($staff['type']) ?>
-                                        <?php if ($is_external): ?>
-                                            <span class="text-danger ms-1 fw-bold">(ที่อื่น)</span>
-                                        <?php endif; ?>
                                         <!-- 🌟 แจ้งเตือนคนยังไม่จัดกลุ่มสายงาน -->
                                         <?php if (empty($staff['pay_rate_id'])): ?>
                                             <span class="text-danger fw-bold ms-1" title="ยังไม่ได้ระบุกลุ่มค่าตอบแทน"><i class="bi bi-exclamation-triangle-fill"></i></span>
@@ -1020,20 +988,13 @@ foreach ($roster_coverage as $coverage) {
                                     $pay
                                 );
                             ?>
-                            <tr class="<?= $is_external ? 'bg-danger bg-opacity-10' : '' ?> summary-staff-row" id="summary-row-<?= htmlspecialchars($staff['id']) ?>" style="<?= $is_visible ? '' : 'display: none;' ?>">
+                            <tr class="summary-staff-row" id="summary-row-<?= htmlspecialchars($staff['id']) ?>">
                                 <td class="text-start px-4 fw-medium text-dark">
                                     <?= htmlspecialchars($staff['name']) ?>
-                                    <?php if ($is_external): ?>
-                                        <span class="badge bg-danger text-white ms-1" style="font-size: 9px; font-weight: normal;">ช่วยราชการ</span>
-                                    <?php endif; ?>
                                 </td>
                                 <td class="text-start text-muted" style="font-size: 12px;">
                                     <?= htmlspecialchars($staff['type']) ?><br>
-                                    <?php if ($is_external): ?>
-                                        <span class="text-danger fw-bold"><i class="bi bi-building"></i> สังกัดอื่น</span>
-                                    <?php else: ?>
-                                        <span class="text-success"><i class="bi bi-house-door"></i> ในสังกัด</span>
-                                    <?php endif; ?>
+                                    <span class="text-success"><i class="bi bi-house-door"></i> ในสังกัด</span>
                                 </td>
                                 <td class="align-middle fs-6" style="color: #059669;" id="modal-sum-r-<?= $staff['id'] ?>"><?= $sum_r ?></td>
                                 <td class="align-middle fs-6" style="color: #dc2626;" id="modal-sum-y-<?= $staff['id'] ?>"><?= $sum_y ?></td>
@@ -1206,32 +1167,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 🌟 ระบบค้นหารายชื่อบุคลากรด้านขวามือ
     const staffSearch = document.getElementById('staffSearch');
-    const staffHospitalFilter = document.getElementById('staffHospitalFilter');
     const staffCards = document.querySelectorAll('.staff-card');
 
     function applyFilters() {
         if (!staffSearch) return;
         const term = staffSearch.value.toLowerCase().trim();
-        const showType = staffHospitalFilter.value;
 
         staffCards.forEach(card => {
-            const name = card.querySelector('.staff-name').textContent.toLowerCase();
-            const position = card.querySelector('.staff-position').textContent.toLowerCase();
-            const isExternal = card.getAttribute('data-is-external') === 'true';
-            
-            let matchType = false;
-            if (showType === 'own' && !isExternal) matchType = true;
-            if (showType === 'external' && isExternal) matchType = true;
-
-            if (matchType && (name.includes(term) || position.includes(term))) {
-                card.style.display = '';
-            } else {
-                card.style.display = 'none';
-            }
+            const name = card.querySelector('.staff-name')?.textContent.toLowerCase() || '';
+            const position = card.querySelector('.staff-position')?.textContent.toLowerCase() || '';
+            card.style.display = (name.includes(term) || position.includes(term)) ? '' : 'none';
         });
     }
     if (staffSearch) staffSearch.addEventListener('input', applyFilters);
-    if (staffHospitalFilter) staffHospitalFilter.addEventListener('change', applyFilters);
 
     // Roster row quick filters
     document.querySelectorAll('.roster-staff-row').forEach(row => {
@@ -1292,7 +1240,6 @@ document.addEventListener('DOMContentLoaded', function() {
             handle: '.drag-handle', 
             animation: 150,
             ghostClass: 'sortable-ghost', 
-            filter: '#dropZoneRow', 
             swapThreshold: 0.65,
             onEnd: function (evt) {
                 const orderedRows = Array.from(rosterTableBody.querySelectorAll('.roster-staff-row'));
@@ -1317,46 +1264,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-
-// ==========================================
-// 🌟 Native Drag & Drop (ดึงคนนอกมาช่วยเวร)
-// ==========================================
-function drag(ev) {
-    ev.dataTransfer.setData("text/plain", ev.target.getAttribute('data-userid'));
-}
-function allowDrop(ev) {
-    ev.preventDefault();
-    const dropZone = document.getElementById('dropZoneRow');
-    if (dropZone) dropZone.classList.add('bg-primary', 'bg-opacity-10');
-}
-function dragLeave(ev) {
-    const dropZone = document.getElementById('dropZoneRow');
-    if (dropZone) dropZone.classList.remove('bg-primary', 'bg-opacity-10');
-}
-function dropStaff(ev) {
-    ev.preventDefault();
-    const dropZone = document.getElementById('dropZoneRow');
-    if (dropZone) dropZone.classList.remove('bg-primary', 'bg-opacity-10');
-    
-    const userId = ev.dataTransfer.getData("text/plain");
-    if (!userId) return;
-
-    const staffRow = document.getElementById('row-staff-' + userId);
-    if (staffRow) {
-        if (staffRow.style.display === 'none') {
-            staffRow.style.display = '';
-            staffRow.dataset.rosterBaseVisible = 'true';
-            const summaryRow = document.getElementById('summary-row-' + userId);
-            if (summaryRow) summaryRow.style.display = '';
-            showToast('success', 'เพิ่มบุคลากรลงในตารางเวรแล้ว (จัดเวรได้เลย)');
-            staffRow.classList.add('bg-success', 'bg-opacity-10');
-            setTimeout(() => staffRow.classList.remove('bg-success', 'bg-opacity-10'), 2000);
-            refreshRosterKpis();
-        } else {
-            showToast('warning', 'บุคลากรท่านนี้มีรายชื่ออยู่ในตารางเวรอยู่แล้ว');
-        }
-    }
-}
 
 // ==========================================
 // Roster UI V2 helpers
@@ -1407,7 +1314,6 @@ function applyRosterRowFilter(filter) {
         if (filter === 'empty') match = shiftTypes.length === 0;
         else if (filter === 'night') match = shiftTypes.includes('ร');
         else if (filter === 'leave') match = !!row.querySelector('.leave-badge-cell');
-        else if (filter === 'external') match = row.dataset.isExternal === 'true';
         else if (filter === 'fatigue') match = !!row.querySelector('.fatigue-warn');
 
         row.classList.toggle('rp-filter-hidden', !match);
@@ -1446,7 +1352,7 @@ function updateCoverageForDate(dateStr) {
 }
 
 function refreshRosterKpis() {
-    const baseRows = Array.from(document.querySelectorAll('.roster-staff-row')).filter(row => row.dataset.rosterBaseVisible !== 'false' && row.style.display !== 'none');
+    const baseRows = Array.from(document.querySelectorAll('.roster-staff-row')).filter(row => !row.classList.contains('rp-filter-hidden'));
     const staffKpi = document.getElementById('kpiStaffCount');
     if (staffKpi) staffKpi.textContent = baseRows.length.toLocaleString();
 
