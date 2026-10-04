@@ -31,7 +31,6 @@ function addColumnIfMissing(PDO $db, string $table, string $column, string $defi
 echo "Roster Pro legacy database migration\n";
 echo "Database: " . (getenv('DB_NAME') ?: 'roster_pro_db') . "\n\n";
 
-$db->beginTransaction();
 try {
     // users
     addColumnIfMissing($db, 'users', 'phone', "VARCHAR(50) NULL");
@@ -270,12 +269,9 @@ try {
     $db->exec("UPDATE users SET show_in_roster = 1 WHERE show_in_roster IS NULL");
     $db->exec("UPDATE hospitals SET is_active = 1 WHERE is_active IS NULL");
 
-    $db->commit();
     echo "\nMigration completed successfully.\n";
 } catch (Throwable $e) {
-    if ($db->inTransaction()) {
-        $db->rollBack();
-    }
     fwrite(STDERR, "\nMigration failed: " . $e->getMessage() . "\n");
+    fwrite(STDERR, "The migration is idempotent; fix the reported issue and run it again.\n");
     exit(1);
 }
