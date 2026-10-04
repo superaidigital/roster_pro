@@ -15,7 +15,7 @@ class NotificationController {
         // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน (ต้องล็อกอินก่อน)
         if (!isset($_SESSION['user'])) {
             $_SESSION['error_msg'] = "กรุณาเข้าสู่ระบบก่อนใช้งาน";
-            header("Location: index.php?c=auth&a=login");
+            header("Location: index.php?c=auth&a=index");
             exit;
         }
 
@@ -41,42 +41,54 @@ class NotificationController {
     // 🌟 2. อ่านการแจ้งเตือน 1 รายการและเปลี่ยนหน้า (Redirect)
     // ==========================================
     public function read() {
-        if (isset($_GET['id'])) {
-            $id = (int)$_GET['id'];
-            $user_id = $_SESSION['user']['id'];
-            
-            // อัปเดตสถานะในฐานข้อมูลว่า "อ่านแล้ว"
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST' || !security_is_valid_post_csrf()) {
+            http_response_code(405);
+            $_SESSION['error_msg'] = 'คำขอไม่ถูกต้อง กรุณาลองใหม่';
+            header('Location: index.php?c=notification');
+            exit;
+        }
+
+        $id = (int)($_POST['id'] ?? 0);
+        $user_id = (int)($_SESSION['user']['id'] ?? 0);
+        $notification = $id > 0 ? $this->notifModel->getNotificationById($id, $user_id) : null;
+
+        if ($notification) {
             $this->notifModel->markAsRead($id, $user_id);
         }
 
-        // ตรวจสอบว่ามีลิงก์แนบมาด้วยหรือไม่ ถ้ามีให้วิ่งไปที่ลิงก์นั้น
-        if (!empty($_GET['url'])) {
-            $target_url = urldecode($_GET['url']);
-            header("Location: " . $target_url);
-        } else {
-            // ถ้าไม่มีลิงก์ ให้กลับไปที่หน้ารวมการแจ้งเตือน
-            header("Location: index.php?c=notification");
-        }
+        $target = security_safe_local_redirect(
+            $notification['link'] ?? null,
+            'index.php?c=notification'
+        );
+
+        header('Location: ' . $target);
         exit;
     }
 
     // ==========================================
-    // 🌟 3. ทำเครื่องหมายว่าอ่านทั้งหมด (กรณีเรียกจาก Header Dropdown)
+    // 🌟 3. ทำเครื่องหมายว่าอ่านทั้งหมด
     // ==========================================
     public function read_all() {
-        $user_id = $_SESSION['user']['id'];
-        
-        // สั่งเคลียร์ให้อ่านทั้งหมด
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST' || !security_is_valid_post_csrf()) {
+            http_response_code(405);
+            $_SESSION['error_msg'] = 'คำขอไม่ถูกต้อง กรุณาลองใหม่';
+            header('Location: index.php?c=notification');
+            exit;
+        }
+
+        $user_id = (int)($_SESSION['user']['id'] ?? 0);
         $this->notifModel->markAllAsRead($user_id);
-        
-        // พยายามพากลับไปหน้าเดิมที่ผู้ใช้กด (Referer) ถ้าไม่มีให้ไปหน้า Dashboard
-        $referer = $_SERVER['HTTP_REFERER'] ?? 'index.php?c=dashboard';
-        
-        // ใส่ Alert แจ้งเตือนความสำเร็จ (ถ้ามีระบบรองรับใน View)
-        $_SESSION['success_msg'] = "ทำเครื่องหมายว่าอ่านแล้วทั้งหมดเรียบร้อย";
-        
-        header("Location: " . $referer);
+
+        $_SESSION['success_msg'] = 'ทำเครื่องหมายว่าอ่านแล้วทั้งหมดเรียบร้อย';
+
+        $returnTo = security_safe_local_redirect(
+            $_POST['return_to'] ?? null,
+            'index.php?c=notification'
+        );
+
+        header('Location: ' . $returnTo);
         exit;
     }
+
 }
 ?>
