@@ -36,6 +36,7 @@ $settings = $settings ?? [];
         <div class="card-body p-4 p-md-5">
             
             <form action="index.php?c=settings&a=update_system" method="POST">
+                            <?= security_csrf_input() ?>
                 <input type="hidden" name="section" value="general">
                 
                 <h6 class="fw-bold text-primary mb-4 border-bottom pb-2"><i class="bi bi-info-square me-2"></i> ข้อมูลแอปพลิเคชัน</h6>
