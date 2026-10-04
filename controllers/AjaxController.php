@@ -633,6 +633,7 @@ class AjaxController {
         $hospital_name = $stmt_hosp->fetch(PDO::FETCH_ASSOC)['name'] ?? 'รพ.สต.';
 
         try {
+            $approvedVersionId = null;
             $shiftModel->updateRosterStatus($hospital_id, $month_year, $new_status);
 
             LogsController::addLog($db, $_SESSION['user']['id'], 'APPROVE', "เปลี่ยนสถานะตารางเวร รพ.สต. {$hospital_name} เดือน {$month_year} เป็น {$new_status}");
@@ -697,6 +698,24 @@ class AjaxController {
                 $stmt_snap = $db->prepare("UPDATE roster_status SET pay_summary = NULL WHERE hospital_id = ? AND month_year = ?");
                 $stmt_snap->execute([$hospital_id, $month_year]);
             }
+
+            $auditModel = new RosterAuditModel($db);
+            $auditMetadata = [];
+            if ($approvedVersionId !== null) {
+                $auditMetadata['approved_snapshot_id'] = (int)$approvedVersionId;
+            }
+            $auditModel->record(
+                $hospital_id,
+                $month_year,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_STATUS_CHANGE',
+                ['status' => $current_status],
+                ['status' => $new_status],
+                $auditMetadata,
+                null,
+                null,
+                'WORKFLOW'
+            );
 
             $thai_months = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
             $m = (int)substr($month_year, 5, 2);
@@ -779,6 +798,20 @@ class AjaxController {
             $shiftModel->updateRosterStatus($hospital_id, $month_year, 'REQUEST_EDIT');
             
             LogsController::addLog($db, $_SESSION['user']['id'], 'UPDATE', "ส่งคำขอแก้ไขตารางเวรที่อนุมัติแล้ว เดือน {$month_year}");
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospital_id,
+                $month_year,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_EDIT_REQUEST',
+                ['status' => 'APPROVED'],
+                ['status' => 'REQUEST_EDIT'],
+                [],
+                null,
+                null,
+                'WORKFLOW'
+            );
 
             $stmt = $db->query("SELECT id FROM users WHERE role IN ('ADMIN', 'SUPERADMIN')");
             $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
