@@ -136,6 +136,23 @@ $visitTypeLabels = [
                     <?= security_csrf_input() ?>
                     <input type="hidden" name="visit_id" value="<?= (int)($editVisit['id'] ?? 0) ?>">
                     <input type="hidden" name="status" id="fieldStatus" value="DRAFT">
+                    <input type="hidden" name="duplicate_confirmed" id="fieldDuplicateConfirmed" value="0">
+
+                    <div id="fieldDuplicateNotice" class="alert alert-warning d-none mb-3" role="alert">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-exclamation-triangle-fill fs-5 mt-1"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">พบรายการที่อาจซ้ำ</div>
+                                <div id="fieldDuplicateMessage" class="small mt-1"></div>
+                                <div class="form-check mt-2 mb-0">
+                                    <input class="form-check-input" type="checkbox" id="fieldDuplicateConfirmBox">
+                                    <label class="form-check-label fw-semibold" for="fieldDuplicateConfirmBox">
+                                        ตรวจสอบแล้ว และยืนยันว่าจำเป็นต้องบันทึกรายการนี้เพิ่ม
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <section data-rp-step data-rp-step-title="ข้อมูลทั่วไป">
                         <div class="rp-step-heading">
@@ -339,10 +356,15 @@ $visitTypeLabels = [
                         <h5 class="mb-1"><i class="bi bi-clock-history text-primary me-2"></i>รายการล่าสุด</h5>
                         <small class="text-muted">ข้อมูลที่คุณมีสิทธิ์เข้าถึงตามบทบาทและหน่วยบริการ</small>
                     </div>
-                    <a class="btn btn-outline-success btn-sm"
-                       href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>">
-                        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
-                    </a>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a class="btn btn-outline-primary btn-sm" href="index.php?c=field&a=followups">
+                            <i class="bi bi-list-check me-1"></i>คิวติดตาม
+                        </a>
+                        <a class="btn btn-outline-success btn-sm"
+                           href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>">
+                            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
+                        </a>
+                    </div>
                 </div>
 
                 <form class="row g-2 mt-2" method="GET" action="index.php">
@@ -471,4 +493,4 @@ $visitTypeLabels = [
     JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
 ) ?></script>
 <?php endif; ?>
-<script src="public/js/field.js?v=20261004-field-v2" defer></script>
+<script src="public/js/field.js?v=20261004-field-v3" defer></script>
