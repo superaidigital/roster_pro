@@ -272,6 +272,32 @@ if (is_file($profileControllerPath)) {
     }
 }
 
+// 5.6) Structured roster audit trail must remain wired into roster mutations.
+$auditModelPath = $root . '/models/RosterAuditModel.php';
+if (!is_file($auditModelPath)) {
+    addError($errors, 'models/RosterAuditModel.php: structured roster audit model must remain available');
+}
+
+$ajaxAuditPath = $root . '/controllers/AjaxController.php';
+if (is_file($ajaxAuditPath)) {
+    $ajaxAudit = (string) file_get_contents($ajaxAuditPath);
+    foreach (['SHIFT_SET', 'SHIFT_DELETE', 'ROSTER_COPY_PREVIOUS', 'ROSTER_AUTO_SCHEDULE', 'ROSTER_STATUS_CHANGE'] as $requiredAuditAction) {
+        if (strpos($ajaxAudit, "'{$requiredAuditAction}'") === false) {
+            addError($errors, "controllers/AjaxController.php: missing roster audit action {$requiredAuditAction}");
+        }
+    }
+}
+
+$rosterAuditPath = $root . '/controllers/RosterController.php';
+if (is_file($rosterAuditPath)) {
+    $rosterAudit = (string) file_get_contents($rosterAuditPath);
+    foreach (['ROSTER_CLEAR', 'ROSTER_RANDOMIZE', 'ROSTER_RESTORE', 'SNAPSHOT_CREATE'] as $requiredAuditAction) {
+        if (strpos($rosterAudit, "'{$requiredAuditAction}'") === false) {
+            addError($errors, "controllers/RosterController.php: missing roster audit action {$requiredAuditAction}");
+        }
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
