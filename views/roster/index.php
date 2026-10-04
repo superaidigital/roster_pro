@@ -925,9 +925,7 @@ foreach ($roster_coverage as $coverage) {
                             <?php 
                             $total_r = 0; $total_y = 0; $total_b = 0; $total_all = 0; $total_pay_all = 0;
                             
-                            foreach ($all_staff_for_sidebar as $staff): 
-                                $is_external = (isset($staff['hospital_id']) && $staff['hospital_id'] != ($hospital_id??0));
-                                
+                            foreach ($all_staff_for_sidebar as $staff):
                                 $sum_r = 0; $sum_y = 0; $sum_b = 0;
                                 if (isset($shifts)) {
                                     foreach ($shifts as $s) {
@@ -961,7 +959,6 @@ foreach ($roster_coverage as $coverage) {
                                     $total_pay_all += $pay;
                                 }
 
-                                $is_visible = (!$is_external || $totalShift > 0);
                                 $total_r += $sum_r; $total_y += $sum_y; $total_b += $sum_b; $total_all += $totalShift;
 
                                 $group_name_val = 'ไม่มีกลุ่ม';
