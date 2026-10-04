@@ -171,6 +171,7 @@ class SettingsController {
         $night = $night !== '' ? mb_substr($night, 0, 100, 'UTF-8') : null;
 
         $logo_path = null;
+        $old_logo_path = null;
 
         if (isset($_FILES['logo']) && (int)($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
             $file = $_FILES['logo'];
@@ -227,13 +228,9 @@ class SettingsController {
 
             if ($id > 0) {
                 $current = $hospitalModel->getHospitalById($id);
-                $oldLogo = (string)($current['logo'] ?? '');
-                if ($oldLogo !== '' && strpos($oldLogo, 'default') === false) {
-                    $logoRoot = realpath($uploadDir);
-                    $oldReal = realpath($oldLogo);
-                    if ($logoRoot !== false && $oldReal !== false && str_starts_with($oldReal, $logoRoot . DIRECTORY_SEPARATOR) && is_file($oldReal)) {
-                        @unlink($oldReal);
-                    }
+                $candidateOldLogo = (string)($current['logo'] ?? '');
+                if ($candidateOldLogo !== '' && strpos($candidateOldLogo, 'default') === false) {
+                    $old_logo_path = $candidateOldLogo;
                 }
             }
         }
@@ -247,10 +244,20 @@ class SettingsController {
             );
             
             if ($result) {
-                // 🌟 บันทึก Log: อัปเดตข้อมูลหน่วยบริการ
+                if ($logo_path && $old_logo_path) {
+                    $logoRoot = realpath('public/uploads/logos/');
+                    $oldReal = realpath($old_logo_path);
+                    if ($logoRoot !== false && $oldReal !== false && str_starts_with($oldReal, $logoRoot . DIRECTORY_SEPARATOR) && is_file($oldReal)) {
+                        @unlink($oldReal);
+                    }
+                }
+
                 LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "แก้ไขข้อมูล รพ.สต. ID: {$id} ({$name})");
                 $_SESSION['success_msg'] = "บันทึกข้อมูลหน่วยบริการสำเร็จ";
             } else {
+                if ($logo_path && is_file($logo_path)) {
+                    @unlink($logo_path);
+                }
                 $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล";
             }
         } else {
@@ -273,6 +280,9 @@ class SettingsController {
                 LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มหน่วยบริการใหม่ ({$name})");
                 $_SESSION['success_msg'] = "เพิ่มข้อมูลหน่วยบริการสำเร็จ";
             } else {
+                if ($logo_path && is_file($logo_path)) {
+                    @unlink($logo_path);
+                }
                 $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการสร้างหน่วยบริการใหม่";
             }
         }
