@@ -301,4 +301,90 @@ class FieldVisitModel {
 
         return $row ?: null;
     }
+
+    public function findPotentialDuplicate(
+        array $user,
+        string $patientRef,
+        string $visitDate,
+        int $hospitalId,
+        int $excludeVisitId = 0
+    ): ?array {
+        $patientRef = trim($patientRef);
+        if ($patientRef === '' || $visitDate === '' || $hospitalId <= 0) {
+            return null;
+        }
+
+        $scope = $this->scope($user, 'fv');
+        $where = [
+            $scope['sql'],
+            'fv.hospital_id = :duplicate_hospital',
+            'fv.patient_ref = :duplicate_patient_ref',
+            'fv.visit_date = :duplicate_visit_date'
+        ];
+        $params = $scope['params'];
+        $params[':duplicate_hospital'] = $hospitalId;
+        $params[':duplicate_patient_ref'] = $patientRef;
+        $params[':duplicate_visit_date'] = $visitDate;
+
+        if ($excludeVisitId > 0) {
+            $where[] = 'fv.id <> :duplicate_exclude_id';
+            $params[':duplicate_exclude_id'] = $excludeVisitId;
+        }
+
+        $sql = "SELECT
+                    fv.id,
+                    fv.visit_date,
+                    fv.visit_type,
+                    fv.status,
+                    fv.risk_level,
+                    fv.created_at
+                FROM field_visits fv
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY fv.id DESC
+                LIMIT 1";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
+    }
+
+    public function getFollowUpQueue(array $user, int $limit = 200): array {
+        $scope = $this->scope($user, 'fv');
+        $limit = max(1, min(1000, $limit));
+
+        $sql = "SELECT
+                    fv.*,
+                    h.name AS hospital_name,
+                    u.name AS created_by_name,
+                    DATEDIFF(fv.follow_up_date, CURDATE()) AS days_until_followup
+                FROM field_visits fv
+                LEFT JOIN hospitals h ON h.id = fv.hospital_id
+                LEFT JOIN users u ON u.id = fv.created_by
+                WHERE {$scope['sql']}
+                  AND fv.status = 'COMPLETED'
+                  AND fv.follow_up_status = 'PENDING'
+                  AND fv.follow_up_date IS NOT NULL
+                ORDER BY
+                  CASE fv.risk_level
+                    WHEN 'URGENT' THEN 0
+                    WHEN 'HIGH' THEN 1
+                    WHEN 'WATCH' THEN 2
+                    ELSE 3
+                  END ASC,
+                  CASE
+                    WHEN fv.follow_up_date < CURDATE() THEN 0
+                    WHEN fv.follow_up_date = CURDATE() THEN 1
+                    ELSE 2
+                  END ASC,
+                  fv.follow_up_date ASC,
+                  fv.id DESC
+                LIMIT {$limit}";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($scope['params']);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
 }
