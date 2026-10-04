@@ -66,6 +66,7 @@ function formatDateThai($dateString) {
                 </div>
                 <div class="card-body p-4">
                     <form action="index.php?c=settings&a=save_holiday" method="POST">
+                            <?= security_csrf_input() ?>
                         <div class="mb-3">
                             <label class="form-label fw-bold" style="font-size: 13px;">วันที่ <span class="text-danger">*</span></label>
                             <div class="position-relative">
