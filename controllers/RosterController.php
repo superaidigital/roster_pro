@@ -5,6 +5,7 @@ require_once 'config/database.php';
 require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 require_once 'models/RosterSnapshotModel.php';
+require_once 'models/RosterAuditModel.php';
 
 class RosterController {
 
@@ -155,6 +156,16 @@ class RosterController {
             }
         }
 
+        $roster_audit_events = [];
+        if ($hosp_id_safe > 0 && $this->canManageRosterVersions()) {
+            try {
+                $auditModel = new RosterAuditModel($db);
+                $roster_audit_events = $auditModel->listEvents($hosp_id_safe, $selected_month, 50);
+            } catch (Throwable $e) {
+                error_log('Roster audit list failed: ' . $e->getMessage());
+            }
+        }
+
         // โหลด View หน้ากระดานจัดเวร
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
@@ -283,8 +294,13 @@ class RosterController {
         
         try {
             $db->beginTransaction();
+
+            $beforeCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
+            $beforeCountStmt->execute([$hospital_id, $month_like]);
+            $beforeShiftCount = (int)$beforeCountStmt->fetchColumn();
+
             $snapshotModel = new RosterSnapshotModel($db);
-            $snapshotModel->createSnapshot(
+            $snapshotId = $snapshotModel->createSnapshot(
                 $hospital_id,
                 $month,
                 (int)$_SESSION['user']['id'],
@@ -296,6 +312,24 @@ class RosterController {
             $stmt->execute([$hospital_id, $month_like]);
             
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ล้างข้อมูลตารางเวรทั้งหมดของเดือน {$month}");
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospital_id,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_CLEAR',
+                ['shift_count' => $beforeShiftCount],
+                ['shift_count' => 0],
+                [
+                    'snapshot_id' => $snapshotId,
+                    'deleted_count' => $stmt->rowCount(),
+                ],
+                null,
+                null,
+                'ROSTER'
+            );
+
             $db->commit();
             
             $_SESSION['success_msg'] = "ล้างข้อมูลตารางเวรของเดือน {$month} เรียบร้อยแล้ว เริ่มจัดใหม่ได้ทันที";
