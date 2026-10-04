@@ -101,12 +101,12 @@ if (!function_exists('renderSidebarMenu')) {
             <li class="sidebar-heading">แดชบอร์ดสถิติ</li>
             <li class="nav-item">
                 <a class="nav-link <?= ($c == 'dashboard') ? 'active' : '' ?>" href="index.php?c=dashboard">
-                    <i class="bi bi-grid-1x2-fill text-primary"></i> <span class="sidebar-text">หน้าหลัก (Dashboard)</span>
+                    <i class="bi bi-speedometer2 text-primary"></i> <span class="sidebar-text">หน้าหลัก (Dashboard)</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link <?= ($c == 'profile' && $a == 'schedule') ? 'active' : '' ?>" href="index.php?c=profile&a=schedule">
-                    <i class="bi bi-calendar-heart-fill text-danger"></i> <span class="sidebar-text">ปฏิทินเวรของฉัน</span>
+                    <i class="bi bi-calendar2-week-fill text-danger"></i> <span class="sidebar-text">ปฏิทินเวรของฉัน</span>
                 </a>
             </li>
             <?php endif; ?>
@@ -148,7 +148,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('roster', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'roster') ? 'active' : '' ?>" href="index.php?c=roster">
-                        <i class="bi bi-calendar3 text-info"></i> <span class="sidebar-text">ตารางปฏิบัติงาน (เวร)</span>
+                        <i class="bi bi-calendar2-check-fill text-info"></i> <span class="sidebar-text">ตารางปฏิบัติงาน (เวร)</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -156,7 +156,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('report', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'report' && $a == 'overview') ? 'active' : '' ?>" href="index.php?c=report&a=overview">
-                        <i class="bi bi-bar-chart-line-fill text-success"></i> <span class="sidebar-text">ติดตามการส่งเวร</span>
+                        <i class="bi bi-graph-up-arrow text-success"></i> <span class="sidebar-text">ติดตามการส่งเวร</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -166,7 +166,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <li class="nav-item leave-dropdown-container">
                     <a class="nav-link <?= ($c == 'leave') ? '' : 'collapsed' ?> d-flex justify-content-between align-items-center" 
                         data-bs-toggle="collapse" href="#leaveMenu" role="button" aria-expanded="<?= ($c == 'leave') ? 'true' : 'false' ?>">
-                        <div><i class="bi bi-envelope-paper-fill text-warning"></i> <span class="sidebar-text">ระบบจัดการวันลา</span></div>
+                        <div><i class="bi bi-calendar2-minus-fill text-warning"></i> <span class="sidebar-text">ระบบจัดการวันลา</span></div>
                         <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
                     </a>
                     <div class="collapse <?= ($c == 'leave') ? 'show' : '' ?>" id="leaveMenu">
@@ -229,7 +229,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('users', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'users') ? 'active' : '' ?>" href="index.php?c=users">
-                        <i class="bi bi-database-gear text-dark"></i> <span class="sidebar-text">ฐานข้อมูลบุคลากร</span>
+                        <i class="bi bi-person-vcard-fill text-dark"></i> <span class="sidebar-text">ฐานข้อมูลบุคลากร</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -239,7 +239,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <li class="nav-item hr-dropdown-container">
                     <a class="nav-link <?= ($c == 'hr') ? '' : 'collapsed' ?> d-flex justify-content-between align-items-center" 
                         data-bs-toggle="collapse" href="#hrMenu" role="button" aria-expanded="<?= ($c == 'hr') ? 'true' : 'false' ?>">
-                        <div><i class="bi bi-person-bounding-box text-danger"></i> <span class="sidebar-text">ระบบงานบุคคล (HR)</span></div>
+                        <div><i class="bi bi-person-badge-fill text-danger"></i> <span class="sidebar-text">ระบบงานบุคคล (HR)</span></div>
                         <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
                     </a>
                     <div class="collapse <?= ($c == 'hr') ? 'show' : '' ?>" id="hrMenu">
@@ -278,7 +278,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('settings', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'settings') ? 'active' : '' ?>" href="index.php?c=settings">
-                        <i class="bi bi-gear-fill text-secondary"></i> <span class="sidebar-text">ตั้งค่าหน่วยบริการ/ระบบ</span>
+                        <i class="bi bi-sliders2-vertical text-secondary"></i> <span class="sidebar-text">ตั้งค่าหน่วยบริการ/ระบบ</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -286,7 +286,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('logs', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'logs') ? 'active' : '' ?>" href="index.php?c=logs">
-                        <i class="bi bi-journal-text text-secondary"></i> <span class="sidebar-text">ประวัติการใช้งาน</span>
+                        <i class="bi bi-clock-history text-secondary"></i> <span class="sidebar-text">ประวัติการใช้งาน</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -294,7 +294,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('hospitals', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'hospitals') ? 'active' : '' ?>" href="index.php?c=hospitals">
-                        <i class="bi bi-building-fill text-primary"></i> <span class="sidebar-text">จัดการ รพ.สต. ทั้งหมด</span>
+                        <i class="bi bi-hospital-fill text-primary"></i> <span class="sidebar-text">จัดการ รพ.สต. ทั้งหมด</span>
                     </a>
                 </li>
                 <?php endif; ?>
