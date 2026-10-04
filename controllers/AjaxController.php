@@ -715,35 +715,59 @@ class AjaxController {
     // 🌟 1. ตรวจสอบความผิดปกติของตารางเวร (Advanced Validation)
     // ==========================================
     public function validate_roster() {
-        error_reporting(0); // 🌟 ปิด Warning
-        header('Content-Type: application/json');
-        if (!isset($_SESSION['user'])) { echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit; }
+        error_reporting(0);
+        header('Content-Type: application/json; charset=utf-8');
+        if (!isset($_SESSION['user'])) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
 
         $db = (new Database())->getConnection();
         $month_year = trim((string)($_GET['month'] ?? date('Y-m')));
 
         if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month_year)) {
             http_response_code(422);
-            echo json_encode(['status' => 'error', 'message' => 'รูปแบบเดือนไม่ถูกต้อง']);
+            echo json_encode(['status' => 'error', 'message' => 'รูปแบบเดือนไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        
-        $hospital_id = $_SESSION['user']['hospital_id'];
-        if (isset($_GET['hosp_id']) && $_GET['hosp_id'] !== '' && in_array(strtoupper($_SESSION['user']['role']), ['ADMIN', 'SUPERADMIN'])) {
-            $hospital_id = $_GET['hosp_id'];
+
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        if (isset($_GET['hosp_id']) && $_GET['hosp_id'] !== '' && in_array($role, ['ADMIN', 'SUPERADMIN'], true)) {
+            $hospital_id = (int)$_GET['hosp_id'];
         }
-        
+        if ($hospital_id <= 0) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'กรุณาเลือกหน่วยบริการก่อนตรวจสอบตาราง'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         $warnings = [];
         $errors = [];
-        
+
+        $normalizeCode = static function (string $code): string {
+            $code = trim($code);
+            $aliases = ['A' => 'บ', 'N' => 'ร', 'O' => 'ย', 'M' => 'ช'];
+            return $aliases[$code] ?? $code;
+        };
+        $parseShift = static function ($value) use ($normalizeCode): array {
+            $parts = preg_split('/[\\/,\\s]+/', trim((string)$value)) ?: [];
+            $parts = array_map($normalizeCode, $parts);
+            return array_values(array_filter(array_unique($parts), static fn($v) => $v !== ''));
+        };
+        $hasWorkShift = static function (array $types): bool {
+            return count(array_intersect($types, ['ช', 'บ', 'ร', 'ย'])) > 0;
+        };
+
         try {
             $start_date = $month_year . '-01';
             $max_days = (int)date('t', strtotime($start_date));
 
             $stmt_shifts = $db->prepare("
-                SELECT s.shift_date, s.shift_type, s.user_id, u.name, u.type, u.employee_type 
-                FROM shifts s 
-                JOIN users u ON s.user_id = u.id 
+                SELECT s.shift_date, s.shift_type, s.user_id, u.name, u.type, u.employee_type
+                FROM shifts s
+                JOIN users u ON s.user_id = u.id
                 WHERE s.hospital_id = ? AND s.shift_date LIKE ?
                 ORDER BY s.user_id, s.shift_date ASC
             ");
@@ -752,27 +776,34 @@ class AjaxController {
 
             if (empty($shifts)) {
                 $errors[] = "ตารางเวรว่างเปล่า: ยังไม่มีการจัดเจ้าหน้าที่ลงในตารางเวร กรุณาจัดเวรก่อนส่งอนุมัติ";
-                echo json_encode(['status' => 'success', 'warnings' => $errors, 'has_error' => true]);
+                echo json_encode([
+                    'status' => 'success',
+                    'warnings' => $errors,
+                    'errors' => $errors,
+                    'advisories' => [],
+                    'has_error' => true
+                ], JSON_UNESCAPED_UNICODE);
                 exit;
             }
 
             $user_schedules = [];
             $user_names = [];
             $shift_roster = [];
-            $shift_counts = []; 
+            $shift_counts = [];
 
             foreach ($shifts as $s) {
-                $user_schedules[$s['user_id']][$s['shift_date']] = $s['shift_type'];
-                $user_names[$s['user_id']] = $s['name'];
-                
-                if (!isset($shift_counts[$s['user_id']])) $shift_counts[$s['user_id']] = 0;
-                
-                $types = explode('/', $s['shift_type']);
+                $uid = (int)$s['user_id'];
+                $user_schedules[$uid][$s['shift_date']] = (string)$s['shift_type'];
+                $user_names[$uid] = htmlspecialchars((string)$s['name'], ENT_QUOTES, 'UTF-8');
+                $shift_counts[$uid] = $shift_counts[$uid] ?? 0;
+
+                $types = $parseShift($s['shift_type']);
                 foreach ($types as $st) {
-                    $st = trim($st);
-                    if (in_array($st, ['บ', 'ร', 'ช'])) {
-                        $shift_roster[$s['shift_date']][$st][] = $s;
-                        $shift_counts[$s['user_id']]++;
+                    if (in_array($st, ['ช', 'บ', 'ร', 'ย'], true)) {
+                        if (in_array($st, ['ช', 'บ', 'ร'], true)) {
+                            $shift_roster[$s['shift_date']][$st][] = $s;
+                        }
+                        $shift_counts[$uid]++;
                     }
                 }
             }
@@ -782,8 +813,8 @@ class AjaxController {
             $holidays = $stmt_holidays->fetchAll(PDO::FETCH_COLUMN);
 
             for ($i = 1; $i <= $max_days; $i++) {
-                $date = "$month_year-" . str_pad($i, 2, '0', STR_PAD_LEFT);
-                $is_holiday = in_array($date, $holidays);
+                $date = "$month_year-" . str_pad((string)$i, 2, '0', STR_PAD_LEFT);
+                $is_holiday = in_array($date, $holidays, true);
                 $is_weekend = (date('N', strtotime($date)) >= 6);
                 $is_normal_day = (!$is_weekend && !$is_holiday);
 
@@ -798,7 +829,8 @@ class AjaxController {
                         foreach ($staff_in_shift as $staff) {
                             $type_str = ($staff['type'] ?? '') . ' ' . ($staff['employee_type'] ?? '');
                             if (mb_strpos($type_str, 'ผู้ช่วย') === false) {
-                                $has_professional = true; break;
+                                $has_professional = true;
+                                break;
                             }
                         }
                         if (!$has_professional) {
@@ -815,27 +847,28 @@ class AjaxController {
                 $consecutive_work = 0;
 
                 for ($i = 1; $i <= $max_days; $i++) {
-                    $curr_date = "$month_year-" . str_pad($i, 2, '0', STR_PAD_LEFT);
+                    $curr_date = "$month_year-" . str_pad((string)$i, 2, '0', STR_PAD_LEFT);
                     $curr_shift = $dates[$curr_date] ?? '';
                     $tomorrow_date = date('Y-m-d', strtotime($curr_date . ' +1 day'));
                     $tomorrow_shift = $dates[$tomorrow_date] ?? '';
+                    $curr_types = $parseShift($curr_shift);
+                    $tomorrow_types = $parseShift($tomorrow_shift);
+                    $has_night = in_array('ร', $curr_types, true);
+                    $works_today = $hasWorkShift($curr_types);
+                    $works_tomorrow = $hasWorkShift($tomorrow_types);
 
-                    if (strpos($curr_shift, 'บ/ร') !== false || strpos($curr_shift, 'ร/บ') !== false) {
-                        $errors[] = "ห้ามค่อมเวร: <b>{$user_names[$uid]}</b> มีเวรควบ บ่าย-ดึก (บ/ร) ในวันที่ $i";
+                    if (in_array('บ', $curr_types, true) && in_array('ร', $curr_types, true)) {
+                        $warnings[] = "กะควบ: <b>{$user_names[$uid]}</b> มีเวรบ่าย-ดึก (บ/ร) ในวันที่ $i ควรตรวจสอบภาระงานและเวลาพัก";
                     }
 
-                    if (strpos($curr_shift, 'ร') !== false) {
+                    if ($has_night) {
                         $consecutive_nights++;
                         $consecutive_work++;
-                        
-                        if (strpos($tomorrow_shift, 'บ') !== false || strpos($tomorrow_shift, 'ช') !== false) {
-                            $errors[] = "ไม่ได้พัก: <b>{$user_names[$uid]}</b> ลงดึก (ร) วันที่ $i แล้วต่อกะ ($tomorrow_shift) วันที่ " . ($i+1) . " ทันที";
+
+                        if ($works_tomorrow) {
+                            $errors[] = "ไม่ได้พัก: <b>{$user_names[$uid]}</b> ลงดึก (ร) วันที่ $i แล้วมีเวรอีกในวันที่ " . ($i + 1) . " ($tomorrow_shift)";
                         }
-                        
-                        if ($tomorrow_shift !== 'ย' && $tomorrow_shift !== '' && strpos($tomorrow_shift, 'ร') === false) {
-                            $warnings[] = "แนะนำพักผ่อน: <b>{$user_names[$uid]}</b> ลงดึกวันที่ $i ควรได้หยุด (ย) ในวันที่ " . ($i+1);
-                        }
-                    } elseif (in_array($curr_shift, ['บ', 'ช'])) {
+                    } elseif ($works_today) {
                         $consecutive_work++;
                         $consecutive_nights = 0;
                     } else {
@@ -861,13 +894,26 @@ class AjaxController {
                 }
             }
 
-            $all_issues = array_merge($errors, $warnings);
-            echo json_encode(['status' => 'success', 'warnings' => array_unique($all_issues), 'has_error' => (count($errors) > 0)]);
-            
+            $errors = array_values(array_unique($errors));
+            $warnings = array_values(array_unique($warnings));
+            $all_issues = array_values(array_unique(array_merge($errors, $warnings)));
+
+            echo json_encode([
+                'status' => 'success',
+                'warnings' => $all_issues,
+                'errors' => $errors,
+                'advisories' => $warnings,
+                'has_error' => count($errors) > 0,
+                'summary' => [
+                    'errors' => count($errors),
+                    'warnings' => count($warnings),
+                    'total' => count($all_issues)
+                ]
+            ], JSON_UNESCAPED_UNICODE);
         } catch (Exception $e) {
             error_log('Ajax operation failed: ' . $e->getMessage());
             http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่'], JSON_UNESCAPED_UNICODE);
         }
         exit;
     }
