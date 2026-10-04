@@ -64,17 +64,23 @@
    - total
    - high-risk/urgent
    - due follow-up
-14. Role/hospital data scope
+14. Dedicated Follow-up Queue:
+   - overdue first
+   - due today
+   - next 7 days
+   - high-risk/urgent prioritized
+   - close follow-up by POST + CSRF
+15. Duplicate visit warning:
+   - checks patient/household reference + visit date
+   - client advisory warning before submit
+   - server-side duplicate guard repeated before save
+   - explicit confirmation required when a duplicate is intentional
+16. Role/hospital data scope
 
 ## 3. Field Work — recommended next features
 
 ### Phase F1 — operational safety / usability
 
-- Dedicated “Follow-up Queue” page:
-  - due today
-  - overdue
-  - next 7 days
-  - high-risk first
 - Visit detail page and chronological patient/household visit timeline
 - Explicit referral workflow:
   - pending referral
@@ -82,7 +88,7 @@
   - acknowledged/closed
 - Attach referral destination and contact/coordination note
 - Task assignment to another staff member
-- Duplicate-visit warning by patient_ref + date
+- Configurable duplicate policy by visit type/organization
 - Configurable required fields by visit type
 - Image metadata stripping and optional resize/compression before permanent storage
 - Audit log for photo viewing/download
@@ -309,3 +315,50 @@ Prefer a documented integration layer/API when external integration is approved.
 - authorization verified for cross-hospital/cross-user access
 - backup/restore procedure tested
 - field-work privacy review completed
+
+
+## 12. Current implementation status
+
+### Production-candidate baseline already implemented
+
+- Responsive Bootstrap 5 application shell
+- Phone/tablet/desktop breakpoints
+- mobile stacked data tables
+- dark clinical navigation
+- Light/Dark mode using Bootstrap 5 `data-bs-theme`
+- responsive wizard/progress component
+- button/global loading indicators
+- skeleton utility for asynchronous content
+- Field Work / Home Visit module
+- GPS capture
+- encrypted IndexedDB offline draft
+- controlled photo upload outside public web root
+- risk/follow-up/referral metadata
+- scoped CSV export
+- Follow-up Queue
+- duplicate-visit warning
+- CSRF and role/hospital scoping
+- runtime smoke coverage for core field-work model flows
+
+### Recommended next office features
+
+1. PDF visit summary and monthly PDF report
+2. Real Excel workbook export with Summary / Visits / Follow-ups / Referrals sheets
+3. Printable appointment slip from follow-up date
+4. Referral work queue with acknowledgement/closure status
+5. Dashboard trends by day/week/month
+6. Staff workload heatmap
+7. Scheduled follow-up reminders
+8. Visit-detail timeline
+9. Configurable clinical checklist templates
+10. True offline sync queue with idempotency/conflict resolution
+
+### Recommended governance before wider clinical rollout
+
+- define retention/deletion rules for field photos and visit records
+- confirm organizational/legal basis for storing patient names and photographs
+- require HTTPS and managed device lock for field use
+- audit photo view/download
+- encrypt backup media
+- document incident response and access revocation
+- pilot with a small number of service units before province-wide rollout
