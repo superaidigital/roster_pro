@@ -1173,6 +1173,9 @@ let shiftModal = null;
 let payCalcModal = null; 
 let holidayInfoModal = null;
 let selectedHolidayDate = '';
+let paintShiftValue = null;
+let paintColorClass = 'text-dark';
+let validationKpiTimer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     
@@ -1227,6 +1230,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (staffSearch) staffSearch.addEventListener('input', applyFilters);
     if (staffHospitalFilter) staffHospitalFilter.addEventListener('change', applyFilters);
+
+    // Roster row quick filters
+    document.querySelectorAll('.roster-staff-row').forEach(row => {
+        row.dataset.rosterBaseVisible = row.style.display === 'none' ? 'false' : 'true';
+    });
+
+    document.querySelectorAll('.rp-roster-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.rp-roster-filter-btn').forEach(item => item.classList.remove('active'));
+            btn.classList.add('active');
+            applyRosterRowFilter(btn.dataset.rosterFilter || 'all');
+        });
+    });
+
+    // Quick Paint: click a shift once, then click cells to fill quickly.
+    document.querySelectorAll('.rp-paint-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setPaintMode(btn.dataset.paintShift ?? '', btn.dataset.paintClass || 'text-dark', btn);
+        });
+    });
+    document.getElementById('btnPaintOff')?.addEventListener('click', () => setPaintMode(null, 'text-dark', null));
+
+    refreshRosterKpis();
+    refreshValidationKpis();
 
     const btnRosterToday = document.getElementById('btnRosterToday');
     const rosterTableScroll = document.getElementById('rosterTableScroll');
@@ -1316,15 +1343,152 @@ function dropStaff(ev) {
     if (staffRow) {
         if (staffRow.style.display === 'none') {
             staffRow.style.display = '';
+            staffRow.dataset.rosterBaseVisible = 'true';
             const summaryRow = document.getElementById('summary-row-' + userId);
             if (summaryRow) summaryRow.style.display = '';
             showToast('success', 'เพิ่มบุคลากรลงในตารางเวรแล้ว (จัดเวรได้เลย)');
             staffRow.classList.add('bg-success', 'bg-opacity-10');
             setTimeout(() => staffRow.classList.remove('bg-success', 'bg-opacity-10'), 2000);
+            refreshRosterKpis();
         } else {
             showToast('warning', 'บุคลากรท่านนี้มีรายชื่ออยู่ในตารางเวรอยู่แล้ว');
         }
     }
+}
+
+// ==========================================
+// Roster UI V2 helpers
+// ==========================================
+function parseRosterShiftTypes(value) {
+    const aliases = { A: 'บ', N: 'ร', O: 'ย', M: 'ช' };
+    return String(value || '').trim().split(/[\\/,\\s]+/).filter(Boolean).map(v => aliases[v] || v);
+}
+
+function getRosterShiftColorClass(value) {
+    const types = parseRosterShiftTypes(value);
+    if (types.length > 1) return 'text-primary';
+    if (types.includes('บ')) return 'text-warning text-dark';
+    if (types.includes('ร')) return 'text-success';
+    if (types.includes('ย')) return 'text-danger';
+    if (types.includes('ช')) return 'text-info';
+    return 'text-dark';
+}
+
+function setPaintMode(value, colorClass = 'text-dark', sourceButton = null) {
+    paintShiftValue = value;
+    paintColorClass = colorClass;
+
+    document.querySelectorAll('.rp-paint-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.shift-cell[data-date]').forEach(cell => cell.classList.toggle('rp-paint-ready', value !== null));
+
+    if (sourceButton && value !== null) sourceButton.classList.add('active');
+
+    const indicator = document.getElementById('paintModeIndicator');
+    if (indicator) {
+        indicator.classList.toggle('is-active', value !== null);
+        const textEl = indicator.querySelector('span');
+        if (textEl) textEl.textContent = value === null ? 'โหมดระบายเวร' : (value === '' ? 'โหมดลบเวร' : `ระบายเวร: ${value}`);
+    }
+}
+
+function applyRosterRowFilter(filter) {
+    document.querySelectorAll('.roster-staff-row').forEach(row => {
+        if (row.dataset.rosterBaseVisible === 'false') {
+            row.classList.add('rp-filter-hidden');
+            return;
+        }
+
+        const cells = Array.from(row.querySelectorAll('.shift-cell[data-date]'));
+        const shiftTypes = cells.flatMap(cell => parseRosterShiftTypes(cell.innerText));
+        let match = true;
+
+        if (filter === 'empty') match = shiftTypes.length === 0;
+        else if (filter === 'night') match = shiftTypes.includes('ร');
+        else if (filter === 'leave') match = !!row.querySelector('.leave-badge-cell');
+        else if (filter === 'external') match = row.dataset.isExternal === 'true';
+        else if (filter === 'fatigue') match = !!row.querySelector('.fatigue-warn');
+
+        row.classList.toggle('rp-filter-hidden', !match);
+    });
+}
+
+function updateCoverageForDate(dateStr) {
+    const coverageEl = document.querySelector(`.rp-coverage-mini[data-coverage-date="${dateStr}"]`);
+    if (!coverageEl) return;
+
+    let b = 0;
+    let r = 0;
+    document.querySelectorAll(`.shift-cell[data-date="${dateStr}"]`).forEach(cell => {
+        const types = parseRosterShiftTypes(cell.innerText);
+        if (types.includes('บ')) b++;
+        if (types.includes('ร')) r++;
+    });
+
+    const spans = coverageEl.querySelectorAll('span');
+    if (spans[0]) {
+        spans[0].textContent = `บ${b}`;
+        spans[0].classList.toggle('is-covered', b >= 1);
+    }
+    if (spans[1]) {
+        spans[1].textContent = `ร${r}`;
+        spans[1].classList.toggle('is-covered', r >= 1);
+    }
+
+    const ok = b >= 1 && r >= 1;
+    coverageEl.classList.toggle('is-ok', ok);
+    coverageEl.classList.toggle('is-gap', !ok);
+    coverageEl.title = `ความครอบคลุม: บ ${b} คน / ร ${r} คน`;
+
+    const coverageKpi = document.getElementById('kpiCoverageDays');
+    if (coverageKpi) coverageKpi.textContent = document.querySelectorAll('.rp-coverage-mini.is-ok').length.toLocaleString();
+}
+
+function refreshRosterKpis() {
+    const baseRows = Array.from(document.querySelectorAll('.roster-staff-row')).filter(row => row.dataset.rosterBaseVisible !== 'false' && row.style.display !== 'none');
+    const staffKpi = document.getElementById('kpiStaffCount');
+    if (staffKpi) staffKpi.textContent = baseRows.length.toLocaleString();
+
+    let shifts = 0;
+    baseRows.forEach(row => {
+        row.querySelectorAll('.shift-cell[data-date]').forEach(cell => {
+            shifts += parseRosterShiftTypes(cell.innerText).filter(type => ['ช', 'บ', 'ร', 'ย'].includes(type)).length;
+        });
+    });
+    const shiftKpi = document.getElementById('kpiShiftCount');
+    if (shiftKpi) shiftKpi.textContent = shifts.toLocaleString();
+
+    const payKpi = document.getElementById('kpiEstimatedPay');
+    const grandPay = document.getElementById('grand-total-pay');
+    if (payKpi && grandPay) payKpi.textContent = (grandPay.innerText || '0').replace(/[^0-9.-]/g, '') === '' ? '0' : Number((grandPay.innerText || '0').replace(/,/g, '')).toLocaleString();
+}
+
+function refreshValidationKpis() {
+    if (!targetHospId) return;
+    rosterApiFetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
+        .then(res => res.json())
+        .then(data => {
+            const err = document.getElementById('kpiErrorCount');
+            const warn = document.getElementById('kpiWarningCount');
+            const state = document.getElementById('kpiValidationState');
+            if (data.status !== 'success') {
+                if (state) state.textContent = 'ตรวจสอบไม่สำเร็จ';
+                return;
+            }
+            const errors = Array.isArray(data.errors) ? data.errors.length : (data.has_error ? (data.warnings?.length || 0) : 0);
+            const warnings = Array.isArray(data.advisories) ? data.advisories.length : (data.has_error ? 0 : (data.warnings?.length || 0));
+            if (err) err.textContent = errors.toLocaleString();
+            if (warn) warn.textContent = warnings.toLocaleString();
+            if (state) state.textContent = errors > 0 ? 'มีรายการที่ต้องแก้ไข' : (warnings > 0 ? 'มีข้อควรตรวจสอบ' : 'ผ่านการตรวจสอบ');
+        })
+        .catch(() => {
+            const state = document.getElementById('kpiValidationState');
+            if (state) state.textContent = 'เชื่อมต่อตรวจสอบไม่ได้';
+        });
+}
+
+function scheduleValidationKpiRefresh() {
+    clearTimeout(validationKpiTimer);
+    validationKpiTimer = setTimeout(refreshValidationKpis, 650);
 }
 
 // ==========================================
@@ -1347,8 +1511,14 @@ function showPayCalculation(el) {
 }
 
 function openShiftModal(btn) {
-    if (!shiftModal) shiftModal = new bootstrap.Modal(document.getElementById('shiftSelectorModal'));
     currentCellBtn = btn;
+
+    if (paintShiftValue !== null) {
+        saveShift(paintShiftValue, paintColorClass);
+        return;
+    }
+
+    if (!shiftModal) shiftModal = new bootstrap.Modal(document.getElementById('shiftSelectorModal'));
     const dateStr = btn.getAttribute('data-date');
     const parts = dateStr.split('-');
     const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -1378,7 +1548,14 @@ function saveShift(shiftValue, colorClass) {
     .then(res => res.json())
     .then(data => {
         if (data.status === 'success') {
+            if (typeof data.shift_type === 'string') {
+                currentCellBtn.innerText = data.shift_type;
+                currentCellBtn.className = `btn w-100 h-100 p-0 border-0 shadow-none hover-cell shift-cell ${getRosterShiftColorClass(data.shift_type)} ${paintShiftValue !== null ? 'rp-paint-ready' : ''}`;
+            }
             if (indicator) setTimeout(() => indicator.classList.add('d-none'), 1500);
+            updateCoverageForDate(dateStr);
+            refreshRosterKpis();
+            scheduleValidationKpiRefresh();
         } else {
             alert('Error: ' + (data.message || 'ไม่สามารถบันทึกเวรได้'));
             window.location.reload();
@@ -1418,9 +1595,13 @@ function removeStaffFromRoster(staffId, staffName) {
             recalculateRowSummary(staffId, payRateId);
             
             row.style.display = 'none'; row.style.opacity = '1';
+            row.dataset.rosterBaseVisible = 'false';
             const summaryRow = document.getElementById('summary-row-' + staffId);
             if (summaryRow) summaryRow.style.display = 'none';
             updateGrandTotals();
+            cells.forEach(cell => updateCoverageForDate(cell.getAttribute('data-date')));
+            refreshRosterKpis();
+            scheduleValidationKpiRefresh();
         } else { alert('ลบข้อมูลไม่สำเร็จบางส่วน'); row.style.opacity = '1'; }
     });
 }
@@ -1470,6 +1651,9 @@ function checkFatigueRules() {
             }
         }
     });
+
+    const activeFilter = document.querySelector('.rp-roster-filter-btn.active')?.dataset.rosterFilter;
+    if (activeFilter === 'fatigue') applyRosterRowFilter('fatigue');
 
     Swal.fire({
         icon: warningCount > 0 ? 'warning' : 'success',
