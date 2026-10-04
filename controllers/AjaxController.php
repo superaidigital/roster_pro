@@ -7,6 +7,7 @@ require_once 'models/ShiftModel.php';
 require_once 'models/NotificationModel.php';
 require_once 'models/UserModel.php';
 require_once 'models/LeaveModel.php';
+require_once 'models/RosterSnapshotModel.php';
 require_once 'controllers/LogsController.php'; // 🌟 นำเข้า Logs Controller
 
 class AjaxController {
@@ -408,6 +409,15 @@ class AjaxController {
 
             $db->beginTransaction();
 
+            $snapshotModel = new RosterSnapshotModel($db);
+            $snapshotModel->createSnapshot(
+                $hospital_id,
+                $target_month,
+                (int)$_SESSION['user']['id'],
+                'BEFORE_COPY',
+                "สำรองก่อนคัดลอกจากเดือน {$prev_month}"
+            );
+
             $start_curr = $target_month . '-01';
             $end_curr = date('Y-m-t', strtotime($start_curr));
             $stmt_del = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
@@ -608,6 +618,22 @@ class AjaxController {
                 $json_snapshot = json_encode($snapshot_data, JSON_UNESCAPED_UNICODE);
                 $stmt_snap = $db->prepare("UPDATE roster_status SET pay_summary = ? WHERE hospital_id = ? AND month_year = ?");
                 $stmt_snap->execute([$json_snapshot, $hospital_id, $month_year]);
+
+                $rosterSnapshotModel = new RosterSnapshotModel($db);
+                $approvedVersionId = $rosterSnapshotModel->createSnapshot(
+                    $hospital_id,
+                    $month_year,
+                    (int)$_SESSION['user']['id'],
+                    'APPROVED',
+                    'เวอร์ชันที่อนุมัติแล้ว',
+                    true
+                );
+                LogsController::addLog(
+                    $db,
+                    $_SESSION['user']['id'],
+                    'APPROVE',
+                    "เก็บ Approved Roster Snapshot #{$approvedVersionId} เดือน {$month_year}"
+                );
                 
             } elseif ($new_status === 'DRAFT' || $new_status === 'REQUEST_EDIT') {
                 $stmt_snap = $db->prepare("UPDATE roster_status SET pay_summary = NULL WHERE hospital_id = ? AND month_year = ?");
@@ -1016,6 +1042,15 @@ class AjaxController {
 
         try {
             $db->beginTransaction();
+
+            $snapshotModel = new RosterSnapshotModel($db);
+            $snapshotModel->createSnapshot(
+                (int)$hospital_id,
+                (string)$month_year,
+                (int)$_SESSION['user']['id'],
+                'BEFORE_AUTO_SCHEDULE',
+                'สำรองอัตโนมัติก่อนจัดเวรด้วย Rule Engine'
+            );
 
             $start_date = $month_year . '-01';
             $max_days = (int)date('t', strtotime($start_date));
