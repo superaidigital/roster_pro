@@ -343,6 +343,31 @@ CREATE TABLE `roster_status` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `roster_snapshots`
+--
+
+CREATE TABLE `roster_snapshots` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `hospital_id` int(11) NOT NULL,
+  `month_year` varchar(7) NOT NULL,
+  `snapshot_kind` varchar(30) NOT NULL DEFAULT 'MANUAL',
+  `label` varchar(160) DEFAULT NULL,
+  `status_snapshot` varchar(30) NOT NULL DEFAULT 'DRAFT',
+  `shift_count` int(11) NOT NULL DEFAULT 0,
+  `shifts_json` longtext NOT NULL,
+  `checksum` char(64) NOT NULL,
+  `is_protected` tinyint(1) NOT NULL DEFAULT 0,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_roster_snapshot_month` (`hospital_id`,`month_year`,`created_at`),
+  KEY `idx_roster_snapshot_creator` (`created_by`,`created_at`),
+  KEY `idx_roster_snapshot_checksum` (`hospital_id`,`month_year`,`checksum`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `shifts`
 --
 
