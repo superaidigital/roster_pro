@@ -70,28 +70,33 @@ class RosterController {
             }
         }
 
-        // 👥 2. ดึงรายชื่อบุคลากรทั้งหมด (🌟 เพิ่มเงื่อนไข show_in_roster = 1)
-        $hosp_id_safe = !empty($hospital_id) ? $hospital_id : 0;
+        // 👥 2. แสดงเฉพาะบุคลากรที่สังกัดหน่วยบริการที่กำลังเปิดดูเท่านั้น
+        $hosp_id_safe = !empty($hospital_id) ? (int)$hospital_id : 0;
         $query_all_staff = "
-            SELECT u.*, p.rate_r, p.rate_y, p.rate_b, p.name as pay_rate_name 
+            SELECT u.*, p.rate_r, p.rate_y, p.rate_b, p.name as pay_rate_name
             FROM users u
             LEFT JOIN pay_rates p ON u.pay_rate_id = p.id
-            WHERE u.role NOT IN ('SUPERADMIN', 'ADMIN') 
-            AND u.is_deleted = 0 
-            AND u.is_active = 1
-            AND (u.show_in_roster = 1 OR u.show_in_roster IS NULL)
-            ORDER BY 
-                CASE WHEN u.hospital_id = :hosp_id THEN 1 ELSE 2 END ASC, 
-                u.display_order ASC, 
-                u.name ASC
+            WHERE u.hospital_id = :hosp_id
+              AND u.role NOT IN ('SUPERADMIN', 'ADMIN')
+              AND u.is_deleted = 0
+              AND u.is_active = 1
+              AND (u.show_in_roster = 1 OR u.show_in_roster IS NULL)
+            ORDER BY u.display_order ASC, u.name ASC
         ";
         $stmt_all = $db->prepare($query_all_staff);
         $stmt_all->execute([':hosp_id' => $hosp_id_safe]);
         $all_staff_for_sidebar = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
 
         // 📅 3. ดึงข้อมูลกะปฏิบัติงาน (Shifts) ของเดือนนี้
-        $stmt_shifts = $db->prepare("SELECT * FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
-        $stmt_shifts->execute([$hospital_id, $selected_month . '-%']);
+        $stmt_shifts = $db->prepare("
+            SELECT s.*
+            FROM shifts s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.hospital_id = ?
+              AND u.hospital_id = ?
+              AND s.shift_date LIKE ?
+        ");
+        $stmt_shifts->execute([$hospital_id, $hospital_id, $selected_month . '-%']);
         $shifts = $stmt_shifts->fetchAll(PDO::FETCH_ASSOC);
 
         // 📝 4. ดึงข้อมูลวันลา (Leaves)
@@ -100,10 +105,11 @@ class RosterController {
             FROM leave_requests lr
             JOIN leave_quotas lq ON lr.leave_type_id = lq.id
             JOIN users u ON lr.user_id = u.id
-            WHERE lr.status IN ('APPROVED', 'PENDING', 'CANCEL_REQUESTED')
+            WHERE u.hospital_id = ?
+            AND lr.status IN ('APPROVED', 'PENDING', 'CANCEL_REQUESTED')
             AND (DATE_FORMAT(lr.start_date, '%Y-%m') = ? OR DATE_FORMAT(lr.end_date, '%Y-%m') = ?)
         ");
-        $stmt_leaves->execute([$selected_month, $selected_month]);
+        $stmt_leaves->execute([$hospital_id, $selected_month, $selected_month]);
         $leaves = $stmt_leaves->fetchAll(PDO::FETCH_ASSOC);
 
         // 🚦 5. ดึงสถานะตารางเวร
@@ -166,23 +172,29 @@ class RosterController {
         $hospital_info = $stmt_hosp->fetch(PDO::FETCH_ASSOC);
         $hospital_name = $hospital_info ? $hospital_info['name'] : 'หน่วยบริการ';
 
-        // 🌟 ดึงรายชื่อพนักงานที่มีเวร หรือ สังกัด รพ.สต. นี้ (🌟 เพิ่มเงื่อนไข show_in_roster = 1)
+        // 🌟 Export เฉพาะบุคลากรที่สังกัดหน่วยบริการนี้
         $stmt_staff = $db->prepare("
-            SELECT DISTINCT u.* FROM users u
-            LEFT JOIN shifts s ON u.id = s.user_id AND s.shift_date LIKE ?
-            WHERE (u.hospital_id = ? OR s.hospital_id = ?) 
-            AND u.role NOT IN ('SUPERADMIN', 'ADMIN') 
-            AND u.is_deleted = 0
-            AND (u.show_in_roster = 1 OR u.show_in_roster IS NULL)
+            SELECT u.*
+            FROM users u
+            WHERE u.hospital_id = ?
+              AND u.role NOT IN ('SUPERADMIN', 'ADMIN')
+              AND u.is_deleted = 0
+              AND u.is_active = 1
+              AND (u.show_in_roster = 1 OR u.show_in_roster IS NULL)
             ORDER BY u.display_order ASC, u.id ASC
         ");
         $month_like = $selected_month . '-%';
-        $stmt_staff->execute([$month_like, $hospital_id, $hospital_id]);
+        $stmt_staff->execute([$hospital_id]);
         $staffs = $stmt_staff->fetchAll(PDO::FETCH_ASSOC);
 
         // ดึงเวร (Shifts)
-        $stmt_shifts = $db->prepare("SELECT * FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
-        $stmt_shifts->execute([$hospital_id, $month_like]);
+        $stmt_shifts = $db->prepare("
+            SELECT s.*
+            FROM shifts s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.hospital_id = ? AND u.hospital_id = ? AND s.shift_date LIKE ?
+        ");
+        $stmt_shifts->execute([$hospital_id, $hospital_id, $month_like]);
         $shifts = $stmt_shifts->fetchAll(PDO::FETCH_ASSOC);
 
         // ดึงวันลา (Leaves) เพื่อขีด ล. ในตาราง
@@ -191,10 +203,11 @@ class RosterController {
             FROM leave_requests lr
             JOIN leave_quotas lq ON lr.leave_type_id = lq.id
             JOIN users u ON lr.user_id = u.id
-            WHERE lr.status IN ('APPROVED', 'PENDING', 'CANCEL_REQUESTED')
+            WHERE u.hospital_id = ?
+            AND lr.status IN ('APPROVED', 'PENDING', 'CANCEL_REQUESTED')
             AND (DATE_FORMAT(lr.start_date, '%Y-%m') = ? OR DATE_FORMAT(lr.end_date, '%Y-%m') = ?)
         ");
-        $stmt_leaves->execute([$selected_month, $selected_month]);
+        $stmt_leaves->execute([$hospital_id, $selected_month, $selected_month]);
         $leaves = $stmt_leaves->fetchAll(PDO::FETCH_ASSOC);
 
         // ดึงเรทค่าตอบแทน
