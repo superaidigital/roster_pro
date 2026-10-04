@@ -121,7 +121,7 @@
     const fd = new FormData(form);
 
     for (const [key, value] of fd.entries()) {
-      if (key === '_csrf' || key === 'photos[]' || value instanceof File) continue;
+      if (key === '_csrf' || key === 'photos[]' || key === 'duplicate_confirmed' || value instanceof File) continue;
       data[key] = String(value);
     }
 
@@ -135,7 +135,7 @@
   function restoreForm(data) {
     Object.entries(data || {}).forEach(([name, rawValue]) => {
       const field = form.elements.namedItem(name);
-      if (!field || name === 'status') return;
+      if (!field || name === 'status' || name === 'duplicate_confirmed') return;
       if (field instanceof RadioNodeList) return;
 
       const value = rawValue == null ? '' : String(rawValue);
@@ -252,6 +252,110 @@
       if (status) status.value = button.dataset.fieldStatus || 'DRAFT';
     });
   });
+
+  const duplicateConfirmed = document.getElementById('fieldDuplicateConfirmed');
+  const duplicateConfirmBox = document.getElementById('fieldDuplicateConfirmBox');
+  const duplicateNotice = document.getElementById('fieldDuplicateNotice');
+  const duplicateMessage = document.getElementById('fieldDuplicateMessage');
+  let duplicateFound = false;
+  let duplicateTimer = null;
+
+  function renderDuplicateState(found, record = null) {
+    duplicateFound = Boolean(found);
+
+    if (!duplicateNotice || !duplicateConfirmed || !duplicateConfirmBox) return;
+
+    if (!duplicateFound) {
+      duplicateNotice.classList.add('d-none');
+      duplicateConfirmBox.checked = false;
+      duplicateConfirmed.value = '0';
+      return;
+    }
+
+    duplicateNotice.classList.remove('d-none');
+    duplicateConfirmBox.checked = false;
+    duplicateConfirmed.value = '0';
+
+    if (duplicateMessage) {
+      const status = record?.status === 'COMPLETED' ? 'เสร็จแล้ว' : 'ร่าง';
+      duplicateMessage.textContent =
+        'พบรายการเดิมในวันที่ ' + (record?.visit_date || '') +
+        ' (สถานะ: ' + status + ') กรุณาตรวจสอบก่อนบันทึกซ้ำ';
+    }
+  }
+
+  async function checkDuplicateVisit() {
+    if (!navigator.onLine) return;
+
+    const patientRef = String(document.getElementById('patient_ref')?.value || '').trim();
+    const visitDate = String(document.getElementById('visit_date')?.value || '').trim();
+    const hospitalField = document.getElementById('hospital_id');
+
+    if (!patientRef || !visitDate || (hospitalField && !hospitalField.value)) {
+      renderDuplicateState(false);
+      return;
+    }
+
+    const params = new URLSearchParams({
+      c: 'field',
+      a: 'duplicate_check',
+      patient_ref: patientRef,
+      visit_date: visitDate,
+      exclude_id: recordId
+    });
+
+    if (hospitalField?.value) {
+      params.set('hospital_id', hospitalField.value);
+    }
+
+    try {
+      const response = await fetch('index.php?' + params.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'X-Roster-Silent': '1'
+        },
+        credentials: 'same-origin'
+      });
+
+      if (!response.ok) return;
+      const payload = await response.json();
+      renderDuplicateState(Boolean(payload?.duplicate), payload?.record || null);
+    } catch (_) {
+      // Duplicate detection is an advisory UX layer.
+      // The server repeats the check before saving.
+    }
+  }
+
+  function queueDuplicateCheck() {
+    if (duplicateConfirmed) duplicateConfirmed.value = '0';
+    if (duplicateConfirmBox) duplicateConfirmBox.checked = false;
+
+    clearTimeout(duplicateTimer);
+    duplicateTimer = window.setTimeout(checkDuplicateVisit, 350);
+  }
+
+  duplicateConfirmBox?.addEventListener('change', () => {
+    if (duplicateConfirmed) {
+      duplicateConfirmed.value = duplicateConfirmBox.checked ? '1' : '0';
+    }
+  });
+
+  ['patient_ref', 'visit_date', 'hospital_id'].forEach((id) => {
+    const field = document.getElementById(id);
+    field?.addEventListener('change', queueDuplicateCheck);
+    field?.addEventListener('blur', queueDuplicateCheck);
+  });
+
+  form.addEventListener('submit', (event) => {
+    if (duplicateFound && duplicateConfirmed?.value !== '1') {
+      event.preventDefault();
+      if (duplicateNotice) {
+        duplicateNotice.classList.remove('d-none');
+        duplicateNotice.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      duplicateConfirmBox?.focus();
+    }
+  }, true);
 
   const referral = document.getElementById('referral_required');
   const referralWrap = document.getElementById('fieldReferralNoteWrap');
@@ -372,5 +476,5 @@
     });
   }
 
-  restoreDraft().finally(syncReferral);
+  restoreDraft().finally(() => { syncReferral(); queueDuplicateCheck(); });
 })();
