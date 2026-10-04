@@ -83,6 +83,53 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     $d_str = "$year-$month-" . str_pad($i, 2, '0', STR_PAD_LEFT);
     $holiday_cache[$i] = isset($holidayModel) ? $holidayModel->isHoliday($d_str) : false;
 }
+
+// ============================================================================
+// Roster UI V2: KPI + Coverage summary
+// ============================================================================
+$roster_staff_map = [];
+$roster_visible_staff_ids = [];
+foreach ($all_staff_for_sidebar as $staff) {
+    $uid = (int)($staff['id'] ?? 0);
+    if ($uid <= 0) continue;
+    $roster_staff_map[$uid] = $staff;
+    if ((int)($staff['hospital_id'] ?? 0) === (int)($hospital_id ?? 0)) {
+        $roster_visible_staff_ids[$uid] = true;
+    }
+}
+
+$roster_coverage = [];
+for ($i = 1; $i <= $days_in_month; $i++) {
+    $roster_coverage[$i] = ['บ' => 0, 'ร' => 0, 'ย' => 0, 'ช' => 0];
+}
+
+$roster_kpi_shift_count = 0;
+$roster_kpi_estimated_pay = 0;
+foreach (($shifts ?? []) as $shift) {
+    $uid = (int)($shift['user_id'] ?? 0);
+    $shift_date = (string)($shift['shift_date'] ?? '');
+    if ($uid > 0) $roster_visible_staff_ids[$uid] = true;
+
+    $day = (int)substr($shift_date, 8, 2);
+    $parts = preg_split('/[\\/,\\s]+/', trim((string)($shift['shift_type'] ?? ''))) ?: [];
+    $rates = isset($roster_staff_map[$uid]) ? calculatePayRatesPHP($roster_staff_map[$uid], $pay_rates_db ?? []) : ['ร' => 0, 'ย' => 0, 'บ' => 0];
+
+    foreach ($parts as $part) {
+        $type = ['A' => 'บ', 'N' => 'ร', 'O' => 'ย', 'M' => 'ช'][$part] ?? $part;
+        if (!in_array($type, ['ช', 'บ', 'ร', 'ย'], true)) continue;
+        $roster_kpi_shift_count++;
+        if (isset($roster_coverage[$day][$type])) $roster_coverage[$day][$type]++;
+        if (isset($rates[$type])) $roster_kpi_estimated_pay += (float)$rates[$type];
+    }
+}
+
+$roster_kpi_staff_count = count($roster_visible_staff_ids);
+$roster_kpi_coverage_ok_days = 0;
+foreach ($roster_coverage as $coverage) {
+    if (($coverage['บ'] ?? 0) >= 1 && ($coverage['ร'] ?? 0) >= 1) {
+        $roster_kpi_coverage_ok_days++;
+    }
+}
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
@@ -132,6 +179,28 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     .rp-roster-footer-actions .btn { min-height: 32px; }
     .rp-roster-panel-hidden { display: none !important; }
     .rp-roster-main-expanded { flex: 0 0 100% !important; max-width: 100% !important; width: 100% !important; }
+
+    .rp-roster-kpi { border: 1px solid #e5edf3; border-radius: 1rem; background: #fff; box-shadow: 0 3px 14px rgba(15,23,42,.035); }
+    .rp-roster-kpi-icon { width: 2.45rem; height: 2.45rem; display: grid; place-items: center; border-radius: .8rem; background: #f1f7fb; color: #0f6cbd; font-size: 1.05rem; }
+    .rp-roster-kpi-value { color: #183247; font-size: 1.28rem; font-weight: 800; line-height: 1.05; }
+    .rp-roster-kpi-label { color: #7a909f; font-size: .72rem; font-weight: 700; }
+    .rp-roster-kpi-sub { color: #9aabb6; font-size: .64rem; margin-top: .12rem; }
+
+    .rp-roster-tools { position: sticky; top: 0; z-index: 12; background: rgba(255,255,255,.96); backdrop-filter: blur(8px); }
+    .rp-roster-filter-btn.active { color: #fff !important; background: #0f6cbd !important; border-color: #0f6cbd !important; }
+    .rp-paint-btn.active { color: #fff !important; background: #172033 !important; border-color: #172033 !important; box-shadow: 0 0 0 .18rem rgba(23,32,51,.10); }
+    .rp-paint-indicator { display: none; align-items: center; gap: .35rem; min-height: 1.8rem; padding: .25rem .55rem; border-radius: 999px; background: #eef7ff; color: #0f6cbd; font-size: .7rem; font-weight: 800; }
+    .rp-paint-indicator.is-active { display: inline-flex; }
+    .shift-cell.rp-paint-ready { cursor: crosshair !important; }
+
+    .rp-coverage-mini { display: flex; justify-content: center; gap: 2px; margin-top: 3px; font-size: 7px; line-height: 1; font-weight: 800; }
+    .rp-coverage-mini span { display: inline-flex; min-width: 16px; justify-content: center; padding: 2px 2px; border-radius: 4px; }
+    .rp-coverage-mini.is-ok span { color: #15803d; background: #dcfce7; }
+    .rp-coverage-mini.is-gap span { color: #b91c1c; background: #fee2e2; }
+    .rp-coverage-mini.is-gap span.is-covered { color: #15803d; background: #dcfce7; }
+
+    .roster-staff-row.rp-filter-hidden { display: none !important; }
+
     @media (max-width: 767.98px) {
         .table-roster th { font-size: 11px; }
         .shift-cell { font-size: 13px !important; }
@@ -268,6 +337,62 @@ for ($i = 1; $i <= $days_in_month; $i++) {
             </div>
             <?php unset($_SESSION['error_msg']); ?>
         <?php endif; ?>
+
+        <!-- Roster UI V2: KPI Overview -->
+        <div class="row g-2 g-md-3 mb-3" id="rosterKpiGrid">
+            <div class="col-6 col-xl">
+                <div class="rp-roster-kpi h-100 p-3 d-flex align-items-center gap-3">
+                    <div class="rp-roster-kpi-icon"><i class="bi bi-people-fill"></i></div>
+                    <div class="min-w-0">
+                        <div class="rp-roster-kpi-value" id="kpiStaffCount"><?= number_format($roster_kpi_staff_count) ?></div>
+                        <div class="rp-roster-kpi-label">บุคลากรในสังกัด</div>
+                        <div class="rp-roster-kpi-sub">เฉพาะหน่วยบริการที่เลือก</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-xl">
+                <div class="rp-roster-kpi h-100 p-3 d-flex align-items-center gap-3">
+                    <div class="rp-roster-kpi-icon"><i class="bi bi-calendar2-check-fill"></i></div>
+                    <div>
+                        <div class="rp-roster-kpi-value" id="kpiShiftCount"><?= number_format($roster_kpi_shift_count) ?></div>
+                        <div class="rp-roster-kpi-label">กะที่จัดแล้ว</div>
+                        <div class="rp-roster-kpi-sub">นับกะควบแยกตามประเภท</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-xl">
+                <div class="rp-roster-kpi h-100 p-3 d-flex align-items-center gap-3">
+                    <div class="rp-roster-kpi-icon"><i class="bi bi-shield-check"></i></div>
+                    <div>
+                        <div class="rp-roster-kpi-value"><span id="kpiCoverageDays"><?= number_format($roster_kpi_coverage_ok_days) ?></span><span class="fs-6 text-muted">/<?= $days_in_month ?></span></div>
+                        <div class="rp-roster-kpi-label">วันครอบคลุม บ + ร</div>
+                        <div class="rp-roster-kpi-sub">อย่างน้อยกะละ 1 คน</div>
+                    </div>
+                </div>
+            </div>
+            <?php if (($_SESSION['user']['role'] ?? '') !== 'STAFF'): ?>
+            <div class="col-6 col-xl">
+                <div class="rp-roster-kpi h-100 p-3 d-flex align-items-center gap-3">
+                    <div class="rp-roster-kpi-icon"><i class="bi bi-cash-stack"></i></div>
+                    <div>
+                        <div class="rp-roster-kpi-value" id="kpiEstimatedPay"><?= number_format($roster_kpi_estimated_pay, 0) ?></div>
+                        <div class="rp-roster-kpi-label">ค่าตอบแทนประมาณการ</div>
+                        <div class="rp-roster-kpi-sub">บาท · ตามเรทปัจจุบัน</div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            <div class="col-12 col-sm-6 col-xl">
+                <div class="rp-roster-kpi h-100 p-3 d-flex align-items-center gap-3">
+                    <div class="rp-roster-kpi-icon"><i class="bi bi-activity"></i></div>
+                    <div>
+                        <div class="rp-roster-kpi-value"><span id="kpiErrorCount">–</span><span class="fs-6 text-danger"> / </span><span id="kpiWarningCount">–</span></div>
+                        <div class="rp-roster-kpi-label">Error / Warning</div>
+                        <div class="rp-roster-kpi-sub" id="kpiValidationState">กำลังตรวจสอบอัตโนมัติ</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- 🌟 แถบสถานะตารางเวร และ ปุ่มดำเนินการ Workflow -->
         <div class="card border-0 shadow-sm rounded-4 mb-4 <?= in_array($roster_status, ['APPROVED', 'LOCKED'], true) ? 'bg-success bg-opacity-10 border-success' : ($roster_status == 'SUBMITTED' ? 'bg-info bg-opacity-10' : 'bg-warning bg-opacity-10') ?>" style="border-left: 4px solid !important;">
@@ -420,6 +545,31 @@ for ($i = 1; $i <= $days_in_month; $i++) {
             <div class="col-xl-9 col-lg-8 d-flex flex-column" id="rosterMainColumn" style="transition: all 0.3s ease;">
                 <div class="card card-modern overflow-hidden mb-4 flex-grow-1">
                     <div class="card-body p-0 d-flex flex-column">
+                        <div class="rp-roster-tools border-bottom p-2 p-md-3">
+                            <div class="d-flex flex-column flex-xxl-row justify-content-between gap-2">
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <span class="small fw-bold text-muted me-1"><i class="bi bi-funnel me-1"></i>กรอง:</span>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill rp-roster-filter-btn active" data-roster-filter="all">ทั้งหมด</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill rp-roster-filter-btn" data-roster-filter="empty"><i class="bi bi-calendar-x me-1"></i>ยังไม่มีเวร</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill rp-roster-filter-btn" data-roster-filter="night"><i class="bi bi-moon-stars me-1"></i>มีเวรดึก</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill rp-roster-filter-btn" data-roster-filter="leave"><i class="bi bi-calendar2-minus me-1"></i>มีวันลา</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill rp-roster-filter-btn" data-roster-filter="fatigue"><i class="bi bi-heart-pulse me-1"></i>จุดเสี่ยง</button>
+                                </div>
+
+                                <?php if ($canEdit): ?>
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <span class="small fw-bold text-muted me-1"><i class="bi bi-brush-fill me-1"></i>Quick Paint:</span>
+                                    <button type="button" class="btn btn-sm btn-outline-warning fw-bold rp-paint-btn" data-paint-shift="บ" data-paint-class="text-warning text-dark">บ</button>
+                                    <button type="button" class="btn btn-sm btn-outline-success fw-bold rp-paint-btn" data-paint-shift="ร" data-paint-class="text-success">ร</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold rp-paint-btn" data-paint-shift="ย" data-paint-class="text-danger">ย</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary fw-bold rp-paint-btn" data-paint-shift="บ/ร" data-paint-class="text-primary">บ/ร</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rp-paint-btn" data-paint-shift="" data-paint-class="text-dark"><i class="bi bi-eraser-fill"></i></button>
+                                    <button type="button" class="btn btn-sm btn-light border rounded-pill px-3" id="btnPaintOff">ปิดโหมด</button>
+                                    <span class="rp-paint-indicator" id="paintModeIndicator"><i class="bi bi-brush-fill"></i><span>โหมดระบายเวร</span></span>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                         <div class="table-responsive flex-grow-1 custom-scrollbar rp-roster-table-wrap" id="rosterTableScroll" style="max-height: 70vh;">
                             <table class="table table-bordered table-hover table-roster mb-0 text-center" id="rosterTable" style="min-width: 56rem;">
                                 <thead class="sticky-top" style="z-index: 10;">
@@ -446,6 +596,16 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                                 onclick="openHolidayInfoModal('<?= $current_date_str ?>', <?= $is_holiday_flag ?>, '<?= $h_name ?>')"
                                                 title="<?= $holidayName ? 'วันหยุด: '.$holidayName : 'คลิกเพื่อเสนอวันหยุด' ?>">
                                                 <?= $i ?>
+                                                <?php
+                                                    $coverage = $roster_coverage[$i] ?? ['บ' => 0, 'ร' => 0];
+                                                    $coverage_b = (int)($coverage['บ'] ?? 0);
+                                                    $coverage_r = (int)($coverage['ร'] ?? 0);
+                                                    $coverage_ok = ($coverage_b >= 1 && $coverage_r >= 1);
+                                                ?>
+                                                <div class="rp-coverage-mini <?= $coverage_ok ? 'is-ok' : 'is-gap' ?>" data-coverage-date="<?= $current_date_str ?>" title="ความครอบคลุม: บ <?= $coverage_b ?> คน / ร <?= $coverage_r ?> คน">
+                                                    <span class="<?= $coverage_b >= 1 ? 'is-covered' : '' ?>">บ<?= $coverage_b ?></span>
+                                                    <span class="<?= $coverage_r >= 1 ? 'is-covered' : '' ?>">ร<?= $coverage_r ?></span>
+                                                </div>
                                                 <?php if ($holidayName): ?>
                                                     <div class="<?= $is_current_day ? 'text-warning' : 'text-danger' ?> mt-1" style="font-size: 8px;"><i class="bi bi-star-fill"></i></div>
                                                 <?php endif; ?>
@@ -469,8 +629,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                             </td>
                                         </tr>
                                     <?php else: ?>
-                                        <?php foreach ($all_staff_for_sidebar as $staff): 
-                                            $is_external = (isset($staff['hospital_id']) && $staff['hospital_id'] != ($hospital_id??0));
+                                        <?php foreach ($all_staff_for_sidebar as $staff):
                                             $has_shift = false;
                                             $my_shifts = [];
                                             
@@ -484,7 +643,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                                 }
                                             }
                                             
-                                            $is_visible = (!$is_external || $has_shift);
+                                            $is_visible = true;
 
                                             // ข้อมูลวันลา
                                             $my_leaves_on_days = [];
@@ -510,25 +669,20 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                             }
                                         ?>
                                         <!-- 🌟 แนบ data-id ไว้ให้ SortableJS -->
-                                        <tr class="roster-staff-row" id="row-staff-<?= htmlspecialchars($staff['id']) ?>" data-id="<?= htmlspecialchars($staff['id']) ?>" style="<?= $is_visible ? '' : 'display: none;' ?>">
-                                            <td class="text-start px-3 shadow-sm bg-white" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0; <?php if($is_external) echo 'background-color: #fef2f2 !important;'; ?>">
+                                        <tr class="roster-staff-row" id="row-staff-<?= htmlspecialchars($staff['id']) ?>" data-id="<?= htmlspecialchars($staff['id']) ?>">
+                                            <td class="text-start px-3 shadow-sm bg-white" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0;">
                                                 <div class="fw-bold text-dark d-flex align-items-center justify-content-between">
                                                     <div class="d-flex align-items-center text-truncate pe-2">
-                                                        <?php if ($canEdit && !$is_external): ?>
+                                                        <?php if ($canEdit): ?>
                                                             <i class="bi bi-grip-vertical text-muted drag-handle me-1 flex-shrink-0" style="cursor: grab;" title="ลากเพื่อสลับตำแหน่ง"></i>
                                                         <?php endif; ?>
                                                         <span class="text-truncate" style="font-size: 14.5px;"><?= htmlspecialchars($staff['name']) ?></span>
                                                     </div>
                                                     <div class="d-flex align-items-center flex-shrink-0">
-                                                        <?php if ($is_external): ?>
-                                                            <span class="badge bg-danger ms-1" style="font-size: 9px;">ช่วยราชการ</span>
-                                                        <?php endif; ?>
-                                                        <?php if ($canEdit): ?>
-                                                            <i class="bi bi-person-x-fill text-danger ms-2 btn-remove-staff" style="cursor: pointer; font-size: 14px;" title="นำออกจากตารางเวร" onclick="removeStaffFromRoster('<?= $staff['id'] ?>', '<?= htmlspecialchars($staff['name'], ENT_QUOTES) ?>')"></i>
-                                                        <?php endif; ?>
+                                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 9px;">ในสังกัด</span>
                                                     </div>
                                                 </div>
-                                                <div class="text-muted text-truncate <?= ($canEdit && !$is_external) ? 'ms-4' : '' ?>" style="font-size: 11px;">
+                                                <div class="text-muted text-truncate <?= $canEdit ? 'ms-4' : '' ?>" style="font-size: 11px;">
                                                     <?= htmlspecialchars($staff['type']) ?>
                                                     <?php if(empty($staff['pay_rate_id'])): ?>
                                                         <span class="text-danger fw-bold ms-1" title="ยังไม่จัดกลุ่ม"><i class="bi bi-exclamation-triangle-fill"></i></span>
@@ -586,7 +740,9 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                                     
                                                     <?php else: ?>
                                                         <!-- โหมดอ่านอย่างเดียว -->
-                                                        <div class="w-100 h-100 d-flex justify-content-center align-items-center shift-cell <?= $color_class ?>" 
+                                                        <div class="w-100 h-100 d-flex justify-content-center align-items-center shift-cell <?= $color_class ?>"
+                                                             data-staff-id="<?= $staff['id'] ?>"
+                                                             data-date="<?= $full_date ?>"
                                                              style="padding-top: <?= $leave_txt ? '15px' : '0' ?> !important; <?= $is_approved_leave ? 'opacity: 0.6;' : '' ?>">
                                                             <?= htmlspecialchars($shift_val) ?>
                                                         </div>
@@ -597,16 +753,6 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                         <?php endforeach; ?>
                                     <?php endif; ?>
                                     
-                                    <!-- 🌟 Drop Zone สำหรับลากคนนอกมาลงตาราง -->
-                                    <?php if ($canEdit): ?>
-                                    <tr id="dropZoneRow" ondragover="allowDrop(event)" ondrop="dropStaff(event)" ondragleave="dragLeave(event)" class="bg-light bg-opacity-75">
-                                        <td colspan="<?= $days_in_month + 1 ?>" class="py-4 text-center text-primary" style="border: 2px dashed #a5b4fc; transition: all 0.2s;">
-                                            <i class="bi bi-person-down fs-3 d-block mb-1 opacity-75"></i>
-                                            <span class="fw-bold fs-6">ลากรายชื่อเจ้าหน้าที่จากแถบด้านขวามาวางที่บริเวณนี้</span>
-                                            <div class="text-muted mt-1" style="font-size: 12px;">เพื่อเพิ่มผู้ปฏิบัติงานนอกสังกัด ลงในตารางเวรเดือนนี้</div>
-                                        </td>
-                                    </tr>
-                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -658,17 +804,10 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <div class="p-3 border-bottom bg-light <?= $canEdit ? 'rounded-top-4' : '' ?>">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="fw-bold <?= !$canEdit ? 'text-muted' : 'text-dark' ?> mb-0 d-flex align-items-center">
-                                <i class="bi bi-people-fill <?= !$canEdit ? 'text-muted' : 'text-primary' ?> me-2"></i> <?= $canEdit ? 'เลือกบุคลากรเข้าเวร' : 'รายชื่อ/สถิติบุคลากร' ?>
+                                <i class="bi bi-people-fill <?= !$canEdit ? 'text-muted' : 'text-primary' ?> me-2"></i> บุคลากรในสังกัด
                             </h6>
                         </div>
                         
-                        <div class="mb-2">
-                            <select id="staffHospitalFilter" class="form-select form-select-sm shadow-sm border-primary border-opacity-25 font-monospace fw-bold text-primary rounded-3">
-                                <option value="own" selected>🔹 บุคลากรในสังกัด รพ.สต.</option>
-                                <option value="external">🔸 บุคลากรช่วยราชการ</option>
-                            </select>
-                        </div>
-
                         <div class="input-group input-group-sm input-group-modern mt-2">
                             <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
                             <input type="text" id="staffSearch" class="form-control" placeholder="ค้นหาชื่อ หรือตำแหน่ง...">
@@ -677,19 +816,14 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     
                     <div class="flex-grow-1 overflow-auto p-3 bg-light custom-scrollbar rounded-bottom-4" id="staffListContainer">
                         <?php 
-                        foreach ($all_staff_for_sidebar as $staff): 
-                            $is_external = (isset($staff['hospital_id']) && $staff['hospital_id'] != ($hospital_id??0));
+                        foreach ($all_staff_for_sidebar as $staff):
                             $bs_color = getBsColor($staff['color_theme']);
                         ?>
                         <!-- 🌟 แนบ pay_rate_id ไว้เผื่อดึงผ่าน JS -->
-                        <div class="card mb-2 shadow-sm border-0 rounded-3 staff-card draggable-staff" 
-                             draggable="<?= $canEdit ? 'true' : 'false' ?>"
-                             <?= $canEdit ? 'ondragstart="drag(event)"' : '' ?>
-                             style="<?= $is_external ? 'display: none;' : '' ?>"
-                             data-userid="<?= $staff['id'] ?>" 
+                        <div class="card mb-2 shadow-sm border-0 rounded-3 staff-card"
+                             data-userid="<?= $staff['id'] ?>"
                              data-username="<?= htmlspecialchars($staff['name']) ?>"
-                             data-payrateid="<?= $staff['pay_rate_id'] ?? '' ?>"
-                             data-is-external="<?= $is_external ? 'true' : 'false' ?>">
+                             data-payrateid="<?= $staff['pay_rate_id'] ?? '' ?>">
                             
                             <div class="card-body p-2 d-flex align-items-center">
                                 <div class="bg-<?= $bs_color ?> bg-opacity-10 text-<?= $bs_color ?> rounded-circle d-flex justify-content-center align-items-center fw-bold me-3 flex-shrink-0" style="width: 38px; height: 38px; font-size:15px;">
@@ -701,9 +835,6 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                     </h6>
                                     <div class="text-muted text-truncate staff-position" style="font-size: 11px;" title="<?= htmlspecialchars($staff['type']) ?>">
                                         <?= htmlspecialchars($staff['type']) ?>
-                                        <?php if ($is_external): ?>
-                                            <span class="text-danger ms-1 fw-bold">(ที่อื่น)</span>
-                                        <?php endif; ?>
                                         <!-- 🌟 แจ้งเตือนคนยังไม่จัดกลุ่มสายงาน -->
                                         <?php if (empty($staff['pay_rate_id'])): ?>
                                             <span class="text-danger fw-bold ms-1" title="ยังไม่ได้ระบุกลุ่มค่าตอบแทน"><i class="bi bi-exclamation-triangle-fill"></i></span>
@@ -794,9 +925,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                             <?php 
                             $total_r = 0; $total_y = 0; $total_b = 0; $total_all = 0; $total_pay_all = 0;
                             
-                            foreach ($all_staff_for_sidebar as $staff): 
-                                $is_external = (isset($staff['hospital_id']) && $staff['hospital_id'] != ($hospital_id??0));
-                                
+                            foreach ($all_staff_for_sidebar as $staff):
                                 $sum_r = 0; $sum_y = 0; $sum_b = 0;
                                 if (isset($shifts)) {
                                     foreach ($shifts as $s) {
@@ -830,7 +959,6 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                     $total_pay_all += $pay;
                                 }
 
-                                $is_visible = (!$is_external || $totalShift > 0);
                                 $total_r += $sum_r; $total_y += $sum_y; $total_b += $sum_b; $total_all += $totalShift;
 
                                 $group_name_val = 'ไม่มีกลุ่ม';
@@ -857,20 +985,13 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                     $pay
                                 );
                             ?>
-                            <tr class="<?= $is_external ? 'bg-danger bg-opacity-10' : '' ?> summary-staff-row" id="summary-row-<?= htmlspecialchars($staff['id']) ?>" style="<?= $is_visible ? '' : 'display: none;' ?>">
+                            <tr class="summary-staff-row" id="summary-row-<?= htmlspecialchars($staff['id']) ?>">
                                 <td class="text-start px-4 fw-medium text-dark">
                                     <?= htmlspecialchars($staff['name']) ?>
-                                    <?php if ($is_external): ?>
-                                        <span class="badge bg-danger text-white ms-1" style="font-size: 9px; font-weight: normal;">ช่วยราชการ</span>
-                                    <?php endif; ?>
                                 </td>
                                 <td class="text-start text-muted" style="font-size: 12px;">
                                     <?= htmlspecialchars($staff['type']) ?><br>
-                                    <?php if ($is_external): ?>
-                                        <span class="text-danger fw-bold"><i class="bi bi-building"></i> สังกัดอื่น</span>
-                                    <?php else: ?>
-                                        <span class="text-success"><i class="bi bi-house-door"></i> ในสังกัด</span>
-                                    <?php endif; ?>
+                                    <span class="text-success"><i class="bi bi-house-door"></i> ในสังกัด</span>
                                 </td>
                                 <td class="align-middle fs-6" style="color: #059669;" id="modal-sum-r-<?= $staff['id'] ?>"><?= $sum_r ?></td>
                                 <td class="align-middle fs-6" style="color: #dc2626;" id="modal-sum-y-<?= $staff['id'] ?>"><?= $sum_y ?></td>
@@ -1012,6 +1133,9 @@ let shiftModal = null;
 let payCalcModal = null; 
 let holidayInfoModal = null;
 let selectedHolidayDate = '';
+let paintShiftValue = null;
+let paintColorClass = 'text-dark';
+let validationKpiTimer = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     
@@ -1040,32 +1164,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 🌟 ระบบค้นหารายชื่อบุคลากรด้านขวามือ
     const staffSearch = document.getElementById('staffSearch');
-    const staffHospitalFilter = document.getElementById('staffHospitalFilter');
     const staffCards = document.querySelectorAll('.staff-card');
 
     function applyFilters() {
         if (!staffSearch) return;
         const term = staffSearch.value.toLowerCase().trim();
-        const showType = staffHospitalFilter.value;
 
         staffCards.forEach(card => {
-            const name = card.querySelector('.staff-name').textContent.toLowerCase();
-            const position = card.querySelector('.staff-position').textContent.toLowerCase();
-            const isExternal = card.getAttribute('data-is-external') === 'true';
-            
-            let matchType = false;
-            if (showType === 'own' && !isExternal) matchType = true;
-            if (showType === 'external' && isExternal) matchType = true;
-
-            if (matchType && (name.includes(term) || position.includes(term))) {
-                card.style.display = '';
-            } else {
-                card.style.display = 'none';
-            }
+            const name = card.querySelector('.staff-name')?.textContent.toLowerCase() || '';
+            const position = card.querySelector('.staff-position')?.textContent.toLowerCase() || '';
+            card.style.display = (name.includes(term) || position.includes(term)) ? '' : 'none';
         });
     }
     if (staffSearch) staffSearch.addEventListener('input', applyFilters);
-    if (staffHospitalFilter) staffHospitalFilter.addEventListener('change', applyFilters);
+
+    // Roster row quick filters
+    document.querySelectorAll('.roster-staff-row').forEach(row => {
+        row.dataset.rosterBaseVisible = row.style.display === 'none' ? 'false' : 'true';
+    });
+
+    document.querySelectorAll('.rp-roster-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.rp-roster-filter-btn').forEach(item => item.classList.remove('active'));
+            btn.classList.add('active');
+            applyRosterRowFilter(btn.dataset.rosterFilter || 'all');
+        });
+    });
+
+    // Quick Paint: click a shift once, then click cells to fill quickly.
+    document.querySelectorAll('.rp-paint-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setPaintMode(btn.dataset.paintShift ?? '', btn.dataset.paintClass || 'text-dark', btn);
+        });
+    });
+    document.getElementById('btnPaintOff')?.addEventListener('click', () => setPaintMode(null, 'text-dark', null));
+
+    refreshRosterKpis();
+    refreshValidationKpis();
 
     const btnRosterToday = document.getElementById('btnRosterToday');
     const rosterTableScroll = document.getElementById('rosterTableScroll');
@@ -1102,7 +1237,6 @@ document.addEventListener('DOMContentLoaded', function() {
             handle: '.drag-handle', 
             animation: 150,
             ghostClass: 'sortable-ghost', 
-            filter: '#dropZoneRow', 
             swapThreshold: 0.65,
             onEnd: function (evt) {
                 const orderedRows = Array.from(rosterTableBody.querySelectorAll('.roster-staff-row'));
@@ -1129,41 +1263,137 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ==========================================
-// 🌟 Native Drag & Drop (ดึงคนนอกมาช่วยเวร)
+// Roster UI V2 helpers
 // ==========================================
-function drag(ev) {
-    ev.dataTransfer.setData("text/plain", ev.target.getAttribute('data-userid'));
+function parseRosterShiftTypes(value) {
+    const aliases = { A: 'บ', N: 'ร', O: 'ย', M: 'ช' };
+    return String(value || '').trim().split(/[\\/,\\s]+/).filter(Boolean).map(v => aliases[v] || v);
 }
-function allowDrop(ev) {
-    ev.preventDefault();
-    const dropZone = document.getElementById('dropZoneRow');
-    if (dropZone) dropZone.classList.add('bg-primary', 'bg-opacity-10');
-}
-function dragLeave(ev) {
-    const dropZone = document.getElementById('dropZoneRow');
-    if (dropZone) dropZone.classList.remove('bg-primary', 'bg-opacity-10');
-}
-function dropStaff(ev) {
-    ev.preventDefault();
-    const dropZone = document.getElementById('dropZoneRow');
-    if (dropZone) dropZone.classList.remove('bg-primary', 'bg-opacity-10');
-    
-    const userId = ev.dataTransfer.getData("text/plain");
-    if (!userId) return;
 
-    const staffRow = document.getElementById('row-staff-' + userId);
-    if (staffRow) {
-        if (staffRow.style.display === 'none') {
-            staffRow.style.display = '';
-            const summaryRow = document.getElementById('summary-row-' + userId);
-            if (summaryRow) summaryRow.style.display = '';
-            showToast('success', 'เพิ่มบุคลากรลงในตารางเวรแล้ว (จัดเวรได้เลย)');
-            staffRow.classList.add('bg-success', 'bg-opacity-10');
-            setTimeout(() => staffRow.classList.remove('bg-success', 'bg-opacity-10'), 2000);
-        } else {
-            showToast('warning', 'บุคลากรท่านนี้มีรายชื่ออยู่ในตารางเวรอยู่แล้ว');
-        }
+function getRosterShiftColorClass(value) {
+    const types = parseRosterShiftTypes(value);
+    if (types.length > 1) return 'text-primary';
+    if (types.includes('บ')) return 'text-warning text-dark';
+    if (types.includes('ร')) return 'text-success';
+    if (types.includes('ย')) return 'text-danger';
+    if (types.includes('ช')) return 'text-info';
+    return 'text-dark';
+}
+
+function setPaintMode(value, colorClass = 'text-dark', sourceButton = null) {
+    paintShiftValue = value;
+    paintColorClass = colorClass;
+
+    document.querySelectorAll('.rp-paint-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('button.shift-cell[data-date]').forEach(cell => cell.classList.toggle('rp-paint-ready', value !== null));
+
+    if (sourceButton && value !== null) sourceButton.classList.add('active');
+
+    const indicator = document.getElementById('paintModeIndicator');
+    if (indicator) {
+        indicator.classList.toggle('is-active', value !== null);
+        const textEl = indicator.querySelector('span');
+        if (textEl) textEl.textContent = value === null ? 'โหมดระบายเวร' : (value === '' ? 'โหมดลบเวร' : `ระบายเวร: ${value}`);
     }
+}
+
+function applyRosterRowFilter(filter) {
+    document.querySelectorAll('.roster-staff-row').forEach(row => {
+        if (row.dataset.rosterBaseVisible === 'false') {
+            row.classList.add('rp-filter-hidden');
+            return;
+        }
+
+        const cells = Array.from(row.querySelectorAll('.shift-cell[data-date]'));
+        const shiftTypes = cells.flatMap(cell => parseRosterShiftTypes(cell.innerText));
+        let match = true;
+
+        if (filter === 'empty') match = shiftTypes.length === 0;
+        else if (filter === 'night') match = shiftTypes.includes('ร');
+        else if (filter === 'leave') match = !!row.querySelector('.leave-badge-cell');
+        else if (filter === 'fatigue') match = !!row.querySelector('.fatigue-warn');
+
+        row.classList.toggle('rp-filter-hidden', !match);
+    });
+}
+
+function updateCoverageForDate(dateStr) {
+    const coverageEl = document.querySelector(`.rp-coverage-mini[data-coverage-date="${dateStr}"]`);
+    if (!coverageEl) return;
+
+    let b = 0;
+    let r = 0;
+    document.querySelectorAll(`.shift-cell[data-date="${dateStr}"]`).forEach(cell => {
+        const types = parseRosterShiftTypes(cell.innerText);
+        if (types.includes('บ')) b++;
+        if (types.includes('ร')) r++;
+    });
+
+    const spans = coverageEl.querySelectorAll('span');
+    if (spans[0]) {
+        spans[0].textContent = `บ${b}`;
+        spans[0].classList.toggle('is-covered', b >= 1);
+    }
+    if (spans[1]) {
+        spans[1].textContent = `ร${r}`;
+        spans[1].classList.toggle('is-covered', r >= 1);
+    }
+
+    const ok = b >= 1 && r >= 1;
+    coverageEl.classList.toggle('is-ok', ok);
+    coverageEl.classList.toggle('is-gap', !ok);
+    coverageEl.title = `ความครอบคลุม: บ ${b} คน / ร ${r} คน`;
+
+    const coverageKpi = document.getElementById('kpiCoverageDays');
+    if (coverageKpi) coverageKpi.textContent = document.querySelectorAll('.rp-coverage-mini.is-ok').length.toLocaleString();
+}
+
+function refreshRosterKpis() {
+    const baseRows = Array.from(document.querySelectorAll('.roster-staff-row')).filter(row => !row.classList.contains('rp-filter-hidden'));
+    const staffKpi = document.getElementById('kpiStaffCount');
+    if (staffKpi) staffKpi.textContent = baseRows.length.toLocaleString();
+
+    let shifts = 0;
+    baseRows.forEach(row => {
+        row.querySelectorAll('.shift-cell[data-date]').forEach(cell => {
+            shifts += parseRosterShiftTypes(cell.innerText).filter(type => ['ช', 'บ', 'ร', 'ย'].includes(type)).length;
+        });
+    });
+    const shiftKpi = document.getElementById('kpiShiftCount');
+    if (shiftKpi) shiftKpi.textContent = shifts.toLocaleString();
+
+    const payKpi = document.getElementById('kpiEstimatedPay');
+    const grandPay = document.getElementById('grand-total-pay');
+    if (payKpi && grandPay) payKpi.textContent = (grandPay.innerText || '0').replace(/[^0-9.-]/g, '') === '' ? '0' : Number((grandPay.innerText || '0').replace(/,/g, '')).toLocaleString();
+}
+
+function refreshValidationKpis() {
+    if (!targetHospId) return;
+    rosterApiFetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
+        .then(res => res.json())
+        .then(data => {
+            const err = document.getElementById('kpiErrorCount');
+            const warn = document.getElementById('kpiWarningCount');
+            const state = document.getElementById('kpiValidationState');
+            if (data.status !== 'success') {
+                if (state) state.textContent = 'ตรวจสอบไม่สำเร็จ';
+                return;
+            }
+            const errors = Array.isArray(data.errors) ? data.errors.length : (data.has_error ? (data.warnings?.length || 0) : 0);
+            const warnings = Array.isArray(data.advisories) ? data.advisories.length : (data.has_error ? 0 : (data.warnings?.length || 0));
+            if (err) err.textContent = errors.toLocaleString();
+            if (warn) warn.textContent = warnings.toLocaleString();
+            if (state) state.textContent = errors > 0 ? 'มีรายการที่ต้องแก้ไข' : (warnings > 0 ? 'มีข้อควรตรวจสอบ' : 'ผ่านการตรวจสอบ');
+        })
+        .catch(() => {
+            const state = document.getElementById('kpiValidationState');
+            if (state) state.textContent = 'เชื่อมต่อตรวจสอบไม่ได้';
+        });
+}
+
+function scheduleValidationKpiRefresh() {
+    clearTimeout(validationKpiTimer);
+    validationKpiTimer = setTimeout(refreshValidationKpis, 650);
 }
 
 // ==========================================
@@ -1186,8 +1416,14 @@ function showPayCalculation(el) {
 }
 
 function openShiftModal(btn) {
-    if (!shiftModal) shiftModal = new bootstrap.Modal(document.getElementById('shiftSelectorModal'));
     currentCellBtn = btn;
+
+    if (paintShiftValue !== null) {
+        saveShift(paintShiftValue, paintColorClass);
+        return;
+    }
+
+    if (!shiftModal) shiftModal = new bootstrap.Modal(document.getElementById('shiftSelectorModal'));
     const dateStr = btn.getAttribute('data-date');
     const parts = dateStr.split('-');
     const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -1217,7 +1453,14 @@ function saveShift(shiftValue, colorClass) {
     .then(res => res.json())
     .then(data => {
         if (data.status === 'success') {
+            if (typeof data.shift_type === 'string') {
+                currentCellBtn.innerText = data.shift_type;
+                currentCellBtn.className = `btn w-100 h-100 p-0 border-0 shadow-none hover-cell shift-cell ${getRosterShiftColorClass(data.shift_type)} ${paintShiftValue !== null ? 'rp-paint-ready' : ''}`;
+            }
             if (indicator) setTimeout(() => indicator.classList.add('d-none'), 1500);
+            updateCoverageForDate(dateStr);
+            refreshRosterKpis();
+            scheduleValidationKpiRefresh();
         } else {
             alert('Error: ' + (data.message || 'ไม่สามารถบันทึกเวรได้'));
             window.location.reload();
@@ -1257,9 +1500,13 @@ function removeStaffFromRoster(staffId, staffName) {
             recalculateRowSummary(staffId, payRateId);
             
             row.style.display = 'none'; row.style.opacity = '1';
+            row.dataset.rosterBaseVisible = 'false';
             const summaryRow = document.getElementById('summary-row-' + staffId);
             if (summaryRow) summaryRow.style.display = 'none';
             updateGrandTotals();
+            cells.forEach(cell => updateCoverageForDate(cell.getAttribute('data-date')));
+            refreshRosterKpis();
+            scheduleValidationKpiRefresh();
         } else { alert('ลบข้อมูลไม่สำเร็จบางส่วน'); row.style.opacity = '1'; }
     });
 }
@@ -1309,6 +1556,9 @@ function checkFatigueRules() {
             }
         }
     });
+
+    const activeFilter = document.querySelector('.rp-roster-filter-btn.active')?.dataset.rosterFilter;
+    if (activeFilter === 'fatigue') applyRosterRowFilter('fatigue');
 
     Swal.fire({
         icon: warningCount > 0 ? 'warning' : 'success',

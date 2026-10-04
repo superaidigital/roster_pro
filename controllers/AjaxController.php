@@ -199,16 +199,16 @@ class AjaxController {
         }
 
         $stmt_user = $db->prepare("
-            SELECT id, role, is_active, is_deleted
+            SELECT id, hospital_id, role, is_active, is_deleted
             FROM users
-            WHERE id = ?
+            WHERE id = ? AND hospital_id = ?
             LIMIT 1
         ");
-        $stmt_user->execute([$user_id]);
+        $stmt_user->execute([$user_id, $hospital_id]);
         $targetUser = $stmt_user->fetch(PDO::FETCH_ASSOC);
         if (!$targetUser || (int)$targetUser['is_active'] !== 1 || (int)$targetUser['is_deleted'] === 1 || in_array(strtoupper((string)$targetUser['role']), ['ADMIN', 'SUPERADMIN'], true)) {
             http_response_code(422);
-            echo json_encode(['status' => 'error', 'message' => 'ไม่พบบุคลากรที่สามารถจัดเวรได้'], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['status' => 'error', 'message' => 'จัดเวรได้เฉพาะบุคลากรที่สังกัดหน่วยบริการนี้เท่านั้น'], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
@@ -332,13 +332,13 @@ class AjaxController {
             try {
                 $db->beginTransaction();
                 
-                $stmt = $db->prepare("UPDATE users SET display_order = ? WHERE id = ?");
+                $stmt = $db->prepare("UPDATE users SET display_order = ? WHERE id = ? AND hospital_id = ?");
                 
                 foreach ($data['order'] as $item) {
                     if (isset($item['id']) && isset($item['order'])) {
                         // บวก 1 เพื่อให้ลำดับใน Database เริ่มที่ 1
                         $display_order = (int)$item['order'] + 1;
-                        $stmt->execute([$display_order, $item['id']]);
+                        $stmt->execute([$display_order, (int)$item['id'], $hospital_id]);
                     }
                 }
                 
@@ -389,8 +389,15 @@ class AjaxController {
         try {
             $start_prev = $prev_month . '-01';
             $end_prev = date('Y-m-t', strtotime($start_prev));
-            $stmt_get = $db->prepare("SELECT user_id, shift_date, shift_type FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
-            $stmt_get->execute([$hospital_id, $start_prev, $end_prev]);
+            $stmt_get = $db->prepare("
+                SELECT s.user_id, s.shift_date, s.shift_type
+                FROM shifts s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.hospital_id = ?
+                  AND u.hospital_id = ?
+                  AND s.shift_date BETWEEN ? AND ?
+            ");
+            $stmt_get->execute([$hospital_id, $hospital_id, $start_prev, $end_prev]);
             $prev_shifts = $stmt_get->fetchAll(PDO::FETCH_ASSOC);
 
             // Important: never delete the current month until source data is confirmed.
@@ -826,10 +833,12 @@ class AjaxController {
                 SELECT s.shift_date, s.shift_type, s.user_id, u.name, u.type, u.employee_type
                 FROM shifts s
                 JOIN users u ON s.user_id = u.id
-                WHERE s.hospital_id = ? AND s.shift_date LIKE ?
+                WHERE s.hospital_id = ?
+                  AND u.hospital_id = ?
+                  AND s.shift_date LIKE ?
                 ORDER BY s.user_id, s.shift_date ASC
             ");
-            $stmt_shifts->execute([$hospital_id, "$month_year-%"]);
+            $stmt_shifts->execute([$hospital_id, $hospital_id, "$month_year-%"]);
             $shifts = $stmt_shifts->fetchAll(PDO::FETCH_ASSOC);
 
             if (empty($shifts)) {
@@ -1038,8 +1047,13 @@ class AjaxController {
             $counts = []; 
             foreach($users as $u) $counts[$u['id']] = ['บ'=>0, 'ร'=>0, 'worked_weekends'=>0];
 
-            $stmt_exist = $db->prepare("SELECT user_id, shift_date, shift_type FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
-            $stmt_exist->execute([$hospital_id, "$month_year-%"]);
+            $stmt_exist = $db->prepare("
+                SELECT s.user_id, s.shift_date, s.shift_type
+                FROM shifts s
+                JOIN users u ON u.id = s.user_id
+                WHERE s.hospital_id = ? AND u.hospital_id = ? AND s.shift_date LIKE ?
+            ");
+            $stmt_exist->execute([$hospital_id, $hospital_id, "$month_year-%"]);
             foreach ($stmt_exist->fetchAll(PDO::FETCH_ASSOC) as $es) {
                 $schedule[$es['shift_date']][$es['user_id']] = $es['shift_type'];
                 if (isset($counts[$es['user_id']])) {
