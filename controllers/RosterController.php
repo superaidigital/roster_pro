@@ -5,6 +5,7 @@ require_once 'config/database.php';
 require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 require_once 'models/RosterSnapshotModel.php';
+require_once 'models/RosterAuditModel.php';
 
 class RosterController {
 
@@ -155,6 +156,16 @@ class RosterController {
             }
         }
 
+        $roster_audit_events = [];
+        if ($hosp_id_safe > 0 && $this->canManageRosterVersions()) {
+            try {
+                $auditModel = new RosterAuditModel($db);
+                $roster_audit_events = $auditModel->listEvents($hosp_id_safe, $selected_month, 50);
+            } catch (Throwable $e) {
+                error_log('Roster audit list failed: ' . $e->getMessage());
+            }
+        }
+
         // โหลด View หน้ากระดานจัดเวร
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
@@ -283,8 +294,13 @@ class RosterController {
         
         try {
             $db->beginTransaction();
+
+            $beforeCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
+            $beforeCountStmt->execute([$hospital_id, $month_like]);
+            $beforeShiftCount = (int)$beforeCountStmt->fetchColumn();
+
             $snapshotModel = new RosterSnapshotModel($db);
-            $snapshotModel->createSnapshot(
+            $snapshotId = $snapshotModel->createSnapshot(
                 $hospital_id,
                 $month,
                 (int)$_SESSION['user']['id'],
@@ -296,6 +312,24 @@ class RosterController {
             $stmt->execute([$hospital_id, $month_like]);
             
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ล้างข้อมูลตารางเวรทั้งหมดของเดือน {$month}");
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospital_id,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_CLEAR',
+                ['shift_count' => $beforeShiftCount],
+                ['shift_count' => 0],
+                [
+                    'snapshot_id' => $snapshotId,
+                    'deleted_count' => $stmt->rowCount(),
+                ],
+                null,
+                null,
+                'ROSTER'
+            );
+
             $db->commit();
             
             $_SESSION['success_msg'] = "ล้างข้อมูลตารางเวรของเดือน {$month} เรียบร้อยแล้ว เริ่มจัดใหม่ได้ทันที";
@@ -348,8 +382,12 @@ class RosterController {
         try {
             $db->beginTransaction();
 
+            $beforeCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
+            $beforeCountStmt->execute([$hospital_id, $month_like]);
+            $beforeRandomizeCount = (int)$beforeCountStmt->fetchColumn();
+
             $snapshotModel = new RosterSnapshotModel($db);
-            $snapshotModel->createSnapshot(
+            $snapshotId = $snapshotModel->createSnapshot(
                 $hospital_id,
                 $month,
                 (int)$_SESSION['user']['id'],
@@ -386,6 +424,24 @@ class RosterController {
                     }
                 }
             }
+
+            $afterCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
+            $afterCountStmt->execute([$hospital_id, $month_like]);
+            $afterRandomizeCount = (int)$afterCountStmt->fetchColumn();
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospital_id,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_RANDOMIZE',
+                ['shift_count' => $beforeRandomizeCount],
+                ['shift_count' => $afterRandomizeCount],
+                ['snapshot_id' => $snapshotId],
+                null,
+                null,
+                'ROSTER'
+            );
 
             $db->commit();
             
@@ -437,6 +493,20 @@ class RosterController {
                 $db, $_SESSION['user']['id'], LogsController::ACTION_CREATE,
                 "สร้าง Snapshot ตารางเวรเดือน {$month} (Version #{$id})"
             );
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospitalId,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'SNAPSHOT_CREATE',
+                null,
+                ['snapshot_id' => $id],
+                ['label' => $label],
+                null,
+                null,
+                'SNAPSHOT'
+            );
             $_SESSION['success_msg'] = "บันทึกเวอร์ชันตารางเวรเรียบร้อยแล้ว (#{$id})";
         } catch (Throwable $e) {
             error_log('Roster snapshot create failed: ' . $e->getMessage());
@@ -481,6 +551,10 @@ class RosterController {
         }
 
         try {
+            $beforeCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
+            $beforeCountStmt->execute([$hospitalId, $month . '-%']);
+            $beforeRestoreCount = (int)$beforeCountStmt->fetchColumn();
+
             $snapshotModel = new RosterSnapshotModel($db);
             $result = $snapshotModel->restoreSnapshot(
                 $snapshotId, $hospitalId, $month, (int)$_SESSION['user']['id']
@@ -488,6 +562,23 @@ class RosterController {
             LogsController::addLog(
                 $db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE,
                 "ย้อนตารางเวรเดือน {$month} กลับ Version #{$snapshotId} จำนวน {$result['restored_shift_count']} รายการ"
+            );
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospitalId,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_RESTORE',
+                ['shift_count' => $beforeRestoreCount],
+                ['shift_count' => (int)$result['restored_shift_count'], 'status' => 'DRAFT'],
+                [
+                    'source_snapshot_id' => $snapshotId,
+                    'before_restore_snapshot_id' => (int)$result['before_restore_snapshot_id'],
+                ],
+                null,
+                null,
+                'ROSTER'
             );
             $_SESSION['success_msg'] = 'ย้อนเวอร์ชันสำเร็จ และเปลี่ยนสถานะกลับเป็น DRAFT เพื่อให้ตรวจสอบอีกครั้ง';
         } catch (Throwable $e) {

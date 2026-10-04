@@ -11,6 +11,7 @@ require_once __DIR__ . '/../models/LeaveModel.php';
 require_once __DIR__ . '/../models/NotificationModel.php';
 require_once __DIR__ . '/../models/RosterModel.php';
 require_once __DIR__ . '/../models/RosterSnapshotModel.php';
+require_once __DIR__ . '/../models/RosterAuditModel.php';
 require_once __DIR__ . '/../models/FieldVisitModel.php';
 require_once __DIR__ . '/../controllers/StaffController.php';
 require_once __DIR__ . '/../controllers/ProfileController.php';
@@ -150,6 +151,51 @@ $shift1 = $shiftModel->addShift('2026-10-10', 'บ', $uid1, $hospitalId);
 $shift2 = $shiftModel->addShift('2026-10-11', 'ร', $uid2, $hospitalId);
 ok((bool)$shift1 && (bool)$shift2, 'two shifts created');
 ok($shiftModel->getRosterStatus($hospitalId, '2026-10') === 'DRAFT', 'roster status initialized');
+
+$auditModel = new RosterAuditModel($db);
+$auditId = $auditModel->record(
+    $hospitalId,
+    '2026-10',
+    $uid1,
+    'SHIFT_SET',
+    ['shift_type' => null],
+    ['shift_type' => 'บ'],
+    ['source' => 'RUNTIME_SMOKE'],
+    $uid1,
+    '2026-10-10',
+    'SHIFT'
+);
+ok($auditId > 0, 'structured roster audit event created');
+
+$auditEvents = $auditModel->listEvents($hospitalId, '2026-10', 10);
+ok(count($auditEvents) >= 1, 'roster audit timeline returns events');
+$firstAudit = $auditEvents[0];
+ok((int)$firstAudit['id'] === $auditId, 'roster audit timeline sorts newest event first');
+ok(($firstAudit['before']['shift_type'] ?? null) === null, 'roster audit preserves before value');
+ok(($firstAudit['after']['shift_type'] ?? null) === 'บ', 'roster audit preserves after value');
+ok(($firstAudit['metadata']['source'] ?? '') === 'RUNTIME_SMOKE', 'roster audit preserves metadata');
+ok((int)$firstAudit['target_user_id'] === $uid1, 'roster audit preserves target user');
+ok($firstAudit['shift_date'] === '2026-10-10', 'roster audit preserves target shift date');
+ok(!method_exists($auditModel, 'delete'), 'roster audit model exposes no delete API');
+
+$otherAuditId = $auditModel->record(
+    $otherHospitalId,
+    '2026-10',
+    $uid3,
+    'SHIFT_SET',
+    null,
+    ['shift_type' => 'ร'],
+    ['source' => 'OTHER_UNIT'],
+    $uid3,
+    '2026-10-12',
+    'SHIFT'
+);
+ok($otherAuditId > 0, 'cross-unit audit fixture created');
+$auditEventsScoped = $auditModel->listEvents($hospitalId, '2026-10', 20);
+ok(
+    count(array_filter($auditEventsScoped, static fn(array $event): bool => (int)$event['hospital_id'] === $otherHospitalId)) === 0,
+    'roster audit timeline prevents cross-hospital reads'
+);
 
 $snapshotModel = new RosterSnapshotModel($db);
 $snapshotId = $snapshotModel->createSnapshot(

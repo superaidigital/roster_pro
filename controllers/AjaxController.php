@@ -8,6 +8,7 @@ require_once 'models/NotificationModel.php';
 require_once 'models/UserModel.php';
 require_once 'models/LeaveModel.php';
 require_once 'models/RosterSnapshotModel.php';
+require_once 'models/RosterAuditModel.php';
 require_once 'controllers/LogsController.php'; // 🌟 นำเข้า Logs Controller
 
 class AjaxController {
@@ -270,6 +271,16 @@ class AjaxController {
         try {
             $db->beginTransaction();
 
+            $stmtBefore = $db->prepare(
+                "SELECT shift_type FROM shifts WHERE user_id = ? AND shift_date = ? AND hospital_id = ? ORDER BY id ASC"
+            );
+            $stmtBefore->execute([$user_id, $date, $hospital_id]);
+            $beforeTypes = array_values(array_filter(
+                array_map('strval', $stmtBefore->fetchAll(PDO::FETCH_COLUMN)),
+                static fn(string $value): bool => $value !== ''
+            ));
+            $beforeShift = $beforeTypes ? implode('/', $beforeTypes) : null;
+
             $stmt = $db->prepare("DELETE FROM shifts WHERE user_id = ? AND shift_date = ? AND hospital_id = ?");
             $stmt->execute([$user_id, $date, $hospital_id]);
 
@@ -282,10 +293,40 @@ class AjaxController {
                 }
 
                 LogsController::addLog($db, $_SESSION['user']['id'], 'UPDATE', "จัดเวร '{$canonical_shift}' ให้ผู้ใช้ ID:{$user_id} วันที่ {$date}");
+
+                $auditModel = new RosterAuditModel($db);
+                $auditModel->record(
+                    $hospital_id,
+                    $month_year,
+                    (int)$_SESSION['user']['id'],
+                    'SHIFT_SET',
+                    ['shift_type' => $beforeShift],
+                    ['shift_type' => $canonical_shift],
+                    ['source' => 'ROSTER_BOARD'],
+                    $user_id,
+                    $date,
+                    'SHIFT'
+                );
+
                 $db->commit();
                 echo json_encode(['status' => 'success', 'shift_id' => $last_id, 'shift_type' => $canonical_shift], JSON_UNESCAPED_UNICODE);
             } else {
                 LogsController::addLog($db, $_SESSION['user']['id'], 'DELETE', "ลบเวรของผู้ใช้ ID:{$user_id} ในวันที่ {$date}");
+
+                $auditModel = new RosterAuditModel($db);
+                $auditModel->record(
+                    $hospital_id,
+                    $month_year,
+                    (int)$_SESSION['user']['id'],
+                    'SHIFT_DELETE',
+                    ['shift_type' => $beforeShift],
+                    ['shift_type' => null],
+                    ['source' => 'ROSTER_BOARD'],
+                    $user_id,
+                    $date,
+                    'SHIFT'
+                );
+
                 $db->commit();
                 echo json_encode(['status' => 'success', 'message' => 'Deleted'], JSON_UNESCAPED_UNICODE);
             }
@@ -409,17 +450,20 @@ class AjaxController {
 
             $db->beginTransaction();
 
+            $start_curr = $target_month . '-01';
+            $end_curr = date('Y-m-t', strtotime($start_curr));
+            $beforeCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
+            $beforeCountStmt->execute([$hospital_id, $start_curr, $end_curr]);
+            $beforeCopyCount = (int)$beforeCountStmt->fetchColumn();
+
             $snapshotModel = new RosterSnapshotModel($db);
-            $snapshotModel->createSnapshot(
+            $snapshotId = $snapshotModel->createSnapshot(
                 $hospital_id,
                 $target_month,
                 (int)$_SESSION['user']['id'],
                 'BEFORE_COPY',
                 "สำรองก่อนคัดลอกจากเดือน {$prev_month}"
             );
-
-            $start_curr = $target_month . '-01';
-            $end_curr = date('Y-m-t', strtotime($start_curr));
             $stmt_del = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date BETWEEN ? AND ?");
             $stmt_del->execute([$hospital_id, $start_curr, $end_curr]);
 
@@ -441,6 +485,20 @@ class AjaxController {
                 $_SESSION['user']['id'],
                 'CREATE',
                 "คัดลอกเวรจากเดือน {$prev_month} ไปยังเดือน {$target_month} จำนวน {$copied} รายการ"
+            );
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospital_id,
+                $target_month,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_COPY_PREVIOUS',
+                ['shift_count' => $beforeCopyCount],
+                ['shift_count' => $copied],
+                ['source_month' => $prev_month, 'snapshot_id' => $snapshotId],
+                null,
+                null,
+                'ROSTER'
             );
 
             $db->commit();
@@ -575,6 +633,7 @@ class AjaxController {
         $hospital_name = $stmt_hosp->fetch(PDO::FETCH_ASSOC)['name'] ?? 'รพ.สต.';
 
         try {
+            $approvedVersionId = null;
             $shiftModel->updateRosterStatus($hospital_id, $month_year, $new_status);
 
             LogsController::addLog($db, $_SESSION['user']['id'], 'APPROVE', "เปลี่ยนสถานะตารางเวร รพ.สต. {$hospital_name} เดือน {$month_year} เป็น {$new_status}");
@@ -639,6 +698,24 @@ class AjaxController {
                 $stmt_snap = $db->prepare("UPDATE roster_status SET pay_summary = NULL WHERE hospital_id = ? AND month_year = ?");
                 $stmt_snap->execute([$hospital_id, $month_year]);
             }
+
+            $auditModel = new RosterAuditModel($db);
+            $auditMetadata = [];
+            if ($approvedVersionId !== null) {
+                $auditMetadata['approved_snapshot_id'] = (int)$approvedVersionId;
+            }
+            $auditModel->record(
+                $hospital_id,
+                $month_year,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_STATUS_CHANGE',
+                ['status' => $current_status],
+                ['status' => $new_status],
+                $auditMetadata,
+                null,
+                null,
+                'WORKFLOW'
+            );
 
             $thai_months = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
             $m = (int)substr($month_year, 5, 2);
@@ -721,6 +798,20 @@ class AjaxController {
             $shiftModel->updateRosterStatus($hospital_id, $month_year, 'REQUEST_EDIT');
             
             LogsController::addLog($db, $_SESSION['user']['id'], 'UPDATE', "ส่งคำขอแก้ไขตารางเวรที่อนุมัติแล้ว เดือน {$month_year}");
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospital_id,
+                $month_year,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_EDIT_REQUEST',
+                ['status' => 'APPROVED'],
+                ['status' => 'REQUEST_EDIT'],
+                [],
+                null,
+                null,
+                'WORKFLOW'
+            );
 
             $stmt = $db->query("SELECT id FROM users WHERE role IN ('ADMIN', 'SUPERADMIN')");
             $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1044,7 +1135,7 @@ class AjaxController {
             $db->beginTransaction();
 
             $snapshotModel = new RosterSnapshotModel($db);
-            $snapshotModel->createSnapshot(
+            $snapshotId = $snapshotModel->createSnapshot(
                 (int)$hospital_id,
                 (string)$month_year,
                 (int)$_SESSION['user']['id'],
@@ -1089,7 +1180,9 @@ class AjaxController {
                 WHERE s.hospital_id = ? AND u.hospital_id = ? AND s.shift_date LIKE ?
             ");
             $stmt_exist->execute([$hospital_id, $hospital_id, "$month_year-%"]);
-            foreach ($stmt_exist->fetchAll(PDO::FETCH_ASSOC) as $es) {
+            $existingShifts = $stmt_exist->fetchAll(PDO::FETCH_ASSOC);
+            $beforeAutoCount = count($existingShifts);
+            foreach ($existingShifts as $es) {
                 $schedule[$es['shift_date']][$es['user_id']] = $es['shift_type'];
                 if (isset($counts[$es['user_id']])) {
                     if (strpos($es['shift_type'], 'บ') !== false) $counts[$es['user_id']]['บ']++;
@@ -1157,6 +1250,25 @@ class AjaxController {
             }
 
             LogsController::addLog($db, $_SESSION['user']['id'], 'CREATE', "ใช้งานระบบจัดการเวรอัตโนมัติ เดือน $month_year (จัดเพิ่ม $added_count กะ)");
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                (int)$hospital_id,
+                (string)$month_year,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_AUTO_SCHEDULE',
+                ['shift_count' => $beforeAutoCount],
+                ['shift_count' => $beforeAutoCount + $added_count],
+                [
+                    'added_count' => $added_count,
+                    'snapshot_id' => $snapshotId,
+                    'engine' => 'RULE_ENGINE',
+                ],
+                null,
+                null,
+                'ROSTER'
+            );
+
             $db->commit();
             echo json_encode(['status' => 'success', 'message' => "ดำเนินการจัดเวรตามกฎสำเร็จ (เพิ่ม $added_count กะ)", 'added' => $added_count]);
 

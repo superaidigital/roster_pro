@@ -428,6 +428,19 @@ foreach ($roster_coverage as $coverage) {
                         <?php endif; ?>
                     </button>
                     <?php endif; ?>
+
+                    <?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SCHEDULER','DIRECTOR','ADMIN','SUPERADMIN'], true)): ?>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-dark bg-white fw-bold shadow-sm text-nowrap rounded-pill px-3"
+                            data-bs-toggle="modal"
+                            data-bs-target="#rosterAuditModal"
+                            title="ดูประวัติการแก้ไขตารางเวร">
+                        <i class="bi bi-journal-text me-1"></i> ประวัติแก้ไข
+                        <?php if (!empty($roster_audit_events)): ?>
+                            <span class="badge text-bg-dark ms-1"><?= count($roster_audit_events) ?></span>
+                        <?php endif; ?>
+                    </button>
+                    <?php endif; ?>
                 </div>
                 
                 <div class="d-flex flex-wrap gap-2">
@@ -1225,6 +1238,145 @@ foreach ($roster_coverage as $coverage) {
                     <div class="small text-muted mt-3">
                         <i class="bi bi-info-circle me-1"></i>
                         เมื่อ Restore ระบบจะเปลี่ยนตารางกลับเป็น <strong>DRAFT</strong> เสมอ เพื่อบังคับตรวจสอบใหม่ก่อนอนุมัติ
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- ================= 📜 Modal Audit Trail ================= -->
+<?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SCHEDULER','DIRECTOR','ADMIN','SUPERADMIN'], true)): ?>
+<div class="modal fade" id="rosterAuditModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom bg-light rounded-top-4">
+                <div>
+                    <h5 class="modal-title fw-bold mb-1">
+                        <i class="bi bi-journal-check text-dark me-2"></i>Audit Trail การแก้ไขตารางเวร
+                    </h5>
+                    <div class="small text-muted">
+                        บันทึกแบบ Before / After · เดือน <?= htmlspecialchars($display_month_text ?? $selected_month, ENT_QUOTES, 'UTF-8') ?>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+            </div>
+
+            <div class="modal-body p-3 p-md-4">
+                <div class="alert alert-light border rounded-4 small mb-4">
+                    <i class="bi bi-info-circle me-1"></i>
+                    ประวัตินี้ใช้ตรวจสอบว่าใครเปลี่ยนข้อมูลอะไร เมื่อใด และค่าก่อน/หลังเป็นอะไร
+                    โดยรายการ Audit ไม่มีปุ่มแก้ไขหรือลบจากหน้าเว็บ
+                </div>
+
+                <?php if (empty($roster_audit_events)): ?>
+                    <div class="text-center py-5">
+                        <i class="bi bi-journal-text display-5 text-secondary opacity-50"></i>
+                        <h6 class="fw-bold mt-3 mb-1">ยังไม่มีประวัติการแก้ไข</h6>
+                        <div class="small text-muted">เหตุการณ์ใหม่จะเริ่มแสดงหลังเปิดใช้ Audit Trail</div>
+                    </div>
+                <?php else: ?>
+                    <?php
+                    $auditLabels = [
+                        'SHIFT_SET' => ['แก้ไขเวร', 'bi-pencil-square', 'primary'],
+                        'SHIFT_DELETE' => ['ลบเวร', 'bi-eraser', 'danger'],
+                        'ROSTER_CLEAR' => ['ล้างตาราง', 'bi-trash3', 'danger'],
+                        'ROSTER_RANDOMIZE' => ['สุ่มตารางใหม่', 'bi-shuffle', 'warning'],
+                        'ROSTER_COPY_PREVIOUS' => ['คัดลอกเดือนก่อน', 'bi-copy', 'success'],
+                        'ROSTER_AUTO_SCHEDULE' => ['Auto Schedule', 'bi-robot', 'info'],
+                        'ROSTER_STATUS_CHANGE' => ['เปลี่ยนสถานะ', 'bi-diagram-3', 'secondary'],
+                        'ROSTER_EDIT_REQUEST' => ['ขอแก้ไขตาราง', 'bi-unlock', 'warning'],
+                        'SNAPSHOT_CREATE' => ['สร้าง Checkpoint', 'bi-save2', 'primary'],
+                        'ROSTER_RESTORE' => ['Restore เวอร์ชัน', 'bi-arrow-counterclockwise', 'dark'],
+                    ];
+                    ?>
+                    <div class="d-flex flex-column gap-3">
+                        <?php foreach ($roster_audit_events as $event):
+                            $action = strtoupper((string)($event['action_type'] ?? ''));
+                            $def = $auditLabels[$action] ?? [$action ?: 'กิจกรรม', 'bi-clock-history', 'secondary'];
+                            $before = is_array($event['before'] ?? null) ? $event['before'] : [];
+                            $after = is_array($event['after'] ?? null) ? $event['after'] : [];
+                            $meta = is_array($event['metadata'] ?? null) ? $event['metadata'] : [];
+                            $createdAt = !empty($event['created_at'])
+                                ? date('d/m/Y H:i:s', strtotime((string)$event['created_at']))
+                                : '-';
+
+                            $beforeText = '—';
+                            $afterText = '—';
+                            if (array_key_exists('shift_type', $before)) {
+                                $beforeText = (string)($before['shift_type'] ?? 'ว่าง');
+                            } elseif (array_key_exists('status', $before)) {
+                                $beforeText = (string)$before['status'];
+                            } elseif (array_key_exists('shift_count', $before)) {
+                                $beforeText = number_format((int)$before['shift_count']) . ' รายการ';
+                            }
+                            if (array_key_exists('shift_type', $after)) {
+                                $afterText = (string)($after['shift_type'] ?? 'ว่าง');
+                            } elseif (array_key_exists('status', $after)) {
+                                $afterText = (string)$after['status'];
+                            } elseif (array_key_exists('shift_count', $after)) {
+                                $afterText = number_format((int)$after['shift_count']) . ' รายการ';
+                            }
+                        ?>
+                        <article class="border rounded-4 p-3 p-md-4 bg-white">
+                            <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                                <div class="d-flex gap-3 min-w-0">
+                                    <div class="rounded-circle bg-<?= htmlspecialchars($def[2], ENT_QUOTES, 'UTF-8') ?> bg-opacity-10 text-<?= htmlspecialchars($def[2], ENT_QUOTES, 'UTF-8') ?> d-grid flex-shrink-0"
+                                         style="width:42px;height:42px;place-items:center;">
+                                        <i class="bi <?= htmlspecialchars($def[1], ENT_QUOTES, 'UTF-8') ?>"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <span class="fw-bold"><?= htmlspecialchars($def[0], ENT_QUOTES, 'UTF-8') ?></span>
+                                            <span class="badge text-bg-light border">#<?= (int)$event['id'] ?></span>
+                                        </div>
+                                        <div class="small text-muted mt-1">
+                                            โดย <strong><?= htmlspecialchars((string)($event['actor_name'] ?: 'ระบบ'), ENT_QUOTES, 'UTF-8') ?></strong>
+                                            · <?= htmlspecialchars($createdAt, ENT_QUOTES, 'UTF-8') ?>
+                                        </div>
+
+                                        <?php if (!empty($event['target_name']) || !empty($event['shift_date'])): ?>
+                                        <div class="small mt-2">
+                                            <?php if (!empty($event['target_name'])): ?>
+                                                <span class="me-2"><i class="bi bi-person me-1"></i><?= htmlspecialchars((string)$event['target_name'], ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($event['shift_date'])): ?>
+                                                <span><i class="bi bi-calendar3 me-1"></i><?= htmlspecialchars(date('d/m/Y', strtotime((string)$event['shift_date'])), ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 flex-wrap flex-md-nowrap">
+                                    <span class="badge text-bg-light border px-3 py-2"><?= htmlspecialchars($beforeText, ENT_QUOTES, 'UTF-8') ?></span>
+                                    <i class="bi bi-arrow-right text-muted"></i>
+                                    <span class="badge text-bg-primary px-3 py-2"><?= htmlspecialchars($afterText, ENT_QUOTES, 'UTF-8') ?></span>
+                                </div>
+                            </div>
+
+                            <?php if (!empty($meta)): ?>
+                            <div class="mt-3 pt-3 border-top d-flex flex-wrap gap-2 small text-muted">
+                                <?php if (isset($meta['snapshot_id'])): ?>
+                                    <span class="badge text-bg-light border">Snapshot #<?= (int)$meta['snapshot_id'] ?></span>
+                                <?php endif; ?>
+                                <?php if (isset($meta['source_snapshot_id'])): ?>
+                                    <span class="badge text-bg-light border">Restore จาก #<?= (int)$meta['source_snapshot_id'] ?></span>
+                                <?php endif; ?>
+                                <?php if (isset($meta['source_month'])): ?>
+                                    <span class="badge text-bg-light border">ต้นทาง <?= htmlspecialchars((string)$meta['source_month'], ENT_QUOTES, 'UTF-8') ?></span>
+                                <?php endif; ?>
+                                <?php if (isset($meta['added_count'])): ?>
+                                    <span class="badge text-bg-light border">เพิ่ม <?= (int)$meta['added_count'] ?> กะ</span>
+                                <?php endif; ?>
+                                <?php if (isset($meta['approved_snapshot_id'])): ?>
+                                    <span class="badge text-bg-success">Approved Snapshot #<?= (int)$meta['approved_snapshot_id'] ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php endif; ?>
+                        </article>
+                        <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
             </div>

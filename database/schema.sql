@@ -343,6 +343,32 @@ CREATE TABLE `roster_status` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `roster_audit_logs`
+--
+
+CREATE TABLE `roster_audit_logs` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `hospital_id` int(11) NOT NULL,
+  `month_year` varchar(7) NOT NULL,
+  `actor_user_id` int(11) DEFAULT NULL,
+  `action_type` varchar(40) NOT NULL,
+  `entity_type` varchar(30) NOT NULL DEFAULT 'ROSTER',
+  `target_user_id` int(11) DEFAULT NULL,
+  `shift_date` date DEFAULT NULL,
+  `before_json` longtext DEFAULT NULL,
+  `after_json` longtext DEFAULT NULL,
+  `metadata_json` longtext DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_roster_audit_month` (`hospital_id`,`month_year`,`created_at`),
+  KEY `idx_roster_audit_actor` (`actor_user_id`,`created_at`),
+  KEY `idx_roster_audit_target` (`target_user_id`,`shift_date`),
+  KEY `idx_roster_audit_action` (`action_type`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `roster_snapshots`
 --
 
