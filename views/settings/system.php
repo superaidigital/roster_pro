@@ -241,6 +241,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="index.php?c=settings&a=update_system" method="POST">
+                            <?= security_csrf_input() ?>
                 <input type="hidden" name="section" value="general">
                 <div class="modal-body p-4 modern-input-group">
                     <div class="mb-4">
@@ -282,6 +283,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
             </div>
             <div class="modal-body p-4 bg-white modern-input-group">
                 <form action="index.php?c=settings&a=update_system" method="POST" id="lineNotifyForm">
+                            <?= security_csrf_input() ?>
                     <input type="hidden" name="section" value="line_notify">
                     
                     <div class="mb-4 pb-4 border-bottom">
@@ -347,6 +349,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
             </div>
             
             <form action="index.php?c=settings&a=factory_reset" method="POST" id="resetForm">
+                            <?= security_csrf_input() ?>
                 <div class="modal-body p-4 bg-white">
                     <div class="text-center mb-4">
                         <i class="bi bi-trash3-fill text-danger" style="font-size: 3rem;"></i>
