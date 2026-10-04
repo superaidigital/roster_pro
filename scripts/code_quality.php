@@ -66,6 +66,24 @@ if (is_file($root . '/database.php')) {
     addError($errors, 'Duplicate root database.php detected; use config/database.php');
 }
 
+foreach (phpFilesUnder($root . '/public') as $unusedPhpFile) {
+    // PHP under public is checked elsewhere when applicable.
+}
+if (is_dir($root . '/public')) {
+    $publicIterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($root . '/public', FilesystemIterator::SKIP_DOTS)
+    );
+    foreach ($publicIterator as $publicFile) {
+        if ($publicFile->isFile() && strtolower($publicFile->getExtension()) === 'sql') {
+            addError(
+                $errors,
+                'Database dump must not be committed under public web root: ' .
+                ltrim(str_replace($root, '', $publicFile->getPathname()), DIRECTORY_SEPARATOR)
+            );
+        }
+    }
+}
+
 // 2) Sanitized schema must never contain application data.
 $schemaPath = $root . '/database/schema.sql';
 if (!is_file($schemaPath)) {
@@ -125,6 +143,56 @@ foreach ($routeFiles as $file) {
         }
         if (!isset($controllers[$controller][$action])) {
             addError($errors, basename($file) . " links to missing action: {$controller}::{$action}()");
+        }
+    }
+}
+
+// 4.5) Runtime method contracts for non-inherited classes.
+// PHP lint cannot detect calls to methods that were removed during a refactor.
+foreach (array_merge(phpFilesUnder($root . '/controllers'), phpFilesUnder($root . '/models')) as $file) {
+    $content = (string) file_get_contents($file);
+    $rel = ltrim(str_replace($root, '', $file), DIRECTORY_SEPARATOR);
+
+    if (!preg_match('/class\s+[A-Za-z_][A-Za-z0-9_]*(?:\s+extends\s+[A-Za-z_][A-Za-z0-9_]*)?\s*\{/i', $content, $classMatch)) {
+        continue;
+    }
+
+    // Skip inherited classes because a method may intentionally come from the parent.
+    if (preg_match('/class\s+[A-Za-z_][A-Za-z0-9_]*\s+extends\s+/i', $classMatch[0])) {
+        continue;
+    }
+
+    preg_match_all(
+        '/(?:public|protected|private)\s+function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/i',
+        $content,
+        $definedMatches
+    );
+    $definedMethods = array_fill_keys($definedMatches[1] ?? [], true);
+
+    preg_match_all('/\$this->([A-Za-z_][A-Za-z0-9_]*)\s*\(/', $content, $calledMatches);
+    foreach (array_unique($calledMatches[1] ?? []) as $calledMethod) {
+        if (!isset($definedMethods[$calledMethod])) {
+            addError($errors, $rel . ': calls undefined local method $this->' . $calledMethod . '()');
+        }
+    }
+}
+
+// 4.6) PWA manifest assets must resolve inside the repository.
+$manifestPath = $root . '/manifest.json';
+if (is_file($manifestPath)) {
+    $manifest = json_decode((string) file_get_contents($manifestPath), true);
+    if (!is_array($manifest)) {
+        addError($errors, 'manifest.json is not valid JSON');
+    } else {
+        foreach (($manifest['icons'] ?? []) as $icon) {
+            $src = (string)($icon['src'] ?? '');
+            if ($src === '' || preg_match('#^https?://#i', $src)) {
+                continue;
+            }
+            $assetPath = $root . '/' . ltrim(preg_replace('#^\./#', '', $src), '/');
+            if (!is_file($assetPath)) {
+                addError($errors, 'manifest.json references missing icon: ' . $src);
+            }
         }
     }
 }
