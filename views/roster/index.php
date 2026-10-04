@@ -12,8 +12,22 @@ $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 
 $isAdmin = in_array($_SESSION['user']['role'] ?? '', ['ADMIN', 'SUPERADMIN']);
 $is_manager = in_array($_SESSION['user']['role'] ?? '', ['DIRECTOR', 'SCHEDULER', 'ADMIN', 'SUPERADMIN']);
-$roster_status = $roster_status ?? 'DRAFT';
+$roster_status = strtoupper((string)($roster_status ?? 'DRAFT'));
 $canEdit = ($is_manager && $roster_status !== 'APPROVED');
+
+// Workflow state is derived once here so the view never emits Undefined variable warnings.
+$roster_workflow_map = [
+    'DRAFT'        => ['step' => 1, 'progress' => 0,      'label' => 'กำลังจัดทำ'],
+    'SUBMITTED'    => ['step' => 2, 'progress' => 33.333, 'label' => 'รอตรวจสอบ'],
+    'REQUEST_EDIT' => ['step' => 2, 'progress' => 33.333, 'label' => 'ขอแก้ไข'],
+    'APPROVED'     => ['step' => 3, 'progress' => 66.667, 'label' => 'อนุมัติแล้ว'],
+    'LOCKED'       => ['step' => 3, 'progress' => 66.667, 'label' => 'ยืนยันแล้ว'],
+];
+
+$roster_workflow_state = $roster_workflow_map[$roster_status] ?? $roster_workflow_map['DRAFT'];
+$roster_progress_step = (int)$roster_workflow_state['step'];
+$roster_progress_percent = (float)$roster_workflow_state['progress'];
+$roster_workflow_label = (string)$roster_workflow_state['label'];
 
 function getShiftColorClass($shift_val) {
     if ($shift_val == 'บ' || $shift_val == 'A') return 'text-warning text-dark';
@@ -338,26 +352,41 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                 </div>
             </div>
             <div class="rp-workflow-card mx-3 mb-3 rp-roster-workflow">
-                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
-                    <div class="fw-bold text-dark"><i class="bi bi-diagram-3-fill text-primary me-2"></i>ขั้นตอนการจัดตารางเวร</div>
-                    <small class="text-muted"><?= $roster_status === 'REQUEST_EDIT' ? 'มีคำขอแก้ไข' : 'อัปเดตตามสถานะปัจจุบัน' ?></small>
+                <div class="rp-workflow-head">
+                    <div class="rp-workflow-heading">
+                        <span class="rp-workflow-heading-icon" aria-hidden="true">
+                            <i class="bi bi-diagram-3-fill"></i>
+                        </span>
+                        <div>
+                            <div class="rp-workflow-title">ขั้นตอนการจัดตารางเวร</div>
+                            <div class="rp-workflow-subtitle">ติดตามสถานะการจัดทำ ตรวจสอบ และอนุมัติตารางเวร</div>
+                        </div>
+                    </div>
+                    <span class="rp-workflow-state <?= $roster_status === 'REQUEST_EDIT' ? 'is-warning' : ($roster_status === 'APPROVED' ? 'is-success' : '') ?>">
+                        <i class="bi <?= $roster_status === 'APPROVED' ? 'bi-check-circle-fill' : ($roster_status === 'REQUEST_EDIT' ? 'bi-exclamation-circle-fill' : 'bi-clock-history') ?>"></i>
+                        <?= htmlspecialchars($roster_workflow_label, ENT_QUOTES, 'UTF-8') ?>
+                    </span>
                 </div>
-                <div class="rp-workflow <?= $roster_status === 'REQUEST_EDIT' ? 'rp-workflow--warning' : '' ?>"
-                     style="--rp-workflow-count:3; --rp-workflow-progress:<?= (int)$roster_progress_percent ?>%;">
+
+                <div class="rp-workflow <?= $roster_status === 'REQUEST_EDIT' ? 'rp-workflow--warning' : '' ?> <?= $roster_status === 'APPROVED' ? 'rp-workflow--approved' : '' ?>"
+                     style="--rp-workflow-count:3; --rp-workflow-progress:<?= htmlspecialchars((string)$roster_progress_percent, ENT_QUOTES, 'UTF-8') ?>%;"
+                     role="list"
+                     aria-label="ขั้นตอนการจัดตารางเวร">
                     <?php
                     $roster_steps = [
-                        1 => ['icon' => 'bi-pencil-fill', 'label' => 'จัดทำตาราง'],
-                        2 => ['icon' => 'bi-send-check-fill', 'label' => $roster_status === 'REQUEST_EDIT' ? 'ขอแก้ไข' : 'ส่งตรวจสอบ'],
-                        3 => ['icon' => 'bi-check-lg', 'label' => 'อนุมัติ']
+                        1 => ['icon' => 'bi-calendar2-week-fill', 'label' => 'จัดทำตาราง', 'desc' => 'บันทึกและปรับเวร'],
+                        2 => ['icon' => 'bi-send-check-fill', 'label' => $roster_status === 'REQUEST_EDIT' ? 'ขอแก้ไข' : 'ส่งตรวจสอบ', 'desc' => $roster_status === 'REQUEST_EDIT' ? 'รออนุญาตให้แก้ไข' : 'ส่งให้ผู้ตรวจสอบ'],
+                        3 => ['icon' => 'bi-patch-check-fill', 'label' => 'อนุมัติ', 'desc' => 'ยืนยันตารางพร้อมใช้']
                     ];
                     foreach ($roster_steps as $stepNo => $stepData):
                         $stepClass = '';
                         if ($stepNo < $roster_progress_step) $stepClass = 'is-complete';
                         elseif ($stepNo === $roster_progress_step) $stepClass = 'is-current';
                     ?>
-                        <div class="rp-workflow-step <?= $stepClass ?>">
-                            <div class="rp-workflow-dot"><i class="bi <?= $stepData['icon'] ?>"></i></div>
+                        <div class="rp-workflow-step <?= $stepClass ?>" role="listitem">
+                            <div class="rp-workflow-dot" aria-hidden="true"><i class="bi <?= $stepData['icon'] ?>"></i></div>
                             <div class="rp-workflow-label"><?= htmlspecialchars($stepData['label'], ENT_QUOTES, 'UTF-8') ?></div>
+                            <div class="rp-workflow-desc"><?= htmlspecialchars($stepData['desc'], ENT_QUOTES, 'UTF-8') ?></div>
                         </div>
                     <?php endforeach; ?>
                 </div>
