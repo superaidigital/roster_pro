@@ -2705,3 +2705,108 @@ h1, h2, h3, h4, h5, h6,
 .fw-bolder {
   font-family: "Sarabun", Tahoma, Arial, sans-serif !important;
 }
+
+
+/* Roster workflow + navigation icon polish — 2026-10-04 */
+.sidebar-menu .nav-link > i:not(.dropdown-arrow),
+.sidebar-menu .nav-link > div > i:first-child {
+  display:inline-grid !important; place-items:center;
+  width:1.9rem !important; height:1.9rem !important; flex:0 0 1.9rem !important;
+  margin:0 !important; border-radius:.58rem;
+  color:#9bb6c5 !important; background:rgba(255,255,255,.055);
+  font-size:.95rem !important; line-height:1;
+}
+.sidebar-menu .nav-link:hover > i:not(.dropdown-arrow),
+.sidebar-menu .nav-link:hover > div > i:first-child {
+  color:#5eead4 !important; background:rgba(94,234,212,.10);
+}
+.sidebar-menu .nav-link.active > i:not(.dropdown-arrow),
+.sidebar-menu .nav-link.active > div > i:first-child {
+  color:#5eead4 !important; background:rgba(94,234,212,.13);
+  box-shadow:inset 0 0 0 1px rgba(94,234,212,.12);
+}
+.sidebar-menu .nav-link .dropdown-arrow {
+  display:inline-flex !important; align-items:center; justify-content:center;
+  width:1rem !important; height:1rem !important; flex:0 0 1rem !important;
+  margin-left:auto !important; border-radius:0 !important;
+  color:#6f899b !important; background:transparent !important; font-size:.72rem !important;
+}
+#desktopSidebar.collapsed .sidebar-menu .nav-link > i:not(.dropdown-arrow) {
+  width:2rem !important; height:2rem !important; flex-basis:2rem !important;
+}
+
+.rp-roster-workflow {
+  position:relative; overflow:hidden; padding:1rem 1.1rem 1.05rem !important;
+  border-color:#dce8ef !important;
+  background:radial-gradient(circle at 100% 0%, rgba(15,108,189,.055), transparent 14rem),
+             linear-gradient(180deg,#fff 0%,#f9fbfc 100%) !important;
+}
+.rp-workflow-head {
+  display:flex; align-items:center; justify-content:space-between; gap:.85rem; min-width:0;
+}
+.rp-workflow-heading { display:flex; align-items:center; gap:.72rem; min-width:0; }
+.rp-workflow-heading-icon {
+  display:grid; place-items:center; width:2.25rem; height:2.25rem; flex:0 0 2.25rem;
+  border:1px solid #d6e8f3; border-radius:.72rem; color:#0f6cbd; background:#eef7fd; font-size:1rem;
+}
+.rp-workflow-title { color:#183247; font-size:.92rem; font-weight:800; line-height:1.25; }
+.rp-workflow-subtitle { margin-top:.12rem; color:#7890a0; font-size:.72rem; line-height:1.3; }
+.rp-workflow-state {
+  display:inline-flex; align-items:center; gap:.35rem; min-height:1.85rem; padding:.3rem .62rem;
+  flex:0 0 auto; border:1px solid #dce6ed; border-radius:999px; color:#567183;
+  background:#f7fafc; font-size:.7rem; font-weight:800; white-space:nowrap;
+}
+.rp-workflow-state.is-warning { color:#9a6508; border-color:#f5d38d; background:#fff8e8; }
+.rp-workflow-state.is-success { color:#16734f; border-color:#b9e8d3; background:#effbf5; }
+
+.rp-roster-workflow .rp-workflow { margin-top:1rem; padding:.15rem .3rem 0; align-items:start; }
+.rp-roster-workflow .rp-workflow::before,
+.rp-roster-workflow .rp-workflow::after { top:1.34rem; height:.16rem; }
+.rp-roster-workflow .rp-workflow::before { background:#dfe8ee; }
+.rp-roster-workflow .rp-workflow::after {
+  width:var(--rp-workflow-progress);
+  max-width:calc(100% - (100% / var(--rp-workflow-count,3)));
+  background:linear-gradient(90deg,#0f6cbd 0%,#20b7a1 100%);
+}
+.rp-roster-workflow .rp-workflow-step { gap:.32rem; padding-inline:.45rem; }
+.rp-roster-workflow .rp-workflow-dot {
+  width:2.55rem; height:2.55rem; border-width:.12rem; border-radius:.82rem;
+  color:#708697; border-color:#cfdae2; background:#fff;
+  box-shadow:0 .2rem .5rem rgba(16,33,46,.04); font-size:.95rem;
+}
+.rp-roster-workflow .rp-workflow-step.is-current .rp-workflow-dot {
+  color:#fff; border-color:#0f6cbd; background:linear-gradient(145deg,#1680d2,#0f6cbd);
+  box-shadow:0 0 0 .28rem rgba(15,108,189,.10),0 .35rem .8rem rgba(15,108,189,.12);
+}
+.rp-roster-workflow .rp-workflow-step.is-complete .rp-workflow-dot,
+.rp-roster-workflow .rp-workflow--approved .rp-workflow-step.is-current .rp-workflow-dot {
+  color:#fff; border-color:#16805d; background:linear-gradient(145deg,#20b781,#16805d);
+}
+.rp-roster-workflow .rp-workflow--warning .rp-workflow-step.is-current .rp-workflow-dot {
+  color:#8a5a06; border-color:#efb83e; background:#fff4d7;
+  box-shadow:0 0 0 .28rem rgba(245,158,11,.10);
+}
+.rp-roster-workflow .rp-workflow-label {
+  max-width:none; color:#385365; font-size:.78rem; font-weight:800; line-height:1.25;
+}
+.rp-workflow-desc { max-width:10rem; color:#8a9da9; font-size:.66rem; line-height:1.25; text-align:center; }
+
+@media (max-width:767.98px) {
+  .rp-roster-workflow { padding:.85rem !important; }
+  .rp-workflow-head { align-items:flex-start; }
+  .rp-workflow-subtitle { display:none; }
+  .rp-workflow-state { font-size:.65rem; padding-inline:.5rem; }
+  .rp-roster-workflow .rp-workflow { grid-template-columns:1fr; gap:.55rem; padding:.1rem 0 0; }
+  .rp-roster-workflow .rp-workflow::before,
+  .rp-roster-workflow .rp-workflow::after { display:none; }
+  .rp-roster-workflow .rp-workflow-step {
+    grid-template-columns:2.35rem minmax(0,1fr); grid-template-rows:auto auto;
+    justify-items:start; column-gap:.7rem; row-gap:.08rem; padding:.5rem .55rem;
+    border:1px solid #e3ebf0; border-radius:.72rem; background:rgba(255,255,255,.72); text-align:left;
+  }
+  .rp-roster-workflow .rp-workflow-dot {
+    grid-row:1 / span 2; width:2.35rem; height:2.35rem; border-radius:.7rem;
+  }
+  .rp-roster-workflow .rp-workflow-label,
+  .rp-workflow-desc { max-width:none; text-align:left; }
+}
