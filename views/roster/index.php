@@ -747,7 +747,9 @@ foreach ($roster_coverage as $coverage) {
                                                     
                                                     <?php else: ?>
                                                         <!-- โหมดอ่านอย่างเดียว -->
-                                                        <div class="w-100 h-100 d-flex justify-content-center align-items-center shift-cell <?= $color_class ?>" 
+                                                        <div class="w-100 h-100 d-flex justify-content-center align-items-center shift-cell <?= $color_class ?>"
+                                                             data-staff-id="<?= $staff['id'] ?>"
+                                                             data-date="<?= $full_date ?>"
                                                              style="padding-top: <?= $leave_txt ? '15px' : '0' ?> !important; <?= $is_approved_leave ? 'opacity: 0.6;' : '' ?>">
                                                             <?= htmlspecialchars($shift_val) ?>
                                                         </div>
@@ -1379,7 +1381,7 @@ function setPaintMode(value, colorClass = 'text-dark', sourceButton = null) {
     paintColorClass = colorClass;
 
     document.querySelectorAll('.rp-paint-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.shift-cell[data-date]').forEach(cell => cell.classList.toggle('rp-paint-ready', value !== null));
+    document.querySelectorAll('button.shift-cell[data-date]').forEach(cell => cell.classList.toggle('rp-paint-ready', value !== null));
 
     if (sourceButton && value !== null) sourceButton.classList.add('active');
 
