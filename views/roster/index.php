@@ -1053,7 +1053,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 rosterApiFetch('index.php?c=ajax&a=update_order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ order: orderData })
+                    body: JSON.stringify({
+                        order: orderData,
+                        month_year: currentMonthYear,
+                        hosp_id: targetHospId
+                    })
                 })
                 .then(res => res.json())
                 .then(data => {
@@ -1155,8 +1159,13 @@ function saveShift(shiftValue, colorClass) {
         if (data.status === 'success') {
             if (indicator) setTimeout(() => indicator.classList.add('d-none'), 1500);
         } else {
-            alert('Error: ' + data.message); window.location.reload();
+            alert('Error: ' + (data.message || 'ไม่สามารถบันทึกเวรได้'));
+            window.location.reload();
         }
+    })
+    .catch(() => {
+        alert('ไม่สามารถเชื่อมต่อเพื่อบันทึกเวรได้ กรุณาลองใหม่');
+        window.location.reload();
     });
 }
 
