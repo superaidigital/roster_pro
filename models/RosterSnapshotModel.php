@@ -152,7 +152,14 @@ class RosterSnapshotModel {
             throw new RuntimeException('Snapshot not found.');
         }
 
-        $rows = json_decode((string)$snapshot['shifts_json'], true);
+        $rawJson = (string)$snapshot['shifts_json'];
+        $expectedChecksum = (string)($snapshot['checksum'] ?? '');
+        $actualChecksum = hash('sha256', $rawJson);
+        if ($expectedChecksum === '' || !hash_equals($expectedChecksum, $actualChecksum)) {
+            throw new RuntimeException('Snapshot integrity check failed.');
+        }
+
+        $rows = json_decode($rawJson, true);
         if (!is_array($rows)) {
             throw new RuntimeException('Snapshot data is invalid.');
         }
