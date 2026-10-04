@@ -169,6 +169,17 @@ ok((int)$fieldRows[0]['referral_required'] === 1, 'referral flag preserved');
 $dueFollowUps = $fieldModel->getVisibleVisits($user1, ['followup' => 'due'], 10);
 ok(count($dueFollowUps) === 1 && (int)$dueFollowUps[0]['id'] === $fieldVisitId, 'due follow-up filter returns pending item');
 
+$duplicateVisit = $fieldModel->findPotentialDuplicate(
+    $user1,
+    'SYNTH-HN-001',
+    '2026-10-20',
+    $hospitalId
+);
+ok(is_array($duplicateVisit) && (int)$duplicateVisit['id'] === $fieldVisitId, 'duplicate field visit detected within user scope');
+
+$followUpQueue = $fieldModel->getFollowUpQueue($user1, 10);
+ok(count($followUpQueue) === 1 && (int)$followUpQueue[0]['id'] === $fieldVisitId, 'prioritized follow-up queue returns pending completed visit');
+
 $fieldRowsOtherUser = $fieldModel->getVisibleVisits($user2, [], 10);
 ok(count($fieldRowsOtherUser) === 0, 'staff field visit scope prevents cross-user read');
 
