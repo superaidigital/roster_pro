@@ -33,11 +33,12 @@ $roster_progress_percent = (float)$roster_workflow_state['progress'];
 $roster_workflow_label = (string)$roster_workflow_state['label'];
 
 function getShiftColorClass($shift_val) {
+    $shift_val = trim((string)$shift_val);
+    if (strpos($shift_val, '/') !== false) return 'text-primary';
     if ($shift_val == 'บ' || $shift_val == 'A') return 'text-warning text-dark';
     if ($shift_val == 'ร' || $shift_val == 'N') return 'text-success';
     if ($shift_val == 'ย' || $shift_val == 'O') return 'text-danger';
-    if ($shift_val == 'บ/ร' || $shift_val == 'ย/บ') return 'text-primary';
-    if ($shift_val == 'M') return 'text-info';
+    if ($shift_val == 'ช' || $shift_val == 'M') return 'text-info';
     return 'text-dark';
 }
 
@@ -84,9 +85,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
 }
 ?>
 
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
 <style>
     .card-modern { border: none; border-radius: 1.25rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); background: #ffffff; }
@@ -97,10 +96,10 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     .table-roster th { font-weight: 600; color: #475569; font-size: 13px; vertical-align: middle; }
     .table-roster td { vertical-align: middle; }
     .date-header-cell { transition: all 0.2s ease; }
-    .date-header-cell:hover { background-color: #e0f2fe !important; color: #0284c7 !important; transform: translateY(-2px); z-index: 10; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-radius: 6px; }
+    .date-header-cell:hover { background-color: #e0f2fe !important; color: #0284c7 !important; z-index: 10; box-shadow: inset 0 -2px 0 #38bdf8; }
     
     .shift-cell { font-size: 15px !important; font-weight: 800 !important; border-radius: 6px !important; transition: all 0.15s ease; background-color: transparent !important; width: 100%; height: 100%; }
-    .shift-cell:hover { background-color: #f0f9ff !important; transform: scale(1.15); z-index: 5; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .shift-cell:hover { background-color: #f0f9ff !important; z-index: 5; box-shadow: inset 0 0 0 2px rgba(14,165,233,.35); }
     
     .leave-badge-cell { font-size: 10px; padding: 2px 5px; border-radius: 4px; line-height: 1.2; margin-bottom: 2px; display: inline-block; max-width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     
@@ -117,7 +116,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     @keyframes blinkWarning { from { box-shadow: 0 0 0px #ef4444; } to { box-shadow: 0 0 8px #ef4444; } }
 
     .pay-cell-clickable { transition: all 0.2s; cursor: pointer; }
-    .pay-cell-clickable:hover { background-color: #dcfce7 !important; transform: scale(1.05); border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .pay-cell-clickable:hover { background-color: #dcfce7 !important; box-shadow: inset 0 0 0 2px rgba(34,197,94,.22); }
 
     .today-column { background-color: #f0fdf4 !important; border-left: 1px solid #bbf7d0 !important; border-right: 1px solid #bbf7d0 !important; }
     .holiday-column { background-color: #fff1f2 !important; } /* 🌟 พื้นหลังสีแดงอ่อนๆ สำหรับวันหยุด */
@@ -127,10 +126,21 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+    .rp-roster-table-wrap { scroll-behavior: smooth; overscroll-behavior: contain; }
+    .rp-roster-table-wrap td, .rp-roster-table-wrap th { white-space: nowrap; }
+    .rp-roster-footer-actions .btn { min-height: 32px; }
+    .rp-roster-panel-hidden { display: none !important; }
+    .rp-roster-main-expanded { flex: 0 0 100% !important; max-width: 100% !important; width: 100% !important; }
+    @media (max-width: 767.98px) {
+        .table-roster th { font-size: 11px; }
+        .shift-cell { font-size: 13px !important; }
+        .rp-roster-table-wrap { max-height: 66vh !important; }
+    }
 </style>
 
 <div class="w-100 bg-light p-3 p-md-4 min-vh-100 d-flex flex-column">
-    <div class="container-fluid max-w-7xl mx-auto flex-grow-1 d-flex flex-column">
+    <div class="container-fluid mx-auto flex-grow-1 d-flex flex-column">
         
         <!-- 🌟 Header & Controls -->
         <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center mb-4 gap-3 bg-white p-3 p-md-4 rounded-4 shadow-sm border-0">
@@ -407,10 +417,10 @@ for ($i = 1; $i <= $days_in_month; $i++) {
 
         <div class="row g-3 flex-grow-1">
             <!-- 🌟 ตารางเวรหลัก -->
-            <div class="col-xl-9 col-lg-8 d-flex flex-column" style="transition: all 0.3s ease;">
+            <div class="col-xl-9 col-lg-8 d-flex flex-column" id="rosterMainColumn" style="transition: all 0.3s ease;">
                 <div class="card card-modern overflow-hidden mb-4 flex-grow-1">
                     <div class="card-body p-0 d-flex flex-column">
-                        <div class="table-responsive flex-grow-1 custom-scrollbar" style="max-height: 70vh;">
+                        <div class="table-responsive flex-grow-1 custom-scrollbar rp-roster-table-wrap" id="rosterTableScroll" style="max-height: 70vh;">
                             <table class="table table-bordered table-hover table-roster mb-0 text-center" id="rosterTable" style="min-width: 56rem;">
                                 <thead class="sticky-top" style="z-index: 10;">
                                     <tr>
@@ -431,6 +441,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                             $h_name = $holidayName ? htmlspecialchars($holidayName, ENT_QUOTES) : '';
                                         ?>
                                             <th class="<?= $is_current_day ? 'bg-primary text-white shadow-sm' : ($is_weekend || $holidayName ? 'text-danger bg-light' : 'bg-light') ?> date-header-cell border-bottom" 
+                                                data-roster-date="<?= $current_date_str ?>"
                                                 style="min-width: 42px; cursor: pointer; position: relative;"
                                                 onclick="openHolidayInfoModal('<?= $current_date_str ?>', <?= $is_holiday_flag ?>, '<?= $h_name ?>')"
                                                 title="<?= $holidayName ? 'วันหยุด: '.$holidayName : 'คลิกเพื่อเสนอวันหยุด' ?>">
@@ -601,20 +612,35 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                         </div>
                     </div>
                     
-                    <div class="card-footer bg-white border-top p-3 text-muted d-flex flex-wrap justify-content-between align-items-center" style="font-size: 12px;">
+                    <div class="card-footer bg-white border-top p-3 text-muted d-flex flex-wrap justify-content-between align-items-center gap-2" style="font-size: 12px;">
                         <div>
-                            <i class="bi bi-info-circle text-primary me-1"></i> 
-                            <strong>สัญลักษณ์:</strong> <span class="fw-bold text-warning text-dark mx-1">บ</span> = บ่าย, <span class="fw-bold text-success mx-1">ร</span> = ดึก, <span class="fw-bold text-danger mx-1">ย</span> = วันหยุด
+                            <i class="bi bi-info-circle text-primary me-1"></i>
+                            <strong>สัญลักษณ์:</strong>
+                            <span class="fw-bold text-warning text-dark mx-1">บ</span> = บ่าย,
+                            <span class="fw-bold text-success mx-1">ร</span> = ดึก,
+                            <span class="fw-bold text-danger mx-1">ย</span> = ปฏิบัติงานวันหยุด,
+                            <span class="fw-bold text-primary mx-1">บ/ร</span> = กะควบ
                         </div>
-                        <div class="text-primary fw-bold">
-                            <i class="bi bi-mouse2 me-1"></i> ดับเบิลคลิกที่ช่องเพื่อลบเวรอย่างรวดเร็ว
+                        <div class="d-flex flex-wrap align-items-center gap-2 rp-roster-footer-actions">
+                            <?php if ($selected_month === date('Y-m')): ?>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" id="btnRosterToday">
+                                <i class="bi bi-crosshair2 me-1"></i> ไปวันนี้
+                            </button>
+                            <?php endif; ?>
+                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-none d-lg-inline-flex align-items-center" id="btnToggleRosterStaff">
+                                <i class="bi bi-layout-sidebar-inset-reverse me-1"></i>
+                                <span>ซ่อนแถบรายชื่อ</span>
+                            </button>
+                            <span class="text-primary fw-bold d-none d-md-inline">
+                                <i class="bi bi-mouse2 me-1"></i> ดับเบิลคลิกเพื่อลบเวร
+                            </span>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- 🌟 แถบรายชื่อบุคลากร (Sidebar) -->
-            <div class="col-xl-3 col-lg-4 sticky-sidebar">
+            <div class="col-xl-3 col-lg-4 sticky-sidebar" id="rosterStaffColumn">
                 <div class="card card-modern p-0 d-flex flex-column position-relative h-100">
                     
                     <?php if (!$canEdit): ?>
@@ -775,12 +801,13 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                 if (isset($shifts)) {
                                     foreach ($shifts as $s) {
                                         if ($s['user_id'] == $staff['id']) {
-                                            $val = $s['shift_type'];
-                                            if ($val === 'ร' || $val === 'N') $sum_r++;
-                                            elseif ($val === 'ย' || $val === 'O') $sum_y++;
-                                            elseif ($val === 'บ' || $val === 'A') $sum_b++;
-                                            elseif ($val === 'บ/ร') { $sum_b++; $sum_r++; }
-                                            elseif ($val === 'ย/บ') { $sum_y++; $sum_b++; }
+                                            $raw_types = preg_split('/[\\/,\\s]+/', trim((string)$s['shift_type'])) ?: [];
+                                            foreach ($raw_types as $raw_type) {
+                                                $type = ['A' => 'บ', 'N' => 'ร', 'O' => 'ย', 'M' => 'ช'][$raw_type] ?? $raw_type;
+                                                if ($type === 'ร') $sum_r++;
+                                                elseif ($type === 'ย') $sum_y++;
+                                                elseif ($type === 'บ') $sum_b++;
+                                            }
                                         }
                                     }
                                 }
@@ -1040,6 +1067,34 @@ document.addEventListener('DOMContentLoaded', function() {
     if (staffSearch) staffSearch.addEventListener('input', applyFilters);
     if (staffHospitalFilter) staffHospitalFilter.addEventListener('change', applyFilters);
 
+    const btnRosterToday = document.getElementById('btnRosterToday');
+    const rosterTableScroll = document.getElementById('rosterTableScroll');
+    if (btnRosterToday && rosterTableScroll) {
+        btnRosterToday.addEventListener('click', () => {
+            const today = new Date();
+            const todayKey = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            const target = document.querySelector(`[data-roster-date="${todayKey}"]`);
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        });
+    }
+
+    const btnToggleRosterStaff = document.getElementById('btnToggleRosterStaff');
+    const rosterMainColumn = document.getElementById('rosterMainColumn');
+    const rosterStaffColumn = document.getElementById('rosterStaffColumn');
+    if (btnToggleRosterStaff && rosterMainColumn && rosterStaffColumn) {
+        btnToggleRosterStaff.addEventListener('click', () => {
+            const hidden = rosterStaffColumn.classList.toggle('rp-roster-panel-hidden');
+            rosterMainColumn.classList.toggle('rp-roster-main-expanded', hidden);
+            const label = btnToggleRosterStaff.querySelector('span');
+            const icon = btnToggleRosterStaff.querySelector('i');
+            if (label) label.textContent = hidden ? 'แสดงแถบรายชื่อ' : 'ซ่อนแถบรายชื่อ';
+            if (icon) {
+                icon.classList.toggle('bi-layout-sidebar-inset-reverse', !hidden);
+                icon.classList.toggle('bi-layout-sidebar-inset', hidden);
+            }
+        });
+    }
+
     // 🌟 ระบบ SortableJS (ลากสลับตำแหน่ง)
     const rosterTableBody = document.getElementById('rosterTableBody');
     if (typeof Sortable !== 'undefined' && rosterTableBody) {
@@ -1211,21 +1266,56 @@ function removeStaffFromRoster(staffId, staffName) {
 
 function checkFatigueRules() {
     let warningCount = 0;
-    document.querySelectorAll('.shift-cell').forEach(c => c.classList.remove('fatigue-warn'));
-    document.querySelectorAll('.roster-staff-row').forEach(row => {
-        const cells = Array.from(row.querySelectorAll('.shift-cell'));
-        let consecutiveDays = 0;
-        for (let i = 0; i < cells.length; i++) {
-            const val = cells[i].innerText.trim();
-            const nextVal = (i + 1 < cells.length) ? cells[i+1].innerText.trim() : '';
-            if (val !== '' && val !== 'OFF' && val !== 'ย') {
-                consecutiveDays++;
-                if (consecutiveDays > 7) { cells[i].classList.add('fatigue-warn'); cells[i].setAttribute('title', '⚠️ ทำงานติดกันเกิน 7 วัน'); warningCount++; }
-            } else consecutiveDays = 0;
-            if (val.includes('ร') && nextVal.includes('M')) { cells[i+1].classList.add('fatigue-warn'); cells[i+1].setAttribute('title', '⚠️ ลงดึกต่อเช้า'); warningCount++; }
+    const aliases = { A: 'บ', N: 'ร', O: 'ย', M: 'ช' };
+    const parseTypes = (value) => value.trim().split(/[\\/,\\s]+/).filter(Boolean).map(v => aliases[v] || v);
+    const isWork = (value) => parseTypes(value).some(v => ['ช', 'บ', 'ร', 'ย'].includes(v));
+
+    document.querySelectorAll('.shift-cell').forEach(cell => {
+        cell.classList.remove('fatigue-warn');
+        if (cell.dataset.fatigueTitle === '1') {
+            cell.removeAttribute('title');
+            delete cell.dataset.fatigueTitle;
         }
     });
-    alert(warningCount > 0 ? `ตรวจพบจุดเสี่ยงความเหนื่อยล้า ${warningCount} จุด! (กระพริบสีแดง)` : 'ตารางเวรนี้ผ่านเกณฑ์ความปลอดภัย!');
+
+    document.querySelectorAll('.roster-staff-row').forEach(row => {
+        const cells = Array.from(row.querySelectorAll('.shift-cell[data-date]'));
+        let consecutiveDays = 0;
+
+        for (let i = 0; i < cells.length; i++) {
+            const val = cells[i].innerText.trim();
+            const nextVal = (i + 1 < cells.length) ? cells[i + 1].innerText.trim() : '';
+            const types = parseTypes(val);
+
+            if (isWork(val)) {
+                consecutiveDays++;
+                if (consecutiveDays > 6) {
+                    cells[i].classList.add('fatigue-warn');
+                    cells[i].setAttribute('title', '⚠️ ปฏิบัติงานติดต่อกันเกิน 6 วัน');
+                    cells[i].dataset.fatigueTitle = '1';
+                    warningCount++;
+                }
+            } else {
+                consecutiveDays = 0;
+            }
+
+            if (types.includes('ร') && isWork(nextVal)) {
+                if (cells[i + 1]) {
+                    cells[i + 1].classList.add('fatigue-warn');
+                    cells[i + 1].setAttribute('title', '⚠️ มีเวรต่อหลังเวรดึก ควรตรวจสอบเวลาพัก');
+                    cells[i + 1].dataset.fatigueTitle = '1';
+                    warningCount++;
+                }
+            }
+        }
+    });
+
+    Swal.fire({
+        icon: warningCount > 0 ? 'warning' : 'success',
+        title: warningCount > 0 ? 'พบจุดเสี่ยงความเหนื่อยล้า' : 'ไม่พบจุดเสี่ยงจากการตรวจเบื้องต้น',
+        text: warningCount > 0 ? `พบทั้งหมด ${warningCount} จุด ระบบทำเครื่องหมายไว้ในตารางแล้ว` : 'ควรใช้ปุ่ม “ตรวจสอบตาราง” เพื่อตรวจเงื่อนไขทั้งหมดอีกครั้ง',
+        confirmButtonText: 'ตกลง'
+    });
 }
 
 function getPayRates(payRateId) {
@@ -1248,9 +1338,13 @@ function getPayRates(payRateId) {
 function recalculateRowSummary(staffId, payRateId) {
     let sumR = 0, sumY = 0, sumB = 0;
     document.querySelectorAll(`.shift-cell[data-staff-id="${staffId}"]`).forEach(cell => {
-        let val = cell.innerText.trim();
-        if (val === 'ร' || val === 'N') sumR++; else if (val === 'ย' || val === 'O') sumY++; else if (val === 'บ' || val === 'A') sumB++;
-        else if (val === 'บ/ร') { sumB++; sumR++; } else if (val === 'ย/บ') { sumY++; sumB++; }
+        const aliases = { A: 'บ', N: 'ร', O: 'ย', M: 'ช' };
+        const types = cell.innerText.trim().split(/[\\/,\\s]+/).filter(Boolean).map(v => aliases[v] || v);
+        types.forEach(type => {
+            if (type === 'ร') sumR++;
+            else if (type === 'ย') sumY++;
+            else if (type === 'บ') sumB++;
+        });
     });
     
     if(document.getElementById(`modal-sum-r-${staffId}`)) document.getElementById(`modal-sum-r-${staffId}`).innerText = sumR;
@@ -1385,14 +1479,24 @@ function validateRoster() {
         const warningContainer = document.getElementById('rosterWarnings');
         
         if (data.status === 'success') {
-            if (data.warnings.length === 0) {
-                warningContainer.style.display = 'block';
-                warningContainer.innerHTML = `<div class="alert alert-success border-0 shadow-sm"><i class="bi bi-check-circle-fill me-2"></i> ตารางเวรสมบูรณ์ ไม่มีข้อผิดพลาดครับ</div>`;
+            const hardErrors = Array.isArray(data.errors) ? data.errors : (data.has_error ? data.warnings : []);
+            const advisories = Array.isArray(data.advisories) ? data.advisories : (data.has_error ? [] : data.warnings);
+            warningContainer.style.display = 'block';
+
+            if (hardErrors.length === 0 && advisories.length === 0) {
+                warningContainer.innerHTML = `<div class="alert alert-success border-0 shadow-sm mb-0"><i class="bi bi-check-circle-fill me-2"></i> ตารางเวรผ่านการตรวจสอบ ไม่พบข้อผิดพลาดหรือคำเตือน</div>`;
             } else {
-                let html = `<div class="alert alert-danger border-0 shadow-sm"><h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i> พบข้อควรระวัง ${data.warnings.length} รายการ:</h6><ul class="mb-0">`;
-                data.warnings.forEach(w => html += `<li>${w}</li>`);
-                html += `</ul></div>`;
-                warningContainer.style.display = 'block';
+                let html = '';
+                if (hardErrors.length > 0) {
+                    html += `<div class="alert alert-danger border-0 shadow-sm"><h6 class="fw-bold"><i class="bi bi-x-octagon-fill me-2"></i> ต้องแก้ไขก่อนส่งอนุมัติ ${hardErrors.length} รายการ</h6><ul class="mb-0">`;
+                    hardErrors.forEach(item => html += `<li>${item}</li>`);
+                    html += `</ul></div>`;
+                }
+                if (advisories.length > 0) {
+                    html += `<div class="alert alert-warning border-0 shadow-sm mb-0"><h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i> ข้อควรตรวจสอบ ${advisories.length} รายการ</h6><ul class="mb-0">`;
+                    advisories.forEach(item => html += `<li>${item}</li>`);
+                    html += `</ul></div>`;
+                }
                 warningContainer.innerHTML = html;
             }
         }
@@ -1403,57 +1507,63 @@ function validateRoster() {
 // 🛡️ ฟังก์ชันตรวจสอบก่อนส่งอนุมัติ (Pre-submit Validation)
 // ==========================================
 function submitForApproval(e, formElement) {
-    e.preventDefault(); // ป้องกันการส่งฟอร์มทันที
-    
-    Swal.fire({ title: 'กำลังตรวจสอบตารางก่อนส่งอนุมัติ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
-    
+    e.preventDefault();
+    Swal.fire({ title: 'กำลังตรวจสอบตารางก่อนส่งอนุมัติ...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
     rosterApiFetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
     .then(res => res.json())
     .then(data => {
         Swal.close();
-        if (data.status === 'success') {
-            if (data.warnings.length === 0) {
-                // หากไม่มี Error ให้ถามยืนยันปกติ
-                Swal.fire({
-                    title: 'ยืนยันการส่งอนุมัติ?',
-                    text: "ตารางเวรสมบูรณ์ ไม่มีข้อผิดพลาด",
-                    icon: 'success',
-                    showCancelButton: true,
-                    confirmButtonText: 'ส่งอนุมัติเลย',
-                    cancelButtonText: 'ยกเลิก'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        formElement.submit();
-                    }
-                });
-            } else {
-                // หากพบ Error ให้แสดงรายการขึ้นมาก่อน
-                let html = `<div class="alert alert-danger border-0 shadow-sm text-start"><h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i> พบข้อควรระวัง ${data.warnings.length} รายการ:</h6><ul class="mb-0 small">`;
-                data.warnings.forEach(w => html += `<li>${w}</li>`);
-                html += `</ul></div><p class="mt-3 fs-6">คุณแน่ใจหรือไม่ว่าต้องการส่งตารางเวรนี้เพื่อพิจารณาอนุมัติ?</p>`;
-                
-                Swal.fire({
-                    title: 'พบข้อควรระวังในตารางเวร!',
-                    html: html,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#ef4444',
-                    cancelButtonColor: '#6c757d',
-                    confirmButtonText: 'ยืนยันส่งอนุมัติ (ละเว้นคำเตือน)',
-                    cancelButtonText: 'กลับไปแก้ไข'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        formElement.submit();
-                    }
-                });
-            }
-        } else {
-            Swal.fire('ผิดพลาด', 'ไม่สามารถตรวจสอบตารางได้: ' + data.message, 'error');
+        if (data.status !== 'success') {
+            Swal.fire('ผิดพลาด', 'ไม่สามารถตรวจสอบตารางได้: ' + (data.message || 'Unknown error'), 'error');
+            return;
         }
+
+        const hardErrors = Array.isArray(data.errors) ? data.errors : (data.has_error ? data.warnings : []);
+        const advisories = Array.isArray(data.advisories) ? data.advisories : (data.has_error ? [] : data.warnings);
+
+        if (hardErrors.length > 0) {
+            let html = `<div class="alert alert-danger border-0 text-start"><strong>พบข้อผิดพลาดที่ต้องแก้ไข ${hardErrors.length} รายการ</strong><ul class="mb-0 mt-2 small">`;
+            hardErrors.forEach(item => html += `<li>${item}</li>`);
+            html += '</ul></div><p class="mb-0">ระบบจะยังไม่ส่งอนุมัติจนกว่าจะผ่านเงื่อนไขที่จำเป็น</p>';
+            Swal.fire({
+                title: 'ยังส่งอนุมัติไม่ได้',
+                html,
+                icon: 'error',
+                confirmButtonText: 'กลับไปแก้ไข'
+            });
+            return;
+        }
+
+        if (advisories.length > 0) {
+            let html = `<div class="alert alert-warning border-0 text-start"><strong>มีข้อควรตรวจสอบ ${advisories.length} รายการ</strong><ul class="mb-0 mt-2 small">`;
+            advisories.forEach(item => html += `<li>${item}</li>`);
+            html += '</ul></div><p class="mb-0">สามารถส่งอนุมัติได้ หากผู้จัดเวรตรวจสอบและยืนยันแล้ว</p>';
+            Swal.fire({
+                title: 'ยืนยันส่งอนุมัติ?',
+                html,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'ตรวจแล้ว ส่งอนุมัติ',
+                cancelButtonText: 'กลับไปตรวจสอบ'
+            }).then(result => {
+                if (result.isConfirmed) formElement.submit();
+            });
+            return;
+        }
+
+        Swal.fire({
+            title: 'ยืนยันการส่งอนุมัติ?',
+            text: 'ตารางเวรผ่านการตรวจสอบแล้ว',
+            icon: 'success',
+            showCancelButton: true,
+            confirmButtonText: 'ส่งอนุมัติเลย',
+            cancelButtonText: 'ยกเลิก'
+        }).then(result => {
+            if (result.isConfirmed) formElement.submit();
+        });
     })
-    .catch(err => {
-        Swal.fire('ผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
-    });
+    .catch(() => Swal.fire('ผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error'));
 }
 
 // ==========================================
