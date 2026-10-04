@@ -235,6 +235,21 @@ class FieldController {
                 throw new InvalidArgumentException('กรุณาระบุ HN/รหัสผู้รับบริการ/รหัสครัวเรือน');
             }
 
+            $duplicateConfirmed = ((string)($_POST['duplicate_confirmed'] ?? '0')) === '1';
+            $duplicate = $model->findPotentialDuplicate(
+                $user,
+                $patientRef,
+                $visitDate,
+                $hospitalId,
+                $visitId
+            );
+
+            if ($duplicate && !$duplicateConfirmed) {
+                throw new InvalidArgumentException(
+                    'พบรายการเยี่ยมบ้านรหัสเดียวกันในวันที่เดียวกัน กรุณาตรวจสอบรายการเดิมก่อน หากจำเป็นต้องบันทึกซ้ำให้ยืนยันในแบบฟอร์ม'
+                );
+            }
+
             $visitTypes = ['HOME_VISIT', 'CHRONIC_FOLLOWUP', 'WOUND_CARE', 'MATERNAL_CHILD', 'ELDERLY', 'OTHER'];
             $visitType = strtoupper(trim((string)($_POST['visit_type'] ?? 'HOME_VISIT')));
             if (!in_array($visitType, $visitTypes, true)) {
@@ -371,14 +386,113 @@ class FieldController {
         exit;
     }
 
+    public function followups(): void {
+        $user = $this->currentUser();
+        $db = (new Database())->getConnection();
+        $model = new FieldVisitModel($db);
+
+        $queue = $model->getFollowUpQueue($user, 300);
+
+        $followUpSummary = [
+            'overdue' => 0,
+            'today' => 0,
+            'next_7_days' => 0,
+            'high_risk' => 0,
+        ];
+
+        foreach ($queue as $item) {
+            $days = (int)($item['days_until_followup'] ?? 0);
+            if ($days < 0) {
+                $followUpSummary['overdue']++;
+            } elseif ($days === 0) {
+                $followUpSummary['today']++;
+            } elseif ($days <= 7) {
+                $followUpSummary['next_7_days']++;
+            }
+
+            if (in_array(strtoupper((string)($item['risk_level'] ?? '')), ['HIGH', 'URGENT'], true)) {
+                $followUpSummary['high_risk']++;
+            }
+        }
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/field/followups.php';
+        echo '</main></div></body></html>';
+    }
+
+    public function duplicate_check(): void {
+        $user = $this->currentUser();
+
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-store');
+        header('X-Content-Type-Options: nosniff');
+
+        $patientRef = mb_substr(trim((string)($_GET['patient_ref'] ?? '')), 0, 50, 'UTF-8');
+        $visitDate = trim((string)($_GET['visit_date'] ?? ''));
+        $excludeId = max(0, (int)($_GET['exclude_id'] ?? 0));
+
+        if ($patientRef === '' || !$this->validDate($visitDate)) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'duplicate' => false], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $hospitalId = $this->isGlobal($user)
+            ? (int)($_GET['hospital_id'] ?? 0)
+            : (int)($user['hospital_id'] ?? 0);
+
+        if ($hospitalId <= 0) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'duplicate' => false], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $duplicate = (new FieldVisitModel($db))->findPotentialDuplicate(
+                $user,
+                $patientRef,
+                $visitDate,
+                $hospitalId,
+                $excludeId
+            );
+
+            echo json_encode([
+                'ok' => true,
+                'duplicate' => (bool)$duplicate,
+                'record' => $duplicate ? [
+                    'id' => (int)$duplicate['id'],
+                    'visit_date' => (string)$duplicate['visit_date'],
+                    'visit_type' => (string)$duplicate['visit_type'],
+                    'status' => (string)$duplicate['status'],
+                    'risk_level' => (string)$duplicate['risk_level'],
+                ] : null,
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            error_log('Field duplicate check failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode([
+                'ok' => false,
+                'duplicate' => false,
+                'message' => 'ไม่สามารถตรวจสอบรายการซ้ำได้ในขณะนี้'
+            ], JSON_UNESCAPED_UNICODE);
+        }
+
+        exit;
+    }
+
     public function complete_followup(): void {
         $this->requirePost();
         $user = $this->currentUser();
         $visitId = (int)($_POST['visit_id'] ?? 0);
+        $returnTo = ((string)($_POST['return_to'] ?? '')) === 'followups'
+            ? 'index.php?c=field&a=followups'
+            : 'index.php?c=field';
 
         if ($visitId <= 0) {
             $_SESSION['error_msg'] = 'ไม่พบรายการติดตาม';
-            header('Location: index.php?c=field');
+            header('Location: ' . $returnTo);
             exit;
         }
 
@@ -405,7 +519,7 @@ class FieldController {
             $_SESSION['error_msg'] = 'เกิดข้อผิดพลาด ไม่สามารถปิดงานติดตามได้';
         }
 
-        header('Location: index.php?c=field');
+        header('Location: ' . $returnTo);
         exit;
     }
 
