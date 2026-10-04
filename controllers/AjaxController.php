@@ -1135,7 +1135,7 @@ class AjaxController {
             $db->beginTransaction();
 
             $snapshotModel = new RosterSnapshotModel($db);
-            $snapshotModel->createSnapshot(
+            $snapshotId = $snapshotModel->createSnapshot(
                 (int)$hospital_id,
                 (string)$month_year,
                 (int)$_SESSION['user']['id'],
@@ -1180,7 +1180,9 @@ class AjaxController {
                 WHERE s.hospital_id = ? AND u.hospital_id = ? AND s.shift_date LIKE ?
             ");
             $stmt_exist->execute([$hospital_id, $hospital_id, "$month_year-%"]);
-            foreach ($stmt_exist->fetchAll(PDO::FETCH_ASSOC) as $es) {
+            $existingShifts = $stmt_exist->fetchAll(PDO::FETCH_ASSOC);
+            $beforeAutoCount = count($existingShifts);
+            foreach ($existingShifts as $es) {
                 $schedule[$es['shift_date']][$es['user_id']] = $es['shift_type'];
                 if (isset($counts[$es['user_id']])) {
                     if (strpos($es['shift_type'], 'บ') !== false) $counts[$es['user_id']]['บ']++;
@@ -1248,6 +1250,25 @@ class AjaxController {
             }
 
             LogsController::addLog($db, $_SESSION['user']['id'], 'CREATE', "ใช้งานระบบจัดการเวรอัตโนมัติ เดือน $month_year (จัดเพิ่ม $added_count กะ)");
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                (int)$hospital_id,
+                (string)$month_year,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_AUTO_SCHEDULE',
+                ['shift_count' => $beforeAutoCount],
+                ['shift_count' => $beforeAutoCount + $added_count],
+                [
+                    'added_count' => $added_count,
+                    'snapshot_id' => $snapshotId,
+                    'engine' => 'RULE_ENGINE',
+                ],
+                null,
+                null,
+                'ROSTER'
+            );
+
             $db->commit();
             echo json_encode(['status' => 'success', 'message' => "ดำเนินการจัดเวรตามกฎสำเร็จ (เพิ่ม $added_count กะ)", 'added' => $added_count]);
 
