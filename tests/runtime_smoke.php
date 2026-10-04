@@ -192,6 +192,23 @@ ok(
     'restore automatically creates a before-restore safety snapshot'
 );
 
+$integritySnapshotId = $snapshotModel->createSnapshot(
+    $hospitalId,
+    '2026-10',
+    $uid1,
+    'MANUAL',
+    'Integrity smoke checkpoint'
+);
+$db->prepare("UPDATE roster_snapshots SET shifts_json = ? WHERE id = ?")
+   ->execute(['[]', $integritySnapshotId]);
+$integrityRejected = false;
+try {
+    $snapshotModel->restoreSnapshot($integritySnapshotId, $hospitalId, '2026-10', $uid1);
+} catch (RuntimeException $e) {
+    $integrityRejected = str_contains($e->getMessage(), 'integrity');
+}
+ok($integrityRejected, 'tampered roster snapshot is rejected by checksum verification');
+
 $swapModel = new SwapModel($db);
 $swapData = [
     'hospital_id' => $hospitalId,
