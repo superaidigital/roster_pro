@@ -10,6 +10,7 @@ require_once __DIR__ . '/../models/SwapModel.php';
 require_once __DIR__ . '/../models/LeaveModel.php';
 require_once __DIR__ . '/../models/NotificationModel.php';
 require_once __DIR__ . '/../models/RosterModel.php';
+require_once __DIR__ . '/../models/RosterSnapshotModel.php';
 require_once __DIR__ . '/../models/FieldVisitModel.php';
 require_once __DIR__ . '/../controllers/StaffController.php';
 require_once __DIR__ . '/../controllers/ProfileController.php';
@@ -149,6 +150,47 @@ $shift1 = $shiftModel->addShift('2026-10-10', 'บ', $uid1, $hospitalId);
 $shift2 = $shiftModel->addShift('2026-10-11', 'ร', $uid2, $hospitalId);
 ok((bool)$shift1 && (bool)$shift2, 'two shifts created');
 ok($shiftModel->getRosterStatus($hospitalId, '2026-10') === 'DRAFT', 'roster status initialized');
+
+$snapshotModel = new RosterSnapshotModel($db);
+$snapshotId = $snapshotModel->createSnapshot(
+    $hospitalId,
+    '2026-10',
+    $uid1,
+    'MANUAL',
+    'Runtime smoke checkpoint'
+);
+ok($snapshotId > 0, 'roster snapshot created for current month');
+
+$snapshotList = $snapshotModel->listSnapshots($hospitalId, '2026-10', 10);
+ok(
+    count($snapshotList) >= 1 && (int)$snapshotList[0]['id'] === $snapshotId,
+    'roster snapshot history lists newest version'
+);
+
+// Change the roster after the checkpoint, then restore it.
+$db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND user_id = ? AND shift_date = ?")
+   ->execute([$hospitalId, $uid1, '2026-10-10']);
+$shiftModel->addShift('2026-10-12', 'ย', $uid1, $hospitalId);
+
+$restoreResult = $snapshotModel->restoreSnapshot($snapshotId, $hospitalId, '2026-10', $uid1);
+ok((int)$restoreResult['restored_shift_count'] === 2, 'roster snapshot restore reports original shift count');
+
+$restoredCount = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date LIKE '2026-10-%'");
+$restoredCount->execute([$hospitalId]);
+ok((int)$restoredCount->fetchColumn() === 2, 'roster restore replaces changed month atomically');
+
+$restoredCheck = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND user_id = ? AND shift_date = ? AND shift_type = ?");
+$restoredCheck->execute([$hospitalId, $uid1, '2026-10-10', 'บ']);
+ok((int)$restoredCheck->fetchColumn() === 1, 'roster restore recovers original requestor shift');
+$restoredCheck->execute([$hospitalId, $uid2, '2026-10-11', 'ร']);
+ok((int)$restoredCheck->fetchColumn() === 1, 'roster restore recovers original target shift');
+ok($shiftModel->getRosterStatus($hospitalId, '2026-10') === 'DRAFT', 'restored roster is forced back to DRAFT');
+
+$versionsAfterRestore = $snapshotModel->listSnapshots($hospitalId, '2026-10', 10);
+ok(
+    count(array_filter($versionsAfterRestore, static fn(array $v): bool => ($v['snapshot_kind'] ?? '') === 'BEFORE_RESTORE')) >= 1,
+    'restore automatically creates a before-restore safety snapshot'
+);
 
 $swapModel = new SwapModel($db);
 $swapData = [
