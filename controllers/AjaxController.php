@@ -75,18 +75,16 @@ class AjaxController {
     // 🛡️ Helper: ตรวจสอบสิทธิ์การจัดการตารางเวร
     // ==========================================
     private function canEditRoster($hospital_id, $month_year) {
-        $role = $_SESSION['user']['role'];
-        
-        // แอดมินและซุปเปอร์แอดมินจัดการได้อิสระ
-        if (in_array($role, ['ADMIN', 'SUPERADMIN'])) return true;
-        if ($role === 'STAFF') return false;
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        if (!in_array($role, ['SCHEDULER', 'DIRECTOR', 'ADMIN', 'SUPERADMIN'], true)) {
+            return false;
+        }
 
         $db = (new Database())->getConnection();
         $shiftModel = new ShiftModel($db);
-        $status = $shiftModel->getRosterStatus($hospital_id, $month_year);
-        
-        if ($status === 'SUBMITTED' || $status === 'APPROVED' || $status === 'REQUEST_EDIT') return false;
-        return true; 
+        $status = strtoupper((string)$shiftModel->getRosterStatus($hospital_id, $month_year));
+
+        return in_array($status, ['DRAFT', 'NOT_STARTED'], true);
     }
 
     // ==========================================
@@ -252,6 +250,18 @@ class AjaxController {
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
 
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        $month_year = trim((string)($data['month_year'] ?? ''));
+        $hospital_id = in_array($role, ['ADMIN', 'SUPERADMIN'], true)
+            ? (int)($data['hosp_id'] ?? $_SESSION['user']['hospital_id'] ?? 0)
+            : (int)($_SESSION['user']['hospital_id'] ?? 0);
+
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month_year) || !$this->canEditRoster($hospital_id, $month_year)) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่มีสิทธิ์จัดลำดับบุคลากรในสถานะตารางปัจจุบัน']);
+            exit;
+        }
+
         if (isset($data['order']) && is_array($data['order'])) {
             $db = (new Database())->getConnection();
             
@@ -405,9 +415,60 @@ class AjaxController {
         $shiftModel = new ShiftModel($db);
         $notifModel = new NotificationModel($db);
 
-        $month_year = $_POST['month_year'];
-        $new_status = $_POST['status']; 
-        $hospital_id = $_POST['hospital_id'] ?? $_SESSION['user']['hospital_id'];
+        $month_year = trim((string)($_POST['month_year'] ?? ''));
+        $new_status = strtoupper(trim((string)($_POST['status'] ?? '')));
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+
+        $is_admin = in_array($role, ['ADMIN', 'SUPERADMIN'], true);
+        $hospital_id = $is_admin
+            ? (int)($_POST['hospital_id'] ?? $_SESSION['user']['hospital_id'] ?? 0)
+            : (int)($_SESSION['user']['hospital_id'] ?? 0);
+
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month_year) || $hospital_id <= 0) {
+            $_SESSION['error_msg'] = 'ข้อมูลเดือนหรือหน่วยบริการไม่ถูกต้อง';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        if (!in_array($new_status, ['DRAFT', 'SUBMITTED', 'APPROVED'], true)) {
+            $_SESSION['error_msg'] = 'สถานะตารางเวรไม่ถูกต้อง';
+            header("Location: index.php?c=roster&month=" . urlencode($month_year));
+            exit;
+        }
+
+        $current_status = strtoupper((string)$shiftModel->getRosterStatus($hospital_id, $month_year));
+        if ($current_status === 'NOT_STARTED') {
+            $current_status = 'DRAFT';
+        }
+
+        $allowed_transitions = [
+            'SCHEDULER' => [
+                'DRAFT' => ['SUBMITTED'],
+            ],
+            'DIRECTOR' => [
+                'DRAFT' => ['SUBMITTED'],
+                'SUBMITTED' => ['DRAFT', 'APPROVED'],
+            ],
+            'ADMIN' => [
+                'DRAFT' => ['SUBMITTED'],
+                'SUBMITTED' => ['DRAFT', 'APPROVED'],
+                'APPROVED' => ['DRAFT'],
+                'REQUEST_EDIT' => ['DRAFT', 'APPROVED'],
+            ],
+            'SUPERADMIN' => [
+                'DRAFT' => ['SUBMITTED'],
+                'SUBMITTED' => ['DRAFT', 'APPROVED'],
+                'APPROVED' => ['DRAFT'],
+                'REQUEST_EDIT' => ['DRAFT', 'APPROVED'],
+            ],
+        ];
+
+        $allowed_for_role = $allowed_transitions[$role][$current_status] ?? [];
+        if (!in_array($new_status, $allowed_for_role, true)) {
+            $_SESSION['error_msg'] = 'คุณไม่มีสิทธิ์เปลี่ยนสถานะตารางเวรในขั้นตอนนี้';
+            header("Location: index.php?c=roster&month=" . urlencode($month_year));
+            exit;
+        }
 
         $stmt_hosp = $db->prepare("SELECT name FROM hospitals WHERE id = ?");
         $stmt_hosp->execute([$hospital_id]);
@@ -500,6 +561,7 @@ class AjaxController {
 
         $redirect = (in_array($_SESSION['user']['role'], ['ADMIN', 'SUPERADMIN'])) ? "index.php?c=report&a=overview&month=".$month_year : "index.php?c=roster&month=".$month_year;
         header("Location: " . $redirect);
+        exit;
     }
 
     // ==========================================
@@ -509,8 +571,21 @@ class AjaxController {
         $this->requireAjaxMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) { header("Location: index.php?c=roster"); exit; }
 
-        $month_year = $_POST['month_year'];
-        $hospital_id = $_SESSION['user']['hospital_id'];
+        $month_year = trim((string)($_POST['month_year'] ?? ''));
+        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month_year) || $hospital_id <= 0) {
+            $_SESSION['error_msg'] = 'ข้อมูลเดือนหรือหน่วยบริการไม่ถูกต้อง';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        if (!in_array($role, ['SCHEDULER', 'DIRECTOR'], true)) {
+            $_SESSION['error_msg'] = 'คุณไม่มีสิทธิ์ขอแก้ไขตารางเวร';
+            header("Location: index.php?c=roster&month=" . urlencode($month_year));
+            exit;
+        }
         
         $db = (new Database())->getConnection();
         $stmt_hosp = $db->prepare("SELECT name FROM hospitals WHERE id = ?");
@@ -519,6 +594,12 @@ class AjaxController {
 
         $shiftModel = new ShiftModel($db);
         $notifModel = new NotificationModel($db);
+
+        if (strtoupper((string)$shiftModel->getRosterStatus($hospital_id, $month_year)) !== 'APPROVED') {
+            $_SESSION['error_msg'] = 'ขอแก้ไขได้เฉพาะตารางที่อนุมัติแล้วเท่านั้น';
+            header("Location: index.php?c=roster&month=" . urlencode($month_year));
+            exit;
+        }
 
         try {
             $shiftModel->updateRosterStatus($hospital_id, $month_year, 'REQUEST_EDIT');
@@ -544,7 +625,8 @@ class AjaxController {
 
         } catch (Exception $e) {}
 
-        header("Location: index.php?c=roster&month=" . $month_year);
+        header("Location: index.php?c=roster&month=" . urlencode($month_year));
+        exit;
     }
 
     // ==========================================
