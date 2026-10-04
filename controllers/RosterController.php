@@ -317,7 +317,7 @@ class RosterController {
         $this->checkAuth();
         $db = (new Database())->getConnection();
         
-        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $hospital_id = $this->resolveTargetHospitalId(isset($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : null);
         $month = trim((string)($_POST['month'] ?? ''));
         $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
 
@@ -347,6 +347,15 @@ class RosterController {
         
         try {
             $db->beginTransaction();
+
+            $snapshotModel = new RosterSnapshotModel($db);
+            $snapshotModel->createSnapshot(
+                $hospital_id,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'BEFORE_RANDOMIZE',
+                'สำรองอัตโนมัติก่อนสุ่มตารางใหม่'
+            );
 
             $stmt_del = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
             $stmt_del->execute([$hospital_id, $month_like]);
