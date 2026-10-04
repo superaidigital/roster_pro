@@ -3,7 +3,10 @@
 
 // 🌟 ส่วนที่ 1: จัดการตัวแปรพื้นฐานและฟังก์ชันคำนวณ
 $thai_months = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-$selected_month = $selected_month ?? date('Y-m');
+$selected_month = trim((string)($selected_month ?? date('Y-m')));
+if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $selected_month)) {
+    $selected_month = date('Y-m');
+}
 $exp = explode('-', $selected_month);
 $year = $exp[0];
 $month = $exp[1];
@@ -243,14 +246,14 @@ for ($i = 1; $i <= $days_in_month; $i++) {
         <!-- 🌟 แจ้งเตือนข้อผิดพลาด/ความสำเร็จ -->
         <?php if (isset($_SESSION['success_msg'])): ?>
             <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 rounded-3" role="alert">
-                <i class="bi bi-check-circle-fill me-2"></i> <strong>สำเร็จ!</strong> <?= $_SESSION['success_msg'] ?>
+                <i class="bi bi-check-circle-fill me-2"></i> <strong>สำเร็จ!</strong> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php unset($_SESSION['success_msg']); ?>
         <?php endif; ?>
         <?php if (isset($_SESSION['error_msg'])): ?>
             <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0 rounded-3" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i> <strong>ข้อผิดพลาด!</strong> <?= $_SESSION['error_msg'] ?>
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> <strong>ข้อผิดพลาด!</strong> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php unset($_SESSION['error_msg']); ?>
@@ -263,6 +266,8 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <div>
                         <?php if ($roster_status == 'APPROVED'): ?>
                             <i class="bi bi-check-circle-fill fs-5 me-2 text-success"></i> <strong class="text-success">สถานะ: อนุมัติแล้ว</strong> <span class="text-dark opacity-75">ตารางเวรเดือนนี้ได้รับการยืนยันความถูกต้องแล้ว</span>
+                        <?php elseif ($roster_status == 'LOCKED'): ?>
+                            <i class="bi bi-lock-fill fs-5 me-2 text-success"></i> <strong class="text-success">สถานะ: ล็อกตารางแล้ว</strong> <span class="text-dark opacity-75">ตารางเวรนี้ถูกยืนยันและไม่สามารถแก้ไขได้</span>
                         <?php elseif ($roster_status == 'SUBMITTED'): ?>
                             <i class="bi bi-send-fill fs-5 me-2 text-primary"></i> <strong class="text-primary">สถานะ: รอพิจารณา</strong> <span class="text-dark opacity-75">ส่งถึงผู้อำนวยการแล้ว เพื่อรอการตรวจสอบ</span>
                         <?php elseif ($roster_status == 'REQUEST_EDIT'): ?>
