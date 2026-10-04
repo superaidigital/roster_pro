@@ -11,6 +11,24 @@ require_once 'controllers/LogsController.php'; // 🌟 นำเข้า Logs C
 
 class AjaxController {
 
+    private function requireAjaxMutation(): void {
+        security_start_session();
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (!isset($_SESSION['user'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'กรุณาเข้าสู่ระบบใหม่'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'คำขอไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
+
     // ==========================================
     // ⚙️ Helper: ดึงค่า Config จากฐานข้อมูล
     // ==========================================
