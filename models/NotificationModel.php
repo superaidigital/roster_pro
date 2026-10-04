@@ -10,43 +10,12 @@ class NotificationModel {
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         
         // 🌟 ตรวจสอบและสร้างตารางอัตโนมัติเมื่อเรียกใช้ Model ครั้งแรก
-        $this->checkAndCreateTable();
-    }
+}
 
     /**
      * 🌟 ระบบสร้างตารางอัตโนมัติ (Auto-Migration)
      */
-    private function checkAndCreateTable() {
-        $query = "
-            CREATE TABLE IF NOT EXISTS `" . $this->table_name . "` (
-                `id` INT AUTO_INCREMENT PRIMARY KEY,
-                `user_id` INT NOT NULL,
-                `type` VARCHAR(50) DEFAULT 'INFO',
-                `title` VARCHAR(255) NOT NULL,
-                `message` TEXT NOT NULL,
-                `link` VARCHAR(255) NULL,
-                `is_read` TINYINT(1) DEFAULT 0,
-                `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                INDEX (`user_id`),
-                INDEX (`is_read`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        ";
-        try {
-            $this->conn->exec($query);
-        } catch (PDOException $e) {
-            error_log("Notification Table Creation Error: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * 🌟 1. เพิ่มการแจ้งเตือนใหม่ลงในระบบ
-     * @param int $user_id รหัสผู้ใช้งานที่ต้องการแจ้งเตือน
-     * @param string $type ประเภทแจ้งเตือน (INFO, SUCCESS, WARNING, DANGER, SWAP, LEAVE)
-     * @param string $title หัวข้อการแจ้งเตือน
-     * @param string $message รายละเอียด
-     * @param string|null $link ลิงก์สำหรับกดเข้าไปดู (Option)
-     */
-    public function addNotification($user_id, $type, $title, $message, $link = null) {
+public function addNotification($user_id, $type, $title, $message, $link = null) {
         $query = "INSERT INTO " . $this->table_name . " 
                   (user_id, type, title, message, link, is_read) 
                   VALUES (:user_id, :type, :title, :message, :link, 0)";
@@ -142,4 +111,3 @@ class NotificationModel {
         }
     }
 }
-?>

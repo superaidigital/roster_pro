@@ -47,13 +47,13 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
     <!-- Alert Messages -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars($_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars($_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
@@ -152,7 +152,11 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
                                 
                                 <!-- Delete Button -->
                                 <?php if($user['id'] != $_SESSION['user']['id']): ?>
-                                    <a href="index.php?c=staff&a=delete&id=<?= $user['id'] ?>" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm" onclick="return confirm('ยืนยันการลบข้อมูลบุคลากร?');"><i class="bi bi-trash-fill"></i></a>
+                                    <form action="index.php?c=staff&a=delete" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบข้อมูลบุคลากร?');">
+                                        <?= security_csrf_input() ?>
+                                        <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm" title="ลบข้อมูลบุคลากร"><i class="bi bi-trash-fill"></i></button>
+                                    </form>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -232,7 +236,7 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold text-primary">Password *</label>
-                            <input type="password" name="password" class="form-control rounded-3 border-primary" required minlength="4">
+                            <input type="password" name="password" class="form-control rounded-3 border-primary" required minlength="8" autocomplete="new-password">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold text-primary">ระดับสิทธิ์ *</label>
@@ -323,7 +327,7 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold text-warning">รหัสผ่านใหม่ <small>(เว้นว่างถ้าไม่เปลี่ยน)</small></label>
-                            <input type="password" name="password" class="form-control rounded-3" minlength="4">
+                            <input type="password" name="password" class="form-control rounded-3" minlength="8" autocomplete="new-password">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-bold">ระดับสิทธิ์ *</label>

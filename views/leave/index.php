@@ -52,7 +52,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     /* ========================================== */
     .card-modern {
         border: none;
-        border-radius: 1.25rem;
+        border-radius: 1rem;
         box-shadow: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.04);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         background: #ffffff;
@@ -79,8 +79,8 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     .card-stat.border-warning { border-left-color: #f59e0b; }
     .card-stat.border-success { border-left-color: #10b981; }
 
-    .icon-box { width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
-    .icon-box-sm { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    .icon-box { width: 2.65rem; height: 2.65rem; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+    .icon-box-sm { width: 2.25rem; height: 2.25rem; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
     .progress-thin { height: 8px; border-radius: 4px; background-color: #f1f5f9; overflow: hidden; }
 
     .input-group-modern { border: 1px solid #e2e8f0; border-radius: 0.75rem; transition: all 0.2s; background-color: #f8fafc; overflow: hidden; }
@@ -155,7 +155,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                     </h5>
                 </div>
                 <div class="card-body p-4">
-                    <form action="index.php?c=leave&a=request" method="POST" id="leaveForm" enctype="multipart/form-data">
+                    <form action="index.php?c=leave&a=request" method="POST" id="leaveForm" enctype="multipart/form-data" data-rp-wizard="leave">
                         
                         <div class="mb-4">
                             <label class="form-label fw-bold text-secondary small text-uppercase">ประเภทการลา <span class="text-danger">*</span></label>
@@ -293,7 +293,31 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                         </td>
                                     </tr>
                                 <?php else: ?>
-                                    <?php foreach($my_history as $leave): ?>
+                                    <?php foreach($my_history as $leave):
+                                        $leave_progress_percent = 35;
+                                        $leave_progress_class = '';
+                                        $leave_progress_text = 'ส่งคำขอแล้ว';
+
+                                        if ($leave['status'] === 'PENDING') {
+                                            $leave_progress_percent = 60;
+                                            $leave_progress_class = 'is-warning';
+                                            $leave_progress_text = 'รอการพิจารณา';
+                                        } elseif ($leave['status'] === 'APPROVED') {
+                                            $leave_progress_percent = 100;
+                                            $leave_progress_text = 'อนุมัติเรียบร้อย';
+                                        } elseif ($leave['status'] === 'REJECTED') {
+                                            $leave_progress_percent = 100;
+                                            $leave_progress_class = 'is-danger';
+                                            $leave_progress_text = 'สิ้นสุดการพิจารณา';
+                                        } elseif ($leave['status'] === 'CANCEL_REQUESTED') {
+                                            $leave_progress_percent = 75;
+                                            $leave_progress_class = 'is-warning';
+                                            $leave_progress_text = 'รออนุมัติยกเลิก';
+                                        } elseif ($leave['status'] === 'CANCELLED') {
+                                            $leave_progress_percent = 100;
+                                            $leave_progress_text = 'ยกเลิกเรียบร้อย';
+                                        }
+                                    ?>
                                     <tr class="leave-row">
                                         <td class="ps-4 py-3 leave-type-cell">
                                             <div class="d-flex flex-wrap align-items-center mb-1">
@@ -326,6 +350,23 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                                 elseif ($leave['status'] == 'CANCEL_REQUESTED') { echo '<span class="badge bg-warning text-dark border border-warning d-block mb-2 py-1 px-2 rounded-pill w-100 shadow-sm"><i class="bi bi-exclamation-triangle-fill me-1"></i> รออนุมัติยกเลิก</span>'; }
                                                 else { echo '<span class="badge bg-light text-dark border d-block mb-2 py-1 px-2 rounded-pill w-100">สถานะไม่ทราบ</span>'; }
                                             ?>
+
+                                            <div class="mt-2 mb-2">
+                                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                                    <small class="text-muted fw-semibold">ความคืบหน้า</small>
+                                                    <small class="text-muted"><?= htmlspecialchars($leave_progress_text, ENT_QUOTES, 'UTF-8') ?></small>
+                                                </div>
+                                                <div class="rp-mini-progress <?= $leave_progress_class ?>"
+                                                     style="--rp-progress:<?= (int)$leave_progress_percent ?>%;"
+                                                     role="progressbar"
+                                                     aria-label="ความคืบหน้าใบลา"
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100"
+                                                     aria-valuenow="<?= (int)$leave_progress_percent ?>">
+                                                    <span></span>
+                                                </div>
+                                            </div>
+
                                             
                                             <!-- ปุ่มเครื่องมือ -->
                                             <div class="d-flex gap-2 justify-content-center">

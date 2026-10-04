@@ -176,21 +176,46 @@ try {
                                             // กรณีคนถูกขอแลก (เพื่อน) ต้องกดยอมรับ/ปฏิเสธ
                                             if ($swap['status'] == 'PENDING_TARGET' && $swap['target_user_id'] == $current_user_id): 
                                         ?>
-                                            <a href="index.php?c=swap&a=action&act=accept&id=<?= $swap['id'] ?>" class="btn btn-sm btn-success rounded-pill fw-bold shadow-sm" onclick="return confirm('ยืนยันรับข้อเสนอแลกเวรนี้?');"><i class="bi bi-check-lg"></i> ยอมรับ</a>
-                                            <a href="index.php?c=swap&a=action&act=reject&id=<?= $swap['id'] ?>" class="btn btn-sm btn-danger rounded-pill fw-bold shadow-sm ms-1" onclick="return confirm('ปฏิเสธข้อเสนอนี้?');"><i class="bi bi-x-lg"></i> ปฏิเสธ</a>
+                                            <form action="index.php?c=swap&a=action" method="POST" class="d-inline">
+                                                <?= security_csrf_input() ?>
+                                                <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                <input type="hidden" name="act" value="accept">
+                                                <button type="submit" class="btn btn-sm btn-success rounded-pill fw-bold shadow-sm" onclick="return confirm('ยืนยันรับข้อเสนอแลกเวรนี้?');"><i class="bi bi-check-lg"></i> ยอมรับ</button>
+                                            </form>
+                                            <form action="index.php?c=swap&a=action" method="POST" class="d-inline">
+                                                <?= security_csrf_input() ?>
+                                                <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                <input type="hidden" name="act" value="reject">
+                                                <button type="submit" class="btn btn-sm btn-danger rounded-pill fw-bold shadow-sm ms-1" onclick="return confirm('ปฏิเสธข้อเสนอนี้?');"><i class="bi bi-x-lg"></i> ปฏิเสธ</button>
+                                            </form>
                                         
                                         <?php 
                                             // กรณีผู้จัดเวร/ผอ. ต้องกดอนุมัติ
                                             elseif ($swap['status'] == 'PENDING_DIRECTOR' && $is_manager): 
                                         ?>
-                                            <a href="index.php?c=swap&a=action&act=approve&id=<?= $swap['id'] ?>" class="btn btn-sm btn-primary rounded-pill fw-bold shadow-sm" onclick="return confirm('ยืนยันอนุมัติและสลับตารางเวรทันที?');"><i class="bi bi-check-circle"></i> อนุมัติ</a>
-                                            <a href="index.php?c=swap&a=action&act=decline&id=<?= $swap['id'] ?>" class="btn btn-sm btn-outline-danger rounded-pill fw-bold ms-1" onclick="return confirm('ไม่อนุมัติคำขอนี้?');"><i class="bi bi-x-circle"></i> ไม่อนุมัติ</a>
+                                            <form action="index.php?c=swap&a=action" method="POST" class="d-inline">
+                                                <?= security_csrf_input() ?>
+                                                <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                <input type="hidden" name="act" value="approve">
+                                                <button type="submit" class="btn btn-sm btn-primary rounded-pill fw-bold shadow-sm" onclick="return confirm('ยืนยันอนุมัติและสลับตารางเวรทันที?');"><i class="bi bi-check-circle"></i> อนุมัติ</button>
+                                            </form>
+                                            <form action="index.php?c=swap&a=action" method="POST" class="d-inline">
+                                                <?= security_csrf_input() ?>
+                                                <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                <input type="hidden" name="act" value="decline">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill fw-bold ms-1" onclick="return confirm('ไม่อนุมัติคำขอนี้?');"><i class="bi bi-x-circle"></i> ไม่อนุมัติ</button>
+                                            </form>
                                         
                                         <?php 
                                             // กรณีผู้ขอแลกเวรเอง ต้องการ "ลบ/ยกเลิกคำขอ" ของตัวเอง
                                             elseif (in_array($swap['status'], ['PENDING_TARGET', 'PENDING_DIRECTOR']) && $swap['requestor_id'] == $current_user_id): 
                                         ?>
-                                            <a href="index.php?c=swap&a=action&act=cancel&id=<?= $swap['id'] ?>" class="btn btn-sm btn-secondary rounded-pill fw-bold shadow-sm" onclick="return confirm('คุณต้องการยกเลิกและลบคำขอแลกเวรนี้ใช่หรือไม่?');"><i class="bi bi-trash"></i> ยกเลิกคำขอ</a>
+                                            <form action="index.php?c=swap&a=action" method="POST" class="d-inline">
+                                                <?= security_csrf_input() ?>
+                                                <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                <input type="hidden" name="act" value="cancel">
+                                                <button type="submit" class="btn btn-sm btn-secondary rounded-pill fw-bold shadow-sm" onclick="return confirm('คุณต้องการยกเลิกและลบคำขอแลกเวรนี้ใช่หรือไม่?');"><i class="bi bi-trash"></i> ยกเลิกคำขอ</button>
+                                            </form>
 
                                         <?php else: ?>
                                             <span class="text-muted small">-</span>

@@ -12,8 +12,22 @@ $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 
 $isAdmin = in_array($_SESSION['user']['role'] ?? '', ['ADMIN', 'SUPERADMIN']);
 $is_manager = in_array($_SESSION['user']['role'] ?? '', ['DIRECTOR', 'SCHEDULER', 'ADMIN', 'SUPERADMIN']);
-$roster_status = $roster_status ?? 'DRAFT';
+$roster_status = strtoupper((string)($roster_status ?? 'DRAFT'));
 $canEdit = ($is_manager && $roster_status !== 'APPROVED');
+
+// Workflow state is derived once here so the view never emits Undefined variable warnings.
+$roster_workflow_map = [
+    'DRAFT'        => ['step' => 1, 'progress' => 0,      'label' => 'กำลังจัดทำ'],
+    'SUBMITTED'    => ['step' => 2, 'progress' => 33.333, 'label' => 'รอตรวจสอบ'],
+    'REQUEST_EDIT' => ['step' => 2, 'progress' => 33.333, 'label' => 'ขอแก้ไข'],
+    'APPROVED'     => ['step' => 3, 'progress' => 66.667, 'label' => 'อนุมัติแล้ว'],
+    'LOCKED'       => ['step' => 3, 'progress' => 66.667, 'label' => 'ยืนยันแล้ว'],
+];
+
+$roster_workflow_state = $roster_workflow_map[$roster_status] ?? $roster_workflow_map['DRAFT'];
+$roster_progress_step = (int)$roster_workflow_state['step'];
+$roster_progress_percent = (float)$roster_workflow_state['progress'];
+$roster_workflow_label = (string)$roster_workflow_state['label'];
 
 function getShiftColorClass($shift_val) {
     if ($shift_val == 'บ' || $shift_val == 'A') return 'text-warning text-dark';
@@ -105,7 +119,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     .today-column { background-color: #f0fdf4 !important; border-left: 1px solid #bbf7d0 !important; border-right: 1px solid #bbf7d0 !important; }
     .holiday-column { background-color: #fff1f2 !important; } /* 🌟 พื้นหลังสีแดงอ่อนๆ สำหรับวันหยุด */
 
-    @media (min-width: 992px) { .sticky-sidebar { position: sticky; top: 15px; align-self: flex-start; height: calc(100vh - 110px); overflow: hidden; } }
+    @media (min-width: 992px) { .sticky-sidebar { position: sticky; top: 15px; align-self: flex-start; height: calc(100dvh - var(--rp-header-h, 4.5rem) - 2rem); overflow: hidden; } }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
@@ -136,7 +150,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <input type="hidden" name="a" value="index">
                     
                     <?php if ($isAdmin): ?>
-                    <div class="dropdown shadow-sm" style="width: 220px;">
+                    <div class="dropdown shadow-sm" style="width: 12rem;">
                         <button class="btn d-flex justify-content-between align-items-center bg-white border border-secondary border-opacity-25 w-100 rounded-pill px-3" type="button" id="hospDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="true" style="height: 40px;">
                             <div class="d-flex align-items-center gap-2 text-truncate" style="min-width: 0;">
                                 <i class="bi bi-hospital text-danger flex-shrink-0"></i>
@@ -318,9 +332,13 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                             <i class="bi bi-copy me-1"></i> คัดลอกเดือนก่อน
                         </button>
                         
-                        <a href="javascript:void(0)" onclick="confirmAction('index.php?c=roster&a=clear_roster&month=<?= $selected_month ?>', 'ยืนยันการล้างตารางเวรทั้งหมดของเดือนนี้?', this)" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm bg-white text-nowrap rounded-3">
+                        <form action="index.php?c=roster&a=clear_roster" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการล้างตารางเวรทั้งหมดของเดือนนี้?');">
+                            <?= security_csrf_input() ?>
+                            <input type="hidden" name="month" value="<?= htmlspecialchars($selected_month, ENT_QUOTES, 'UTF-8') ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm bg-white text-nowrap rounded-3">
                             <i class="bi bi-eraser-fill me-1"></i> ล้างข้อมูล
-                        </a>
+                        </button>
+                        </form>
 
                         <div class="vr mx-1"></div>
 
@@ -333,6 +351,47 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <?php endif; ?>
                 </div>
             </div>
+            <div class="rp-workflow-card mx-3 mb-3 rp-roster-workflow">
+                <div class="rp-workflow-head">
+                    <div class="rp-workflow-heading">
+                        <span class="rp-workflow-heading-icon" aria-hidden="true">
+                            <i class="bi bi-diagram-3-fill"></i>
+                        </span>
+                        <div>
+                            <div class="rp-workflow-title">ขั้นตอนการจัดตารางเวร</div>
+                            <div class="rp-workflow-subtitle">ติดตามสถานะการจัดทำ ตรวจสอบ และอนุมัติตารางเวร</div>
+                        </div>
+                    </div>
+                    <span class="rp-workflow-state <?= $roster_status === 'REQUEST_EDIT' ? 'is-warning' : ($roster_status === 'APPROVED' ? 'is-success' : '') ?>">
+                        <i class="bi <?= $roster_status === 'APPROVED' ? 'bi-check-circle-fill' : ($roster_status === 'REQUEST_EDIT' ? 'bi-exclamation-circle-fill' : 'bi-clock-history') ?>"></i>
+                        <?= htmlspecialchars($roster_workflow_label, ENT_QUOTES, 'UTF-8') ?>
+                    </span>
+                </div>
+
+                <div class="rp-workflow <?= $roster_status === 'REQUEST_EDIT' ? 'rp-workflow--warning' : '' ?> <?= $roster_status === 'APPROVED' ? 'rp-workflow--approved' : '' ?>"
+                     style="--rp-workflow-count:3; --rp-workflow-progress:<?= htmlspecialchars((string)$roster_progress_percent, ENT_QUOTES, 'UTF-8') ?>%;"
+                     role="list"
+                     aria-label="ขั้นตอนการจัดตารางเวร">
+                    <?php
+                    $roster_steps = [
+                        1 => ['icon' => 'bi-calendar2-week-fill', 'label' => 'จัดทำตาราง', 'desc' => 'บันทึกและปรับเวร'],
+                        2 => ['icon' => 'bi-send-check-fill', 'label' => $roster_status === 'REQUEST_EDIT' ? 'ขอแก้ไข' : 'ส่งตรวจสอบ', 'desc' => $roster_status === 'REQUEST_EDIT' ? 'รออนุญาตให้แก้ไข' : 'ส่งให้ผู้ตรวจสอบ'],
+                        3 => ['icon' => 'bi-patch-check-fill', 'label' => 'อนุมัติ', 'desc' => 'ยืนยันตารางพร้อมใช้']
+                    ];
+                    foreach ($roster_steps as $stepNo => $stepData):
+                        $stepClass = '';
+                        if ($stepNo < $roster_progress_step) $stepClass = 'is-complete';
+                        elseif ($stepNo === $roster_progress_step) $stepClass = 'is-current';
+                    ?>
+                        <div class="rp-workflow-step <?= $stepClass ?>" role="listitem">
+                            <div class="rp-workflow-dot" aria-hidden="true"><i class="bi <?= $stepData['icon'] ?>"></i></div>
+                            <div class="rp-workflow-label"><?= htmlspecialchars($stepData['label'], ENT_QUOTES, 'UTF-8') ?></div>
+                            <div class="rp-workflow-desc"><?= htmlspecialchars($stepData['desc'], ENT_QUOTES, 'UTF-8') ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
             <!-- 🌟 แสดงผลลัพธ์การตรวจสอบตารางเวรทั่วไป -->
             <div id="rosterWarnings" class="px-3 pb-3" style="display: none;"></div>
         </div>
@@ -343,10 +402,10 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                 <div class="card card-modern overflow-hidden mb-4 flex-grow-1">
                     <div class="card-body p-0 d-flex flex-column">
                         <div class="table-responsive flex-grow-1 custom-scrollbar" style="max-height: 70vh;">
-                            <table class="table table-bordered table-hover table-roster mb-0 text-center" id="rosterTable" style="min-width: 1000px;">
+                            <table class="table table-bordered table-hover table-roster mb-0 text-center" id="rosterTable" style="min-width: 56rem;">
                                 <thead class="sticky-top" style="z-index: 10;">
                                     <tr>
-                                        <th rowspan="2" class="align-middle shadow-sm bg-white" style="min-width: 220px; left: 0; position: sticky; z-index: 11; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
+                                        <th rowspan="2" class="align-middle shadow-sm bg-white" style="min-width: 12rem; left: 0; position: sticky; z-index: 11; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
                                         <th colspan="<?= $days_in_month ?>" class="bg-light border-bottom text-dark">วันที่ปฏิบัติงาน เดือน <?= $display_month_text ?></th>
                                     </tr>
                                     <tr>

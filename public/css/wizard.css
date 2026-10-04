@@ -1,0 +1,286 @@
+/* ==========================================================================
+   Responsive Multi-step Forms + Skeleton Loading
+   ========================================================================== */
+
+.rp-wizard-progress {
+  position: sticky;
+  top: .25rem;
+  z-index: 20;
+  margin-bottom: 1.25rem;
+  padding: .9rem 1rem;
+  border: 1px solid var(--rp-theme-border, #d7e3ea);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--rp-theme-surface, #fff) 96%, transparent);
+  box-shadow: 0 .45rem 1.3rem var(--rp-theme-shadow, rgba(16,33,46,.06));
+  backdrop-filter: blur(.75rem);
+}
+
+.rp-wizard-desktop {
+  display: grid;
+  grid-template-columns: repeat(var(--rp-step-count, 3), minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.rp-wizard-progress-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  min-width: 0;
+  padding-right: 1rem;
+}
+
+.rp-wizard-progress-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 1.05rem;
+  left: 2.7rem;
+  right: .55rem;
+  height: .18rem;
+  border-radius: 999px;
+  background: var(--rp-theme-border, #d7e3ea);
+}
+
+.rp-wizard-progress-step.is-complete:not(:last-child)::after {
+  background: linear-gradient(90deg, #0f6cbd, #10b981);
+}
+
+.rp-wizard-number {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: 0 0 2.1rem;
+  border: .14rem solid var(--rp-theme-border, #cbd5e1);
+  border-radius: 50%;
+  color: var(--rp-theme-muted, #64748b);
+  background: var(--rp-theme-surface, #fff);
+  font-weight: 800;
+}
+
+.rp-wizard-progress-step.is-current .rp-wizard-number {
+  color: #fff;
+  border-color: #0f6cbd;
+  background: #0f6cbd;
+  box-shadow: 0 0 0 .3rem rgba(15,108,189,.12);
+}
+
+.rp-wizard-progress-step.is-complete .rp-wizard-number {
+  color: #fff;
+  border-color: #15803d;
+  background: #15803d;
+}
+
+.rp-wizard-progress-copy {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.rp-wizard-progress-copy strong {
+  overflow: hidden;
+  color: var(--rp-theme-text, #10212e);
+  font-size: .86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-wizard-progress-copy small {
+  margin-top: .12rem;
+  color: var(--rp-theme-muted, #64748b);
+  font-size: .68rem;
+}
+
+.rp-wizard-mobile {
+  display: none;
+}
+
+.rp-wizard-step-panel[hidden] {
+  display: none !important;
+}
+
+.rp-wizard-step-panel {
+  animation: rp-step-in .2s ease-out;
+}
+
+@keyframes rp-step-in {
+  from { opacity: .2; transform: translateY(.35rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rp-wizard-actions {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rp-theme-border, #e2e8f0);
+}
+
+.rp-wizard-actions .btn {
+  min-width: 7rem;
+}
+
+/* Skeleton loading */
+.rp-skeleton-screen {
+  display: grid;
+  gap: .8rem;
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid var(--rp-theme-border, #e2e8f0);
+  border-radius: 1rem;
+  background: var(--rp-theme-surface, #fff);
+}
+
+.rp-skeleton-row {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr .75fr;
+  gap: .75rem;
+}
+
+.rp-skeleton-row span {
+  position: relative;
+  display: block;
+  height: 2.2rem;
+  overflow: hidden;
+  border-radius: .6rem;
+  background: var(--rp-theme-surface-3, #e8eff4);
+}
+
+.rp-skeleton-row span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  animation: rp-skeleton-shimmer 1.15s infinite;
+}
+
+@keyframes rp-skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+html[data-theme="dark"] .rp-skeleton-row span::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+}
+
+@media (max-width: 639.98px) {
+  .rp-wizard-progress {
+    position: sticky;
+    top: .25rem;
+    margin-bottom: .9rem;
+    padding: .75rem .85rem;
+    border-radius: .85rem;
+  }
+
+  .rp-wizard-desktop {
+    display: none;
+  }
+
+  .rp-wizard-mobile {
+    display: block;
+    color: var(--rp-theme-text, #10212e);
+    font-size: .86rem;
+  }
+
+  .rp-wizard-mobile [data-rp-mobile-percent] {
+    color: var(--rp-theme-primary, #0f6cbd);
+    font-weight: 800;
+  }
+
+  .rp-wizard-mobile-track {
+    width: 100%;
+    height: .48rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--rp-theme-surface-3, #e2e8f0);
+  }
+
+  .rp-wizard-mobile-track > span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #0f6cbd, #10b981);
+    transition: width .28s ease;
+  }
+
+  .rp-wizard-mobile-title {
+    margin-top: .45rem;
+    color: var(--rp-theme-muted, #64748b);
+    font-size: .78rem;
+    font-weight: 650;
+  }
+
+  .rp-wizard-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    margin-inline: -.1rem;
+    padding: .75rem 0 max(.65rem, env(safe-area-inset-bottom));
+    background: var(--rp-theme-surface, #fff);
+  }
+
+  .rp-wizard-actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .rp-skeleton-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ==========================================================================
+   Wizard field UX v3
+   ========================================================================== */
+
+.rp-wizard-progress {
+  scroll-margin-top: 1rem;
+}
+
+.rp-wizard-actions .btn {
+  min-height: 3rem;
+}
+
+@media (max-width: 639.98px) {
+  .rp-wizard-progress {
+    top: .35rem;
+    padding: .7rem .8rem;
+  }
+
+  .rp-wizard-mobile-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem;
+    min-width: 0;
+  }
+
+  .rp-wizard-mobile-summary strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .9rem;
+  }
+
+  .rp-wizard-mobile [data-rp-mobile-percent] {
+    flex: 0 0 auto;
+    font-size: .9rem;
+  }
+
+  .rp-wizard-mobile-title {
+    display: none;
+  }
+
+  .rp-wizard-actions .btn {
+    min-height: 3rem !important;
+  }
+}

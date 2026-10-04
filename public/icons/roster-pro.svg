@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Roster Pro">
+  <defs>
+    <linearGradient id="g" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f6cbd"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <path d="M126 263h67l25-67 49 143 31-76h88" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 113c-75-72-172 5-135 91 24 56 91 108 135 142 44-34 111-86 135-142 37-86-60-163-135-91Z" fill="none" stroke="#fff" stroke-width="25" stroke-linejoin="round" opacity=".96"/>
+</svg>

@@ -1,0 +1,29 @@
+# Local environment secrets
+.env
+.env.*
+!.env.example
+
+# Runtime backup data
+/storage/backups/*
+!/storage/backups/.gitkeep
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+
+# Never commit database exports/dumps at repository root
+/*.sql
+
+# Local database exports and temporary backups
+*.dump
+*.bak
+*.sql.gz
+public/uploads/Backup/
+public/uploads/backup/
+public/uploads/**/*.sql
+*.sql.zip
+/storage/field_visits/*
+!/storage/field_visits/.gitkeep

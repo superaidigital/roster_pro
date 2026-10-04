@@ -2,6 +2,7 @@
 // ที่อยู่ไฟล์: controllers/SettingsController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 
 class SettingsController {
@@ -11,9 +12,7 @@ class SettingsController {
     // ========================================================
 
     private function requireAccess($allowed_roles = []) {
-        if (session_status() === PHP_SESSION_NONE) { 
-            session_start(); 
-        }
+        security_start_session();
 
         if (!isset($_SESSION['user'])) {
             header("Location: index.php?c=auth&a=index");
@@ -278,7 +277,8 @@ class SettingsController {
             if ($db->inTransaction()) {
                 $db->rollBack();
             }
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+            error_log("Settings update failed: " . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถบันทึกการตั้งค่าได้ กรุณาลองใหม่อีกครั้ง";
         }
 
         header("Location: index.php?c=settings&a=system");
@@ -286,6 +286,7 @@ class SettingsController {
     }
 
     public function test_line() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
 
         $db = (new Database())->getConnection();
@@ -305,8 +306,8 @@ class SettingsController {
                 "Authorization: Bearer " . $token
             ]);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             $result = curl_exec($ch);
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -346,7 +347,7 @@ class SettingsController {
         $holidayModel = new HolidayModel($db);
         
         if (!empty($_POST['holiday_date']) && !empty($_POST['holiday_name'])) {
-            $holidayModel->addHoliday($_POST['holiday_date'], $_POST['holiday_name']);
+            $holidayModel->addHoliday($_POST['holiday_date'], $_POST['holiday_name'], $_POST['holiday_type'] ?? 'REGULAR');
             
             // 🌟 บันทึก Log: เพิ่มวันหยุด
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มวันหยุดนักขัตฤกษ์ด้วยตนเอง: " . $_POST['holiday_name']);
@@ -356,19 +357,39 @@ class SettingsController {
         exit;
     }
 
+    public function toggle_holiday() {
+        $this->requirePost();
+        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+        $db = (new Database())->getConnection();
+        require_once 'models/HolidayModel.php';
+        $holidayModel = new HolidayModel($db);
+
+        $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+        $status = isset($_POST['status']) && (int)$_POST['status'] === 1 ? 1 : 0;
+
+        if ($id > 0 && $holidayModel->toggleStatus($id, $status)) {
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "เปลี่ยนสถานะวันหยุด ID: " . $id);
+            $_SESSION['success_msg'] = $status ? "เปิดใช้งานวันหยุดเรียบร้อยแล้ว" : "ปิดใช้งานวันหยุดเรียบร้อยแล้ว";
+        }
+
+        header("Location: index.php?c=settings&a=holidays");
+        exit;
+    }
+
     public function delete_holiday() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
         
-        if (isset($_GET['id'])) {
+        if (isset($_POST['id'])) {
             // ดึงชื่อวันหยุดมาเพื่อบันทึก Log ให้ชัดเจน
             $stmt = $db->prepare("SELECT holiday_name FROM holidays WHERE id = ?");
-            $stmt->execute([$_GET['id']]);
-            $holiday_name = $stmt->fetchColumn() ?: "ID: " . $_GET['id'];
+            $stmt->execute([$_POST['id']]);
+            $holiday_name = $stmt->fetchColumn() ?: "ID: " . $_POST['id'];
             
-            $holidayModel->deleteHoliday($_GET['id']);
+            $holidayModel->deleteHoliday($_POST['id']);
             
             // 🌟 บันทึก Log: ลบวันหยุด
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบวันหยุดนักขัตฤกษ์: {$holiday_name}");
@@ -379,8 +400,9 @@ class SettingsController {
     }
 
     public function sync_api() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
-        $year = isset($_GET['year']) ? $_GET['year'] : date('Y');
+        $year = isset($_POST['year']) ? $_POST['year'] : date('Y');
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
@@ -412,6 +434,33 @@ class SettingsController {
 
     public function pay_rates() {
         $this->shift_types();
+    }
+
+    public function save_pay_rates() {
+        $this->requirePost();
+        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+
+        $db = (new Database())->getConnection();
+        require_once 'models/PayRateModel.php';
+        $payRateModel = new PayRateModel($db);
+        $rates = $payRateModel->getAllRates();
+
+        foreach ($rates as $rate) {
+            $id = (int)$rate['id'];
+            $data = [
+                'name' => $rate['name'] ?? ($rate['group_name'] ?? ''),
+                'keywords' => $rate['keywords'] ?? '',
+                'rate_y' => $_POST['rate_y_' . $id] ?? $rate['rate_y'],
+                'rate_b' => $_POST['rate_b_' . $id] ?? $rate['rate_b'],
+                'rate_r' => $_POST['rate_r_' . $id] ?? $rate['rate_r'],
+            ];
+            $payRateModel->updateRate($id, $data);
+        }
+
+        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "ปรับปรุงอัตราค่าตอบแทน");
+        $_SESSION['success_msg'] = "บันทึกอัตราค่าตอบแทนเรียบร้อยแล้ว";
+        header("Location: index.php?c=settings&a=shift_types");
+        exit;
     }
 
     public function save_payrate() {
@@ -448,16 +497,17 @@ class SettingsController {
     }
 
     public function delete_payrate() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         $db = (new Database())->getConnection();
         require_once 'models/PayRateModel.php';
         $payRateModel = new PayRateModel($db);
         
-        if (isset($_GET['id'])) {
-            $payRateModel->deleteRate($_GET['id']);
+        if (isset($_POST['id'])) {
+            $payRateModel->deleteRate($_POST['id']);
             
             // 🌟 บันทึก Log: ลบเรทค่าตอบแทน
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบหมวดเรทค่าตอบแทน ID: " . $_GET['id']);
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบหมวดเรทค่าตอบแทน ID: " . $_POST['id']);
             $_SESSION['success_msg'] = "ลบเรทค่าตอบแทนเรียบร้อยแล้ว";
         }
         header("Location: index.php?c=settings&a=shift_types");
@@ -482,7 +532,8 @@ class SettingsController {
             $stmt = $db->query("SELECT * FROM system_menus ORDER BY display_order ASC, id ASC");
             $menus = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "ไม่สามารถดึงข้อมูลเมนูได้: " . $e->getMessage();
+            error_log('SettingsController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
 
         require_once 'views/layouts/header.php';
@@ -534,7 +585,8 @@ class SettingsController {
                 if ($db->inTransaction()) {
                     $db->rollBack();
                 }
-                $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึก: " . $e->getMessage();
+                error_log('SettingsController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
             }
         } else {
             $_SESSION['error_msg'] = "ไม่มีข้อมูลส่งมาบันทึก";
@@ -574,7 +626,7 @@ class SettingsController {
 
         // ดึงรายการไฟล์ Backup ที่อยู่ในเซิร์ฟเวอร์
         $server_backups = [];
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = 'storage/backups/';
         if (is_dir($backup_dir)) {
             $files = scandir($backup_dir);
             foreach ($files as $file) {
@@ -584,8 +636,7 @@ class SettingsController {
                         'filename' => $file,
                         'size' => round(filesize($filepath) / 1024, 2), // KB
                         'date' => date("d/m/Y H:i:s", filemtime($filepath)),
-                        'path' => $filepath
-                    ];
+                        ];
                 }
             }
             // เรียงจากใหม่ไปเก่า
@@ -679,7 +730,8 @@ class SettingsController {
             exit;
 
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการสำรองข้อมูล: " . $e->getMessage();
+            error_log('SettingsController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
             header("Location: index.php?c=settings&a=backup");
             exit;
         }
@@ -694,11 +746,11 @@ class SettingsController {
         ini_set('memory_limit', '256M');
 
         $db = (new Database())->getConnection();
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = 'storage/backups/';
 
         try {
             if (!is_dir($backup_dir)) {
-                mkdir($backup_dir, 0777, true);
+                mkdir($backup_dir, 0700, true);
             }
 
             $sqlScript = $this->generateSqlScript($db);
@@ -712,22 +764,45 @@ class SettingsController {
                 LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "สำรองข้อมูลจัดเก็บลงเซิร์ฟเวอร์ ({$backup_file_name})");
                 $_SESSION['success_msg'] = "บันทึกไฟล์สำรองข้อมูลลงเซิร์ฟเวอร์เรียบร้อยแล้ว";
             } else {
-                $_SESSION['error_msg'] = "ไม่สามารถเขียนไฟล์ลงในโฟลเดอร์ public/uploads/Backup/ ได้ โปรดตรวจสอบ Permission (CHMOD 777)";
+                $_SESSION['error_msg'] = "ไม่สามารถเขียนไฟล์ลงในโฟลเดอร์ storage/backups/ ได้ โปรดตรวจสอบ Permission";
             }
 
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+            error_log('SettingsController error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
 
         header("Location: index.php?c=settings&a=backup");
         exit;
     }
 
+    public function download_server_backup() {
+        $this->requireAccess(['SUPERADMIN']);
+        $filename = basename((string)($_GET['file'] ?? ''));
+        $filepath = 'storage/backups/' . $filename;
+
+        if ($filename === '' || !is_file($filepath) || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) !== 'sql') {
+            http_response_code(404);
+            exit('Backup file not found.');
+        }
+
+        $db = (new Database())->getConnection();
+        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "ดาวน์โหลดไฟล์สำรองข้อมูลในเซิร์ฟเวอร์ ({$filename})");
+
+        header('Content-Type: application/sql');
+        header('Content-Disposition: attachment; filename="' . rawurlencode($filename) . '"');
+        header('Content-Length: ' . filesize($filepath));
+        header('X-Content-Type-Options: nosniff');
+        readfile($filepath);
+        exit;
+    }
+
     // ฟังก์ชันใหม่: ลบไฟล์ Backup ใน Server
     public function delete_server_backup() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN']);
-        $filename = $_GET['file'] ?? '';
-        $filepath = 'public/uploads/Backup/' . basename($filename);
+        $filename = $_POST['file'] ?? '';
+        $filepath = 'storage/backups/' . basename($filename);
 
         if (!empty($filename) && file_exists($filepath)) {
             unlink($filepath);
@@ -745,10 +820,10 @@ class SettingsController {
 
     // ฟังก์ชันใหม่: URL สำหรับให้ Cron Job เรียกใช้งาน (ไม่ต้อง Login)
     public function cron_monthly_backup() {
-        $secret_key = "ROSTER_PRO_CRON_2026"; 
+        $secret_key = (string)(getenv('ROSTER_CRON_KEY') ?: ''); 
         $provided_key = $_GET['key'] ?? '';
 
-        if ($provided_key !== $secret_key) {
+        if ($secret_key === '' || !hash_equals($secret_key, (string)$provided_key)) {
             die("Access Denied: Invalid Cron Key.");
         }
 
@@ -756,11 +831,11 @@ class SettingsController {
         ini_set('memory_limit', '256M');
 
         $db = (new Database())->getConnection();
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = 'storage/backups/';
 
         try {
             if (!is_dir($backup_dir)) {
-                mkdir($backup_dir, 0777, true);
+                mkdir($backup_dir, 0700, true);
             }
 
             // เช็คว่าเดือนนี้มีไฟล์แล้วหรือยัง
@@ -791,7 +866,9 @@ class SettingsController {
             }
 
         } catch (Exception $e) {
-            echo "Cron Backup Error: " . $e->getMessage();
+            error_log("Cron backup failed: " . $e->getMessage());
+            http_response_code(500);
+            echo "Cron Backup Error";
         }
         exit;
     }
@@ -818,9 +895,13 @@ class SettingsController {
             $db->exec("SET FOREIGN_KEY_CHECKS=0;");
 
             $tables_to_clear = [
-                'shifts', 'rosters', 'roster_details', 'roster_status', 
-                'leaves', 'leave_requests', 'shift_swaps', 'logs', 
-                'system_logs', 'notifications'
+                'shifts',
+                'roster_status',
+                'leave_requests',
+                'shift_swaps',
+                'logs',
+                'system_logs',
+                'notifications'
             ];
 
             foreach ($tables_to_clear as $table) {
@@ -845,7 +926,8 @@ class SettingsController {
 
         } catch (Exception $e) {
             $db->exec("SET FOREIGN_KEY_CHECKS=1;"); 
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการล้างข้อมูล: " . $e->getMessage();
+            error_log("Factory reset failed: " . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถล้างข้อมูลระบบได้ กรุณาตรวจสอบ Log และลองใหม่";
         }
 
         header("Location: index.php?c=settings&a=system");

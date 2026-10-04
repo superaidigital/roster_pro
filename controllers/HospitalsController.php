@@ -2,16 +2,34 @@
 // ที่อยู่ไฟล์: controllers/HospitalsController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/HospitalModel.php';
 require_once 'controllers/LogsController.php';
 
 class HospitalsController {
+
+    private function requireMutation(): void {
+        security_start_session();
+
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
+    }
+
     
     // ==========================================
     // 🛡️ ฟังก์ชันตรวจสอบสิทธิ์ (Authorization)
     // ==========================================
     private function requireAccess($allowed_roles = []) {
-        if (session_status() === PHP_SESSION_NONE) { session_start(); }
+        security_start_session();
         
         // ถ้ายังไม่ได้ล็อกอิน ให้เด้งไปหน้าล็อกอิน
         if (!isset($_SESSION['user'])) { 
@@ -49,6 +67,7 @@ class HospitalsController {
     // 🌟 2. เพิ่ม รพ.สต. ใหม่ (Add)
     // ==========================================
     public function add() {
+        $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header("Location: index.php?c=hospitals"); exit;
         }
@@ -87,6 +106,7 @@ class HospitalsController {
     // 🌟 3. แก้ไข รพ.สต. (Edit)
     // ==========================================
     public function edit() {
+        $this->requireMutation();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             header("Location: index.php?c=hospitals"); exit;
         }
@@ -135,11 +155,12 @@ class HospitalsController {
     // 🌟 4. ลบ รพ.สต. แบบ Soft Delete (ลบเดี่ยว)
     // ==========================================
     public function delete() {
+        $this->requireMutation();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         $db = (new Database())->getConnection();
         $hospitalModel = new HospitalModel($db);
         
-        $id = $_GET['id'] ?? null;
+        $id = $_POST['id'] ?? null;
         
         if ($id && $id != 0 && $id != '0') { 
             // ดึงชื่อ รพ.สต. มาเก็บไว้บันทึก Log ให้ชัดเจน
@@ -167,6 +188,7 @@ class HospitalsController {
     // 🌟 5. ลบหลายรายการ (Bulk Delete)
     // ==========================================
     public function bulk_delete() {
+        $this->requireMutation();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -208,11 +230,12 @@ class HospitalsController {
     // 🌟 6. เปิด/ปิด การใช้งานหน่วยบริการ (Toggle)
     // ==========================================
     public function toggle() {
+        $this->requireMutation();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         
-        if (isset($_GET['id']) && isset($_GET['status'])) {
-            $id = $_GET['id'];
-            $status = (int)$_GET['status'];
+        if (isset($_POST['id']) && isset($_POST['status'])) {
+            $id = $_POST['id'];
+            $status = (int)$_POST['status'];
             
             if ($id != 0 && $id != '0') { // ป้องกันปิดส่วนกลาง
                 $db = (new Database())->getConnection();
@@ -243,6 +266,7 @@ class HospitalsController {
     // 🌟 7. อัปเดตลำดับจากการลากวางตาราง (Drag & Drop)
     // ==========================================
     public function update_order() {
+        $this->requireMutation();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
         header('Content-Type: application/json');
         
@@ -267,7 +291,9 @@ class HospitalsController {
                 echo json_encode(['success' => true]);
             } catch (Exception $e) {
                 if ($db->inTransaction()) $db->rollBack();
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                error_log('Hospital operation failed: ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'ไม่สามารถดำเนินการข้อมูลหน่วยบริการได้']);
             }
         } else {
             echo json_encode(['success' => false, 'message' => 'รูปแบบข้อมูลไม่ถูกต้อง']);
@@ -299,6 +325,7 @@ class HospitalsController {
     }
 
     public function import_csv() {
+        $this->requireMutation();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['file_csv'])) {

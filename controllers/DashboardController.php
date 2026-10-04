@@ -79,15 +79,16 @@ class DashboardController {
             // 4. ดึงจำนวนคำขอแลกเวร
             $my_pending_swaps = 0;
             try {
-                $stmt_swaps = $db->prepare("SELECT COUNT(*) FROM shift_swaps WHERE (request_user_id = ? OR target_user_id = ?) AND status = 'PENDING'");
+                $stmt_swaps = $db->prepare(
+                    "SELECT COUNT(*)
+                     FROM shift_swaps
+                     WHERE (requestor_id = ? OR target_user_id = ?)
+                       AND status IN ('PENDING_TARGET', 'PENDING_DIRECTOR')"
+                );
                 $stmt_swaps->execute([$my_user_id, $my_user_id]);
-                $my_pending_swaps = $stmt_swaps->fetchColumn() ?: 0;
+                $my_pending_swaps = (int)$stmt_swaps->fetchColumn();
             } catch (Exception $e) {
-                try {
-                    $stmt_swaps = $db->prepare("SELECT COUNT(*) FROM shift_swaps WHERE user_id = ? AND status = 'PENDING'");
-                    $stmt_swaps->execute([$my_user_id]);
-                    $my_pending_swaps = $stmt_swaps->fetchColumn() ?: 0;
-                } catch (Exception $ex) { $my_pending_swaps = 0; }
+                $my_pending_swaps = 0;
             }
 
             // 5. ดึงสถานะตารางเวรของหน่วยงานเดือนนี้
@@ -130,15 +131,13 @@ class DashboardController {
 
         $pending_swaps = 0;
         try {
-            $query_swaps = "SELECT COUNT(*) FROM shift_swaps WHERE status = 'PENDING'";
-            if (!$is_global) $query_swaps .= " AND request_user_id IN (SELECT id FROM users WHERE hospital_id = " . (int)$my_hosp_id . ")";
-            $pending_swaps = $db->query($query_swaps)->fetchColumn() ?: 0;
-        } catch(Exception $e) {
-            try {
-                $query_swaps = "SELECT COUNT(*) FROM shift_swaps WHERE status = 'PENDING'";
-                if (!$is_global) $query_swaps .= " AND user_id IN (SELECT id FROM users WHERE hospital_id = " . (int)$my_hosp_id . ")";
-                $pending_swaps = $db->query($query_swaps)->fetchColumn() ?: 0;
-            } catch(Exception $ex) { $pending_swaps = 0; }
+            $query_swaps = "SELECT COUNT(*) FROM shift_swaps WHERE status IN ('PENDING_TARGET', 'PENDING_DIRECTOR')";
+            if (!$is_global) {
+                $query_swaps .= " AND hospital_id = " . (int)$my_hosp_id;
+            }
+            $pending_swaps = (int)$db->query($query_swaps)->fetchColumn();
+        } catch (Exception $e) {
+            $pending_swaps = 0;
         }
 
         $estimated_budget = 0;

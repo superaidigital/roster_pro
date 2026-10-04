@@ -7,59 +7,7 @@ class HospitalModel {
 
     public function __construct($db) {
         $this->conn = $db;
-        $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        
-        // 🌟 เรียกใช้ฟังก์ชันตรวจสอบและเพิ่มคอลัมน์
-        $this->checkAndCreateColumns();
-    }
-
-    private function checkAndCreateColumns() {
-        try {
-            $stmt = $this->conn->query("SHOW COLUMNS FROM " . $this->table_name);
-            $existing_columns = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-            $required_columns = [
-                'name' => 'VARCHAR(255) NOT NULL',
-                'short_name' => 'VARCHAR(100) NULL',
-                'email' => 'VARCHAR(100) NULL',
-                'phone' => 'VARCHAR(50) NULL',
-                'address' => 'VARCHAR(255) NULL',
-                'sub_district' => 'VARCHAR(100) NULL',
-                'district' => 'VARCHAR(100) NULL',
-                'province' => 'VARCHAR(100) NULL',
-                'zipcode' => 'VARCHAR(10) NULL',
-                'logo' => 'VARCHAR(255) NULL',
-                'director_name' => 'VARCHAR(255) NULL',
-                'hospital_code' => 'VARCHAR(20) NULL',
-                'hospital_size' => "VARCHAR(10) DEFAULT 'S'",
-                'latitude' => "VARCHAR(50) NULL",
-                'longitude' => "VARCHAR(50) NULL",
-                'shift_m_start' => "TIME DEFAULT '08:00:00'",
-                'shift_m_end' => "TIME DEFAULT '16:00:00'",
-                'shift_a_start' => "TIME DEFAULT '16:00:00'",
-                'shift_a_end' => "TIME DEFAULT '00:00:00'",
-                'shift_n_start' => "TIME DEFAULT '00:00:00'",
-                'shift_n_end' => "TIME DEFAULT '08:00:00'",
-                'is_active' => "TINYINT(1) NOT NULL DEFAULT 1",
-                'display_order' => "INT(11) DEFAULT 0",
-                'deleted_at' => "DATETIME NULL DEFAULT NULL COMMENT 'เวลาที่ถูกลบ (Soft Delete)'"
-            ];
-
-            $columns_to_add = [];
-            foreach ($required_columns as $column_name => $column_type) {
-                if (!in_array($column_name, $existing_columns)) {
-                    $columns_to_add[] = "ADD COLUMN `$column_name` $column_type";
-                }
-            }
-
-            if (!empty($columns_to_add)) {
-                $alter_query = "ALTER TABLE `" . $this->table_name . "` " . implode(', ', $columns_to_add);
-                $this->conn->exec($alter_query);
-            }
-        } catch (PDOException $e) {
-            error_log("Hospital Auto-migration failed: " . $e->getMessage());
-        }
-    }
+        $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);}
 
     public function getHospitalLogo($hospitalData) {
         if (!empty($hospitalData['logo']) && file_exists($hospitalData['logo'])) {
@@ -310,4 +258,3 @@ class HospitalModel {
         try { return $stmt->execute(); } catch (PDOException $e) { return false; }
     }
 }
-?>

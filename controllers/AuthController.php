@@ -3,6 +3,7 @@
 // ชื่อไฟล์: AuthController.php
 
 require_once 'config/database.php';
+require_once 'config/security.php';
 require_once 'models/UserModel.php';
 require_once 'controllers/LogsController.php'; // 🌟 นำเข้าระบบบันทึกประวัติ
 
@@ -10,9 +11,7 @@ class AuthController {
     
     public function index() {
         // เช็คสถานะ Session ก่อนเริ่ม
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        security_start_session();
         
         // ถ้าล็อกอินค้างไว้แล้ว ให้แยกทางเดินตามสิทธิ์
         if(isset($_SESSION['user'])) {
@@ -27,11 +26,14 @@ class AuthController {
     }
 
     public function login() {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        security_start_session();
 
         if($_SERVER['REQUEST_METHOD'] == 'POST') {
+            if (!security_verify_csrf($_POST['_csrf'] ?? null)) {
+                $_SESSION['login_error'] = "คำขอหมดอายุหรือไม่ถูกต้อง กรุณาลองเข้าสู่ระบบใหม่";
+                header("Location: index.php?c=auth&a=index");
+                exit;
+            }
             $database = new Database();
             $db = $database->getConnection();
             $userModel = new UserModel($db);
@@ -79,7 +81,13 @@ class AuthController {
                 // ล็อกอินไม่สำเร็จ: ตรวจสอบว่าใน DB รหัสผ่านถูก Hash หรือยัง
                 
                 // 📝 บันทึก Log: พยายามเข้าสู่ระบบล้มเหลว (ใช้ ID = 0 สำหรับคนแปลกหน้า)
-                LogsController::addLog($db, 0, LogsController::ACTION_LOGIN, "พยายามเข้าสู่ระบบล้มเหลว (รหัสผ่านผิด) Username: {$username}");
+                LogsController::addLog(
+                    $db,
+                    0,
+                    LogsController::ACTION_LOGIN,
+                    security_login_failure_details($username),
+                    security_client_ip()
+                );
                 
                 $_SESSION['login_error'] = "ชื่อผู้ใช้ หรือ รหัสผ่านไม่ถูกต้อง (กรุณาตรวจสอบว่ารหัสใน DB ถูกเข้ารหัสแล้ว)";
                 header("Location: index.php?c=auth&a=index");
@@ -89,9 +97,7 @@ class AuthController {
     }
 
     public function logout() {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        security_start_session();
         
         // 📝 บันทึก Log: ออกจากระบบด้วยตนเอง
         if (isset($_SESSION['user'])) {

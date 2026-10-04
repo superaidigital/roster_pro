@@ -1,8 +1,7 @@
 <?php
 // ที่อยู่ไฟล์: views/layouts/header.php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once 'config/security.php';
+security_start_session();
 
 $app_name = "Roster Pro"; // ค่าเริ่มต้นกรณีหาฐานข้อมูลไม่เจอ
 $app_subtitle = "ระบบจัดการตารางปฏิบัติงานและลางาน"; // 🌟 ค่าเริ่มต้นของชื่อย่อย
@@ -113,17 +112,29 @@ if (isset($_SESSION['user'])) {
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <!-- 🌟 ดึงชื่อแอปมาแสดงที่ชื่อแท็บเบราว์เซอร์ -->
     <title><?= htmlspecialchars($app_name) ?> - <?= htmlspecialchars($app_subtitle) ?></title>
     
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0d6efd">
-    <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <meta name="theme-color" content="#f8fbfd">
+    <script id="rp-theme-prepaint">
+    (() => {
+      try {
+        const saved = localStorage.getItem('rp-theme');
+        const theme = saved === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      } catch (_) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-bs-theme', 'light');
+      }
+    })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="public/icons/roster-pro.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
@@ -131,127 +142,96 @@ if (isset($_SESSION['user'])) {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-    <style>
-        :root {
-            --primary-color: #0d6efd;
-            --sidebar-bg: #ffffff;
-            --navbar-height: 70px;
-        }
-
-        /* 🌟 บังคับความสูงเต็มจอ และซ่อน Scrollbar ของ Body เพื่อให้เลื่อนได้เฉพาะ <main> */
-        body {
-            font-family: 'Noto Sans Thai', sans-serif;
-            background-color: #f4f6f9;
-            height: 100vh;
-            overflow: hidden;
-            margin: 0; padding: 0;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        h1, h2, h3, h4, h5, h6, .fw-bold { font-family: 'Kanit', sans-serif; }
-
-        .top-navbar {
-            background-color: rgba(255, 255, 255, 0.95);
-            border-bottom: 1px solid rgba(226, 232, 240, 0.8);
-            height: var(--navbar-height);
-            z-index: 1050;
-        }
-
-        .nav-icon-btn {
-            width: 42px; height: 42px; border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            color: #64748b; background-color: transparent; border: none;
-            transition: all 0.2s; cursor: pointer; position: relative;
-        }
-        .nav-icon-btn:hover { background-color: #f1f5f9; color: var(--primary-color); }
-
-        .notif-badge {
-            position: absolute; top: 2px; right: 2px;
-            background-color: #ef4444; color: white;
-            font-size: 0.65rem; font-weight: bold;
-            padding: 0.2em 0.5em; border-radius: 50rem;
-            border: 2px solid #ffffff; display: none;
-        }
-
-        /* 🌟 Notification Dropdown Styles */
-        .dropdown-menu-notif {
-            width: 350px;
-            border: none;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            border-radius: 1rem;
-        }
-        .notif-item {
-            border-bottom: 1px solid #f1f5f9;
-        }
-        .notif-item:last-child { border-bottom: none; }
-        .notif-item:hover { background-color: #f8fafc !important; }
-
-        .profile-pill {
-            display: flex; align-items: center; gap: 10px;
-            padding: 4px 14px 4px 4px; border-radius: 50rem;
-            text-decoration: none; color: #1e293b; transition: all 0.2s;
-            cursor: pointer;
-        }
-        .profile-pill:hover, .profile-pill[aria-expanded="true"] {
-            background-color: #ffffff; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-        .user-avatar {
-            width: 38px; height: 38px; border-radius: 50%;
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white; display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 1.1rem;
-        }
-
-        /* 🌟 Custom Scrollbars */
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
-        
-        .pwa-toast {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(150%);
-            background: rgba(255, 255, 255, 0.95); padding: 12px 16px; border-radius: 1rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 15px;
-            z-index: 1060; transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            width: 90%; max-width: 380px; border: 1px solid #e2e8f0;
-        }
-        .pwa-toast.show { transform: translateX(-50%) translateY(0); }
-    </style>
+<meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+<link rel="stylesheet" href="public/css/style.css?v=20261004-ui-v16">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ui-v16">
+    <link rel="stylesheet" href="public/css/themes.css?v=20261004-ui-v16">
+    <link rel="stylesheet" href="public/css/wizard.css?v=20261004-ui-v16">
+    <script src="public/js/responsive.js?v=20261004-ui-v16" defer></script>
+    <script src="public/js/progress.js?v=20261004-ui-v16" defer></script>
+    <script src="public/js/theme.js?v=20261004-ui-v16" defer></script>
+    <script src="public/js/wizard.js?v=20261004-ui-v16" defer></script>
 </head>
+<?php
+$rpController = strtolower(trim($_GET['c'] ?? 'dashboard'));
+$rpAction = strtolower(trim($_GET['a'] ?? 'index'));
+$rpPageMap = [
+    'dashboard' => ['หน้าภาพรวม', 'สรุปข้อมูลสำคัญและงานที่ต้องดำเนินการ', 'bi-grid-1x2-fill'],
+    'roster' => ['ตารางปฏิบัติงาน', 'จัดเวร ตรวจสอบ และติดตามสถานะการอนุมัติ', 'bi-calendar3'],
+    'field' => [
+        $rpAction === 'followups' ? 'คิวติดตามงานเยี่ยมบ้าน' : 'เยี่ยมบ้านและงานชุมชน',
+        $rpAction === 'followups'
+            ? 'ติดตามงานครบกำหนด งานเกินกำหนด และรายการเสี่ยงสูง'
+            : 'บันทึกงานภาคสนาม พิกัด สัญญาณชีพ และการติดตามผู้รับบริการ',
+        $rpAction === 'followups' ? 'bi-list-check' : 'bi-house-heart-fill'
+    ],
+    'leave' => ['ระบบวันลา', 'ยื่นคำขอ ตรวจสอบสิทธิ์ และติดตามการอนุมัติ', 'bi-calendar2-minus-fill'],
+    'report' => ['รายงานและติดตาม', 'ภาพรวมการส่งเวร ภาระงาน และข้อมูลประกอบการบริหาร', 'bi-bar-chart-line-fill'],
+    'profile' => [$rpAction === 'schedule' ? 'ปฏิทินเวรของฉัน' : 'ข้อมูลส่วนบุคคล', $rpAction === 'schedule' ? 'ตรวจสอบวันเวรและกิจกรรมของคุณ' : 'จัดการข้อมูลประวัติและข้อมูลการทำงาน', $rpAction === 'schedule' ? 'bi-calendar-heart-fill' : 'bi-person-vcard-fill'],
+    'staff' => ['บุคลากร', 'จัดการรายชื่อและข้อมูลบุคลากรในหน่วยบริการ', 'bi-people-fill'],
+    'users' => ['ผู้ใช้งานและสิทธิ์', 'จัดการบัญชี สิทธิ์ และการเข้าถึงระบบ', 'bi-person-gear'],
+    'hospitals' => ['หน่วยบริการ รพ.สต.', 'จัดการข้อมูลหน่วยบริการและเครือข่าย', 'bi-hospital-fill'],
+    'settings' => ['ตั้งค่าระบบ', 'กำหนดค่าการใช้งานและข้อมูลส่วนกลาง', 'bi-sliders2'],
+    'hr' => ['งานทรัพยากรบุคคล', 'ตรวจสอบและจัดการข้อมูลบุคลากร', 'bi-person-workspace'],
+    'logs' => ['ประวัติการใช้งาน', 'ตรวจสอบกิจกรรมและเหตุการณ์ในระบบ', 'bi-clock-history'],
+    'swap' => ['แลกเวร', 'ส่งคำขอและติดตามสถานะการแลกเวร', 'bi-arrow-left-right'],
+    'notification' => ['การแจ้งเตือน', 'ติดตามรายการแจ้งเตือนและงานที่เกี่ยวข้อง', 'bi-bell-fill'],
+];
+$rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดการตารางปฏิบัติงาน', 'bi-window-stack'];
+?>
 <body>
+<script id="rp-sidebar-prepaint-state">
+    try {
+        if (localStorage.getItem('sidebarState') === 'collapsed') {
+            document.body.classList.add('rp-sidebar-collapsed');
+        }
+    } catch (e) {
+        // Ignore storage restrictions and use the expanded layout.
+    }
+</script>
+<div id="rpGlobalProgress" class="rp-global-progress" role="progressbar" aria-label="สถานะการประมวลผล" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="rp-global-progress-track">
+        <div id="rpGlobalProgressBar" class="rp-global-progress-bar"></div>
+    </div>
+    <div id="rpGlobalProgressLabel" class="rp-global-progress-label" aria-hidden="true"></div>
+</div>
+<div id="rpProgressLive" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
 <!-- 🌟 1. Top Navbar -->
 <nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4">
-    <div class="d-flex align-items-center gap-2 gap-md-3">
-        <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+    <div class="rp-topbar-left d-flex align-items-center gap-2 gap-md-3 min-w-0">
+        <button class="nav-icon-btn rp-mobile-menu-btn" id="mobileSidebarToggleBtn" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูนำทาง">
             <i class="bi bi-list fs-4"></i>
         </button>
-        <button class="nav-icon-btn d-none d-md-flex" id="sidebarToggleBtn" type="button">
+        <button class="nav-icon-btn rp-desktop-menu-btn" id="sidebarToggleBtn" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง">
             <i class="bi bi-list fs-4"></i>
         </button>
         
-        <!-- 🌟 โลโก้และชื่อระบบ -->
-        <a href="index.php?c=dashboard" class="text-decoration-none d-flex align-items-center gap-2 ps-1">
-            <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width:40px; height:40px;">
-                <i class="bi bi-calendar2-check-fill fs-5"></i>
+        <div class="rp-page-context d-flex align-items-center gap-3 min-w-0">
+            <div class="rp-page-icon d-none d-sm-grid">
+                <i class="bi <?= htmlspecialchars($rpPage[2], ENT_QUOTES, 'UTF-8') ?>"></i>
             </div>
-            <div class="d-none d-sm-block">
-                <!-- ชื่อหลัก -->
-                <h5 class="mb-0 fw-bold text-primary" style="line-height: 1.2; letter-spacing: -0.5px;">
-                    <?= htmlspecialchars($app_name) ?>
-                </h5>
-                <!-- ชื่อย่อย (Subtitle) -->
-                <div class="text-muted fw-medium" style="font-size: 11px; letter-spacing: 0.3px; line-height: 1;">
-                    <?= htmlspecialchars($app_subtitle) ?>
-                </div>
+            <div class="min-w-0">
+                <div class="rp-page-kicker">ROSTER PRO WORKSPACE</div>
+                <h1 class="rp-page-title mb-0"><?= htmlspecialchars($rpPage[0], ENT_QUOTES, 'UTF-8') ?></h1>
+                <div class="rp-page-subtitle d-none d-md-block"><?= htmlspecialchars($rpPage[1], ENT_QUOTES, 'UTF-8') ?></div>
             </div>
-        </a>
+        </div>
     </div>
 
-    <div class="d-flex align-items-center gap-1 gap-md-2">
+    <div class="rp-topbar-actions d-flex align-items-center gap-1 gap-md-2">
         <?php if(isset($_SESSION['user'])): ?>
+        <span class="rp-system-online d-none d-xl-inline-flex">ออนไลน์</span>
         
+        <button type="button"
+                class="nav-icon-btn rp-theme-toggle"
+                data-rp-theme-toggle
+                aria-pressed="false"
+                aria-label="เปลี่ยนเป็นโหมดมืด"
+                title="โหมดมืด">
+            <i class="bi bi-moon-stars-fill" data-rp-theme-icon></i>
+        </button>
+
         <!-- 🔔 Notification Dropdown -->
         <div class="dropdown">
             <button class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -317,38 +297,44 @@ if (isset($_SESSION['user'])) {
                 <?php if (!empty($latest_notifications)): ?>
                     <!-- ปุ่ม Footer ทำเครื่องหมายอ่านแล้ว -->
                     <div class="p-2 border-top bg-light text-center" style="border-radius: 0 0 1rem 1rem;">
-                        <a href="index.php?c=notification&a=read_all" class="text-decoration-none text-muted fw-bold small d-block py-2" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')" onclick="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
+                        <form action="index.php?c=notification&a=read_all" method="POST" class="m-0" onsubmit="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
+                            <?= security_csrf_input() ?>
+                            <button type="submit" class="btn btn-link text-decoration-none text-muted fw-bold small d-block py-2 w-100 text-start border-0 bg-transparent" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')">
                             <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
-                        </a>
+                            </button>
+                        </form>
                     </div>
                 <?php endif; ?>
             </div>
         </div>
 
-        <div class="vr d-none d-sm-block bg-secondary opacity-25 mx-2" style="width: 2px; height: 30px;"></div>
-
-        <!-- 👤 Profile Dropdown -->
-        <div class="dropdown">
-            <a href="#" class="profile-pill" data-bs-toggle="dropdown" aria-expanded="false">
-                <div class="user-avatar"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></div>
-                <div class="d-none d-md-block text-start lh-1 pe-2">
-                    <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
-                    <div class="text-primary fw-bold" style="font-size: 11px;"><?= htmlspecialchars($_SESSION['user']['role']) ?></div>
-                </div>
-                <i class="bi bi-chevron-down d-none d-md-block text-muted me-2" style="font-size: 12px;"></i>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end shadow-sm border mt-2">
-                <li class="px-3 py-2 border-bottom mb-2 d-md-none bg-light">
-                    <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
-                    <div class="text-primary fw-bold" style="font-size: 11px;"><?= htmlspecialchars($_SESSION['user']['role']) ?></div>
+        <!-- 👤 Compact User Menu: keep topbar stable at every width -->
+        <div class="dropdown rp-user-menu">
+            <button type="button"
+                    class="rp-user-menu-btn"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="เมนูผู้ใช้งาน <?= htmlspecialchars($_SESSION['user']['name'], ENT_QUOTES, 'UTF-8') ?>"
+                    title="<?= htmlspecialchars($_SESSION['user']['name'], ENT_QUOTES, 'UTF-8') ?>">
+                <span class="user-avatar" aria-hidden="true"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end rp-user-dropdown shadow-sm border mt-2">
+                <li class="rp-user-summary px-3 py-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="user-avatar rp-user-avatar-lg" aria-hidden="true"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></span>
+                        <div class="min-w-0">
+                            <div class="fw-bold text-dark text-truncate"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
+                            <div class="small text-primary fw-semibold text-truncate"><?= htmlspecialchars($_SESSION['user']['role']) ?></div>
+                        </div>
+                    </div>
                 </li>
+                <li><hr class="dropdown-divider my-1"></li>
                 <li><a class="dropdown-item py-2" href="index.php?c=profile"><i class="bi bi-person-circle text-primary me-2"></i> โปรไฟล์ของฉัน</a></li>
-                <li><a class="dropdown-item py-2" href="index.php?c=profile&a=schedule"><i class="bi bi-calendar-week text-success me-2"></i> ตารางเวรของฉัน</a></li>
+                <li><a class="dropdown-item py-2" href="index.php?c=profile&a=schedule"><i class="bi bi-calendar-week text-success me-2"></i> ปฏิทินเวรของฉัน</a></li>
                 <?php if (in_array($_SESSION['user']['role'], ['ADMIN', 'SUPERADMIN'])): ?>
-                <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item py-2" href="index.php?c=settings&a=system"><i class="bi bi-gear text-secondary me-2"></i> ตั้งค่าระบบ</a></li>
                 <?php endif; ?>
-                <li><hr class="dropdown-divider"></li>
+                <li><hr class="dropdown-divider my-1"></li>
                 <li><a class="dropdown-item text-danger fw-bold py-2" href="index.php?c=auth&a=logout"><i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ</a></li>
             </ul>
         </div>
@@ -373,13 +359,37 @@ if (isset($_SESSION['user'])) {
     // ==========================================
     // 🌟 PWA & Notifications & DOM Setup
     // ==========================================
-    
-    // 1. ลงทะเบียน Service Worker (จำเป็นสำหรับ PWA)
+    // 1. ลงทะเบียน Service Worker (Production only)
+    // บน localhost ปิด Service Worker และล้าง cache อัตโนมัติ เพื่อไม่ให้ cache เก่ารบกวนการพัฒนา
     if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
-                .then(registration => console.log('ServiceWorker ใช้งานได้! Scope: ', registration.scope))
-                .catch(err => console.log('ServiceWorker ใช้งานไม่ได้: ', err));
+        window.addEventListener('load', async () => {
+            const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+            if (isLocalDev) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(registration => registration.unregister()));
+
+                    if ('caches' in window) {
+                        const cacheNames = await caches.keys();
+                        await Promise.all(
+                            cacheNames
+                                .filter(name => name.toLowerCase().startsWith('roster'))
+                                .map(name => caches.delete(name))
+                        );
+                    }
+
+                    console.info('Roster Pro dev mode: Service Worker และ cache เก่าถูกปิดบน localhost');
+                } catch (err) {
+                    console.warn('ไม่สามารถล้าง Service Worker ในโหมดพัฒนาได้:', err);
+                }
+                return;
+            }
+
+            navigator.serviceWorker.register('sw.js?v=6', { updateViaCache: 'none' })
+                .then(registration => registration.update())
+                .then(() => console.log('ServiceWorker ใช้งานได้'))
+                .catch(err => console.log('ServiceWorker ใช้งานไม่ได้:', err));
         });
     }
 
@@ -445,5 +455,5 @@ if (isset($_SESSION['user'])) {
 </script>
 
 <!-- 🌟 2. Layout Wrapper: ล็อกความสูงเพื่อป้องกันเลย์เอาท์แตก -->
-<div class="d-flex w-100 overflow-hidden" style="height: calc(100vh - 70px);">
+<div class="app-shell">
     <!-- 💡 ไฟล์ sidebar.php จะถูกแทรกต่อจากบรรทัดนี้ -->

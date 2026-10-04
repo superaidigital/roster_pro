@@ -1,0 +1,459 @@
+/* ==========================================================================
+   Roster Pro Theme System - Light / Dark
+   Light is intentionally high-contrast for outdoor field work.
+   ========================================================================== */
+
+:root,
+html[data-theme="light"] {
+  color-scheme: light;
+  --rp-theme-bg: #eef4f7;
+  --rp-theme-surface: #ffffff;
+  --rp-theme-surface-2: #f7fafc;
+  --rp-theme-surface-3: #edf4f8;
+  --rp-theme-text: #10212e;
+  --rp-theme-muted: #536b7a;
+  --rp-theme-border: #cfdce5;
+  --rp-theme-shadow: rgba(16, 33, 46, .08);
+  --rp-theme-input: #ffffff;
+  --rp-theme-hover: #f2f7fa;
+  --rp-theme-primary: #0b63a5;
+  --rp-theme-accent: #0f766e;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --rp-theme-bg: #071521;
+  --rp-theme-surface: #0d2130;
+  --rp-theme-surface-2: #112938;
+  --rp-theme-surface-3: #173342;
+  --rp-theme-text: #edf7fb;
+  --rp-theme-muted: #a9bdc9;
+  --rp-theme-border: #2d4656;
+  --rp-theme-shadow: rgba(0, 0, 0, .28);
+  --rp-theme-input: #102837;
+  --rp-theme-hover: #173545;
+  --rp-theme-primary: #6dbde8;
+  --rp-theme-accent: #5eead4;
+}
+
+body {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-bg) !important;
+  transition: background-color .18s ease, color .18s ease;
+}
+
+.app-main {
+  color: var(--rp-theme-text) !important;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--rp-theme-accent) 6%, transparent), transparent 24rem),
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--rp-theme-primary) 7%, transparent), transparent 28rem),
+    var(--rp-theme-bg) !important;
+}
+
+.top-navbar {
+  color: var(--rp-theme-text) !important;
+  background: color-mix(in srgb, var(--rp-theme-surface) 96%, transparent) !important;
+  border-bottom-color: var(--rp-theme-border) !important;
+}
+
+.rp-page-title,
+.modal-title,
+.card-title,
+.app-main .text-dark,
+.dropdown-menu .text-dark {
+  color: var(--rp-theme-text) !important;
+}
+
+.rp-page-subtitle,
+.text-muted,
+.text-secondary {
+  color: var(--rp-theme-muted) !important;
+}
+
+.rp-page-icon,
+.nav-icon-btn {
+  color: var(--rp-theme-primary) !important;
+  background: var(--rp-theme-surface-2) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+.nav-icon-btn:hover,
+.profile-pill:hover {
+  background: var(--rp-theme-hover) !important;
+}
+
+.rp-theme-toggle {
+  position: relative;
+}
+
+.rp-theme-toggle::after {
+  content: '';
+  position: absolute;
+  inset: auto .42rem .35rem auto;
+  width: .34rem;
+  height: .34rem;
+  border-radius: 50%;
+  background: var(--rp-theme-accent);
+  box-shadow: 0 0 0 .12rem var(--rp-theme-surface);
+}
+
+/* Surfaces */
+.app-main .card,
+.app-main .card-modern,
+.users-hero,
+.users-filter-card,
+.users-table-card,
+.rp-workflow-card,
+.dropdown-menu,
+.modal-content,
+.offcanvas,
+.pwa-toast {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-surface) !important;
+  border-color: var(--rp-theme-border) !important;
+  box-shadow: 0 .45rem 1.4rem var(--rp-theme-shadow) !important;
+}
+
+.card-header,
+.card-footer,
+.modal-header,
+.modal-footer,
+.dropdown-menu .bg-light,
+.notif-header {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-surface-2) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+.bg-white {
+  background-color: var(--rp-theme-surface) !important;
+}
+
+.bg-light,
+.table-light > * {
+  background-color: var(--rp-theme-surface-2) !important;
+  color: var(--rp-theme-text) !important;
+}
+
+.border,
+.border-top,
+.border-bottom,
+.border-start,
+.border-end {
+  border-color: var(--rp-theme-border) !important;
+}
+
+/* Form controls */
+.form-control,
+.form-select,
+.input-group-text,
+.form-control-modern,
+.form-select-modern,
+.input-group-modern,
+.select2-container--default .select2-selection--single,
+.select2-dropdown,
+.select2-search__field {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-input) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+.form-control::placeholder,
+textarea::placeholder {
+  color: var(--rp-theme-muted) !important;
+  opacity: .9;
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-control-modern:focus,
+.form-select-modern:focus,
+.input-group-modern:focus-within {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-input) !important;
+  border-color: var(--rp-theme-primary) !important;
+  box-shadow: 0 0 0 .2rem color-mix(in srgb, var(--rp-theme-primary) 22%, transparent) !important;
+}
+
+.form-label {
+  color: var(--rp-theme-text) !important;
+}
+
+.form-check-input {
+  background-color: var(--rp-theme-input);
+  border-color: var(--rp-theme-border);
+}
+
+/* Tables */
+.table {
+  --bs-table-color: var(--rp-theme-text);
+  --bs-table-bg: transparent;
+  --bs-table-border-color: var(--rp-theme-border);
+  color: var(--rp-theme-text) !important;
+}
+
+.table thead th {
+  color: var(--rp-theme-muted) !important;
+  background: var(--rp-theme-surface-2) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+.table tbody td {
+  color: var(--rp-theme-text) !important;
+  background: transparent !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+.table-hover tbody tr:hover td {
+  background: var(--rp-theme-hover) !important;
+}
+
+.rp-stack-table tbody tr {
+  background: var(--rp-theme-surface) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+.rp-stack-table td[data-label]::before {
+  color: var(--rp-theme-muted) !important;
+}
+
+/* DataTables */
+.dataTables_wrapper,
+.dataTables_wrapper .dataTables_info,
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_paginate {
+  color: var(--rp-theme-muted) !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-surface) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+/* Charts / empty states / utilities */
+.chart-container,
+.calendar-scroll-shell,
+.table-responsive:has(.rp-scroll-table) {
+  background: var(--rp-theme-surface) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+hr {
+  border-color: var(--rp-theme-border) !important;
+}
+
+code,
+pre {
+  color: var(--rp-theme-text);
+  background: var(--rp-theme-surface-2);
+}
+
+/* Keep clinical navigation dark in both modes, but slightly deepen it in dark mode. */
+html[data-theme="dark"] #desktopSidebar,
+html[data-theme="dark"] .rp-desktop-sidebar,
+html[data-theme="dark"] #mobileSidebar {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(45,212,191,.10), transparent 13rem),
+    linear-gradient(180deg, #0a1d2a 0%, #06131d 100%) !important;
+}
+
+/* Alerts retain semantic contrast. */
+html[data-theme="dark"] .alert-success {
+  color: #bbf7d0 !important;
+  background: #0b2f24 !important;
+}
+html[data-theme="dark"] .alert-danger {
+  color: #fecaca !important;
+  background: #3a171b !important;
+}
+html[data-theme="dark"] .alert-warning {
+  color: #fde68a !important;
+  background: #3b2b0e !important;
+}
+html[data-theme="dark"] .alert-info {
+  color: #bae6fd !important;
+  background: #0b2b3b !important;
+}
+
+/* Third-party calendar */
+html[data-theme="dark"] .flatpickr-calendar {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-surface) !important;
+  border-color: var(--rp-theme-border) !important;
+  box-shadow: 0 1rem 3rem rgba(0,0,0,.35) !important;
+}
+html[data-theme="dark"] .flatpickr-day,
+html[data-theme="dark"] .flatpickr-weekday,
+html[data-theme="dark"] .flatpickr-current-month,
+html[data-theme="dark"] .flatpickr-monthDropdown-months,
+html[data-theme="dark"] .numInputWrapper input {
+  color: var(--rp-theme-text) !important;
+}
+html[data-theme="dark"] .flatpickr-day:hover {
+  background: var(--rp-theme-hover) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+@media (max-width: 639.98px) {
+  .rp-theme-toggle {
+    width: 2.45rem !important;
+    height: 2.45rem !important;
+  }
+}
+
+
+/* Login theme integration */
+.rp-login-theme-toggle {
+  position: fixed !important;
+  top: max(.8rem, env(safe-area-inset-top));
+  right: max(.8rem, env(safe-area-inset-right));
+  z-index: 1100;
+  box-shadow: 0 .45rem 1.2rem var(--rp-theme-shadow) !important;
+}
+
+html[data-theme="dark"] .login-container,
+html[data-theme="dark"] .login-right {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-surface) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+html[data-theme="dark"] .login-right h2,
+html[data-theme="dark"] .login-right h3,
+html[data-theme="dark"] .login-right .text-dark {
+  color: var(--rp-theme-text) !important;
+}
+
+html[data-theme="dark"] .login-right .input-group-modern {
+  background: var(--rp-theme-input) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+html[data-theme="dark"] .login-right .input-group-modern:focus-within {
+  background: var(--rp-theme-input) !important;
+  border-color: var(--rp-theme-primary) !important;
+}
+
+html[data-theme="dark"] .login-right .input-group-text,
+html[data-theme="dark"] .login-right .form-control {
+  color: var(--rp-theme-text) !important;
+  background: transparent !important;
+}
+
+html[data-theme="dark"] .login-right .form-control::placeholder {
+  color: var(--rp-theme-muted) !important;
+}
+
+
+/* ==========================================================================
+   Theme coverage hardening v4
+   ========================================================================== */
+
+/* Outdoor light mode: stronger contrast and crisper boundaries. */
+html[data-theme="light"] {
+  --rp-theme-bg: #f2f6f8;
+  --rp-theme-surface: #ffffff;
+  --rp-theme-surface-2: #f8fafc;
+  --rp-theme-surface-3: #e8f0f5;
+  --rp-theme-text: #071a28;
+  --rp-theme-muted: #3f5969;
+  --rp-theme-border: #bfcfd9;
+  --rp-theme-input: #ffffff;
+  --rp-theme-hover: #edf5f8;
+  --rp-theme-primary: #075b9b;
+  --rp-theme-accent: #0b6f68;
+}
+
+/* Eye-comfort dark mode: slate, never pure black. */
+html[data-theme="dark"] {
+  --rp-theme-bg: #0b1720;
+  --rp-theme-surface: #11232e;
+  --rp-theme-surface-2: #162b37;
+  --rp-theme-surface-3: #1c3542;
+  --rp-theme-text: #edf6f8;
+  --rp-theme-muted: #afc1ca;
+  --rp-theme-border: #35505f;
+  --rp-theme-input: #142a36;
+  --rp-theme-hover: #1a3543;
+  --rp-theme-primary: #79c7ef;
+  --rp-theme-accent: #67e8d2;
+}
+
+.dropdown-menu-notif .custom-scrollbar,
+.dropdown-menu-notif .notif-item,
+.dropdown-menu-notif .notif-header {
+  background-color: var(--rp-theme-surface) !important;
+}
+
+.dropdown-menu-notif .notif-header {
+  background-color: var(--rp-theme-surface-2) !important;
+}
+
+.dropdown-item {
+  color: var(--rp-theme-text) !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-hover) !important;
+}
+
+.dropdown-divider {
+  border-color: var(--rp-theme-border) !important;
+}
+
+.select2-container--default .select2-results__option {
+  color: var(--rp-theme-text);
+  background: var(--rp-theme-surface);
+}
+
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+  color: #fff;
+  background: #0f6cbd;
+}
+
+.dataTables_wrapper select,
+.dataTables_wrapper input {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-input) !important;
+  border-color: var(--rp-theme-border) !important;
+}
+
+/* SweetAlert follows the active theme. */
+html[data-theme="dark"] .swal2-popup {
+  color: var(--rp-theme-text) !important;
+  background: var(--rp-theme-surface) !important;
+  border: 1px solid var(--rp-theme-border);
+}
+
+html[data-theme="dark"] .swal2-title,
+html[data-theme="dark"] .swal2-html-container {
+  color: var(--rp-theme-text) !important;
+}
+
+/* Semantic text remains readable in both modes. */
+html[data-theme="dark"] .text-dark {
+  color: var(--rp-theme-text) !important;
+}
+
+html[data-theme="dark"] .text-secondary,
+html[data-theme="dark"] .text-muted {
+  color: var(--rp-theme-muted) !important;
+}
+
+html[data-theme="dark"] .progress,
+html[data-theme="dark"] .rp-mini-progress,
+html[data-theme="dark"] .rp-wizard-mobile-track {
+  background: var(--rp-theme-surface-3) !important;
+}
+
+/* Theme toggle is a primary utility on touch devices. */
+@media (max-width: 639.98px) {
+  .rp-theme-toggle {
+    width: 3rem !important;
+    height: 3rem !important;
+    min-width: 3rem !important;
+  }
+}

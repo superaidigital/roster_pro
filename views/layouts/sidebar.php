@@ -31,6 +31,11 @@ try {
         if (in_array($role, $roles_array)) {
             
             // 3. หาส่วนลิงก์ (รองรับทุกชื่อคอลัมน์ที่อาจจะมีในฐานข้อมูล)
+            $menu_controller = strtolower(trim((string)($menu['controller'] ?? '')));
+            if ($menu_controller !== '') {
+                $allowed_controllers[] = $menu_controller;
+            }
+
             $link = $menu['path'] ?? $menu['menu_link'] ?? $menu['url'] ?? $menu['menu_url'] ?? $menu['link'] ?? $menu['route'] ?? '';
             $link = strtolower(trim($link));
             
@@ -79,65 +84,11 @@ if ($role === 'HR') {
     $allowed_controllers = ['staff', 'users', 'hr', 'profile'];
 } else {
     // ตำแหน่งอื่น อนุญาตให้เข้าถึงหน้าพื้นฐานเสมอ
-    $allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile']);
+    $allowed_controllers = array_merge($allowed_controllers, ['dashboard', 'profile', 'field']);
 }
 
 $allowed_controllers = array_unique($allowed_controllers);
 ?>
-
-<style>
-    /* 🌟 CSS สำหรับ Sidebar */
-    #desktopSidebar {
-        width: 260px; min-width: 260px; max-width: 260px;
-        flex-shrink: 0; height: 100%;
-        background-color: var(--sidebar-bg, #ffffff); border-right: 1px solid #e2e8f0;
-        overflow-y: auto; overflow-x: hidden;
-        transition: width 0.3s ease; z-index: 1040;
-    }
-    #desktopSidebar.collapsed { width: 80px; min-width: 80px; max-width: 80px; }
-    
-    /* ซ่อนข้อความและลูกศรเวลาพับเมนู */
-    #desktopSidebar.collapsed .sidebar-text, 
-    #desktopSidebar.collapsed .sidebar-heading,
-    #desktopSidebar.collapsed .dropdown-arrow { display: none !important; }
-    
-    /* จัดไอคอนให้อยู่กึ่งกลางเวลาพับเมนู */
-    #desktopSidebar.collapsed .nav-link { justify-content: center !important; padding: 0.8rem 0 !important; }
-    #desktopSidebar.collapsed .nav-link i { margin-right: 0 !important; font-size: 1.4rem !important; }
-    
-    /* ซ่อนเมนูย่อยเวลาพับ Sidebar */
-    #desktopSidebar.collapsed .leave-dropdown-container ul,
-    #desktopSidebar.collapsed .hr-dropdown-container ul { display: none !important; }
-
-    .sidebar-menu { list-style: none; padding: 15px; margin: 0; display: flex; flex-direction: column; gap: 4px; }
-    .nav-link { 
-        display: flex; align-items: center; padding: 12px 15px; 
-        color: #475569; border-radius: 10px; transition: all 0.2s ease; 
-        font-weight: 500; text-decoration: none; white-space: nowrap;
-    }
-    .nav-link:hover { background-color: #f1f5f9; color: #0d6efd; }
-    .nav-link.active { background-color: #eff6ff; color: #0d6efd; font-weight: 600; }
-    .nav-link i { font-size: 1.25rem; margin-right: 12px; width: 24px; text-align: center; transition: transform 0.2s; }
-    .nav-link:hover i { transform: scale(1.1); }
-    
-    .sidebar-heading { 
-        font-size: 0.75rem; font-weight: 700; color: #94a3b8; 
-        text-transform: uppercase; padding: 15px 15px 5px; letter-spacing: 0.5px; 
-    }
-    
-    /* แอนิเมชันลูกศร Dropdown */
-    .dropdown-arrow { transition: transform 0.3s ease; font-size: 0.8rem; }
-    [aria-expanded="true"] .dropdown-arrow { transform: rotate(180deg); }
-    
-    /* สไตล์สำหรับเมนูย่อย */
-    .submenu-item { padding: 8px 15px 8px 45px !important; font-size: 14px; }
-    .submenu-item.active { background-color: transparent !important; color: #0d6efd; font-weight: 600; }
-    .submenu-item.active::before {
-        content: ''; position: absolute; left: 20px; width: 6px; height: 6px; 
-        background-color: #0d6efd; border-radius: 50%;
-    }
-</style>
-
 <?php
 // ฟังก์ชันสร้างเมนูด้านซ้าย เพื่อเรียกใช้ซ้ำทั้งแบบ Desktop และ Mobile
 if (!function_exists('renderSidebarMenu')) {
@@ -150,13 +101,43 @@ if (!function_exists('renderSidebarMenu')) {
             <li class="sidebar-heading">แดชบอร์ดสถิติ</li>
             <li class="nav-item">
                 <a class="nav-link <?= ($c == 'dashboard') ? 'active' : '' ?>" href="index.php?c=dashboard">
-                    <i class="bi bi-grid-1x2-fill text-primary"></i> <span class="sidebar-text">หน้าหลัก (Dashboard)</span>
+                    <i class="bi bi-speedometer2 text-primary"></i> <span class="sidebar-text">หน้าหลัก (Dashboard)</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link <?= ($c == 'profile' && $a == 'schedule') ? 'active' : '' ?>" href="index.php?c=profile&a=schedule">
-                    <i class="bi bi-calendar-heart-fill text-danger"></i> <span class="sidebar-text">ปฏิทินเวรของฉัน</span>
+                    <i class="bi bi-calendar2-week-fill text-danger"></i> <span class="sidebar-text">ปฏิทินเวรของฉัน</span>
                 </a>
+            </li>
+            <?php endif; ?>
+            <?php if (in_array('field', $allowed_controllers, true)): ?>
+            <li class="sidebar-heading mt-2">งานภาคสนาม</li>
+            <li class="nav-item field-dropdown-container">
+                <a class="nav-link <?= ($c == 'field') ? '' : 'collapsed' ?> d-flex justify-content-between align-items-center"
+                   data-bs-toggle="collapse"
+                   href="#fieldMenu"
+                   role="button"
+                   aria-expanded="<?= ($c == 'field') ? 'true' : 'false' ?>">
+                    <div>
+                        <i class="bi bi-house-heart-fill text-success"></i>
+                        <span class="sidebar-text">เยี่ยมบ้าน / งานชุมชน</span>
+                    </div>
+                    <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
+                </a>
+                <div class="collapse <?= ($c == 'field') ? 'show' : '' ?>" id="fieldMenu">
+                    <ul class="sidebar-menu pb-0 mt-1 mb-2 p-0 position-relative" style="gap:2px;">
+                        <li class="nav-item">
+                            <a class="nav-link submenu-item <?= ($c == 'field' && $a == 'index') ? 'active' : '' ?>" href="index.php?c=field">
+                                บันทึก / รายการเยี่ยมบ้าน
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link submenu-item <?= ($c == 'field' && $a == 'followups') ? 'active' : '' ?>" href="index.php?c=field&a=followups">
+                                คิวติดตาม
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </li>
             <?php endif; ?>
 
@@ -167,7 +148,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('roster', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'roster') ? 'active' : '' ?>" href="index.php?c=roster">
-                        <i class="bi bi-calendar3 text-info"></i> <span class="sidebar-text">ตารางปฏิบัติงาน (เวร)</span>
+                        <i class="bi bi-calendar2-check-fill text-info"></i> <span class="sidebar-text">ตารางปฏิบัติงาน (เวร)</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -175,7 +156,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('report', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'report' && $a == 'overview') ? 'active' : '' ?>" href="index.php?c=report&a=overview">
-                        <i class="bi bi-bar-chart-line-fill text-success"></i> <span class="sidebar-text">ติดตามการส่งเวร</span>
+                        <i class="bi bi-graph-up-arrow text-success"></i> <span class="sidebar-text">ติดตามการส่งเวร</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -185,7 +166,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <li class="nav-item leave-dropdown-container">
                     <a class="nav-link <?= ($c == 'leave') ? '' : 'collapsed' ?> d-flex justify-content-between align-items-center" 
                         data-bs-toggle="collapse" href="#leaveMenu" role="button" aria-expanded="<?= ($c == 'leave') ? 'true' : 'false' ?>">
-                        <div><i class="bi bi-envelope-paper-fill text-warning"></i> <span class="sidebar-text">ระบบจัดการวันลา</span></div>
+                        <div><i class="bi bi-calendar2-minus-fill text-warning"></i> <span class="sidebar-text">ระบบจัดการวันลา</span></div>
                         <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
                     </a>
                     <div class="collapse <?= ($c == 'leave') ? 'show' : '' ?>" id="leaveMenu">
@@ -248,7 +229,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('users', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'users') ? 'active' : '' ?>" href="index.php?c=users">
-                        <i class="bi bi-database-gear text-dark"></i> <span class="sidebar-text">ฐานข้อมูลบุคลากร</span>
+                        <i class="bi bi-person-vcard-fill text-dark"></i> <span class="sidebar-text">ฐานข้อมูลบุคลากร</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -258,7 +239,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <li class="nav-item hr-dropdown-container">
                     <a class="nav-link <?= ($c == 'hr') ? '' : 'collapsed' ?> d-flex justify-content-between align-items-center" 
                         data-bs-toggle="collapse" href="#hrMenu" role="button" aria-expanded="<?= ($c == 'hr') ? 'true' : 'false' ?>">
-                        <div><i class="bi bi-person-bounding-box text-danger"></i> <span class="sidebar-text">ระบบงานบุคคล (HR)</span></div>
+                        <div><i class="bi bi-person-badge-fill text-danger"></i> <span class="sidebar-text">ระบบงานบุคคล (HR)</span></div>
                         <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
                     </a>
                     <div class="collapse <?= ($c == 'hr') ? 'show' : '' ?>" id="hrMenu">
@@ -297,7 +278,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('settings', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'settings') ? 'active' : '' ?>" href="index.php?c=settings">
-                        <i class="bi bi-gear-fill text-secondary"></i> <span class="sidebar-text">ตั้งค่าหน่วยบริการ/ระบบ</span>
+                        <i class="bi bi-sliders2-vertical text-secondary"></i> <span class="sidebar-text">ตั้งค่าหน่วยบริการ/ระบบ</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -305,7 +286,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('logs', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'logs') ? 'active' : '' ?>" href="index.php?c=logs">
-                        <i class="bi bi-journal-text text-secondary"></i> <span class="sidebar-text">ประวัติการใช้งาน</span>
+                        <i class="bi bi-clock-history text-secondary"></i> <span class="sidebar-text">ประวัติการใช้งาน</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -313,7 +294,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php if (in_array('hospitals', $allowed_controllers)): ?>
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'hospitals') ? 'active' : '' ?>" href="index.php?c=hospitals">
-                        <i class="bi bi-building-fill text-primary"></i> <span class="sidebar-text">จัดการ รพ.สต. ทั้งหมด</span>
+                        <i class="bi bi-hospital-fill text-primary"></i> <span class="sidebar-text">จัดการ รพ.สต. ทั้งหมด</span>
                     </a>
                 </li>
                 <?php endif; ?>
@@ -328,12 +309,27 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 1. Desktop Sidebar -->
 <!-- ========================================== -->
-<aside id="desktopSidebar" class="d-none d-md-flex flex-column h-100 bg-white">
+<aside id="desktopSidebar" class="rp-desktop-sidebar flex-column h-100" aria-label="เมนูหลัก">
+    <a href="index.php?c=dashboard" class="rp-sidebar-brand text-decoration-none">
+        <span class="rp-sidebar-brand-mark"><i class="bi bi-heart-pulse-fill"></i></span>
+        <span class="rp-sidebar-brand-copy sidebar-text">
+            <strong>Roster Pro</strong>
+            <small>Primary Care Workspace</small>
+        </span>
+    </a>
     <!-- Script ป้องกันการกระพริบของเมนูตอนโหลดหน้าเว็บ -->
     <script>
-        if (localStorage.getItem('sidebarState') === 'collapsed') {
-            document.getElementById('desktopSidebar').classList.add('collapsed');
-        }
+        (function () {
+            const collapsed = localStorage.getItem('sidebarState') === 'collapsed';
+            const sidebar = document.getElementById('desktopSidebar');
+
+            if (collapsed && sidebar) {
+                sidebar.classList.add('collapsed');
+                document.body.classList.add('rp-sidebar-collapsed');
+            } else {
+                document.body.classList.remove('rp-sidebar-collapsed');
+            }
+        })();
     </script>
     
     <div class="flex-grow-1 overflow-auto custom-scrollbar pb-3">
@@ -341,7 +337,7 @@ if (!function_exists('renderSidebarMenu')) {
     </div>
     
     <!-- ปุ่มออกจากระบบ (ล่างสุด) -->
-    <div class="mt-auto p-3 border-top bg-white">
+    <div class="rp-sidebar-footer mt-auto p-3">
         <a href="index.php?c=auth&a=logout" class="nav-link d-flex align-items-center py-2 px-3 rounded-3 text-decoration-none" style="color: #ef4444; font-weight: bold;" onclick="return confirm('คุณต้องการออกจากระบบใช่หรือไม่?');" onmouseover="this.style.backgroundColor='#fef2f2';" onmouseout="this.style.backgroundColor='transparent';">
             <i class="bi bi-box-arrow-left me-2 fs-5" style="color: #ef4444;"></i> <span class="sidebar-text">ออกจากระบบ</span>
         </a>
@@ -351,14 +347,15 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 2. Mobile Sidebar (Offcanvas) -->
 <!-- ========================================== -->
-<div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" style="width: 280px;">
-    <div class="offcanvas-header border-bottom px-4 py-3">
-        <h5 class="offcanvas-title fw-bold d-flex align-items-center text-primary">
-            <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center me-2 shadow-sm" style="width: 32px; height: 32px;">
-                <i class="bi bi-calendar2-check-fill fs-6"></i>
-            </div>
-            Roster<span class="text-dark">Pro</span>
-        </h5>
+<div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" aria-label="เมนูหลักบนมือถือ">
+    <div class="offcanvas-header rp-mobile-sidebar-header px-4 py-3">
+        <div class="rp-mobile-sidebar-brand">
+            <span class="rp-sidebar-brand-mark"><i class="bi bi-heart-pulse-fill"></i></span>
+            <span>
+                <strong>Roster Pro</strong>
+                <small>Primary Care Workspace</small>
+            </span>
+        </div>
         <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body p-0 d-flex flex-column custom-scrollbar pb-4">
@@ -373,31 +370,75 @@ if (!function_exists('renderSidebarMenu')) {
 document.addEventListener('DOMContentLoaded', function() {
     const toggleBtn = document.getElementById('sidebarToggleBtn');
     const desktopSidebar = document.getElementById('desktopSidebar');
-    
+
+    function syncSidebarState(collapsed) {
+        if (!desktopSidebar) return;
+
+        desktopSidebar.classList.toggle('collapsed', collapsed);
+        document.body.classList.toggle('rp-sidebar-collapsed', collapsed);
+        localStorage.setItem('sidebarState', collapsed ? 'collapsed' : 'expanded');
+
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            toggleBtn.setAttribute(
+                'aria-label',
+                collapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง'
+            );
+        }
+
+        desktopSidebar.querySelectorAll('.sidebar-menu .nav-link, .rp-sidebar-footer .nav-link').forEach(link => {
+            const label = link.querySelector('.sidebar-text');
+            const text = label ? label.textContent.replace(/\s+/g, ' ').trim() : '';
+
+            if (collapsed && text) {
+                link.setAttribute('title', text);
+                if (!link.hasAttribute('aria-label')) {
+                    link.setAttribute('aria-label', text);
+                }
+            } else {
+                link.removeAttribute('title');
+            }
+        });
+
+        if (collapsed) {
+            ['fieldMenu', 'leaveMenu', 'hrMenu'].forEach(menuId => {
+                const menuElement = document.getElementById(menuId);
+
+                if (menuElement && menuElement.classList.contains('show')) {
+                    if (window.bootstrap && bootstrap.Collapse) {
+                        bootstrap.Collapse
+                            .getOrCreateInstance(menuElement, { toggle: false })
+                            .hide();
+                    } else {
+                        menuElement.classList.remove('show');
+                    }
+                }
+
+                const menuBtn = document.querySelector(`[href="#${menuId}"]`);
+                if (menuBtn) {
+                    menuBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
+        }
+    }
+
+    syncSidebarState(localStorage.getItem('sidebarState') === 'collapsed');
+
+    const syncSidebarMode = () => {
+        if (window.innerWidth < 1024) {
+            document.body.classList.remove('rp-sidebar-collapsed');
+        } else {
+            document.body.classList.toggle('rp-sidebar-collapsed', desktopSidebar?.classList.contains('collapsed'));
+        }
+    };
+
+    window.addEventListener('resize', syncSidebarMode);
+    syncSidebarMode();
+
     if (toggleBtn && desktopSidebar) {
         toggleBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            desktopSidebar.classList.toggle('collapsed');
-            
-            // บันทึกสถานะลงใน Browser
-            if (desktopSidebar.classList.contains('collapsed')) {
-                localStorage.setItem('sidebarState', 'collapsed');
-                
-                // สั่งปิดเมนู Dropdown อัตโนมัติเวลาพับ Sidebar
-                const menusToCollapse = ['leaveMenu', 'hrMenu'];
-                menusToCollapse.forEach(menuId => {
-                    const menuElement = document.getElementById(menuId);
-                    if(menuElement && menuElement.classList.contains('show')) {
-                        const bsCollapse = new bootstrap.Collapse(menuElement, {toggle: false});
-                        bsCollapse.hide();
-                        const menuBtn = document.querySelector(`[href="#${menuId}"]`);
-                        if(menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
-                    }
-                });
-
-            } else {
-                localStorage.setItem('sidebarState', 'expanded');
-            }
+            syncSidebarState(!desktopSidebar.classList.contains('collapsed'));
         });
     }
 });
@@ -406,4 +447,4 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ========================================== -->
 <!-- 🌟 4. เปิดพื้นที่ Main Content (ส่วนแสดงผลข้อมูล) -->
 <!-- ========================================== -->
-<main class="flex-grow-1 position-relative overflow-y-auto custom-scrollbar" style="background-color: #f4f6f9; padding: 1.5rem; height: 100%;">
+<main class="app-main flex-grow-1 position-relative custom-scrollbar">
