@@ -180,6 +180,7 @@ $rpPageMap = [
 $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดการตารางปฏิบัติงาน', 'bi-window-stack'];
 ?>
 <body>
+<a class="rp-skip-link" href="#main-content">ข้ามไปยังเนื้อหาหลัก</a>
 <script id="rp-sidebar-prepaint-state">
     try {
         if (localStorage.getItem('sidebarState') === 'collapsed') {
@@ -198,7 +199,7 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
 <div id="rpProgressLive" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
 <!-- 🌟 1. Top Navbar -->
-<nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4">
+<nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4" aria-label="แถบนำทางด้านบน">
     <div class="rp-topbar-left d-flex align-items-center gap-2 gap-md-3 min-w-0">
         <button class="nav-icon-btn rp-mobile-menu-btn" id="mobileSidebarToggleBtn" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูนำทาง">
             <i class="bi bi-list fs-4"></i>
@@ -335,7 +336,14 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
                 <li><a class="dropdown-item py-2" href="index.php?c=settings&a=system"><i class="bi bi-gear text-secondary me-2"></i> ตั้งค่าระบบ</a></li>
                 <?php endif; ?>
                 <li><hr class="dropdown-divider my-1"></li>
-                <li><a class="dropdown-item text-danger fw-bold py-2" href="index.php?c=auth&a=logout"><i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ</a></li>
+                <li>
+                    <form action="index.php?c=auth&a=logout" method="POST" class="m-0">
+                        <?= security_csrf_input() ?>
+                        <button type="submit" class="dropdown-item text-danger fw-bold py-2">
+                            <i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ
+                        </button>
+                    </form>
+                </li>
             </ul>
         </div>
         <?php endif; ?>
