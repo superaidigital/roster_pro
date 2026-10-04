@@ -11,6 +11,8 @@ require_once __DIR__ . '/../models/LeaveModel.php';
 require_once __DIR__ . '/../models/NotificationModel.php';
 require_once __DIR__ . '/../models/RosterModel.php';
 require_once __DIR__ . '/../models/FieldVisitModel.php';
+require_once __DIR__ . '/../controllers/StaffController.php';
+require_once __DIR__ . '/../controllers/ProfileController.php';
 
 function ok(bool $condition, string $message): void {
     if (!$condition) {
@@ -77,6 +79,70 @@ ok(is_array($user2) && (int)$user2['id'] > 0, 'second user login');
 
 $uid1 = (int)$user1['id'];
 $uid2 = (int)$user2['id'];
+
+// Authorization regression: local managers must never mutate/read personnel in another hospital.
+$db->exec("INSERT INTO hospitals (hospital_code, name, short_name, is_active) VALUES ('T002', 'Synthetic Other Hospital', 'TEST2', 1)");
+$otherHospitalId = (int)$db->lastInsertId();
+ok($otherHospitalId > 0, 'second synthetic hospital created');
+
+$u3 = $baseUser;
+$u3['hospital_id'] = $otherHospitalId;
+$u3['username'] = 'smoke_user_other_unit';
+$u3['name'] = 'Synthetic Other Unit User';
+ok($users->addUser($u3), 'cross-unit synthetic user created');
+$user3 = $users->login('smoke_user_other_unit', 'SmokePass!2026');
+ok(is_array($user3) && (int)$user3['id'] > 0, 'cross-unit user login');
+$uid3 = (int)$user3['id'];
+
+security_start_session();
+
+$staffController = new StaffController();
+$staffScope = new ReflectionMethod(StaffController::class, 'canManageTargetUser');
+$staffScope->setAccessible(true);
+
+$_SESSION['user'] = [
+    'id' => $uid1,
+    'role' => 'SCHEDULER',
+    'hospital_id' => $hospitalId,
+    'name' => 'Synthetic Scheduler',
+];
+ok(
+    $staffScope->invoke($staffController, ['id' => $uid2, 'role' => 'STAFF', 'hospital_id' => $hospitalId]) === true,
+    'scheduler can manage staff in own hospital'
+);
+ok(
+    $staffScope->invoke($staffController, ['id' => $uid3, 'role' => 'STAFF', 'hospital_id' => $otherHospitalId]) === false,
+    'scheduler cannot manage staff in another hospital'
+);
+ok(
+    $staffScope->invoke($staffController, ['id' => 99991, 'role' => 'DIRECTOR', 'hospital_id' => $hospitalId]) === false,
+    'scheduler cannot manage director'
+);
+
+$_SESSION['user']['role'] = 'DIRECTOR';
+ok(
+    $staffScope->invoke($staffController, ['id' => $uid2, 'role' => 'STAFF', 'hospital_id' => $hospitalId]) === true,
+    'director can manage staff in own hospital'
+);
+ok(
+    $staffScope->invoke($staffController, ['id' => $uid3, 'role' => 'STAFF', 'hospital_id' => $otherHospitalId]) === false,
+    'director cannot manage staff in another hospital'
+);
+
+$profileController = new ProfileController();
+$profileScope = new ReflectionMethod(ProfileController::class, 'canManageProfile');
+$profileScope->setAccessible(true);
+ok(
+    $profileScope->invoke($profileController, $uid2) === true,
+    'director can read profile in own hospital'
+);
+ok(
+    $profileScope->invoke($profileController, $uid3) === false,
+    'director cannot read profile in another hospital'
+);
+
+// Restore a normal staff session for the rest of the smoke flow.
+$_SESSION['user'] = $user1;
 
 $shiftModel = new ShiftModel($db);
 $shift1 = $shiftModel->addShift('2026-10-10', 'บ', $uid1, $hospitalId);
