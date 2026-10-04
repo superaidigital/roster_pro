@@ -38,12 +38,21 @@ class AuthController {
             $db = $database->getConnection();
             $userModel = new UserModel($db);
 
-            $username = trim($_POST['username']);
-            $password = trim($_POST['password']);
+            $username = trim((string)($_POST['username'] ?? ''));
+            $password = (string)($_POST['password'] ?? '');
 
             // ตรวจสอบค่าว่างเบื้องต้น
             if (empty($username) || empty($password)) {
                 $_SESSION['login_error'] = "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน";
+                header("Location: index.php?c=auth&a=index");
+                exit;
+            }
+
+            // จำกัดจำนวนการลองรหัสผ่านผิด เพื่อลดความเสี่ยง brute-force
+            $rateLimit = security_check_login_rate_limit($db, $username);
+            if (!$rateLimit['allowed']) {
+                $minutes = max(1, (int)ceil(((int)$rateLimit['retry_after']) / 60));
+                $_SESSION['login_error'] = "มีการพยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอประมาณ {$minutes} นาทีแล้วลองใหม่";
                 header("Location: index.php?c=auth&a=index");
                 exit;
             }
@@ -62,6 +71,9 @@ class AuthController {
                     header("Location: index.php?c=auth&a=index");
                     exit;
                 }
+
+                // ป้องกัน Session Fixation ก่อนยกระดับเป็น session ที่ล็อกอินแล้ว
+                security_regenerate_session();
 
                 // ล็อกอินสำเร็จ: บันทึกข้อมูลลง Session
                 $_SESSION['user'] = $user;
@@ -89,7 +101,7 @@ class AuthController {
                     security_client_ip()
                 );
                 
-                $_SESSION['login_error'] = "ชื่อผู้ใช้ หรือ รหัสผ่านไม่ถูกต้อง (กรุณาตรวจสอบว่ารหัสใน DB ถูกเข้ารหัสแล้ว)";
+                $_SESSION['login_error'] = "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
                 header("Location: index.php?c=auth&a=index");
                 exit;
             }
@@ -98,14 +110,21 @@ class AuthController {
 
     public function logout() {
         security_start_session();
-        
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST' || !security_is_valid_post_csrf()) {
+            http_response_code(405);
+            $_SESSION['error_msg'] = "คำขอออกจากระบบไม่ถูกต้อง กรุณาลองใหม่";
+            header("Location: index.php?c=dashboard");
+            exit;
+        }
+
         // 📝 บันทึก Log: ออกจากระบบด้วยตนเอง
         if (isset($_SESSION['user'])) {
             $database = new Database();
             $db = $database->getConnection();
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_LOGOUT, "ออกจากระบบด้วยตนเอง");
         }
-        
+
         session_unset();
         session_destroy();
         header("Location: index.php?c=auth&a=index");
