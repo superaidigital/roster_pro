@@ -382,8 +382,12 @@ class RosterController {
         try {
             $db->beginTransaction();
 
+            $beforeCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
+            $beforeCountStmt->execute([$hospital_id, $month_like]);
+            $beforeRandomizeCount = (int)$beforeCountStmt->fetchColumn();
+
             $snapshotModel = new RosterSnapshotModel($db);
-            $snapshotModel->createSnapshot(
+            $snapshotId = $snapshotModel->createSnapshot(
                 $hospital_id,
                 $month,
                 (int)$_SESSION['user']['id'],
@@ -420,6 +424,24 @@ class RosterController {
                     }
                 }
             }
+
+            $afterCountStmt = $db->prepare("SELECT COUNT(*) FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
+            $afterCountStmt->execute([$hospital_id, $month_like]);
+            $afterRandomizeCount = (int)$afterCountStmt->fetchColumn();
+
+            $auditModel = new RosterAuditModel($db);
+            $auditModel->record(
+                $hospital_id,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'ROSTER_RANDOMIZE',
+                ['shift_count' => $beforeRandomizeCount],
+                ['shift_count' => $afterRandomizeCount],
+                ['snapshot_id' => $snapshotId],
+                null,
+                null,
+                'ROSTER'
+            );
 
             $db->commit();
             
