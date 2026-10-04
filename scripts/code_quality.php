@@ -280,7 +280,7 @@ $mutationActions = [
     'delete_notif','delete_all_notif','logout','import_csv','do_backup',
     'do_server_backup','delete_server_backup','save_holiday','toggle_holiday',
     'delete_holiday','update_system','save_hospital','test_line','test_line_notify',
-    'complete_followup'
+    'complete_followup','create_snapshot','restore_snapshot'
 ];
 $mutationAlternation = implode('|', array_map('preg_quote', $mutationActions));
 $getMutationPattern = '/<a\b[^>]+href=[\'"][^\'"]*index\.php\?[^\'"]*(?:&|&amp;)a=(' . $mutationAlternation . ')(?:&|&amp;|[\'"])/i';
