@@ -143,14 +143,14 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261004-health-v15">
-    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-health-v15">
-    <link rel="stylesheet" href="public/css/themes.css?v=20261004-theme-v4">
-    <link rel="stylesheet" href="public/css/wizard.css?v=20261004-wizard-v3">
-    <script src="public/js/responsive.js?v=20261004-health-v15" defer></script>
-    <script src="public/js/progress.js?v=20261004-health-v15" defer></script>
-    <script src="public/js/theme.js?v=20261004-theme-v4" defer></script>
-    <script src="public/js/wizard.js?v=20261004-wizard-v3" defer></script>
+<link rel="stylesheet" href="public/css/style.css?v=20261004-ui-v16">
+    <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ui-v16">
+    <link rel="stylesheet" href="public/css/themes.css?v=20261004-ui-v16">
+    <link rel="stylesheet" href="public/css/wizard.css?v=20261004-ui-v16">
+    <script src="public/js/responsive.js?v=20261004-ui-v16" defer></script>
+    <script src="public/js/progress.js?v=20261004-ui-v16" defer></script>
+    <script src="public/js/theme.js?v=20261004-ui-v16" defer></script>
+    <script src="public/js/wizard.js?v=20261004-ui-v16" defer></script>
 </head>
 <?php
 $rpController = strtolower(trim($_GET['c'] ?? 'dashboard'));
@@ -308,29 +308,37 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
             </div>
         </div>
 
-        <div class="vr d-none d-sm-block bg-secondary opacity-25 mx-2" style="width: 2px; height: 30px;"></div>
-
-        <!-- 👤 Profile Dropdown -->
-        <div class="dropdown">
-            <a href="#" class="profile-pill" data-bs-toggle="dropdown" aria-expanded="false">
-                <div class="user-avatar"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></div>
-                <div class="rp-profile-meta d-none d-md-block text-start lh-1 pe-2">
-                    <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
-                    <div class="text-primary fw-bold" style="font-size: 11px;"><?= htmlspecialchars($_SESSION['user']['role']) ?></div>
-                </div>
-                <i class="rp-profile-chevron bi bi-chevron-down d-none d-md-block text-muted me-2" style="font-size: 12px;"></i>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end shadow-sm border mt-2">
-                <li class="px-3 py-2 border-bottom mb-2 d-md-none bg-light">
-                    <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
-                    <div class="text-primary fw-bold" style="font-size: 11px;"><?= htmlspecialchars($_SESSION['user']['role']) ?></div>
+        <!-- 👤 Compact User Menu: keep topbar stable at every width -->
+        <div class="dropdown rp-user-menu">
+            <button type="button"
+                    class="rp-user-menu-btn"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="เมนูผู้ใช้งาน <?= htmlspecialchars($_SESSION['user']['name'], ENT_QUOTES, 'UTF-8') ?>"
+                    title="<?= htmlspecialchars($_SESSION['user']['name'], ENT_QUOTES, 'UTF-8') ?>">
+                <span class="user-avatar" aria-hidden="true"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end rp-user-dropdown shadow-sm border mt-2">
+                <li class="rp-user-summary px-3 py-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="user-avatar rp-user-avatar-lg" aria-hidden="true"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></span>
+                        <div class="min-w-0">
+                            <div class="fw-bold text-dark text-truncate"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
+                            <div class="small text-primary fw-semibold text-truncate"><?= htmlspecialchars($_SESSION['user']['role']) ?></div>
+                        </div>
+                    </div>
                 </li>
+                <li><hr class="dropdown-divider my-1"></li>
                 <li><a class="dropdown-item py-2" href="index.php?c=profile"><i class="bi bi-person-circle text-primary me-2"></i> โปรไฟล์ของฉัน</a></li>
-                <li><a class="dropdown-item py-2" href="index.php?c=profile&a=schedule"><i class="bi bi-calendar-week text-success me-2"></i> ตารางเวรของฉัน</a></li>
+                <li><a class="dropdown-item py-2" href="index.php?c=profile&a=schedule"><i class="bi bi-calendar-week text-success me-2"></i> ปฏิทินเวรของฉัน</a></li>
                 <?php if (in_array($_SESSION['user']['role'], ['ADMIN', 'SUPERADMIN'])): ?>
-                <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item py-2" href="index.php?c=settings&a=system"><i class="bi bi-gear text-secondary me-2"></i> ตั้งค่าระบบ</a></li>
                 <?php endif; ?>
+                <li><hr class="dropdown-divider my-1"></li>
+                <li><a class="dropdown-item text-danger fw-bold py-2" href="index.php?c=auth&a=logout"><i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ</a></li>
+            </ul>
+        </div>
+        <?php endif; ?>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item text-danger fw-bold py-2" href="index.php?c=auth&a=logout"><i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ</a></li>
             </ul>
