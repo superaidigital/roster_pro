@@ -209,8 +209,32 @@ class RosterController {
         $this->checkAuth();
         $db = (new Database())->getConnection();
         
-        $hospital_id = $_SESSION['user']['hospital_id'];
-        $month = isset($_POST['month']) ? $_POST['month'] : date('Y-m');
+        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $month = trim((string)($_POST['month'] ?? ''));
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+
+        if (!in_array($role, ['SCHEDULER', 'DIRECTOR', 'ADMIN', 'SUPERADMIN'], true)) {
+            $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์ล้างตารางเวร";
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month) || $hospital_id <= 0) {
+            $_SESSION['error_msg'] = "ข้อมูลเดือนหรือหน่วยบริการไม่ถูกต้อง";
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $stmt_status = $db->prepare("SELECT status FROM roster_status WHERE hospital_id = ? AND month_year = ? LIMIT 1");
+        $stmt_status->execute([$hospital_id, $month]);
+        $status = strtoupper((string)($stmt_status->fetchColumn() ?: 'DRAFT'));
+
+        if ($status !== 'DRAFT') {
+            $_SESSION['error_msg'] = "ตารางเวรอยู่ในสถานะล็อก ไม่สามารถล้างข้อมูลได้";
+            header("Location: index.php?c=roster&month=" . urlencode($month));
+            exit;
+        }
+
         $month_like = $month . '-%';
         
         try {
@@ -237,8 +261,31 @@ class RosterController {
         $this->checkAuth();
         $db = (new Database())->getConnection();
         
-        $hospital_id = $_SESSION['user']['hospital_id'];
-        $month = isset($_POST['month']) ? $_POST['month'] : date('Y-m');
+        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $month = trim((string)($_POST['month'] ?? ''));
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+
+        if (!in_array($role, ['SCHEDULER', 'DIRECTOR', 'ADMIN', 'SUPERADMIN'], true)) {
+            $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์จัดตารางเวร";
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        if (!preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month) || $hospital_id <= 0) {
+            $_SESSION['error_msg'] = "ข้อมูลเดือนหรือหน่วยบริการไม่ถูกต้อง";
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $stmt_status = $db->prepare("SELECT status FROM roster_status WHERE hospital_id = ? AND month_year = ? LIMIT 1");
+        $stmt_status->execute([$hospital_id, $month]);
+        $status = strtoupper((string)($stmt_status->fetchColumn() ?: 'DRAFT'));
+        if ($status !== 'DRAFT') {
+            $_SESSION['error_msg'] = "ตารางเวรอยู่ในสถานะล็อก ไม่สามารถสุ่มจัดเวรได้";
+            header("Location: index.php?c=roster&month=" . urlencode($month));
+            exit;
+        }
+
         $month_like = $month . '-%';
         $days_in_month = cal_days_in_month(CAL_GREGORIAN, (int)substr($month, 5, 2), (int)substr($month, 0, 4));
         
