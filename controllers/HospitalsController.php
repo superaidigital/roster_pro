@@ -328,74 +328,131 @@ class HospitalsController {
         $this->requireMutation();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
 
-        if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['file_csv'])) {
-            $file = $_FILES['file_csv'];
-            
-            if ($file['error'] == UPLOAD_ERR_OK && is_uploaded_file($file['tmp_name'])) {
-                
-                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-                if (strtolower($ext) !== 'csv') {
-                    $_SESSION['error_msg'] = "กรุณาอัปโหลดไฟล์นามสกุล .csv เท่านั้น";
-                    header("Location: index.php?c=hospitals");
-                    exit;
-                }
+        $file = $_FILES['file_csv'] ?? null;
+        if (!is_array($file)) {
+            $_SESSION['error_msg'] = "กรุณาเลือกไฟล์ CSV";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
 
-                $db = (new Database())->getConnection();
-                $hospitalModel = new HospitalModel($db);
-                
-                $handle = fopen($file['tmp_name'], "r");
-                
-                // ตรวจสอบและข้าม BOM ถ้ามี
-                $bom = fread($handle, 3);
-                if ($bom !== b"\xEF\xBB\xBF") {
-                    rewind($handle); 
-                }
+        $uploadError = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        $tmpName = (string)($file['tmp_name'] ?? '');
+        $fileSize = (int)($file['size'] ?? 0);
 
-                $row_count = 0;
-                $success_count = 0;
-                $error_count = 0;
+        if ($uploadError !== UPLOAD_ERR_OK || $tmpName === '' || !is_uploaded_file($tmpName)) {
+            $_SESSION['error_msg'] = "ไม่สามารถอ่านไฟล์ CSV ที่อัปโหลดได้";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
 
-                while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                    $row_count++;
-                    if ($row_count == 1) continue; // ข้ามแถว Header
-                    
-                    if (empty($data[0]) && empty($data[1]) && empty($data[2])) continue;
+        if ($fileSize <= 0 || $fileSize > 2 * 1024 * 1024) {
+            $_SESSION['error_msg'] = "ไฟล์ CSV ต้องมีขนาดไม่เกิน 2 MB";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
 
-                    $id = trim($data[0] ?? '');
-                    $code = trim($data[1] ?? '');
-                    $name = trim($data[2] ?? '');
+        $extension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+        if ($extension !== 'csv') {
+            $_SESSION['error_msg'] = "กรุณาอัปโหลดไฟล์นามสกุล .csv เท่านั้น";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
 
-                    if (!empty($name)) {
-                        // ป้องกันชื่อซ้ำก่อนนำเข้า
-                        if (!$hospitalModel->checkNameExists($name)) {
-                            // เรียกใช้ addHospital แบบ Parameter แยก (รองรับโครงสร้างแบบเก่าของไฟล์ CSV)
-                            if ($hospitalModel->addHospital($name, $code)) {
-                                $success_count++;
-                            } else {
-                                $error_count++;
-                            }
-                        } else {
-                            $error_count++; // ข้ามถ้าชื่อซ้ำ
-                        }
-                    } else {
-                        $error_count++;
-                    }
-                }
-                fclose($handle);
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = (string)$finfo->file($tmpName);
+        $allowedMime = [
+            'text/plain',
+            'text/csv',
+            'application/csv',
+            'application/vnd.ms-excel',
+            'application/octet-stream',
+        ];
+        if (!in_array($mime, $allowedMime, true)) {
+            $_SESSION['error_msg'] = "ชนิดไฟล์ที่อัปโหลดไม่ใช่ข้อมูล CSV ที่รองรับ";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
 
-                if ($success_count > 0) {
-                    // 🌟 บันทึก Log: นำเข้าไฟล์ CSV
-                    LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_IMPORT, "นำเข้าข้อมูลหน่วยบริการ รพ.สต. จากไฟล์ CSV สำเร็จ $success_count แห่ง");
-                    $_SESSION['success_msg'] = "นำเข้าข้อมูลสำเร็จ $success_count แห่ง (ล้มเหลว/ซ้ำ/ข้อมูลไม่ครบ $error_count แห่ง)";
-                } else {
-                    $_SESSION['error_msg'] = "ไม่สามารถนำเข้าข้อมูลได้ (อาจจะไม่มีข้อมูลใหม่เลย หรือชื่อซ้ำทั้งหมด)";
-                }
+        $db = (new Database())->getConnection();
+        $hospitalModel = new HospitalModel($db);
+        $handle = fopen($tmpName, 'rb');
 
+        if ($handle === false) {
+            $_SESSION['error_msg'] = "ไม่สามารถเปิดไฟล์ CSV ได้";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
+
+        $bom = fread($handle, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
+
+        $row_count = 0;
+        $success_count = 0;
+        $error_count = 0;
+        $maxRows = 5000;
+
+        while (($data = fgetcsv($handle, 4096, ",")) !== false) {
+            $row_count++;
+
+            if ($row_count > $maxRows + 1) {
+                $error_count++;
+                break;
+            }
+
+            if ($row_count === 1) {
+                continue;
+            }
+
+            if (count($data) > 20) {
+                $error_count++;
+                continue;
+            }
+
+            if (empty($data[0]) && empty($data[1]) && empty($data[2])) {
+                continue;
+            }
+
+            $code = trim((string)($data[1] ?? ''));
+            $name = trim((string)($data[2] ?? ''));
+
+            if ($name === '' || mb_strlen($name, 'UTF-8') > 255) {
+                $error_count++;
+                continue;
+            }
+
+            if ($code !== '' && (!preg_match('/^[A-Za-z0-9_-]{1,20}$/', $code))) {
+                $error_count++;
+                continue;
+            }
+
+            if ($hospitalModel->checkNameExists($name)) {
+                $error_count++;
+                continue;
+            }
+
+            if ($hospitalModel->addHospital($name, $code)) {
+                $success_count++;
             } else {
-                $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการอัปโหลดไฟล์";
+                $error_count++;
             }
         }
-        
+
+        fclose($handle);
+
+        if ($success_count > 0) {
+            LogsController::addLog(
+                $db,
+                $_SESSION['user']['id'],
+                LogsController::ACTION_IMPORT,
+                "นำเข้าข้อมูลหน่วยบริการจาก CSV สำเร็จ {$success_count} แห่ง"
+            );
+            $_SESSION['success_msg'] = "นำเข้าข้อมูลสำเร็จ {$success_count} แห่ง (ข้าม/ผิดพลาด {$error_count} แห่ง)";
+        } else {
+            $_SESSION['error_msg'] = "ไม่สามารถนำเข้าข้อมูลได้ โปรดตรวจสอบรูปแบบไฟล์ ข้อมูลซ้ำ หรือข้อมูลที่ไม่ครบ";
+        }
+
         header("Location: index.php?c=hospitals");
         exit;
     }
