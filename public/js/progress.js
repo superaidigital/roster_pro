@@ -142,6 +142,12 @@
 
     const originalFetch = window.fetch.bind(window);
     window.fetch = async (...args) => {
+      const init = args[1] || {};
+      const requestHeaders = new Headers(init.headers || {});
+      if (requestHeaders.get('X-Roster-Silent') === '1') {
+        return originalFetch(...args);
+      }
+
       start('กำลังประมวลผล...');
       try {
         const response = await originalFetch(...args);
