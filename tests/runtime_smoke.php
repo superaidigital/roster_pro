@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../models/UserModel.php';
+require_once __DIR__ . '/../models/HospitalModel.php';
 require_once __DIR__ . '/../models/ShiftModel.php';
 require_once __DIR__ . '/../models/SwapModel.php';
 require_once __DIR__ . '/../models/LeaveModel.php';
@@ -24,6 +25,13 @@ ok($db instanceof PDO, 'database connection');
 $db->exec("INSERT INTO hospitals (hospital_code, name, short_name, is_active) VALUES ('T001', 'Synthetic Test Hospital', 'TEST', 1)");
 $hospitalId = (int)$db->lastInsertId();
 ok($hospitalId > 0, 'synthetic hospital created');
+
+$hospitalModel = new HospitalModel($db);
+$hospital = $hospitalModel->getHospitalById($hospitalId);
+ok(
+    is_array($hospital) && (int)$hospital['id'] === $hospitalId,
+    'HospitalModel can read synthetic hospital without runtime schema mutation'
+);
 
 $users = new UserModel($db);
 $baseUser = [
