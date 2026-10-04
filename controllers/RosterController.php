@@ -253,7 +253,7 @@ class RosterController {
         $this->checkAuth();
         $db = (new Database())->getConnection();
         
-        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $hospital_id = $this->resolveTargetHospitalId(isset($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : null);
         $month = trim((string)($_POST['month'] ?? ''));
         $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
 
@@ -282,13 +282,25 @@ class RosterController {
         $month_like = $month . '-%';
         
         try {
+            $db->beginTransaction();
+            $snapshotModel = new RosterSnapshotModel($db);
+            $snapshotModel->createSnapshot(
+                $hospital_id,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'BEFORE_CLEAR',
+                'สำรองอัตโนมัติก่อนล้างตาราง'
+            );
+
             $stmt = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
             $stmt->execute([$hospital_id, $month_like]);
             
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ล้างข้อมูลตารางเวรทั้งหมดของเดือน {$month}");
+            $db->commit();
             
             $_SESSION['success_msg'] = "ล้างข้อมูลตารางเวรของเดือน {$month} เรียบร้อยแล้ว เริ่มจัดใหม่ได้ทันที";
         } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
             error_log('RosterController error: ' . $e->getMessage());
             $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
