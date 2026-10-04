@@ -573,7 +573,8 @@ ALTER TABLE `employee_work_history`
 -- Indexes for table `holidays`
 --
 ALTER TABLE `holidays`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_holidays_hospital_date` (`hospital_id`,`holiday_date`);
 
 --
 -- Indexes for table `hospitals`
@@ -598,20 +599,24 @@ ALTER TABLE `leave_quotas`
 -- Indexes for table `leave_requests`
 --
 ALTER TABLE `leave_requests`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_leave_user_status_dates` (`user_id`,`status`,`start_date`,`end_date`),
+  ADD KEY `idx_leave_status_dates` (`status`,`start_date`,`end_date`);
 
 --
 -- Indexes for table `logs`
 --
 ALTER TABLE `logs`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `user_id` (`user_id`);
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `idx_logs_login_rate` (`user_id`,`action`,`ip_address`,`created_at`);
 
 --
 -- Indexes for table `notifications`
 --
 ALTER TABLE `notifications`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_notifications_user_read_created` (`user_id`,`is_read`,`created_at`);
 
 --
 -- Indexes for table `pay_rates`
@@ -631,7 +636,9 @@ ALTER TABLE `roster_status`
 --
 ALTER TABLE `shifts`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `user_date_unique` (`user_id`,`shift_date`);
+  ADD UNIQUE KEY `user_date_unique` (`user_id`,`shift_date`),
+  ADD KEY `idx_shifts_hospital_date` (`hospital_id`,`shift_date`),
+  ADD KEY `idx_shifts_hospital_user_date` (`hospital_id`,`user_id`,`shift_date`);
 
 --
 -- Indexes for table `shift_swaps`
@@ -641,7 +648,8 @@ ALTER TABLE `shift_swaps`
   ADD KEY `hospital_id` (`hospital_id`),
   ADD KEY `requestor_id` (`requestor_id`),
   ADD KEY `target_user_id` (`target_user_id`),
-  ADD KEY `status` (`status`);
+  ADD KEY `status` (`status`),
+  ADD KEY `idx_shift_swaps_hospital_status_created` (`hospital_id`,`status`,`created_at`);
 
 --
 -- Indexes for table `system_logs`
@@ -666,7 +674,8 @@ ALTER TABLE `system_settings`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `username` (`username`);
+  ADD UNIQUE KEY `username` (`username`),
+  ADD KEY `idx_users_hospital_roster` (`hospital_id`,`is_active`,`is_deleted`,`show_in_roster`,`display_order`);
 
 
 --
