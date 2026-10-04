@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/security.php';
 require_once __DIR__ . '/../models/UserModel.php';
 require_once __DIR__ . '/../models/HospitalModel.php';
 require_once __DIR__ . '/../models/ShiftModel.php';
@@ -21,6 +22,17 @@ function ok(bool $condition, string $message): void {
 
 $db = (new Database())->getConnection();
 ok($db instanceof PDO, 'database connection');
+
+ok(security_is_valid_route_token('roster'), 'valid route token accepted');
+ok(!security_is_valid_route_token('../config'), 'path traversal route token rejected');
+ok(
+    security_safe_local_redirect('https://evil.example/phish', 'index.php?c=dashboard') === 'index.php?c=dashboard',
+    'external notification redirect rejected'
+);
+ok(
+    security_safe_local_redirect('index.php?c=roster&a=index', 'index.php?c=dashboard') === 'index.php?c=roster&a=index',
+    'local application redirect accepted'
+);
 
 $db->exec("INSERT INTO hospitals (hospital_code, name, short_name, is_active) VALUES ('T001', 'Synthetic Test Hospital', 'TEST', 1)");
 $hospitalId = (int)$db->lastInsertId();
@@ -121,6 +133,15 @@ $notif = $notificationModel->getUserNotifications($uid1, 1);
 ok(count($notif) === 1, 'notification retrieved');
 ok($notificationModel->markAsRead((int)$notif[0]['id'], $uid1), 'notification marked read');
 ok((int)$notificationModel->getUnreadCount($uid1) === 0, 'notification unread count cleared');
+
+ok($notificationModel->addNotification($uid1, 'INFO', 'Delete Test', 'Owned notification', 'index.php?c=dashboard'), 'owned notification for delete test created');
+$ownedNotif = $notificationModel->getUserNotifications($uid1, 1);
+$ownedNotifId = (int)$ownedNotif[0]['id'];
+ok($notificationModel->getNotificationById($ownedNotifId, $uid2) === null, 'notification read scope prevents cross-user access');
+$notificationModel->deleteNotification($ownedNotifId, $uid2);
+ok($notificationModel->getNotificationById($ownedNotifId, $uid1) !== null, 'cross-user delete cannot remove notification');
+ok($notificationModel->deleteNotification($ownedNotifId, $uid1), 'owner can delete notification');
+ok($notificationModel->getNotificationById($ownedNotifId, $uid1) === null, 'owned notification deletion persisted');
 
 $fieldModel = new FieldVisitModel($db);
 $fieldData = [
