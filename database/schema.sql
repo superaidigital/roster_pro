@@ -678,7 +678,8 @@ ALTER TABLE `field_visits`
   ADD KEY `idx_field_creator_date` (`created_by`,`visit_date`),
   ADD KEY `idx_field_status` (`status`),
   ADD KEY `idx_field_risk` (`risk_level`),
-  ADD KEY `idx_field_followup` (`follow_up_status`,`follow_up_date`);
+  ADD KEY `idx_field_followup` (`follow_up_status`,`follow_up_date`),
+  ADD KEY `idx_field_patient_date` (`hospital_id`,`patient_ref`,`visit_date`);
 
 --
 -- Indexes for table `field_visit_photos`
