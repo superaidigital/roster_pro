@@ -13,7 +13,7 @@ $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 $isAdmin = in_array($_SESSION['user']['role'] ?? '', ['ADMIN', 'SUPERADMIN']);
 $is_manager = in_array($_SESSION['user']['role'] ?? '', ['DIRECTOR', 'SCHEDULER', 'ADMIN', 'SUPERADMIN']);
 $roster_status = strtoupper((string)($roster_status ?? 'DRAFT'));
-$canEdit = ($is_manager && $roster_status !== 'APPROVED');
+$canEdit = ($is_manager && $roster_status === 'DRAFT');
 
 // Workflow state is derived once here so the view never emits Undefined variable warnings.
 $roster_workflow_map = [
@@ -257,7 +257,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
         <?php endif; ?>
 
         <!-- 🌟 แถบสถานะตารางเวร และ ปุ่มดำเนินการ Workflow -->
-        <div class="card border-0 shadow-sm rounded-4 mb-4 <?= $roster_status == 'APPROVED' ? 'bg-success bg-opacity-10 border-success' : ($roster_status == 'SUBMITTED' ? 'bg-info bg-opacity-10' : 'bg-warning bg-opacity-10') ?>" style="border-left: 4px solid !important;">
+        <div class="card border-0 shadow-sm rounded-4 mb-4 <?= in_array($roster_status, ['APPROVED', 'LOCKED'], true) ? 'bg-success bg-opacity-10 border-success' : ($roster_status == 'SUBMITTED' ? 'bg-info bg-opacity-10' : 'bg-warning bg-opacity-10') ?>" style="border-left: 4px solid !important;">
             <div class="card-body p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div class="d-flex align-items-center gap-3 flex-wrap">
                     <div>
@@ -281,6 +281,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <!-- ควบคุม Workflow สำหรับ ADMIN -->
                     <?php if (($roster_status == 'APPROVED' || $roster_status == 'REQUEST_EDIT') && $isAdmin): ?>
                         <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0 d-flex gap-2">
+                            <?= security_csrf_input() ?>
                             <input type="hidden" name="month_year" value="<?= $selected_month ?>">
                             <input type="hidden" name="hospital_id" value="<?= $hospital_id??'' ?>">
                             
@@ -297,6 +298,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <!-- ผอ. (DIRECTOR) ตรวจสอบและอนุมัติ -->
                     <?php if ($roster_status == 'SUBMITTED' && $_SESSION['user']['role'] == 'DIRECTOR'): ?>
                         <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0 d-flex gap-2">
+                            <?= security_csrf_input() ?>
                             <input type="hidden" name="month_year" value="<?= $selected_month ?>">
                             <button type="submit" name="status" value="DRAFT" class="btn btn-sm btn-outline-danger fw-bold bg-white text-nowrap rounded-3" onclick="return confirm('ยืนยันการตีกลับ?');"><i class="bi bi-arrow-return-left me-1"></i> ตีกลับ</button>
                             <button type="submit" name="status" value="APPROVED" class="btn btn-sm btn-success fw-bold shadow-sm text-nowrap rounded-3" onclick="return confirm('อนุมัติตารางเวร?');"><i class="bi bi-check-circle-fill me-1"></i> อนุมัติเวร</button>
@@ -306,6 +308,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     <!-- ผู้จัดเวร / ผอ. ขอแก้ไขตารางที่อนุมัติแล้ว -->
                     <?php if ($roster_status == 'APPROVED' && ($_SESSION['user']['role'] == 'SCHEDULER' || $_SESSION['user']['role'] == 'DIRECTOR')): ?>
                         <form action="index.php?c=ajax&a=request_edit" method="POST" class="m-0" onsubmit="return confirm('ส่งคำขอปลดล็อคตารางเวร?');">
+                            <?= security_csrf_input() ?>
                             <input type="hidden" name="month_year" value="<?= $selected_month ?>">
                             <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold shadow-sm text-nowrap rounded-3"><i class="bi bi-unlock-fill me-1"></i> ขอแก้ไขตาราง</button>
                         </form>
@@ -344,6 +347,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
 
                         <!-- 🌟 เปลี่ยนให้เรียกใช้ submitForApproval(event, this) แทน confirm ธรรมดา -->
                         <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0" onsubmit="submitForApproval(event, this);">
+                            <?= security_csrf_input() ?>
                             <input type="hidden" name="month_year" value="<?= $selected_month ?>">
                             <input type="hidden" name="status" value="SUBMITTED">
                             <button type="submit" class="btn btn-sm btn-dark fw-bold shadow-sm px-4 text-nowrap rounded-3"><i class="bi bi-send-fill me-1"></i> ส่งอนุมัติ</button>
@@ -956,6 +960,21 @@ const _defaultMonth = _d.getFullYear() + '-' + String(_d.getMonth() + 1).padStar
 const currentMonthYear = new URLSearchParams(window.location.search).get('month') || _defaultMonth;
 const targetHospId = '<?= htmlspecialchars($hospital_id ?? $_SESSION['user']['hospital_id'] ?? '') ?>';
 
+const rosterCsrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+function rosterApiFetch(url, options = {}) {
+    const requestOptions = { ...options };
+    const method = String(requestOptions.method || 'GET').toUpperCase();
+    const headers = new Headers(requestOptions.headers || {});
+
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && rosterCsrfToken) {
+        headers.set('X-CSRF-Token', rosterCsrfToken);
+    }
+
+    requestOptions.headers = headers;
+    return window.fetch(url, requestOptions);
+}
+
 let currentCellBtn = null;
 let shiftModal = null; 
 let payCalcModal = null; 
@@ -1031,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return { id: row.getAttribute('data-id'), order: index };
                 });
 
-                fetch('index.php?c=ajax&a=update_order', {
+                rosterApiFetch('index.php?c=ajax&a=update_order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ order: orderData })
@@ -1127,7 +1146,7 @@ function saveShift(shiftValue, colorClass) {
     const indicator = currentCellBtn.nextElementSibling;
     if (indicator) indicator.classList.remove('d-none');
     
-    fetch('index.php?c=ajax&a=save_shift', {
+    rosterApiFetch('index.php?c=ajax&a=save_shift', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ user_id: staffId, date: dateStr, shift_type: shiftValue, hosp_id: targetHospId })
     })
@@ -1151,7 +1170,7 @@ function removeStaffFromRoster(staffId, staffName) {
 
     cells.forEach(cell => {
         if (cell.innerText.trim() !== '') {
-            promises.push(fetch('index.php?c=ajax&a=save_shift', {
+            promises.push(rosterApiFetch('index.php?c=ajax&a=save_shift', {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ user_id: staffId, date: cell.getAttribute('data-date'), shift_type: '', hosp_id: targetHospId })
             }).then(res => res.json()));
@@ -1274,7 +1293,7 @@ function showToast(type, message) {
 
 function copyPreviousMonth(currentMonth) {
     if(confirm('ระบบจะดึงแพทเทิร์นตารางเวรจาก "เดือนก่อนหน้า" มาทับข้อมูลเดือนปัจจุบันทั้งหมด\n\nยืนยันการดำเนินการหรือไม่?')) {
-        fetch('index.php?c=ajax&a=copy_roster_previous', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ target_month: currentMonth, hosp_id: targetHospId }) })
+        rosterApiFetch('index.php?c=ajax&a=copy_roster_previous', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ target_month: currentMonth, hosp_id: targetHospId }) })
         .then(res => res.json()).then(data => {
             if(data.status === 'success') { alert('คัดลอกตารางสำเร็จ!'); window.location.reload(); } else alert('Error: ' + data.message);
         });
@@ -1308,7 +1327,7 @@ function openHolidayInfoModal(dateStr, isHoliday, holidayName) {
 function submitHolidayRequest() {
     const hName = document.getElementById('hiRequestName').value.trim();
     if (!hName) return alert('กรุณาระบุชื่อวันหยุด');
-    fetch('index.php?c=ajax&a=request_holiday', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: selectedHolidayDate, name: hName, hosp_id: targetHospId }) })
+    rosterApiFetch('index.php?c=ajax&a=request_holiday', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: selectedHolidayDate, name: hName, hosp_id: targetHospId }) })
     .then(r => r.json()).then(d => {
         if (d.status === 'success') { alert('ส่งคำขอสำเร็จ!'); holidayInfoModal.hide(); } else alert('Error: ' + d.message);
     });
@@ -1328,7 +1347,7 @@ function autoScheduleRoster() {
     }).then((result) => {
         if (result.isConfirmed) {
             Swal.fire({ title: 'กำลังประมวลผล...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
-            fetch('index.php?c=ajax&a=auto_schedule', {
+            rosterApiFetch('index.php?c=ajax&a=auto_schedule', {
                 method: 'POST',
                 body: JSON.stringify({ month_year: currentMonthYear, hosp_id: targetHospId }),
                 headers: { 'Content-Type': 'application/json' }
@@ -1345,7 +1364,7 @@ function autoScheduleRoster() {
 
 function validateRoster() {
     Swal.fire({ title: 'กำลังตรวจสอบ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
-    fetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
+    rosterApiFetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
     .then(res => res.json())
     .then(data => {
         Swal.close();
@@ -1374,7 +1393,7 @@ function submitForApproval(e, formElement) {
     
     Swal.fire({ title: 'กำลังตรวจสอบตารางก่อนส่งอนุมัติ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
     
-    fetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
+    rosterApiFetch(`index.php?c=ajax&a=validate_roster&month=${currentMonthYear}&hosp_id=${targetHospId}`)
     .then(res => res.json())
     .then(data => {
         Swal.close();
