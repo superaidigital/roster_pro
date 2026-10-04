@@ -294,7 +294,7 @@
 
                 <!-- 🔔 กล่องแจ้งเตือนข้อผิดพลาด/สำเร็จ -->
                 <?php if (isset($_SESSION['login_error'])): ?>
-                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm">
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm" role="alert" aria-live="assertive">
                         <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
                         <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['login_error'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
@@ -310,7 +310,7 @@
                 <?php endif; ?>
                 
                 <?php if (isset($_SESSION['success_msg'])): ?>
-                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm">
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-3 d-flex align-items-center mb-4 p-3 shadow-sm" role="status" aria-live="polite">
                         <i class="bi bi-check-circle-fill fs-5 me-3"></i> 
                         <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
                     </div>
@@ -325,21 +325,26 @@
                     <?= security_csrf_input() ?>
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold text-dark small mb-1">ชื่อผู้ใช้งาน (Username)</label>
+                        <label class="form-label fw-bold text-dark small mb-1" for="usernameInput">ชื่อผู้ใช้งาน (Username)</label>
                         <div class="input-group-modern d-flex align-items-center shadow-sm">
                             <span class="input-group-text ps-3 pe-2"><i class="bi bi-person-fill fs-5"></i></span>
-                            <input type="text" name="username" class="form-control" placeholder="กรอกชื่อผู้ใช้งาน" required autofocus autocomplete="username">
+                            <input type="text" name="username" id="usernameInput" class="form-control" placeholder="กรอกชื่อผู้ใช้งาน" required autofocus autocomplete="username" autocapitalize="none" spellcheck="false">
                         </div>
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label fw-bold text-dark small mb-1">รหัสผ่าน (Password)</label>
+                        <label class="form-label fw-bold text-dark small mb-1" for="passwordInput">รหัสผ่าน (Password)</label>
                         <div class="input-group-modern d-flex align-items-center shadow-sm">
                             <span class="input-group-text ps-3 pe-2"><i class="bi bi-lock-fill fs-5"></i></span>
                             <input type="password" name="password" id="passwordInput" class="form-control" placeholder="กรอกรหัสผ่าน" required autocomplete="current-password">
-                            <span class="input-group-text pe-3 btn-toggle-password" id="togglePasswordBtn">
-                                <i class="bi bi-eye-slash-fill fs-5" id="toggleIcon"></i>
-                            </span>
+                            <button type="button"
+                                    class="input-group-text pe-3 btn-toggle-password border-0 bg-transparent"
+                                    id="togglePasswordBtn"
+                                    aria-controls="passwordInput"
+                                    aria-pressed="false"
+                                    aria-label="แสดงรหัสผ่าน">
+                                <i class="bi bi-eye-slash-fill fs-5" id="toggleIcon" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -371,15 +376,13 @@
             toggleBtn.addEventListener('click', function(e) {
                 e.preventDefault(); 
                 
-                if (passwordInput.getAttribute('type') === 'password') {
-                    passwordInput.setAttribute('type', 'text');
-                    toggleIcon.classList.replace('bi-eye-slash-fill', 'bi-eye-fill');
-                    toggleIcon.classList.add('text-primary');
-                } else {
-                    passwordInput.setAttribute('type', 'password');
-                    toggleIcon.classList.replace('bi-eye-fill', 'bi-eye-slash-fill');
-                    toggleIcon.classList.remove('text-primary');
-                }
+                const showing = passwordInput.getAttribute('type') === 'password';
+                passwordInput.setAttribute('type', showing ? 'text' : 'password');
+                toggleBtn.setAttribute('aria-pressed', showing ? 'true' : 'false');
+                toggleBtn.setAttribute('aria-label', showing ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน');
+                toggleIcon.classList.toggle('bi-eye-fill', showing);
+                toggleIcon.classList.toggle('bi-eye-slash-fill', !showing);
+                toggleIcon.classList.toggle('text-primary', showing);
             });
         }
     });
