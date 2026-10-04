@@ -415,6 +415,19 @@ foreach ($roster_coverage as $coverage) {
                     <button class="btn btn-sm shadow-sm text-nowrap rounded-pill px-3" style="background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); color: white; font-weight: bold;" data-bs-toggle="modal" data-bs-target="#summaryModal">
                         <i class="bi bi-bar-chart-fill me-1"></i> สรุปยอดเดือนนี้
                     </button>
+
+                    <?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SCHEDULER','DIRECTOR','ADMIN','SUPERADMIN'], true)): ?>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-primary bg-white fw-bold shadow-sm text-nowrap rounded-pill px-3"
+                            data-bs-toggle="modal"
+                            data-bs-target="#rosterVersionModal"
+                            title="ดูประวัติเวอร์ชันและย้อนตารางเวร">
+                        <i class="bi bi-clock-history me-1"></i> เวอร์ชัน
+                        <?php if (!empty($roster_snapshots)): ?>
+                            <span class="badge text-bg-primary ms-1"><?= count($roster_snapshots) ?></span>
+                        <?php endif; ?>
+                    </button>
+                    <?php endif; ?>
                 </div>
                 
                 <div class="d-flex flex-wrap gap-2">
@@ -478,6 +491,7 @@ foreach ($roster_coverage as $coverage) {
                         <form action="index.php?c=roster&a=clear_roster" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการล้างตารางเวรทั้งหมดของเดือนนี้?');">
                             <?= security_csrf_input() ?>
                             <input type="hidden" name="month" value="<?= htmlspecialchars($selected_month, ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="hospital_id" value="<?= (int)($hospital_id ?? 0) ?>">
                             <button type="submit" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm bg-white text-nowrap rounded-3">
                             <i class="bi bi-eraser-fill me-1"></i> ล้างข้อมูล
                         </button>
@@ -1100,6 +1114,124 @@ foreach ($roster_coverage as $coverage) {
         </div>
     </div>
 </div>
+
+<!-- ================= 🕘 Modal ประวัติเวอร์ชันตารางเวร ================= -->
+<?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SCHEDULER','DIRECTOR','ADMIN','SUPERADMIN'], true)): ?>
+<div class="modal fade" id="rosterVersionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom bg-light rounded-top-4">
+                <div>
+                    <h5 class="modal-title fw-bold mb-1">
+                        <i class="bi bi-clock-history text-primary me-2"></i>ประวัติเวอร์ชันตารางเวร
+                    </h5>
+                    <div class="small text-muted">
+                        เดือน <?= htmlspecialchars($display_month_text ?? $selected_month, ENT_QUOTES, 'UTF-8') ?> ·
+                        <?= htmlspecialchars($hospital_name ?? 'หน่วยบริการ', ENT_QUOTES, 'UTF-8') ?>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+            </div>
+
+            <div class="modal-body p-3 p-md-4">
+                <div class="alert alert-primary border-0 rounded-4 d-flex gap-3 align-items-start mb-4">
+                    <i class="bi bi-shield-check fs-4"></i>
+                    <div class="small">
+                        <div class="fw-bold mb-1">Version History ป้องกันข้อมูลหาย</div>
+                        ระบบสำรองอัตโนมัติก่อนล้างตาราง สุ่มใหม่ คัดลอกเดือนก่อน และ Auto Schedule
+                        ส่วนเวอร์ชันที่อนุมัติแล้วจะถูกเก็บแบบ Protected
+                    </div>
+                </div>
+
+                <form action="index.php?c=roster&a=create_snapshot" method="POST"
+                      class="card border-0 bg-light rounded-4 p-3 mb-4">
+                    <?= security_csrf_input() ?>
+                    <input type="hidden" name="month" value="<?= htmlspecialchars($selected_month, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="hospital_id" value="<?= (int)($hospital_id ?? 0) ?>">
+                    <label for="snapshotLabel" class="form-label small fw-bold mb-2">บันทึก Checkpoint ตอนนี้</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="snapshotLabel" name="label"
+                               maxlength="160" value="Checkpoint ก่อนปรับตาราง"
+                               aria-label="ชื่อเวอร์ชันตารางเวร">
+                        <button class="btn btn-primary fw-bold" type="submit">
+                            <i class="bi bi-save2 me-1"></i> บันทึกเวอร์ชัน
+                        </button>
+                    </div>
+                </form>
+
+                <?php if (empty($roster_snapshots)): ?>
+                    <div class="text-center py-5">
+                        <i class="bi bi-clock-history display-5 text-secondary opacity-50"></i>
+                        <h6 class="fw-bold mt-3 mb-1">ยังไม่มีประวัติเวอร์ชัน</h6>
+                        <div class="small text-muted">เมื่อมีการสำรองหรืออนุมัติตาราง เวอร์ชันจะปรากฏที่นี่</div>
+                    </div>
+                <?php else: ?>
+                    <div class="d-flex flex-column gap-2">
+                        <?php
+                        $snapshotKindLabels = [
+                            'MANUAL' => 'Checkpoint',
+                            'BEFORE_CLEAR' => 'ก่อนล้างข้อมูล',
+                            'BEFORE_RANDOMIZE' => 'ก่อนสุ่มใหม่',
+                            'BEFORE_COPY' => 'ก่อนคัดลอกเดือนก่อน',
+                            'BEFORE_AUTO_SCHEDULE' => 'ก่อน Auto Schedule',
+                            'BEFORE_RESTORE' => 'ก่อนย้อนเวอร์ชัน',
+                            'APPROVED' => 'อนุมัติแล้ว',
+                        ];
+                        foreach ($roster_snapshots as $version):
+                            $kind = strtoupper((string)($version['snapshot_kind'] ?? 'MANUAL'));
+                            $kindLabel = $snapshotKindLabels[$kind] ?? $kind;
+                            $isProtected = !empty($version['is_protected']);
+                            $createdAt = !empty($version['created_at'])
+                                ? date('d/m/Y H:i', strtotime((string)$version['created_at']))
+                                : '-';
+                        ?>
+                        <div class="border rounded-4 p-3">
+                            <div class="d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">
+                                <div class="min-w-0">
+                                    <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                                        <span class="fw-bold">Version #<?= (int)$version['id'] ?></span>
+                                        <span class="badge text-bg-light border"><?= htmlspecialchars($kindLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                                        <?php if ($isProtected): ?>
+                                            <span class="badge text-bg-success"><i class="bi bi-lock-fill me-1"></i>Protected</span>
+                                        <?php endif; ?>
+                                        <span class="badge text-bg-secondary"><?= (int)$version['shift_count'] ?> รายการ</span>
+                                    </div>
+                                    <div class="small fw-semibold text-dark text-truncate">
+                                        <?= htmlspecialchars((string)($version['label'] ?: 'ไม่มีชื่อเวอร์ชัน'), ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                    <div class="small text-muted mt-1">
+                                        <?= htmlspecialchars($createdAt, ENT_QUOTES, 'UTF-8') ?>
+                                        · โดย <?= htmlspecialchars((string)($version['created_by_name'] ?: 'ระบบ'), ENT_QUOTES, 'UTF-8') ?>
+                                        · สถานะเดิม <?= htmlspecialchars((string)$version['status_snapshot'], ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
+                                </div>
+
+                                <form action="index.php?c=roster&a=restore_snapshot" method="POST"
+                                      class="m-0"
+                                      onsubmit="return confirm('ยืนยันย้อนตารางกลับ Version #<?= (int)$version['id'] ?> ? ระบบจะสำรองสถานะปัจจุบันก่อนย้อนให้อัตโนมัติ');">
+                                    <?= security_csrf_input() ?>
+                                    <input type="hidden" name="snapshot_id" value="<?= (int)$version['id'] ?>">
+                                    <input type="hidden" name="month" value="<?= htmlspecialchars($selected_month, ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="hospital_id" value="<?= (int)($hospital_id ?? 0) ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary fw-bold text-nowrap">
+                                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restore
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <div class="small text-muted mt-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        เมื่อ Restore ระบบจะเปลี่ยนตารางกลับเป็น <strong>DRAFT</strong> เสมอ เพื่อบังคับตรวจสอบใหม่ก่อนอนุมัติ
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- ================= Scripts การทำงานหลัก ================= -->
 <script>

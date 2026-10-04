@@ -4,6 +4,7 @@
 require_once 'config/database.php';
 require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
+require_once 'models/RosterSnapshotModel.php';
 
 class RosterController {
 
@@ -38,6 +39,19 @@ class RosterController {
     // ====================================================
     // 🌟 1. โหลดหน้าจอกระดานตารางเวรหลัก (Roster Board)
     // ====================================================
+    private function resolveTargetHospitalId(?int $requestedHospitalId = null): int {
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        if (in_array($role, ['ADMIN', 'SUPERADMIN'], true) && ($requestedHospitalId ?? 0) > 0) {
+            return (int)$requestedHospitalId;
+        }
+        return (int)($_SESSION['user']['hospital_id'] ?? 0);
+    }
+
+    private function canManageRosterVersions(): bool {
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        return in_array($role, ['SCHEDULER', 'DIRECTOR', 'ADMIN', 'SUPERADMIN'], true);
+    }
+
     public function index() {
         $this->checkAuth();
         $db = (new Database())->getConnection();
@@ -130,6 +144,16 @@ class RosterController {
         // 🏖️ 7. ดึงวันหยุดนักขัตฤกษ์
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
+
+        $roster_snapshots = [];
+        if ($hosp_id_safe > 0) {
+            try {
+                $snapshotModel = new RosterSnapshotModel($db);
+                $roster_snapshots = $snapshotModel->listSnapshots($hosp_id_safe, $selected_month, 12);
+            } catch (Throwable $e) {
+                error_log('Roster snapshot list failed: ' . $e->getMessage());
+            }
+        }
 
         // โหลด View หน้ากระดานจัดเวร
         require_once 'views/layouts/header.php';
@@ -229,7 +253,7 @@ class RosterController {
         $this->checkAuth();
         $db = (new Database())->getConnection();
         
-        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $hospital_id = $this->resolveTargetHospitalId(isset($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : null);
         $month = trim((string)($_POST['month'] ?? ''));
         $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
 
@@ -258,13 +282,25 @@ class RosterController {
         $month_like = $month . '-%';
         
         try {
+            $db->beginTransaction();
+            $snapshotModel = new RosterSnapshotModel($db);
+            $snapshotModel->createSnapshot(
+                $hospital_id,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'BEFORE_CLEAR',
+                'สำรองอัตโนมัติก่อนล้างตาราง'
+            );
+
             $stmt = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
             $stmt->execute([$hospital_id, $month_like]);
             
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ล้างข้อมูลตารางเวรทั้งหมดของเดือน {$month}");
+            $db->commit();
             
             $_SESSION['success_msg'] = "ล้างข้อมูลตารางเวรของเดือน {$month} เรียบร้อยแล้ว เริ่มจัดใหม่ได้ทันที";
         } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
             error_log('RosterController error: ' . $e->getMessage());
             $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }
@@ -281,7 +317,7 @@ class RosterController {
         $this->checkAuth();
         $db = (new Database())->getConnection();
         
-        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $hospital_id = $this->resolveTargetHospitalId(isset($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : null);
         $month = trim((string)($_POST['month'] ?? ''));
         $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
 
@@ -311,6 +347,15 @@ class RosterController {
         
         try {
             $db->beginTransaction();
+
+            $snapshotModel = new RosterSnapshotModel($db);
+            $snapshotModel->createSnapshot(
+                $hospital_id,
+                $month,
+                (int)$_SESSION['user']['id'],
+                'BEFORE_RANDOMIZE',
+                'สำรองอัตโนมัติก่อนสุ่มตารางใหม่'
+            );
 
             $stmt_del = $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
             $stmt_del->execute([$hospital_id, $month_like]);
@@ -361,6 +406,99 @@ class RosterController {
     // ====================================================
     // 🔄 5. ฟังก์ชันอัปเดตลำดับบุคลากรในตารางเวร (Drag & Drop)
     // ====================================================
+    public function create_snapshot() {
+        $this->requireMutation();
+        $this->checkAuth();
+
+        if (!$this->canManageRosterVersions()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = 'คุณไม่มีสิทธิ์สร้างเวอร์ชันตารางเวร';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $month = trim((string)($_POST['month'] ?? ''));
+        $hospitalId = $this->resolveTargetHospitalId(isset($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : null);
+        $label = trim((string)($_POST['label'] ?? 'บันทึกเวอร์ชันด้วยตนเอง'));
+
+        if ($hospitalId <= 0 || !preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month)) {
+            $_SESSION['error_msg'] = 'ข้อมูลเดือนหรือหน่วยบริการไม่ถูกต้อง';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $snapshotModel = new RosterSnapshotModel($db);
+            $id = $snapshotModel->createSnapshot(
+                $hospitalId, $month, (int)$_SESSION['user']['id'], 'MANUAL', $label
+            );
+            LogsController::addLog(
+                $db, $_SESSION['user']['id'], LogsController::ACTION_CREATE,
+                "สร้าง Snapshot ตารางเวรเดือน {$month} (Version #{$id})"
+            );
+            $_SESSION['success_msg'] = "บันทึกเวอร์ชันตารางเวรเรียบร้อยแล้ว (#{$id})";
+        } catch (Throwable $e) {
+            error_log('Roster snapshot create failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = 'ไม่สามารถบันทึกเวอร์ชันตารางเวรได้';
+        }
+
+        header("Location: index.php?c=roster&month=" . urlencode($month) . "&hospital_id=" . $hospitalId);
+        exit;
+    }
+
+    public function restore_snapshot() {
+        $this->requireMutation();
+        $this->checkAuth();
+
+        if (!$this->canManageRosterVersions()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = 'คุณไม่มีสิทธิ์ย้อนเวอร์ชันตารางเวร';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $snapshotId = (int)($_POST['snapshot_id'] ?? 0);
+        $month = trim((string)($_POST['month'] ?? ''));
+        $hospitalId = $this->resolveTargetHospitalId(isset($_POST['hospital_id']) ? (int)$_POST['hospital_id'] : null);
+
+        if ($snapshotId <= 0 || $hospitalId <= 0 || !preg_match('/^\\d{4}-(0[1-9]|1[0-2])$/', $month)) {
+            $_SESSION['error_msg'] = 'ข้อมูลเวอร์ชันที่ต้องการย้อนกลับไม่ถูกต้อง';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $statusStmt = $db->prepare("SELECT status FROM roster_status WHERE hospital_id = ? AND month_year = ? LIMIT 1");
+        $statusStmt->execute([$hospitalId, $month]);
+        $currentStatus = strtoupper((string)($statusStmt->fetchColumn() ?: 'DRAFT'));
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+
+        if ($currentStatus !== 'DRAFT' && !in_array($role, ['ADMIN', 'SUPERADMIN'], true)) {
+            $_SESSION['error_msg'] = 'ตารางที่ส่งตรวจหรืออนุมัติแล้ว ต้องให้ผู้ดูแลระบบปลดสถานะก่อนย้อนเวอร์ชัน';
+            header("Location: index.php?c=roster&month=" . urlencode($month));
+            exit;
+        }
+
+        try {
+            $snapshotModel = new RosterSnapshotModel($db);
+            $result = $snapshotModel->restoreSnapshot(
+                $snapshotId, $hospitalId, $month, (int)$_SESSION['user']['id']
+            );
+            LogsController::addLog(
+                $db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE,
+                "ย้อนตารางเวรเดือน {$month} กลับ Version #{$snapshotId} จำนวน {$result['restored_shift_count']} รายการ"
+            );
+            $_SESSION['success_msg'] = 'ย้อนเวอร์ชันสำเร็จ และเปลี่ยนสถานะกลับเป็น DRAFT เพื่อให้ตรวจสอบอีกครั้ง';
+        } catch (Throwable $e) {
+            error_log('Roster snapshot restore failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = 'ไม่สามารถย้อนเวอร์ชันได้: ข้อมูลบุคลากรหรือ Snapshot อาจไม่สอดคล้องกับระบบปัจจุบัน';
+        }
+
+        header("Location: index.php?c=roster&month=" . urlencode($month) . "&hospital_id=" . $hospitalId);
+        exit;
+    }
+
     public function update_order() {
         $this->requireMutation();
         $this->checkAuth();
