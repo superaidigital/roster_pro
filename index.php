@@ -5,12 +5,33 @@ require_once 'config/security.php';
 
 // 🌟 1. เริ่มต้น Session และตั้งค่าพื้นฐาน
 security_start_session();
+security_send_headers();
 
 date_default_timezone_set('Asia/Bangkok');
 
 // 🌟 2. รับค่า Controller (c) และ Action (a) จาก URL
-$c = isset($_GET['c']) && !empty($_GET['c']) ? strtolower(trim($_GET['c'])) : 'auth';
-$a = isset($_GET['a']) && !empty($_GET['a']) ? strtolower(trim($_GET['a'])) : 'index';
+$c = strtolower(trim((string)($_GET['c'] ?? 'auth')));
+$a = strtolower(trim((string)($_GET['a'] ?? 'index')));
+
+function renderRouteError(int $status, string $title, string $message): void {
+    http_response_code($status);
+    $safeTitle = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+    $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+
+    echo "<!doctype html><html lang='th'><head><meta charset='utf-8'>"
+       . "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+       . "<title>{$safeTitle}</title>"
+       . "<style>body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f8fafc;color:#334155}"
+       . ".box{min-height:100vh;display:grid;place-items:center;padding:24px}.card{max-width:560px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:28px;box-shadow:0 18px 48px rgba(15,23,42,.08)}"
+       . "h1{margin:0 0 10px;color:#b91c1c;font-size:clamp(2rem,7vw,4.5rem)}p{line-height:1.65}a{display:inline-block;margin-top:12px;padding:10px 18px;border-radius:999px;background:#0f6cbd;color:#fff;text-decoration:none;font-weight:700}</style>"
+       . "</head><body><main class='box'><section class='card'><h1>{$status}</h1><h2>{$safeTitle}</h2><p>{$safeMessage}</p>"
+       . "<a href='index.php?c=dashboard'>กลับหน้าหลัก</a></section></main></body></html>";
+    exit;
+}
+
+if (!security_is_valid_route_token($c) || !security_is_valid_route_token($a)) {
+    renderRouteError(400, 'คำขอไม่ถูกต้อง', 'รูปแบบเส้นทางที่ร้องขอไม่ถูกต้อง');
+}
 
 // ถ้าไม่ได้ล็อกอิน และพยายามเข้าหน้าอื่นที่ไม่ใช่ auth ให้เด้งกลับไปหน้า login
 if ($c !== 'auth' && !isset($_SESSION['user'])) {
@@ -18,38 +39,26 @@ if ($c !== 'auth' && !isset($_SESSION['user'])) {
     exit;
 }
 
-// 🌟 3. ระบบนำทางอัจฉริยะ (Auto Routing)
-// แปลงค่า c=swap เป็นคลาส SwapController และไฟล์ controllers/SwapController.php โดยอัตโนมัติ
+// 🌟 3. ระบบนำทางแบบตรวจสอบเส้นทางและ callable method
 $className = ucfirst($c) . 'Controller';
 $controllerFile = 'controllers/' . $className . '.php';
 
-if (file_exists($controllerFile)) {
-    require_once $controllerFile;
-    
-    if (class_exists($className)) {
-        $controller = new $className();
-        
-        // รันฟังก์ชันตามค่า a
-        if (method_exists($controller, $a)) {
-            $controller->$a();
-        } else if (method_exists($controller, 'index')) {
-            $controller->index();
-        } else {
-            die("<div style='padding:30px; font-family:sans-serif;'><h2>⚠️ ระบบทำงานผิดพลาด</h2><p>พบไฟล์ <b>{$controllerFile}</b> แต่ไม่มีฟังก์ชัน <b>{$a}()</b> อยู่ภายในคลาส</p></div>");
-        }
-    } else {
-        die("<div style='padding:30px; font-family:sans-serif;'><h2>⚠️ โค้ดผิดพลาด</h2><p>พบไฟล์ <b>{$controllerFile}</b> แต่ไม่พบคำสั่ง <code>class {$className} { ... }</code> อยู่ภายใน กรุณาตรวจสอบการคัดลอกโค้ด</p></div>");
-    }
-} else {
-    // 🌟 4. กรณีหาไฟล์ไม่เจอ (แสดงหน้า 404 ชัดเจนว่าขาดไฟล์อะไร)
-    echo "<div style='display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; background-color:#f8fafc; color:#334155;'>
-            <h1 style='color:#ef4444; font-size: 120px; margin:0; line-height:1;'>404</h1>
-            <h2 style='margin-bottom: 10px;'>ไม่พบหน้าเว็บ (Page Not Found)</h2>
-            <div style='background:#fee2e2; color:#b91c1c; padding:15px 25px; border-radius:10px; margin-bottom:20px; text-align:center;'>
-                ไม่พบไฟล์: <b>{$controllerFile}</b> <br>
-                <small>กรุณาสร้างไฟล์นี้ในโฟลเดอร์ controllers</small>
-            </div>
-            <a href='index.php?c=dashboard' style='padding:12px 30px; background:#0d6efd; color:#fff; text-decoration:none; border-radius:30px; font-weight:bold; box-shadow:0 4px 10px rgba(13,110,253,0.3); transition:all 0.3s;'>กลับหน้าหลัก (แดชบอร์ด)</a>
-          </div>";
-    exit;
+if (!is_file($controllerFile)) {
+    renderRouteError(404, 'ไม่พบหน้าเว็บ', 'ไม่พบ Controller สำหรับหน้าที่ร้องขอ');
 }
+
+require_once $controllerFile;
+
+if (!class_exists($className, false)) {
+    renderRouteError(500, 'ระบบทำงานผิดพลาด', 'โครงสร้าง Controller ไม่ถูกต้อง');
+}
+
+$controller = new $className();
+
+// is_callable ป้องกันการเรียก private/protected helper โดยตรงผ่าน ?a=...
+if (!is_callable([$controller, $a]) || str_starts_with($a, '__')) {
+    renderRouteError(404, 'ไม่พบคำสั่ง', 'ไม่พบ Action ที่สามารถเรียกใช้งานได้');
+}
+
+$controller->$a();
+

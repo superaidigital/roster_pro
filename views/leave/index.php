@@ -327,7 +327,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                                 <?php endif; ?>
                                             </div>
                                             <?php if(!empty($leave['med_cert_path'])): ?>
-                                                <a href="<?= htmlspecialchars($leave['med_cert_path']) ?>" target="_blank" class="badge bg-info bg-opacity-10 text-info text-decoration-none mt-1 border border-info border-opacity-25" style="font-size: 10px;"><i class="bi bi-paperclip"></i> ดูใบรับรอง</a>
+                                                <a href="index.php?c=leave&a=medical_certificate&id=<?= (int)$leave['id'] ?>" target="_blank" rel="noopener" class="badge bg-info bg-opacity-10 text-info text-decoration-none mt-1 border border-info border-opacity-25" style="font-size: 10px;"><i class="bi bi-paperclip"></i> ดูใบรับรอง</a>
                                             <?php endif; ?>
                                         </td>
                                         <td class="py-3">

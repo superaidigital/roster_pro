@@ -84,6 +84,41 @@ public function addNotification($user_id, $type, $title, $message, $link = null)
         }
     }
 
+    public function getNotificationById($id, $user_id) {
+        $query = "SELECT * FROM " . $this->table_name . " WHERE id = :id AND user_id = :user_id LIMIT 1";
+        $stmt = $this->conn->prepare($query);
+        try {
+            $stmt->execute([':id' => (int)$id, ':user_id' => (int)$user_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (PDOException $e) {
+            error_log("Get Notification Error: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function deleteNotification($id, $user_id) {
+        $query = "DELETE FROM " . $this->table_name . " WHERE id = :id AND user_id = :user_id";
+        $stmt = $this->conn->prepare($query);
+        try {
+            return $stmt->execute([':id' => (int)$id, ':user_id' => (int)$user_id]);
+        } catch (PDOException $e) {
+            error_log("Delete Notification Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function deleteAllForUser($user_id) {
+        $query = "DELETE FROM " . $this->table_name . " WHERE user_id = :user_id";
+        $stmt = $this->conn->prepare($query);
+        try {
+            return $stmt->execute([':user_id' => (int)$user_id]);
+        } catch (PDOException $e) {
+            error_log("Delete All Notifications Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
     /**
      * 🌟 5. ทำเครื่องหมายว่า "อ่านแล้วทั้งหมด"
      */

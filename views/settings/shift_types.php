@@ -119,6 +119,7 @@
 <div class="modal fade" id="editRatesModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <form action="index.php?c=settings&a=save_pay_rates" method="POST" class="modal-content border-0 shadow-lg rounded-4">
+                            <?= security_csrf_input() ?>
             <div class="modal-header border-bottom-0 pb-0">
                 <h5 class="modal-title fw-bold text-dark"><i class="bi bi-cash-coin text-success me-2"></i> ปรับปรุงอัตราค่าตอบแทน</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

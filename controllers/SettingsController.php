@@ -28,8 +28,18 @@ class SettingsController {
     }
 
     private function requirePost() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            $_SESSION['error_msg'] = "คำขอไม่ถูกต้อง (Invalid Request Method)";
+        security_start_session();
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้อง กรุณาทำรายการผ่านแบบฟอร์มในระบบ";
+            header("Location: index.php?c=dashboard&a=index");
+            exit;
+        }
+
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คำขอหมดอายุหรือไม่ถูกต้อง กรุณาลองใหม่";
             header("Location: index.php?c=dashboard&a=index");
             exit;
         }
@@ -62,9 +72,9 @@ class SettingsController {
         require_once 'models/HospitalModel.php';
         $hospitalModel = new HospitalModel($db);
 
-        $hospital_id = $_SESSION['user']['hospital_id'];
-        if (isset($_GET['id']) && in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) {
-            $hospital_id = $_GET['id'];
+        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        if (isset($_GET['id']) && in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'], true)) {
+            $hospital_id = max(0, (int)$_GET['id']);
         }
         
         $hospital = $hospitalModel->getHospitalById($hospital_id);
@@ -76,64 +86,152 @@ class SettingsController {
     }
 
     public function save_hospital() {
-        $this->requirePost(); 
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN', 'DIRECTOR']);
 
         $db = (new Database())->getConnection();
         require_once 'models/HospitalModel.php';
         $hospitalModel = new HospitalModel($db);
 
-        $id = $_POST['id'] ?? null;
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        $isGlobalAdmin = in_array($role, ['SUPERADMIN', 'ADMIN'], true);
+        $sessionHospitalId = (int)($_SESSION['user']['hospital_id'] ?? 0);
 
-        $name = $_POST['name'] ?? '';
-        $hospital_code = $_POST['hospital_code'] ?? null;
-        $hospital_size = $_POST['hospital_size'] ?? 'S';
-        $latitude = $_POST['latitude'] ?? null;
-        $longitude = $_POST['longitude'] ?? null;
-        $email = $_POST['email'] ?? null;
-        $phone = $_POST['phone'] ?? null;
-        $address = $_POST['address'] ?? null;
-        $sub_district = $_POST['sub_district'] ?? null;
-        $district = $_POST['district'] ?? null;
-        $province = $_POST['province'] ?? null;
-        $zipcode = $_POST['zipcode'] ?? null;
-        $morning = $_POST['morning_shift'] ?? null;
-        $afternoon = $_POST['afternoon_shift'] ?? null;
-        $night = $_POST['night_shift'] ?? null;
-        
-        $logo_path = null;
-
-        if (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
-            $fileTmpPath = $_FILES['logo']['tmp_name'];
-            $fileName = $_FILES['logo']['name'];
-            $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            
-            $allowedExtensions = ['jpg', 'jpeg', 'png'];
-            if (in_array($fileExtension, $allowedExtensions)) {
-                $uploadDir = 'public/uploads/logos/';
-                if (!is_dir($uploadDir)) { 
-                    mkdir($uploadDir, 0777, true); 
-                }
-                
-                $newFileName = 'logo_' . ($id ? $id : 'new') . '_' . time() . '.' . $fileExtension;
-                $destPath = $uploadDir . $newFileName;
-
-                if (move_uploaded_file($fileTmpPath, $destPath)) {
-                    $logo_path = $destPath;
-                    
-                    if (!empty($id)) {
-                        $current = $hospitalModel->getHospitalById($id);
-                        if ($current && !empty($current['logo']) && file_exists($current['logo'])) {
-                            if (strpos($current['logo'], 'default') === false) {
-                                unlink($current['logo']);
-                            }
-                        }
-                    }
-                }
-            } else {
-                $_SESSION['error_msg'] = "ชนิดไฟล์รูปภาพไม่ถูกต้อง (อนุญาตเฉพาะ JPG และ PNG)";
-                header("Location: index.php?c=settings&a=hospital" . ($id ? "&id=" . urlencode($id) : ""));
+        $id = (int)($_POST['id'] ?? 0);
+        if (!$isGlobalAdmin) {
+            if ($sessionHospitalId <= 0) {
+                $_SESSION['error_msg'] = "ไม่พบหน่วยบริการของบัญชีผู้ใช้งาน";
+                header("Location: index.php?c=settings&a=hospital");
                 exit;
+            }
+            $id = $sessionHospitalId;
+        }
+
+        $name = trim((string)($_POST['name'] ?? ''));
+        $hospital_code = trim((string)($_POST['hospital_code'] ?? ''));
+        $hospital_size = strtoupper(trim((string)($_POST['hospital_size'] ?? 'S')));
+        $latitudeRaw = trim((string)($_POST['latitude'] ?? ''));
+        $longitudeRaw = trim((string)($_POST['longitude'] ?? ''));
+        $email = trim((string)($_POST['email'] ?? ''));
+        $phone = trim((string)($_POST['phone'] ?? ''));
+        $address = trim((string)($_POST['address'] ?? ''));
+        $sub_district = trim((string)($_POST['sub_district'] ?? ''));
+        $district = trim((string)($_POST['district'] ?? ''));
+        $province = trim((string)($_POST['province'] ?? ''));
+        $zipcode = trim((string)($_POST['zipcode'] ?? ''));
+        $morning = trim((string)($_POST['morning_shift'] ?? ''));
+        $afternoon = trim((string)($_POST['afternoon_shift'] ?? ''));
+        $night = trim((string)($_POST['night_shift'] ?? ''));
+
+        if ($name === '' || mb_strlen($name, 'UTF-8') > 255) {
+            $_SESSION['error_msg'] = "กรุณาระบุชื่อหน่วยบริการให้ถูกต้อง";
+            header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+            exit;
+        }
+
+        if (!in_array($hospital_size, ['S', 'M', 'L', 'XL'], true)) {
+            $hospital_size = 'S';
+        }
+
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['error_msg'] = "รูปแบบอีเมลไม่ถูกต้อง";
+            header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+            exit;
+        }
+
+        $latitude = null;
+        $longitude = null;
+        if ($latitudeRaw !== '') {
+            if (!is_numeric($latitudeRaw) || (float)$latitudeRaw < -90 || (float)$latitudeRaw > 90) {
+                $_SESSION['error_msg'] = "ค่าละติจูดต้องอยู่ระหว่าง -90 ถึง 90";
+                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+                exit;
+            }
+            $latitude = (string)(float)$latitudeRaw;
+        }
+        if ($longitudeRaw !== '') {
+            if (!is_numeric($longitudeRaw) || (float)$longitudeRaw < -180 || (float)$longitudeRaw > 180) {
+                $_SESSION['error_msg'] = "ค่าลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180";
+                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+                exit;
+            }
+            $longitude = (string)(float)$longitudeRaw;
+        }
+
+        $hospital_code = $hospital_code !== '' ? mb_substr($hospital_code, 0, 20, 'UTF-8') : null;
+        $email = $email !== '' ? mb_substr($email, 0, 150, 'UTF-8') : null;
+        $phone = $phone !== '' ? mb_substr($phone, 0, 50, 'UTF-8') : null;
+        $address = $address !== '' ? mb_substr($address, 0, 255, 'UTF-8') : null;
+        $sub_district = $sub_district !== '' ? mb_substr($sub_district, 0, 100, 'UTF-8') : null;
+        $district = $district !== '' ? mb_substr($district, 0, 100, 'UTF-8') : null;
+        $province = $province !== '' ? mb_substr($province, 0, 100, 'UTF-8') : null;
+        $zipcode = $zipcode !== '' ? mb_substr($zipcode, 0, 10, 'UTF-8') : null;
+        $morning = $morning !== '' ? mb_substr($morning, 0, 100, 'UTF-8') : null;
+        $afternoon = $afternoon !== '' ? mb_substr($afternoon, 0, 100, 'UTF-8') : null;
+        $night = $night !== '' ? mb_substr($night, 0, 100, 'UTF-8') : null;
+
+        $logo_path = null;
+        $old_logo_path = null;
+
+        if (isset($_FILES['logo']) && (int)($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $file = $_FILES['logo'];
+            $uploadError = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+
+            if ($uploadError !== UPLOAD_ERR_OK || !is_uploaded_file((string)($file['tmp_name'] ?? ''))) {
+                $_SESSION['error_msg'] = "อัปโหลดโลโก้ไม่สำเร็จ กรุณาลองใหม่";
+                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+                exit;
+            }
+
+            if ((int)($file['size'] ?? 0) <= 0 || (int)$file['size'] > 2 * 1024 * 1024) {
+                $_SESSION['error_msg'] = "ไฟล์โลโก้ต้องมีขนาดไม่เกิน 2 MB";
+                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+                exit;
+            }
+
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = (string)$finfo->file((string)$file['tmp_name']);
+            $allowedMime = [
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+            ];
+
+            if (!isset($allowedMime[$mime])) {
+                $_SESSION['error_msg'] = "ชนิดไฟล์โลโก้ไม่ถูกต้อง อนุญาตเฉพาะ JPG และ PNG";
+                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+                exit;
+            }
+
+            $uploadDir = 'public/uploads/logos/';
+            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+                $_SESSION['error_msg'] = "ไม่สามารถเตรียมพื้นที่อัปโหลดโลโก้ได้";
+                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+                exit;
+            }
+
+            try {
+                $randomPart = bin2hex(random_bytes(12));
+            } catch (Throwable $e) {
+                $randomPart = hash('sha256', uniqid('', true));
+            }
+
+            $newFileName = 'logo_' . $randomPart . '.' . $allowedMime[$mime];
+            $destPath = $uploadDir . $newFileName;
+
+            if (!move_uploaded_file((string)$file['tmp_name'], $destPath)) {
+                $_SESSION['error_msg'] = "ไม่สามารถบันทึกไฟล์โลโก้ได้";
+                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
+                exit;
+            }
+
+            $logo_path = $destPath;
+
+            if ($id > 0) {
+                $current = $hospitalModel->getHospitalById($id);
+                $candidateOldLogo = (string)($current['logo'] ?? '');
+                if ($candidateOldLogo !== '' && strpos($candidateOldLogo, 'default') === false) {
+                    $old_logo_path = $candidateOldLogo;
+                }
             }
         }
 
@@ -146,13 +244,29 @@ class SettingsController {
             );
             
             if ($result) {
-                // 🌟 บันทึก Log: อัปเดตข้อมูลหน่วยบริการ
+                if ($logo_path && $old_logo_path) {
+                    $logoRoot = realpath('public/uploads/logos/');
+                    $oldReal = realpath($old_logo_path);
+                    if ($logoRoot !== false && $oldReal !== false && str_starts_with($oldReal, $logoRoot . DIRECTORY_SEPARATOR) && is_file($oldReal)) {
+                        @unlink($oldReal);
+                    }
+                }
+
                 LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "แก้ไขข้อมูล รพ.สต. ID: {$id} ({$name})");
                 $_SESSION['success_msg'] = "บันทึกข้อมูลหน่วยบริการสำเร็จ";
             } else {
+                if ($logo_path && is_file($logo_path)) {
+                    @unlink($logo_path);
+                }
                 $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงฐานข้อมูล";
             }
         } else {
+            if (!$isGlobalAdmin) {
+                $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์เพิ่มหน่วยบริการใหม่";
+                header("Location: index.php?c=settings&a=hospital");
+                exit;
+            }
+
             $new_id = $hospitalModel->addHospital(
                 $name, $hospital_code, $hospital_size, 
                 $latitude, $longitude, $email, $phone, 
@@ -166,6 +280,9 @@ class SettingsController {
                 LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มหน่วยบริการใหม่ ({$name})");
                 $_SESSION['success_msg'] = "เพิ่มข้อมูลหน่วยบริการสำเร็จ";
             } else {
+                if ($logo_path && is_file($logo_path)) {
+                    @unlink($logo_path);
+                }
                 $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการสร้างหน่วยบริการใหม่";
             }
         }
@@ -206,16 +323,22 @@ class SettingsController {
         $status_data = [];
 
         try {
-            $db_name = 'roster_pro_db'; 
+            $db_name = getenv('DB_NAME') ?: 'roster_pro_db'; 
             $stmt = $db->prepare("SELECT SUM(data_length + index_length) / 1024 / 1024 AS size FROM information_schema.TABLES WHERE table_schema = ?");
             $stmt->execute([$db_name]);
             $status_data['db_size'] = round($stmt->fetchColumn(), 2);
 
-            $free_space = disk_free_space("/");
-            $total_space = disk_total_space("/");
-            $status_data['disk_free'] = round($free_space / 1024 / 1024 / 1024, 2); 
-            $status_data['disk_total'] = round($total_space / 1024 / 1024 / 1024, 2); 
-            $status_data['disk_usage_percent'] = round((($total_space - $free_space) / $total_space) * 100, 2);
+            $free_space = @disk_free_space("/");
+            $total_space = @disk_total_space("/");
+            if ($free_space !== false && $total_space !== false && $total_space > 0) {
+                $status_data['disk_free'] = round($free_space / 1024 / 1024 / 1024, 2);
+                $status_data['disk_total'] = round($total_space / 1024 / 1024 / 1024, 2);
+                $status_data['disk_usage_percent'] = round((($total_space - $free_space) / $total_space) * 100, 2);
+            } else {
+                $status_data['disk_free'] = null;
+                $status_data['disk_total'] = null;
+                $status_data['disk_usage_percent'] = null;
+            }
 
             $status_data['php_version'] = PHP_VERSION;
             $status_data['os'] = PHP_OS;
@@ -223,7 +346,8 @@ class SettingsController {
             $status_data['db_status'] = 'Online';
 
         } catch (Exception $e) {
-            $status_data['db_status'] = 'Offline / Error: ' . $e->getMessage();
+            error_log('System status check failed: ' . $e->getMessage());
+            $status_data['db_status'] = 'Offline / Error';
         }
 
         require_once 'views/layouts/header.php';

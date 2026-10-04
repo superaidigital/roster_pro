@@ -64,6 +64,7 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                     </p>
 
                     <form action="index.php?c=settings&a=do_backup" method="POST" class="w-100" id="backupForm">
+                            <?= security_csrf_input() ?>
                         <button type="submit" class="btn btn-info text-white w-100 py-2 rounded-pill fw-bolder shadow-sm" id="btnBackup">
                             <i class="bi bi-laptop me-2"></i> ดาวน์โหลดลงเครื่อง
                         </button>
@@ -85,6 +86,7 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                     </p>
 
                     <form action="index.php?c=settings&a=do_server_backup" method="POST" class="w-100" onsubmit="return confirm('ต้องการสร้างไฟล์สำรองข้อมูลเก็บบนเซิร์ฟเวอร์ใช่หรือไม่?');">
+                            <?= security_csrf_input() ?>
                         <button type="submit" class="btn btn-success text-white w-100 py-2 rounded-pill fw-bolder shadow-sm">
                             <i class="bi bi-hdd-fill me-2"></i> บันทึกลงเซิร์ฟเวอร์
                         </button>

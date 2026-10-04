@@ -38,6 +38,68 @@ function security_start_session(): void {
     session_start();
 }
 
+/**
+ * Send safe-by-default headers for dynamic application pages.
+ * Static assets are served directly by the web server and are unaffected.
+ */
+function security_send_headers(): void {
+    if (headers_sent()) {
+        return;
+    }
+
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header("Permissions-Policy: camera=(), microphone=(), geolocation=(self)");
+    header('Cache-Control: private, no-store, max-age=0');
+    header('Pragma: no-cache');
+
+    if (security_is_https()) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
+}
+
+/**
+ * Validate controller/action route tokens before they are used to build paths or method names.
+ */
+function security_is_valid_route_token(?string $value): bool {
+    return is_string($value)
+        && $value !== ''
+        && preg_match('/^[a-z][a-z0-9_]{0,63}$/', $value) === 1;
+}
+
+/**
+ * Allow only local application redirects. Reject schemes, protocol-relative
+ * URLs and control characters to prevent open-redirect/header injection bugs.
+ */
+function security_safe_local_redirect(?string $target, string $fallback = 'index.php?c=dashboard'): string {
+    $target = trim((string)$target);
+    if ($target === '' || preg_match('/[\r\n]/', $target)) {
+        return $fallback;
+    }
+
+    if (str_starts_with($target, '//')) {
+        return $fallback;
+    }
+
+    $parts = parse_url($target);
+    if ($parts === false || isset($parts['scheme']) || isset($parts['host'])) {
+        return $fallback;
+    }
+
+    $path = (string)($parts['path'] ?? '');
+    if ($path === '') {
+        return $fallback;
+    }
+
+    // Application links may be relative (index.php?...) or same-origin absolute paths (/roster_pro/index.php?...).
+    if (!str_starts_with($path, 'index.php') && !str_starts_with($path, '/')) {
+        return $fallback;
+    }
+
+    return $target;
+}
+
 function security_regenerate_session(): void {
     security_start_session();
     session_regenerate_id(true);

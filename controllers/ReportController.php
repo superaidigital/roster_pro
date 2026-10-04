@@ -11,9 +11,38 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
     private function checkAuth() {
         if (session_status() === PHP_SESSION_NONE) session_start();
         if (!isset($_SESSION['user'])) {
-            header("Location: index.php?c=auth&a=login");
+            header("Location: index.php?c=auth&a=index");
             exit;
         }
+    }
+
+    private function normalizedPeriod(): array {
+        $month = trim((string)($_GET['month'] ?? date('m')));
+        $year = trim((string)($_GET['year'] ?? date('Y')));
+
+        if (!preg_match('/^(0?[1-9]|1[0-2])$/', $month)) {
+            $month = date('m');
+        }
+        if (!preg_match('/^\d{4}$/', $year) || (int)$year < 2000 || (int)$year > 2100) {
+            $year = date('Y');
+        }
+
+        $month = str_pad((string)(int)$month, 2, '0', STR_PAD_LEFT);
+        return [$month, $year, $year . '-' . $month];
+    }
+
+    private function normalizedHospitalFilter(bool $isAdmin, int $ownHospitalId) {
+        if (!$isAdmin) {
+            return $ownHospitalId;
+        }
+
+        $raw = trim((string)($_GET['hospital_id'] ?? 'all'));
+        if ($raw === '' || strtolower($raw) === 'all') {
+            return 'all';
+        }
+
+        $id = (int)$raw;
+        return $id > 0 ? $id : 'all';
     }
 
     // ==========================================
@@ -47,10 +76,8 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
             exit;
         }
 
-        // 📅 รับค่าเดือนและปี หรือใช้ค่าปัจจุบันถ้าไม่ได้เลือกมา
-        $selected_month = isset($_GET['month']) ? str_pad($_GET['month'], 2, '0', STR_PAD_LEFT) : date('m');
-        $selected_year = isset($_GET['year']) ? $_GET['year'] : date('Y');
-        $month_year = $selected_year . '-' . $selected_month;
+        // 📅 รับค่าเดือน/ปีผ่านตัวกรองที่ตรวจสอบรูปแบบแล้ว
+        [$selected_month, $selected_year, $month_year] = $this->normalizedPeriod();
         $today = date('Y-m-d');
 
         // เตรียมข้อมูลส่งให้ View
@@ -188,13 +215,11 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
 
         $db = (new Database())->getConnection();
         
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('m');
-        $selected_year = isset($_GET['year']) ? $_GET['year'] : date('Y');
-        $month_year = $selected_year . '-' . str_pad($selected_month, 2, '0', STR_PAD_LEFT);
+        [$selected_month, $selected_year, $month_year] = $this->normalizedPeriod();
         
         $my_hospital_id = $_SESSION['user']['hospital_id'];
         $is_admin = in_array($role, ['SUPERADMIN', 'ADMIN', 'HR']);
-        $filter_hospital = isset($_GET['hospital_id']) ? $_GET['hospital_id'] : ($is_admin ? 'all' : $my_hospital_id);
+        $filter_hospital = $this->normalizedHospitalFilter($is_admin, (int)$my_hospital_id);
 
         $sql = "SELECT rs.hospital_id, h.name as hospital_name, rs.status, rs.pay_summary, rs.updated_at 
                 FROM roster_status rs 
@@ -280,13 +305,11 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
 
         $db = (new Database())->getConnection();
         
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('m');
-        $selected_year = isset($_GET['year']) ? $_GET['year'] : date('Y');
-        $month_year = $selected_year . '-' . str_pad($selected_month, 2, '0', STR_PAD_LEFT);
+        [$selected_month, $selected_year, $month_year] = $this->normalizedPeriod();
         
         $my_hospital_id = $_SESSION['user']['hospital_id'];
         $is_admin = in_array($role, ['SUPERADMIN', 'ADMIN', 'HR']);
-        $filter_hospital = isset($_GET['hospital_id']) ? $_GET['hospital_id'] : ($is_admin ? 'all' : $my_hospital_id);
+        $filter_hospital = $this->normalizedHospitalFilter($is_admin, (int)$my_hospital_id);
 
         // 1. ดึงรายชื่อบุคลากรทั้งหมด
         $sql_users = "SELECT u.id, u.name, u.type, u.position_number, h.name as hospital_name 
@@ -380,9 +403,7 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
 
         $db = (new Database())->getConnection();
         
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('m');
-        $selected_year = isset($_GET['year']) ? $_GET['year'] : date('Y');
-        $month_year = $selected_year . '-' . str_pad($selected_month, 2, '0', STR_PAD_LEFT);
+        [$selected_month, $selected_year, $month_year] = $this->normalizedPeriod();
         
         // หาวันแรกและวันสุดท้ายของเดือนที่เลือก เพื่อให้ครอบคลุมการลาที่คาบเกี่ยวเดือน
         $start_of_month = $month_year . '-01';
@@ -390,7 +411,7 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
         
         $my_hospital_id = $_SESSION['user']['hospital_id'];
         $is_admin = in_array($role, ['SUPERADMIN', 'ADMIN', 'HR']);
-        $filter_hospital = isset($_GET['hospital_id']) ? $_GET['hospital_id'] : ($is_admin ? 'all' : $my_hospital_id);
+        $filter_hospital = $this->normalizedHospitalFilter($is_admin, (int)$my_hospital_id);
 
         // 1. ดึงข้อมูลประวัติการลาหยุด
         $sql = "SELECT lr.*, u.name as user_name, u.type as user_type, h.name as hospital_name, lq.leave_type,
@@ -474,7 +495,7 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
         
         $my_hospital_id = $_SESSION['user']['hospital_id'];
         $is_admin = in_array($role, ['SUPERADMIN', 'ADMIN', 'HR']);
-        $filter_hospital = isset($_GET['hospital_id']) ? $_GET['hospital_id'] : ($is_admin ? 'all' : $my_hospital_id);
+        $filter_hospital = $this->normalizedHospitalFilter($is_admin, (int)$my_hospital_id);
 
         // 1. ดึงข้อมูลบุคลากร (ซ่อน Superadmin เพื่อความปลอดภัย)
         $sql = "SELECT u.id, u.name, u.type, u.employee_type, u.position_number, u.role as system_role, h.name as hospital_name 

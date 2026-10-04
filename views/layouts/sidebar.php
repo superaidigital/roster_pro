@@ -338,9 +338,13 @@ if (!function_exists('renderSidebarMenu')) {
     
     <!-- ปุ่มออกจากระบบ (ล่างสุด) -->
     <div class="rp-sidebar-footer mt-auto p-3">
-        <a href="index.php?c=auth&a=logout" class="nav-link d-flex align-items-center py-2 px-3 rounded-3 text-decoration-none" style="color: #ef4444; font-weight: bold;" onclick="return confirm('คุณต้องการออกจากระบบใช่หรือไม่?');" onmouseover="this.style.backgroundColor='#fef2f2';" onmouseout="this.style.backgroundColor='transparent';">
-            <i class="bi bi-box-arrow-left me-2 fs-5" style="color: #ef4444;"></i> <span class="sidebar-text">ออกจากระบบ</span>
-        </a>
+        <form action="index.php?c=auth&a=logout" method="POST" class="m-0" onsubmit="return confirm('คุณต้องการออกจากระบบใช่หรือไม่?');">
+            <?= security_csrf_input() ?>
+            <button type="submit" class="nav-link w-100 border-0 bg-transparent d-flex align-items-center py-2 px-3 rounded-3 text-decoration-none text-start" style="color:#ef4444;font-weight:700;">
+                <i class="bi bi-box-arrow-left me-2 fs-5" style="color:#ef4444;"></i>
+                <span class="sidebar-text">ออกจากระบบ</span>
+            </button>
+        </form>
     </div>
 </aside>
 
@@ -356,7 +360,7 @@ if (!function_exists('renderSidebarMenu')) {
                 <small>Primary Care Workspace</small>
             </span>
         </div>
-        <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas"></button>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="ปิดเมนู"></button>
     </div>
     <div class="offcanvas-body p-0 d-flex flex-column custom-scrollbar pb-4">
         <?php renderSidebarMenu($c, $a, $role, $allowed_controllers); ?>
@@ -447,4 +451,4 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ========================================== -->
 <!-- 🌟 4. เปิดพื้นที่ Main Content (ส่วนแสดงผลข้อมูล) -->
 <!-- ========================================== -->
-<main class="app-main flex-grow-1 position-relative custom-scrollbar">
+<main id="main-content" class="app-main flex-grow-1 position-relative custom-scrollbar" tabindex="-1">

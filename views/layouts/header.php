@@ -180,6 +180,7 @@ $rpPageMap = [
 $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดการตารางปฏิบัติงาน', 'bi-window-stack'];
 ?>
 <body>
+<a class="rp-skip-link" href="#main-content">ข้ามไปยังเนื้อหาหลัก</a>
 <script id="rp-sidebar-prepaint-state">
     try {
         if (localStorage.getItem('sidebarState') === 'collapsed') {
@@ -198,7 +199,7 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
 <div id="rpProgressLive" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 
 <!-- 🌟 1. Top Navbar -->
-<nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4">
+<nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4" aria-label="แถบนำทางด้านบน">
     <div class="rp-topbar-left d-flex align-items-center gap-2 gap-md-3 min-w-0">
         <button class="nav-icon-btn rp-mobile-menu-btn" id="mobileSidebarToggleBtn" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูนำทาง">
             <i class="bi bi-list fs-4"></i>
@@ -259,10 +260,9 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
                         </div>
                     <?php else: ?>
                         <!-- 🌟 วนลูปแสดงการแจ้งเตือนล่าสุด 5 รายการ -->
-                        <?php foreach ($latest_notifications as $notif): 
+                        <?php foreach ($latest_notifications as $notif):
                             $is_read = $notif['is_read'] == 1;
-                            $link = !empty($notif['link']) ? "index.php?c=notification&a=read&id={$notif['id']}&url=" . urlencode($notif['link']) : "index.php?c=notification&a=read&id={$notif['id']}";
-                            
+
                             // ตกแต่งสีไอคอนตามประเภท
                             $type = strtoupper($notif['type'] ?? 'INFO');
                             $icon = 'bi-info-circle-fill'; $color = 'primary';
@@ -272,24 +272,28 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
                             elseif ($type == 'SWAP') { $icon = 'bi-arrow-left-right'; $color = 'info text-dark'; }
                             elseif ($type == 'LEAVE') { $icon = 'bi-person-dash-fill'; $color = 'warning text-dark'; }
                         ?>
-                            <a href="<?= $link ?>" class="text-decoration-none text-dark d-block">
-                                <div class="p-3 d-flex align-items-start <?= !$is_read ? 'bg-primary bg-opacity-10' : 'bg-white' ?> notif-item" style="transition: all 0.2s;">
-                                    <div class="bg-<?= $color ?> bg-opacity-10 text-<?= str_replace(' text-dark', '', $color) ?> rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
-                                        <i class="bi <?= $icon ?>"></i>
-                                    </div>
-                                    <div class="ms-3 flex-grow-1">
-                                        <div class="d-flex justify-content-between align-items-start mb-1">
-                                            <div class="fw-bolder <?= !$is_read ? 'text-dark' : 'text-secondary' ?>" style="font-size: 13.5px; line-height: 1.3;">
-                                                <?= htmlspecialchars($notif['title']) ?>
-                                            </div>
-                                            <small class="text-muted ms-2 text-nowrap" style="font-size: 10px;"><i class="bi bi-clock me-1"></i><?= date('d/m H:i', strtotime($notif['created_at'])) ?></small>
+                            <form action="index.php?c=notification&a=read" method="POST" class="m-0">
+                                <?= security_csrf_input() ?>
+                                <input type="hidden" name="id" value="<?= (int)$notif['id'] ?>">
+                                <button type="submit" class="w-100 border-0 bg-transparent p-0 text-start text-decoration-none text-dark d-block">
+                                    <div class="p-3 d-flex align-items-start <?= !$is_read ? 'bg-primary bg-opacity-10' : 'bg-white' ?> notif-item" style="transition: all 0.2s;">
+                                        <div class="bg-<?= $color ?> bg-opacity-10 text-<?= str_replace(' text-dark', '', $color) ?> rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                                            <i class="bi <?= $icon ?>" aria-hidden="true"></i>
                                         </div>
-                                        <p class="mb-0 text-muted" style="font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                            <?= htmlspecialchars($notif['message']) ?>
-                                        </p>
+                                        <div class="ms-3 flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                                <div class="fw-bolder <?= !$is_read ? 'text-dark' : 'text-secondary' ?>" style="font-size: 13.5px; line-height: 1.3;">
+                                                    <?= htmlspecialchars($notif['title'], ENT_QUOTES, 'UTF-8') ?>
+                                                </div>
+                                                <small class="text-muted ms-2 text-nowrap" style="font-size: 10px;"><i class="bi bi-clock me-1" aria-hidden="true"></i><?= date('d/m H:i', strtotime($notif['created_at'])) ?></small>
+                                            </div>
+                                            <p class="mb-0 text-muted" style="font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                                <?= htmlspecialchars($notif['message'], ENT_QUOTES, 'UTF-8') ?>
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                            </a>
+                                </button>
+                            </form>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
@@ -299,6 +303,7 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
                     <div class="p-2 border-top bg-light text-center" style="border-radius: 0 0 1rem 1rem;">
                         <form action="index.php?c=notification&a=read_all" method="POST" class="m-0" onsubmit="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
                             <?= security_csrf_input() ?>
+                            <input type="hidden" name="return_to" value="<?= htmlspecialchars((string)($_SERVER['REQUEST_URI'] ?? 'index.php?c=notification'), ENT_QUOTES, 'UTF-8') ?>">
                             <button type="submit" class="btn btn-link text-decoration-none text-muted fw-bold small d-block py-2 w-100 text-start border-0 bg-transparent" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')">
                             <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
                             </button>
@@ -335,7 +340,14 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
                 <li><a class="dropdown-item py-2" href="index.php?c=settings&a=system"><i class="bi bi-gear text-secondary me-2"></i> ตั้งค่าระบบ</a></li>
                 <?php endif; ?>
                 <li><hr class="dropdown-divider my-1"></li>
-                <li><a class="dropdown-item text-danger fw-bold py-2" href="index.php?c=auth&a=logout"><i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ</a></li>
+                <li>
+                    <form action="index.php?c=auth&a=logout" method="POST" class="m-0">
+                        <?= security_csrf_input() ?>
+                        <button type="submit" class="dropdown-item text-danger fw-bold py-2">
+                            <i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ
+                        </button>
+                    </form>
+                </li>
             </ul>
         </div>
         <?php endif; ?>
