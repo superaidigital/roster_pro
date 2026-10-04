@@ -158,85 +158,143 @@ class AjaxController {
     // ==========================================
     public function save_shift() {
         $this->requireAjaxMutation();
-        error_reporting(0); // 🌟 ปิด Warning
-        header('Content-Type: application/json');
-        
+        error_reporting(0);
+        header('Content-Type: application/json; charset=utf-8');
+
         $data = json_decode(file_get_contents("php://input"));
-        if (!isset($_SESSION['user'])) { echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit; }
+        if (!is_object($data)) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'รูปแบบข้อมูลไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
 
         $db = (new Database())->getConnection();
         $shiftModel = new ShiftModel($db);
         $notifModel = new NotificationModel($db);
         $leaveModel = class_exists('LeaveModel') ? new LeaveModel($db) : null;
-        
-        // 🌟 รองรับ Admin ส่วนกลางระบุ Hospital ID
-        $hospital_id = $_SESSION['user']['hospital_id'];
-        if (isset($data->hosp_id) && $data->hosp_id !== '' && in_array(strtoupper($_SESSION['user']['role']), ['ADMIN', 'SUPERADMIN'])) {
-            $hospital_id = $data->hosp_id;
+
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        if (isset($data->hosp_id) && $data->hosp_id !== '' && in_array($role, ['ADMIN', 'SUPERADMIN'], true)) {
+            $hospital_id = (int)$data->hosp_id;
         }
 
-        if(!empty($data->user_id) && !empty($data->date)) {
-            $month_year = substr($data->date, 0, 7);
+        $user_id = (int)($data->user_id ?? 0);
+        $date = trim((string)($data->date ?? ''));
+        $shift_input = trim((string)($data->shift_type ?? ''));
 
-            if (!$this->canEditRoster($hospital_id, $month_year)) {
-                echo json_encode(['status' => 'error', 'message' => '⛔ คุณไม่มีสิทธิ์จัดเวร หรือตารางเดือนนี้ถูกล็อคแล้ว']); exit;
+        $dateObj = DateTime::createFromFormat('Y-m-d', $date);
+        $validDate = $dateObj && $dateObj->format('Y-m-d') === $date;
+        if ($hospital_id <= 0 || $user_id <= 0 || !$validDate) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'ข้อมูลบุคลากร วันที่ หรือหน่วยบริการไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $month_year = substr($date, 0, 7);
+        if (!$this->canEditRoster($hospital_id, $month_year)) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => '⛔ คุณไม่มีสิทธิ์จัดเวร หรือตารางเดือนนี้ถูกล็อคแล้ว'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $stmt_user = $db->prepare("
+            SELECT id, role, is_active, is_deleted
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+        ");
+        $stmt_user->execute([$user_id]);
+        $targetUser = $stmt_user->fetch(PDO::FETCH_ASSOC);
+        if (!$targetUser || (int)$targetUser['is_active'] !== 1 || (int)$targetUser['is_deleted'] === 1 || in_array(strtoupper((string)$targetUser['role']), ['ADMIN', 'SUPERADMIN'], true)) {
+            http_response_code(422);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่พบบุคลากรที่สามารถจัดเวรได้'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $aliases = ['A' => 'บ', 'N' => 'ร', 'O' => 'ย', 'M' => 'ช'];
+        $shift_array = [];
+        if ($shift_input !== '') {
+            $parts = preg_split('/[\\/,\\s]+/', $shift_input) ?: [];
+            foreach ($parts as $part) {
+                $part = trim($part);
+                if ($part === '') continue;
+                $shift_array[] = $aliases[$part] ?? $part;
             }
-            
-            if (!empty($data->shift_type)) {
-                $shift_input = trim($data->shift_type);
-                $shift_array = preg_split('/[\/\,\s]+/', $shift_input);
-                $shift_array = array_filter($shift_array); 
+            $shift_array = array_values(array_unique($shift_array));
 
-                if (count($shift_array) > 2) {
-                    echo json_encode(['status' => 'error', 'message' => '⚠️ จัดเวรไม่ได้: 1 คนขึ้นเวรได้ไม่เกิน 2 กะต่อวัน']); exit;
-                }
-                if (in_array('ช', $shift_array) && in_array('ด', $shift_array)) {
-                    echo json_encode(['status' => 'error', 'message' => '🚨 ผิดกฎพักผ่อน: ห้ามจัดเวร "เช้า" ควบ "ดึก" ในวันเดียวกัน']); exit;
-                }
-
-                if ($leaveModel) {
-                    try {
-                        $all_leaves = $leaveModel->getLeavesByHospitalAndMonth($hospital_id, $month_year);
-                        $current_ts = strtotime($data->date);
-                        foreach ($all_leaves as $leave) {
-                            if ($leave['user_id'] == $data->user_id && $leave['status'] == 'APPROVED') {
-                                $start_ts = strtotime($leave['start_date']);
-                                $end_ts = strtotime($leave['end_date']);
-                                if ($current_ts >= $start_ts && $current_ts <= $end_ts) {
-                                    echo json_encode(['status' => 'error', 'message' => "⛔ จัดเวรไม่ได้: เจ้าหน้าที่ติด '{$leave['leave_type']}'"]); exit;
-                                }
-                            }
-                        }
-                    } catch (Exception $e) {}
+            $allowed = ['ช', 'บ', 'ร', 'ย'];
+            foreach ($shift_array as $type) {
+                if (!in_array($type, $allowed, true)) {
+                    http_response_code(422);
+                    echo json_encode(['status' => 'error', 'message' => 'รูปแบบกะปฏิบัติงานไม่ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+                    exit;
                 }
             }
 
-            try {
-                $stmt = $db->prepare("DELETE FROM shifts WHERE user_id = ? AND shift_date = ? AND hospital_id = ?");
-                $stmt->execute([$data->user_id, $data->date, $hospital_id]);
-
-                if (!empty($data->shift_type)) {
-                    $last_id = $shiftModel->addShift($data->date, $data->shift_type, $data->user_id, $hospital_id);
-                    
-                    if ($data->user_id != $_SESSION['user']['id']) {
-                        $thai_date = date('d/m/Y', strtotime($data->date));
-                        $notifModel->addNotification($data->user_id, 'INFO', 'ตารางเวรอัปเดต', "คุณถูกจัดเวร '{$data->shift_type}' ในวันที่ {$thai_date}", "index.php?c=profile&a=schedule");
-                    }
-                    
-                    LogsController::addLog($db, $_SESSION['user']['id'], 'UPDATE', "จัดเวร '{$data->shift_type}' ให้ผู้ใช้ ID:{$data->user_id} วันที่ {$data->date}");
-                    echo json_encode(['status' => 'success', 'shift_id' => $last_id]);
-                } else {
-                    LogsController::addLog($db, $_SESSION['user']['id'], 'DELETE', "ลบเวรของผู้ใช้ ID:{$data->user_id} ในวันที่ {$data->date}");
-                    echo json_encode(['status' => 'success', 'message' => 'Deleted']);
-                }
+            if (count($shift_array) > 2) {
+                http_response_code(422);
+                echo json_encode(['status' => 'error', 'message' => '⚠️ จัดเวรไม่ได้: 1 คนขึ้นเวรได้ไม่เกิน 2 กะต่อวัน'], JSON_UNESCAPED_UNICODE);
                 exit;
-            } catch (Exception $e) {
-                error_log('Ajax operation failed: ' . $e->getMessage());
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']); exit;
+            }
+
+            if (in_array('ช', $shift_array, true) && in_array('ร', $shift_array, true)) {
+                http_response_code(422);
+                echo json_encode(['status' => 'error', 'message' => '🚨 ผิดกฎพักผ่อน: ห้ามจัดเวรเช้าควบเวรดึกในวันเดียวกัน'], JSON_UNESCAPED_UNICODE);
+                exit;
             }
         }
-        echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
+
+        $canonical_shift = implode('/', $shift_array);
+
+        if ($canonical_shift !== '' && $leaveModel) {
+            try {
+                $all_leaves = $leaveModel->getLeavesByHospitalAndMonth($hospital_id, $month_year);
+                $current_ts = strtotime($date);
+                foreach ($all_leaves as $leave) {
+                    if ((int)$leave['user_id'] === $user_id && ($leave['status'] ?? '') === 'APPROVED') {
+                        $start_ts = strtotime($leave['start_date']);
+                        $end_ts = strtotime($leave['end_date']);
+                        if ($current_ts >= $start_ts && $current_ts <= $end_ts) {
+                            echo json_encode(['status' => 'error', 'message' => "⛔ จัดเวรไม่ได้: เจ้าหน้าที่ติด '{$leave['leave_type']}'"], JSON_UNESCAPED_UNICODE);
+                            exit;
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                error_log('Leave validation failed during save_shift: ' . $e->getMessage());
+            }
+        }
+
+        try {
+            $db->beginTransaction();
+
+            $stmt = $db->prepare("DELETE FROM shifts WHERE user_id = ? AND shift_date = ? AND hospital_id = ?");
+            $stmt->execute([$user_id, $date, $hospital_id]);
+
+            if ($canonical_shift !== '') {
+                $last_id = $shiftModel->addShift($date, $canonical_shift, $user_id, $hospital_id);
+
+                if ($user_id !== (int)$_SESSION['user']['id']) {
+                    $thai_date = date('d/m/Y', strtotime($date));
+                    $notifModel->addNotification($user_id, 'INFO', 'ตารางเวรอัปเดต', "คุณถูกจัดเวร '{$canonical_shift}' ในวันที่ {$thai_date}", "index.php?c=profile&a=schedule");
+                }
+
+                LogsController::addLog($db, $_SESSION['user']['id'], 'UPDATE', "จัดเวร '{$canonical_shift}' ให้ผู้ใช้ ID:{$user_id} วันที่ {$date}");
+                $db->commit();
+                echo json_encode(['status' => 'success', 'shift_id' => $last_id, 'shift_type' => $canonical_shift], JSON_UNESCAPED_UNICODE);
+            } else {
+                LogsController::addLog($db, $_SESSION['user']['id'], 'DELETE', "ลบเวรของผู้ใช้ ID:{$user_id} ในวันที่ {$date}");
+                $db->commit();
+                echo json_encode(['status' => 'success', 'message' => 'Deleted'], JSON_UNESCAPED_UNICODE);
+            }
+        } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            error_log('Ajax operation failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่'], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
     }
 
     // ==========================================
