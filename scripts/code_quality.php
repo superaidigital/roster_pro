@@ -251,6 +251,27 @@ foreach ($scanFiles as $file) {
     }
 }
 
+// 5.5) Authorization scope regression guards for personnel/profile access.
+$staffControllerPath = $root . '/controllers/StaffController.php';
+if (is_file($staffControllerPath)) {
+    $staffController = (string) file_get_contents($staffControllerPath);
+    if (substr_count($staffController, '$this->canManageTargetUser(') < 7) {
+        addError($errors, 'controllers/StaffController.php: personnel mutations must enforce target authorization scope');
+    }
+    if (!preg_match('/targetHospitalId\s*!==\s*\$currentHospitalId/', $staffController)) {
+        addError($errors, 'controllers/StaffController.php: missing same-hospital authorization boundary');
+    }
+}
+
+$profileControllerPath = $root . '/controllers/ProfileController.php';
+if (is_file($profileControllerPath)) {
+    $profileController = (string) file_get_contents($profileControllerPath);
+    if (!preg_match('/currentRole\s*!==\s*[\'"]DIRECTOR[\'"]/', $profileController)
+        || !preg_match('/targetHospitalId[^;]{0,240}hospital_id/s', $profileController)) {
+        addError($errors, 'controllers/ProfileController.php: director profile access must be scoped to own hospital');
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
