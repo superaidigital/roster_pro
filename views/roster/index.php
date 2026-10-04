@@ -16,7 +16,7 @@ $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 $isAdmin = in_array($_SESSION['user']['role'] ?? '', ['ADMIN', 'SUPERADMIN']);
 $is_manager = in_array($_SESSION['user']['role'] ?? '', ['DIRECTOR', 'SCHEDULER', 'ADMIN', 'SUPERADMIN']);
 $roster_status = strtoupper((string)($roster_status ?? 'DRAFT'));
-$canEdit = ($is_manager && $roster_status === 'DRAFT');
+$canEdit = ($is_manager && $roster_status === 'DRAFT' && (int)($hospital_id ?? 0) > 0);
 
 // Workflow state is derived once here so the view never emits Undefined variable warnings.
 $roster_workflow_map = [
