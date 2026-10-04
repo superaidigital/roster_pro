@@ -35,7 +35,21 @@ class ProfileController {
             return true;
         }
 
-        return in_array($currentRole, ['SUPERADMIN', 'ADMIN', 'HR', 'DIRECTOR'], true);
+        if (in_array($currentRole, ['SUPERADMIN', 'ADMIN', 'HR'], true)) {
+            return true;
+        }
+
+        if ($currentRole !== 'DIRECTOR') {
+            return false;
+        }
+
+        $db = (new Database())->getConnection();
+        $stmt = $db->prepare("SELECT hospital_id FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1");
+        $stmt->execute([$targetUserId]);
+        $targetHospitalId = $stmt->fetchColumn();
+
+        return $targetHospitalId !== false
+            && (int)$targetHospitalId === (int)($_SESSION['user']['hospital_id'] ?? 0);
     }
 
     private function requirePostAndCsrf(): void {
