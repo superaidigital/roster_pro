@@ -9,6 +9,23 @@ require_once 'models/PayRateModel.php';
 require_once 'controllers/LogsController.php'; 
 
 class UsersController {
+
+    private function requireMutation(): void {
+        security_start_session();
+
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        if (!security_is_valid_post_csrf()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้องหรือหมดอายุ กรุณาลองใหม่";
+            header("Location: index.php?c=users");
+            exit;
+        }
+    }
+
     
     // ====================================================
     // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน (HR, ADMIN, SUPERADMIN เท่านั้น)
