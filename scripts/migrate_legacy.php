@@ -33,6 +33,7 @@ echo "Database: " . (getenv('DB_NAME') ?: 'roster_pro_db') . "\n\n";
 
 try {
     // users
+    addColumnIfMissing($db, 'users', 'hospital_id', "INT NULL");
     addColumnIfMissing($db, 'users', 'phone', "VARCHAR(50) NULL");
     addColumnIfMissing($db, 'users', 'type', "VARCHAR(100) NULL");
     addColumnIfMissing($db, 'users', 'position', "VARCHAR(100) NULL");
