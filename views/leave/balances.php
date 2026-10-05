@@ -55,7 +55,7 @@ $users_balances = $users_balances ?? [];
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-success border-4">
             <i class="bi bi-check-circle-fill fs-5 me-3"></i> 
-            <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['success_msg'] ?></div>
+            <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
@@ -63,7 +63,7 @@ $users_balances = $users_balances ?? [];
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-danger border-4">
             <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
-            <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['error_msg'] ?></div>
+            <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?></div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
