@@ -292,6 +292,18 @@ ok(
     ),
     'queued notification becomes visible to target user'
 );
+$queuedFixture = null;
+foreach ($userNotifications as $row) {
+    if (($row['title'] ?? '') === 'Queued runtime notification') {
+        $queuedFixture = $row;
+        break;
+    }
+}
+ok(
+    is_array($queuedFixture)
+        && $notificationModel->deleteNotification((int)$queuedFixture['id'], $uid1),
+    'queued reliability notification fixture removed after verification'
+);
 
 $observabilityService = new ObservabilityService($db);
 $healthSnapshotId = $observabilityService->captureHealthSnapshot();
