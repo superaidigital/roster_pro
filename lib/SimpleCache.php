@@ -50,6 +50,9 @@ final class SimpleCache {
 
         $lockPath = $this->lockPath($key);
         $lock = fopen($lockPath, 'c+');
+        if ($lock !== false) {
+            @chmod($lockPath, 0600);
+        }
         if ($lock === false) {
             $value = $producer();
             return ['value' => $value, 'hit' => false, 'created_at' => time()];
@@ -110,6 +113,16 @@ final class SimpleCache {
                 if (@unlink($path)) $deleted++;
             }
         }
+
+        $staleLockThreshold = time() - (7 * 86400);
+        foreach (glob($this->directory . '/*.lock') ?: [] as $lockPath) {
+            if (!is_file($lockPath)) continue;
+            $mtime = (int)(filemtime($lockPath) ?: 0);
+            if ($mtime > 0 && $mtime < $staleLockThreshold && @unlink($lockPath)) {
+                $deleted++;
+            }
+        }
+
         return $deleted;
     }
 
