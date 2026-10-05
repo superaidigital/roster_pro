@@ -441,6 +441,19 @@ foreach ($roster_coverage as $coverage) {
                         <?php endif; ?>
                     </button>
                     <?php endif; ?>
+
+                    <?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SCHEDULER','DIRECTOR','ADMIN','SUPERADMIN'], true)): ?>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-success bg-white fw-bold shadow-sm text-nowrap rounded-pill px-3"
+                            data-bs-toggle="modal"
+                            data-bs-target="#rosterRevisionModal"
+                            title="ดูฉบับตารางเวรที่อนุมัติแล้ว">
+                        <i class="bi bi-patch-check-fill me-1"></i> ฉบับอนุมัติ
+                        <?php if (!empty($roster_revisions)): ?>
+                            <span class="badge text-bg-success ms-1"><?= count($roster_revisions) ?></span>
+                        <?php endif; ?>
+                    </button>
+                    <?php endif; ?>
                 </div>
                 
                 <div class="d-flex flex-wrap gap-2">
@@ -1128,6 +1141,105 @@ foreach ($roster_coverage as $coverage) {
     </div>
 </div>
 
+<!-- ================= ✅ Modal ฉบับตารางเวรที่อนุมัติแล้ว ================= -->
+<?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SCHEDULER','DIRECTOR','ADMIN','SUPERADMIN'], true)): ?>
+<div class="modal fade" id="rosterRevisionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom bg-light rounded-top-4">
+                <div>
+                    <h5 class="modal-title fw-bold mb-1">
+                        <i class="bi bi-patch-check-fill text-success me-2"></i>ฉบับตารางเวรที่อนุมัติแล้ว
+                    </h5>
+                    <div class="small text-muted">
+                        Official Revisions · <?= htmlspecialchars($display_month_text ?? $selected_month, ENT_QUOTES, 'UTF-8') ?>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
+            </div>
+
+            <div class="modal-body p-3 p-md-4">
+                <div class="alert alert-success border-0 rounded-4 d-flex gap-3 align-items-start mb-4">
+                    <i class="bi bi-shield-lock-fill fs-4"></i>
+                    <div class="small">
+                        <div class="fw-bold mb-1">Approved Revision เป็นฉบับอ้างอิงแบบ Immutable</div>
+                        เมื่ออนุมัติ ระบบจะตรึงข้อมูลตาราง รายชื่อ ค่าตอบแทน วันหยุด และลายเซ็นไว้ใน Revision นี้
+                        การแก้ไขภายหลังจะไม่เปลี่ยนฉบับเดิม และเมื่ออนุมัติใหม่จะออกเลข Revision ถัดไป
+                    </div>
+                </div>
+
+                <?php if (empty($roster_revisions)): ?>
+                    <div class="text-center py-5">
+                        <i class="bi bi-patch-check display-5 text-secondary opacity-50"></i>
+                        <h6 class="fw-bold mt-3 mb-1">ยังไม่มีฉบับที่อนุมัติ</h6>
+                        <div class="small text-muted">Revision แรกจะถูกสร้างเมื่อ Workflow เปลี่ยนเป็น APPROVED</div>
+                    </div>
+                <?php else: ?>
+                    <div class="d-flex flex-column gap-3">
+                        <?php foreach ($roster_revisions as $revisionIndex => $officialRevision):
+                            $approvedAt = !empty($officialRevision['approved_at'])
+                                ? date('d/m/Y H:i:s', strtotime((string)$officialRevision['approved_at']))
+                                : '-';
+                            $hash = (string)($officialRevision['content_hash'] ?? '');
+                        ?>
+                        <article class="border rounded-4 p-3 p-md-4 <?= $revisionIndex === 0 ? 'border-success' : '' ?>">
+                            <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                                        <span class="badge text-bg-success fs-6 px-3 py-2">
+                                            <?= htmlspecialchars((string)$officialRevision['revision_code'], ENT_QUOTES, 'UTF-8') ?>
+                                        </span>
+                                        <?php if ($revisionIndex === 0): ?>
+                                            <span class="badge text-bg-primary">ฉบับล่าสุด</span>
+                                        <?php endif; ?>
+                                        <span class="badge text-bg-light border">
+                                            Revision <?= (int)$officialRevision['revision_no'] ?>
+                                        </span>
+                                    </div>
+
+                                    <div class="row g-2 small">
+                                        <div class="col-12 col-md-4">
+                                            <span class="text-muted">ผู้จัดทำ:</span>
+                                            <strong><?= htmlspecialchars((string)($officialRevision['prepared_name'] ?: 'ไม่ระบุ'), ENT_QUOTES, 'UTF-8') ?></strong>
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <span class="text-muted">ผู้ตรวจสอบ:</span>
+                                            <strong><?= htmlspecialchars((string)($officialRevision['reviewed_name'] ?: 'ไม่ระบุ'), ENT_QUOTES, 'UTF-8') ?></strong>
+                                        </div>
+                                        <div class="col-12 col-md-4">
+                                            <span class="text-muted">ผู้อนุมัติ:</span>
+                                            <strong><?= htmlspecialchars((string)$officialRevision['approved_name'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                        </div>
+                                    </div>
+
+                                    <div class="small text-muted mt-2">
+                                        <i class="bi bi-calendar-check me-1"></i><?= htmlspecialchars($approvedAt, ENT_QUOTES, 'UTF-8') ?>
+                                        <span class="mx-2">·</span>
+                                        <i class="bi bi-shield-check me-1"></i>
+                                        SHA-256 <?= htmlspecialchars(substr($hash, 0, 16), ENT_QUOTES, 'UTF-8') ?>…
+                                    </div>
+                                </div>
+
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <span class="badge text-bg-light border px-3 py-2">
+                                        Snapshot #<?= (int)$officialRevision['snapshot_id'] ?>
+                                    </span>
+                                    <a class="btn btn-success fw-bold text-nowrap"
+                                       href="index.php?c=roster&a=export_revision_word&revision_id=<?= (int)$officialRevision['id'] ?>&hospital_id=<?= (int)($hospital_id ?? 0) ?>">
+                                        <i class="bi bi-file-earmark-word-fill me-1"></i> ดาวน์โหลดฉบับทางการ
+                                    </a>
+                                </div>
+                            </div>
+                        </article>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- ================= 🕘 Modal ประวัติเวอร์ชันตารางเวร ================= -->
 <?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SCHEDULER','DIRECTOR','ADMIN','SUPERADMIN'], true)): ?>
 <div class="modal fade" id="rosterVersionModal" tabindex="-1" aria-hidden="true">
@@ -1372,6 +1484,12 @@ foreach ($roster_coverage as $coverage) {
                                 <?php endif; ?>
                                 <?php if (isset($meta['approved_snapshot_id'])): ?>
                                     <span class="badge text-bg-success">Approved Snapshot #<?= (int)$meta['approved_snapshot_id'] ?></span>
+                                <?php endif; ?>
+                                <?php if (isset($meta['approved_revision_id'])): ?>
+                                    <span class="badge text-bg-success">
+                                        <i class="bi bi-patch-check-fill me-1"></i>
+                                        <?= htmlspecialchars((string)($meta['revision_code'] ?? ('Revision #' . (int)$meta['approved_revision_id'])), ENT_QUOTES, 'UTF-8') ?>
+                                    </span>
                                 <?php endif; ?>
                             </div>
                             <?php endif; ?>
