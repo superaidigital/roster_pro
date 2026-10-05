@@ -216,6 +216,98 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
         font-weight: 500;
     }
 
+    .leave-wallet-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .8rem;
+        min-height: 54px;
+        padding: .45rem .55rem .45rem .7rem;
+        background: rgba(255,255,255,.72);
+        border: 1px solid #e7eef5;
+        border-radius: .95rem;
+    }
+
+    .leave-wallet-summary-main {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+    }
+
+    .leave-wallet-summary-copy {
+        min-width: 0;
+    }
+
+    .leave-wallet-summary-title {
+        margin: 0;
+        color: #0f172a;
+        font-size: .94rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .leave-wallet-summary-subtitle {
+        margin-top: 2px;
+        color: #94a3b8;
+        font-size: .7rem;
+        line-height: 1.25;
+    }
+
+    .leave-wallet-toggle {
+        min-width: 118px;
+        min-height: 36px;
+        padding: .4rem .7rem;
+        border: 1px solid #dbe7f0;
+        border-radius: .75rem;
+        background: #ffffff;
+        color: #0f766e;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .4rem;
+        font-size: .73rem;
+        font-weight: 700;
+        white-space: nowrap;
+        box-shadow: 0 3px 10px rgba(15,23,42,.04);
+        transition: all .18s ease;
+    }
+
+    .leave-wallet-toggle:hover {
+        background: #f0fdfa;
+        border-color: #99f6e4;
+        color: #115e59;
+        transform: translateY(-1px);
+    }
+
+    .leave-wallet-toggle i {
+        transition: transform .2s ease;
+    }
+
+    .leave-wallet-toggle[aria-expanded="true"] i {
+        transform: rotate(180deg);
+    }
+
+    .leave-wallet-toggle .label-expanded {
+        display: none;
+    }
+
+    .leave-wallet-toggle[aria-expanded="true"] .label-collapsed {
+        display: none;
+    }
+
+    .leave-wallet-toggle[aria-expanded="true"] .label-expanded {
+        display: inline;
+    }
+
+    .leave-wallet-collapse {
+        padding-top: .8rem;
+    }
+
+    .leave-wallet-collapse.collapsing {
+        transition: height .22s ease;
+    }
+
     .leave-wallet .row {
         justify-content: center;
     }
@@ -315,7 +407,24 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
         }
 
         .leave-wallet {
-            padding: .75rem;
+            padding: .7rem;
+        }
+
+        .leave-wallet-summary {
+            align-items: flex-start;
+            padding: .55rem;
+        }
+
+        .leave-wallet-toggle {
+            min-width: 42px;
+            width: 42px;
+            height: 36px;
+            padding: 0;
+        }
+
+        .leave-wallet-toggle .label-collapsed,
+        .leave-wallet-toggle .label-expanded {
+            display: none !important;
         }
     }
 </style>
@@ -559,17 +668,32 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     <!-- 🌟 ส่วนที่ 3: กระเป๋าวันลาคงเหลือ (Compact) -->
     <!-- ========================================== -->
     <section class="leave-wallet" aria-labelledby="leaveWalletTitle">
-        <div class="leave-wallet-heading">
-            <div class="icon-box-sm bg-info bg-opacity-10 text-info">
-                <i class="bi bi-wallet2"></i>
+        <div class="leave-wallet-summary">
+            <div class="leave-wallet-summary-main">
+                <div class="icon-box-sm bg-info bg-opacity-10 text-info">
+                    <i class="bi bi-wallet2"></i>
+                </div>
+                <div class="leave-wallet-summary-copy">
+                    <h4 id="leaveWalletTitle" class="leave-wallet-summary-title">กระเป๋าสิทธิ์วันลาคงเหลือของคุณ</h4>
+                    <div class="leave-wallet-summary-subtitle">ย่อไว้เพื่อประหยัดพื้นที่หน้าจอ • กดเพื่อดูรายละเอียดสิทธิ์วันลา</div>
+                </div>
             </div>
-            <div>
-                <h4 id="leaveWalletTitle">กระเป๋าสิทธิ์วันลาคงเหลือของคุณ</h4>
-                <small>สรุปสิทธิ์คงเหลือแบบย่อ</small>
-            </div>
+
+            <button
+                class="leave-wallet-toggle"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#leaveWalletDetails"
+                aria-expanded="false"
+                aria-controls="leaveWalletDetails">
+                <span class="label-collapsed">แสดงรายละเอียด</span>
+                <span class="label-expanded">ซ่อนรายละเอียด</span>
+                <i class="bi bi-chevron-down"></i>
+            </button>
         </div>
 
-        <div class="row g-2">
+        <div class="collapse leave-wallet-collapse" id="leaveWalletDetails">
+            <div class="row g-2">
             <?php if (!empty($leave_balances)): ?>
                 <?php 
                     $has_shown_card = false;
@@ -650,6 +774,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                     </div>
                 </div>
             <?php endif; ?>
+            </div>
         </div>
     </section>
 </div>
