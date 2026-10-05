@@ -1027,6 +1027,7 @@ if (is_file($userModelSignaturePath)) {
         'signature_method',
         'signature_updated_at',
         'clearSignature',
+        'getSignatureRecord',
     ] as $token) {
         if (strpos($userModelSignature, $token) === false) {
             addError($errors, "models/UserModel.php: missing signature persistence token {$token}");
@@ -1041,6 +1042,8 @@ if (is_file($profileSignatureControllerPath)) {
         'requireSignatureOwner',
         'public function save_signature()',
         'public function delete_signature()',
+        'public function signature_image()',
+        'getSignatureRecord',
         'ElectronicSignature::normalize',
         'security_is_valid_post_csrf',
     ] as $token) {
@@ -1060,6 +1063,7 @@ if (is_file($profileSignatureViewPath)) {
         'id="signatureForm"',
         'save_signature',
         'delete_signature',
+        'a=signature_image',
         '$is_signature_owner',
     ] as $token) {
         if (strpos($profileSignatureView, $token) === false) {
