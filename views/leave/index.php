@@ -83,6 +83,120 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     .icon-box-sm { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
     .progress-thin { height: 8px; border-radius: 4px; background-color: #f1f5f9; overflow: hidden; }
 
+    /* Layout กึ่งกลาง + การ์ดหัวหน้าทันสมัย */
+    .leave-page-shell {
+        width: 100%;
+        max-width: 1320px;
+        margin: 0 auto;
+    }
+    .leave-page-hero {
+        max-width: 780px;
+        margin: 0 auto 1.5rem;
+        padding: 1.35rem 1.5rem;
+        text-align: center;
+        background: linear-gradient(145deg, #ffffff 0%, #f8fbff 100%);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 1.5rem;
+        box-shadow: 0 14px 40px rgba(15, 23, 42, 0.07);
+        position: relative;
+        overflow: hidden;
+    }
+    .leave-page-hero::before {
+        content: '';
+        position: absolute;
+        width: 160px;
+        height: 160px;
+        border-radius: 50%;
+        top: -100px;
+        right: -60px;
+        background: rgba(59, 130, 246, 0.08);
+        pointer-events: none;
+    }
+    .leave-page-hero .hero-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
+        margin: 0 auto 0.65rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    }
+
+    /* กระเป๋าสิทธิ์วันลาแบบ Compact */
+    .leave-wallet-section {
+        padding: 1rem;
+        border: 1px solid #e8eef6;
+        border-radius: 1.25rem;
+        background: linear-gradient(145deg, #fbfdff 0%, #f8fafc 100%);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+    }
+    .leave-wallet-header {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.65rem;
+        margin-bottom: 0.85rem;
+        text-align: center;
+    }
+    .leave-wallet-header .icon-box-sm {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        font-size: 1rem;
+        flex: 0 0 auto;
+    }
+    .leave-wallet-card {
+        border-left-width: 4px;
+        border-radius: 0.9rem;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.045);
+    }
+    .leave-wallet-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
+    }
+    .leave-wallet-card .card-body {
+        padding: 0.9rem 1rem !important;
+    }
+    .leave-wallet-card .wallet-title {
+        font-size: 12px;
+        letter-spacing: 0.35px;
+    }
+    .leave-wallet-card .wallet-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex: 0 0 auto;
+    }
+    .leave-wallet-card .wallet-value {
+        font-size: 1.55rem;
+        line-height: 1;
+    }
+    .leave-wallet-card .progress-thin {
+        height: 5px;
+    }
+
+    @media (max-width: 767.98px) {
+        .leave-page-hero {
+            padding: 1.1rem 1rem;
+            border-radius: 1.2rem;
+        }
+        .leave-page-hero h2 {
+            font-size: 1.35rem;
+        }
+        .leave-wallet-section {
+            padding: 0.75rem;
+        }
+        .leave-wallet-header {
+            margin-bottom: 0.7rem;
+        }
+    }
+
     .input-group-modern { border: 1px solid #e2e8f0; border-radius: 0.75rem; transition: all 0.2s; background-color: #f8fafc; overflow: hidden; }
     .input-group-modern:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.15); background-color: #ffffff; }
     .input-group-modern .input-group-text, .input-group-modern .form-control, .input-group-modern .form-select { border: none; background: transparent; }
@@ -113,17 +227,16 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     }
 </style>
 
-<div class="container-fluid px-4 py-4">
-    <!-- Header -->
-    <div class="mb-4">
-        <h2 class="fw-bold text-dark d-flex align-items-center mb-1">
-            <div class="icon-box-sm bg-<?= $page_theme ?> bg-opacity-10 text-<?= $page_theme ?> me-3">
+<div class="container-fluid px-3 px-md-4 py-4">
+    <div class="leave-page-shell">
+        <!-- Header -->
+        <div class="leave-page-hero">
+            <div class="hero-icon bg-<?= $page_theme ?> bg-opacity-10 text-<?= $page_theme ?>">
                 <i class="bi <?= $page_icon ?>"></i>
             </div>
-            <?= $page_title ?>
-        </h2>
-        <p class="text-muted ms-5 ps-2 mb-0">ส่งแบบฟอร์มขออนุญาตลาออนไลน์ และตรวจสอบประวัติการลา</p>
-    </div>
+            <h2 class="fw-bold text-dark mb-1"><?= $page_title ?></h2>
+            <p class="text-muted mb-0">ส่งแบบฟอร์มขออนุญาตลาออนไลน์ และตรวจสอบประวัติการลา</p>
+        </div>
 
     <!-- แจ้งเตือนสถานะต่างๆ -->
     <?php if (isset($_SESSION['success_msg'])): ?>
@@ -351,56 +464,63 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     </div>
 
     <!-- ========================================== -->
-    <!-- 🌟 ส่วนที่ 3: กระเป๋าวันลาคงเหลือ -->
+    <!-- 🌟 ส่วนที่ 3: กระเป๋าวันลาคงเหลือ (Compact) -->
     <!-- ========================================== -->
-    <hr class="text-muted opacity-25 mt-2 mb-4">
-    <div class="d-flex align-items-center mb-3 px-2">
-        <div class="icon-box-sm bg-info bg-opacity-10 text-info me-3"><i class="bi bi-wallet2"></i></div><h4 class="mb-0 fw-bold text-dark">กระเป๋าสิทธิ์วันลาคงเหลือของคุณ</h4>
-    </div>
+    <div class="leave-wallet-section mb-4">
+        <div class="leave-wallet-header">
+            <div class="icon-box-sm bg-info bg-opacity-10 text-info"><i class="bi bi-wallet2"></i></div>
+            <div>
+                <h5 class="mb-0 fw-bold text-dark">กระเป๋าสิทธิ์วันลาคงเหลือของคุณ</h5>
+                <small class="text-muted">สรุปสิทธิ์คงเหลือแบบย่อ</small>
+            </div>
+        </div>
 
-    <div class="row g-3 mb-4">
-        <?php if (!empty($leave_balances)): ?>
-            <?php 
-                $has_shown_card = false;
-                foreach ($leave_balances as $balance): 
-                    if (!empty($selected_leave_type_req) && $balance['leave_type_name'] != $selected_leave_type_req) continue;
-                    $has_shown_card = true;
+        <div class="row g-2 justify-content-center">
+            <?php if (!empty($leave_balances)): ?>
+                <?php 
+                    $has_shown_card = false;
+                    foreach ($leave_balances as $balance): 
+                        if (!empty($selected_leave_type_req) && $balance['leave_type_name'] != $selected_leave_type_req) continue;
+                        $has_shown_card = true;
 
-                    $color_theme = 'primary'; $icon = 'bi-calendar2-check';
-                    if ($balance['leave_type_name'] == 'ลาป่วย') { $color_theme = 'danger'; $icon = 'bi-bandaid'; }
-                    if ($balance['leave_type_name'] == 'ลากิจส่วนตัว') { $color_theme = 'warning'; $icon = 'bi-briefcase'; }
-                    if ($balance['leave_type_name'] == 'ลาพักผ่อน') { $color_theme = 'success'; $icon = 'bi-brightness-high'; }
+                        $color_theme = 'primary'; $icon = 'bi-calendar2-check';
+                        if ($balance['leave_type_name'] == 'ลาป่วย') { $color_theme = 'danger'; $icon = 'bi-bandaid'; }
+                        if ($balance['leave_type_name'] == 'ลากิจส่วนตัว') { $color_theme = 'warning'; $icon = 'bi-briefcase'; }
+                        if ($balance['leave_type_name'] == 'ลาพักผ่อน') { $color_theme = 'success'; $icon = 'bi-brightness-high'; }
 
-                    $total_allowable = floatval($balance['total_allowable']); $used_days = floatval($balance['used_days']); $remaining = floatval($balance['remaining']);
-                    $percent_used = $total_allowable > 0 ? ($used_days / $total_allowable) * 100 : 0;
-            ?>
-                <div class="col-xl-3 col-md-6">
-                    <div class="card card-stat border-<?= $color_theme ?> h-100">
-                        <div class="card-body p-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="text-muted fw-bold mb-0 text-uppercase" style="font-size: 13px; letter-spacing: 0.5px;"><?= htmlspecialchars($balance['leave_type_name']) ?></h6>
-                                <div class="icon-box bg-<?= $color_theme ?> bg-opacity-10 text-<?= $color_theme ?> shadow-sm"><i class="bi <?= $icon ?>"></i></div>
-                            </div>
-                            <div class="mb-3">
-                                <span class="fw-bold text-dark" style="font-size: 2.2rem; line-height: 1;"><?= $remaining ?></span><span class="text-muted ms-1 fw-medium">/ <?= $total_allowable ?> วัน</span>
-                            </div>
-                            <div class="progress progress-thin mb-2"><div class="progress-bar bg-<?= $color_theme ?>" role="progressbar" style="width: <?= $percent_used ?>%" aria-valuenow="<?= $percent_used ?>" aria-valuemin="0" aria-valuemax="100"></div></div>
-                            <div class="d-flex justify-content-between text-muted" style="font-size: 12px;">
-                                <span>ใช้ไป: <span class="fw-bold text-dark"><?= $used_days ?></span></span>
-                                <?php if($balance['carried_over_days'] > 0): ?>
-                                    <span class="text-info fw-bold"><i class="bi bi-arrow-up-right-circle"></i> ยอดยกมา <?= floatval($balance['carried_over_days']) ?></span>
-                                <?php else: ?><span><?= round($percent_used) ?>%</span><?php endif; ?>
+                        $total_allowable = floatval($balance['total_allowable']); $used_days = floatval($balance['used_days']); $remaining = floatval($balance['remaining']);
+                        $percent_used = $total_allowable > 0 ? ($used_days / $total_allowable) * 100 : 0;
+                ?>
+                    <div class="col-12 col-sm-6 col-xl-3">
+                        <div class="card card-stat leave-wallet-card border-<?= $color_theme ?> h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                    <h6 class="wallet-title text-muted fw-bold mb-0 text-uppercase"><?= htmlspecialchars($balance['leave_type_name']) ?></h6>
+                                    <div class="wallet-icon bg-<?= $color_theme ?> bg-opacity-10 text-<?= $color_theme ?>"><i class="bi <?= $icon ?>"></i></div>
+                                </div>
+                                <div class="d-flex align-items-baseline gap-1 mb-2">
+                                    <span class="wallet-value fw-bold text-dark"><?= $remaining ?></span>
+                                    <span class="text-muted small fw-medium">/ <?= $total_allowable ?> วัน</span>
+                                </div>
+                                <div class="progress progress-thin mb-1"><div class="progress-bar bg-<?= $color_theme ?>" role="progressbar" style="width: <?= $percent_used ?>%" aria-valuenow="<?= $percent_used ?>" aria-valuemin="0" aria-valuemax="100"></div></div>
+                                <div class="d-flex justify-content-between align-items-center gap-2 text-muted" style="font-size: 11px;">
+                                    <span>ใช้ไป <span class="fw-bold text-dark"><?= $used_days ?></span> วัน</span>
+                                    <?php if($balance['carried_over_days'] > 0): ?>
+                                        <span class="text-info fw-bold text-nowrap"><i class="bi bi-arrow-up-right-circle"></i> ยกมา <?= floatval($balance['carried_over_days']) ?></span>
+                                    <?php else: ?><span><?= round($percent_used) ?>%</span><?php endif; ?>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            <?php endforeach; ?>
-            <?php if (!$has_shown_card && !empty($selected_leave_type_req)): ?>
-                <div class="col-12"><div class="alert alert-modern alert-warning px-4 py-3 d-flex align-items-center shadow-sm"><i class="bi bi-exclamation-circle-fill fs-4 text-warning me-3"></i> <div><h6 class="fw-bold mb-1 text-dark">ไม่พบข้อมูลโควตา "<?= htmlspecialchars($selected_leave_type_req) ?>"</h6><p class="mb-0 small text-muted">คุณอาจไม่มีสิทธิ์ในประเภทการลานี้ หรือระบบยังไม่ได้กำหนดโควตาให้ กรุณาติดต่อผู้ดูแลระบบ</p></div></div></div>
+                <?php endforeach; ?>
+                <?php if (!$has_shown_card && !empty($selected_leave_type_req)): ?>
+                    <div class="col-12"><div class="alert alert-modern alert-warning px-4 py-3 d-flex align-items-center shadow-sm mb-0"><i class="bi bi-exclamation-circle-fill fs-4 text-warning me-3"></i> <div><h6 class="fw-bold mb-1 text-dark">ไม่พบข้อมูลโควตา "<?= htmlspecialchars($selected_leave_type_req) ?>"</h6><p class="mb-0 small text-muted">คุณอาจไม่มีสิทธิ์ในประเภทการลานี้ หรือระบบยังไม่ได้กำหนดโควตาให้ กรุณาติดต่อผู้ดูแลระบบ</p></div></div></div>
+                <?php endif; ?>
+            <?php else: ?>
+                <div class="col-12"><div class="alert alert-modern alert-info px-4 py-3 d-flex align-items-center shadow-sm mb-0"><i class="bi bi-info-circle-fill fs-4 text-info me-3"></i> <div><h6 class="fw-bold mb-1">ยังไม่มีข้อมูลบัญชีวันลา</h6><p class="mb-0 small text-muted">ระบบกำลังประมวลผลกระเป๋าวันลาของคุณ กรุณาติดต่อผู้ดูแลระบบหากไม่พบข้อมูลเกิน 24 ชั่วโมง</p></div></div></div>
             <?php endif; ?>
-        <?php else: ?>
-            <div class="col-12"><div class="alert alert-modern alert-info px-4 py-3 d-flex align-items-center shadow-sm"><i class="bi bi-info-circle-fill fs-4 text-info me-3"></i> <div><h6 class="fw-bold mb-1">ยังไม่มีข้อมูลบัญชีวันลา</h6><p class="mb-0 small text-muted">ระบบกำลังประมวลผลกระเป๋าวันลาของคุณ กรุณาติดต่อผู้ดูแลระบบหากไม่พบข้อมูลเกิน 24 ชั่วโมง</p></div></div></div>
-        <?php endif; ?>
+        </div>
+    </div>
     </div>
 </div>
 
