@@ -634,6 +634,9 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                                 <input type="hidden" name="user_id" value="<?= (int)$target_user_id ?>">
                                 <input type="hidden" name="signature_data" id="signatureData" value="">
                                 <input type="hidden" name="signature_method" id="signatureMethod" value="DRAW">
+                                <input type="hidden" name="signature_pdpa_ack" id="signaturePdpaAck" value="0">
+                                <input type="hidden" name="signature_pdpa_notice_version" id="signaturePdpaNoticeVersion"
+                                       value="<?= htmlspecialchars(ElectronicSignature::PRIVACY_NOTICE_VERSION, ENT_QUOTES, 'UTF-8') ?>">
                                 <input type="file" id="signatureUpload" accept="image/png,image/jpeg" class="visually-hidden">
 
                                 <div class="signature-pad-shell mb-3">
@@ -945,6 +948,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const signatureMethod = document.getElementById('signatureMethod');
     const signatureUpload = document.getElementById('signatureUpload');
     const clearButton = document.getElementById('clearSignatureCanvas');
+    const signaturePdpaAck = document.getElementById('signaturePdpaAck');
+    const signaturePdpaNoticeVersion = document.getElementById('signaturePdpaNoticeVersion');
 
     if (!signatureCanvas || !signatureForm || !signatureData || !signatureMethod) return;
 
@@ -1048,11 +1053,12 @@ document.addEventListener('DOMContentLoaded', function () {
         reader.readAsDataURL(file);
     });
 
-    signatureForm.addEventListener('submit', function (event) {
+    signatureForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+
         if (!hasInk) {
-            event.preventDefault();
             if (window.Swal) {
-                Swal.fire('ยังไม่มีลายเซ็น', 'กรุณาวาดหรือเลือกรูปลายเซ็นก่อนบันทึก', 'info');
+                await Swal.fire('ยังไม่มีลายเซ็น', 'กรุณาวาดหรือเลือกรูปลายเซ็นก่อนบันทึก', 'info');
             } else {
                 alert('กรุณาวาดหรือเลือกรูปลายเซ็นก่อนบันทึก');
             }
@@ -1060,6 +1066,73 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         signatureData.value = signatureCanvas.toDataURL('image/png');
+        signaturePdpaAck.value = '0';
+
+        let confirmed = false;
+
+        if (window.Swal) {
+            const result = await Swal.fire({
+                title: 'ยืนยันการรับทราบข้อมูลส่วนบุคคล (PDPA)',
+                icon: 'info',
+                width: '46rem',
+                showCancelButton: true,
+                confirmButtonText: '<i class="bi bi-shield-check me-1"></i> ยืนยันและบันทึก',
+                cancelButtonText: 'ยกเลิก',
+                focusConfirm: false,
+                allowOutsideClick: false,
+                reverseButtons: true,
+                html: `
+                    <div class="text-start" style="font-size:.9rem;line-height:1.65;color:#334155;">
+                        <div class="p-3 mb-3 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                            <div class="fw-bold text-dark mb-2">ประกาศการประมวลผลข้อมูลส่วนบุคคลสำหรับลายเซ็นอิเล็กทรอนิกส์</div>
+                            <div>ระบบจะประมวลผลข้อมูลลายเซ็นของท่านเพื่อใช้ยืนยันตัวผู้ลงนามในกระบวนการจัดตารางเวร การเสนอ/อนุมัติ และเอกสารฉบับทางการของระบบ Roster Pro</div>
+                        </div>
+
+                        <div class="fw-bold text-dark mb-1">ข้อมูลที่จัดเก็บ</div>
+                        <div class="mb-3">ภาพลายเซ็นอิเล็กทรอนิกส์, ค่า SHA-256 สำหรับตรวจสอบความถูกต้อง, วิธีการบันทึก, รหัสผู้ใช้งาน และวันเวลาที่บันทึก/รับทราบประกาศ</div>
+
+                        <div class="fw-bold text-dark mb-1">วัตถุประสงค์การใช้ข้อมูล</div>
+                        <div class="mb-3">เพื่อยืนยันผู้ลงนาม ประกอบการอนุมัติเอกสาร ตรวจสอบความถูกต้องย้อนหลัง และเก็บหลักฐานการดำเนินงานตามหน้าที่ของหน่วยงาน</div>
+
+                        <div class="fw-bold text-dark mb-1">การเข้าถึงและการจัดเก็บ</div>
+                        <div class="mb-3">ข้อมูลจะถูกใช้ภายในระบบโดยผู้มีสิทธิ์ตามหน้าที่ และอาจถูกตรึงไว้ใน Official Revision เมื่อเอกสารได้รับอนุมัติแล้ว การเก็บรักษาและการเปิดเผยข้อมูลเป็นไปตามนโยบายของหน่วยงานและกฎหมายที่ใช้บังคับ</div>
+
+                        <div class="fw-bold text-dark mb-1">สิทธิ์ของเจ้าของข้อมูล</div>
+                        <div class="mb-3">ท่านสามารถติดต่อผู้ควบคุมข้อมูลส่วนบุคคล/หน่วยงานต้นสังกัดเพื่อขอใช้สิทธิตามกฎหมายคุ้มครองข้อมูลส่วนบุคคล ทั้งนี้เป็นไปตามเงื่อนไขและข้อยกเว้นที่กฎหมายกำหนด</div>
+
+                        <div class="form-check p-3 rounded-3" style="background:#eff6ff;border:1px solid #bfdbfe;">
+                            <input class="form-check-input" type="checkbox" value="1" id="pdpaSignatureConfirm">
+                            <label class="form-check-label fw-semibold text-dark" for="pdpaSignatureConfirm">
+                                ข้าพเจ้ายืนยันว่าลายเซ็นนี้เป็นของข้าพเจ้า และได้อ่าน/รับทราบรายละเอียดการประมวลผลข้อมูลส่วนบุคคลข้างต้นแล้ว
+                            </label>
+                        </div>
+
+                        <div class="mt-2 text-muted" style="font-size:.75rem;">
+                            เวอร์ชันประกาศ: ${signaturePdpaNoticeVersion?.value || '-'} · การกดยืนยันไม่ตัดสิทธิ์ของท่านตามกฎหมาย
+                        </div>
+                    </div>
+                `,
+                preConfirm: () => {
+                    const checkbox = document.getElementById('pdpaSignatureConfirm');
+                    if (!checkbox || !checkbox.checked) {
+                        Swal.showValidationMessage('กรุณาติ๊กยืนยันว่าได้อ่านและรับทราบข้อมูลส่วนบุคคลก่อนบันทึก');
+                        return false;
+                    }
+                    return true;
+                }
+            });
+
+            confirmed = result.isConfirmed;
+        } else {
+            confirmed = window.confirm(
+                'ยืนยันว่าลายเซ็นนี้เป็นของท่าน และท่านได้รับทราบการประมวลผลข้อมูลส่วนบุคคลเพื่อใช้ในกระบวนการจัดเวรและเอกสารอนุมัติแล้วหรือไม่?'
+            );
+        }
+
+        if (!confirmed) return;
+
+        signaturePdpaAck.value = '1';
+        signatureForm.submit();
     });
 });
 </script>
