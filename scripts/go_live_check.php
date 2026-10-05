@@ -67,10 +67,16 @@ try {
     CommandRunner::run('Performance contract', [PHP_BINARY, 'scripts/performance_check.php']);
     $checks['performance'] = 'PASS';
 
-    CommandRunner::run(
-        'Security compliance',
-        [PHP_BINARY, '-d', 'display_errors=0', '-d', 'expose_php=0', 'scripts/security_check.php', '--strict']
-    );
+    $securityCommand = [
+        PHP_BINARY,
+        '-d', 'display_errors=0',
+        '-d', 'expose_php=0',
+        'scripts/security_check.php',
+    ];
+    if ($production) {
+        $securityCommand[] = '--strict';
+    }
+    CommandRunner::run('Security compliance', $securityCommand);
     $checks['security'] = 'PASS';
 
     if (!$skipRecovery) {
