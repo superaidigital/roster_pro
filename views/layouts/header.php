@@ -814,7 +814,13 @@ $header_page_icon = $page_context[2];
                 <li><a class="dropdown-item py-2" href="index.php?c=settings&a=system"><i class="bi bi-gear text-secondary me-2"></i> ตั้งค่าระบบ</a></li>
                 <?php endif; ?>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger fw-bold py-2" href="index.php?c=auth&a=logout"><i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ</a></li>
+                <li>
+                    <form action="index.php?c=auth&a=logout" method="POST" class="m-0">
+                        <button type="submit" class="dropdown-item text-danger fw-bold py-2">
+                            <i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ
+                        </button>
+                    </form>
+                </li>
             </ul>
         </div>
         <?php endif; ?>
