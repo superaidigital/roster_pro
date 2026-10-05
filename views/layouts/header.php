@@ -241,13 +241,103 @@ $header_page_icon = $page_context[2];
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
         
         .pwa-toast {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(150%);
-            background: rgba(255, 255, 255, 0.95); padding: 12px 16px; border-radius: 1rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 15px;
-            z-index: 1060; transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-            width: 90%; max-width: 380px; border: 1px solid #e2e8f0;
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: auto;
+            width: min(360px, calc(100vw - 32px));
+            padding: 12px;
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 11px;
+            background: rgba(255,255,255,.98);
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            box-shadow: 0 16px 40px rgba(15,23,42,.16);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            z-index: 1060;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(22px) scale(.98);
+            pointer-events: none;
+            transition: opacity .22s ease, transform .22s ease, visibility .22s ease;
         }
-        .pwa-toast.show { transform: translateX(-50%) translateY(0); }
+
+        .pwa-toast.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .pwa-toast-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 13px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg,#0ea5e9,#2563eb);
+            color: #ffffff;
+            font-size: 20px;
+            box-shadow: 0 8px 18px rgba(37,99,235,.18);
+        }
+
+        .pwa-toast-copy {
+            min-width: 0;
+        }
+
+        .pwa-toast-title {
+            margin: 0;
+            color: #0f172a;
+            font-family: 'Kanit', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .pwa-toast-subtitle {
+            margin-top: 3px;
+            color: #64748b;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        .pwa-toast-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pwa-toast-actions .btn {
+            min-height: 34px;
+            padding: 5px 10px;
+            border-radius: 10px !important;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 575.98px) {
+            .pwa-toast {
+                right: 12px;
+                bottom: 12px;
+                width: calc(100vw - 24px);
+                grid-template-columns: 40px minmax(0, 1fr);
+            }
+
+            .pwa-toast-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            .pwa-toast-actions {
+                grid-column: 1 / -1;
+                justify-content: flex-end;
+            }
+        }
 
         /* =========================================================
            ROSTER PRO - MODERN TOPBAR / SIDEBAR TOGGLE
@@ -689,16 +779,16 @@ $header_page_icon = $page_context[2];
     </div>
 </nav>
 
-<!-- 🌟 PWA Toast -->
-<div id="pwaInstallToast" class="pwa-toast">
-    <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center fs-4 shadow-sm" style="width: 45px; height: 45px;"><i class="bi bi-app-indicator"></i></div>
-    <div class="flex-grow-1">
-        <h6 class="fw-bold mb-1" style="font-size: 15px;">ติดตั้ง <?= htmlspecialchars($app_name) ?></h6>
-        <div class="text-muted" style="font-size: 12px;">เพิ่มลงหน้าจอหลักเพื่อใช้งานเต็มจอ</div>
+<!-- 🌟 Compact PWA Install Toast -->
+<div id="pwaInstallToast" class="pwa-toast" role="status" aria-live="polite">
+    <div class="pwa-toast-icon"><i class="bi bi-app-indicator"></i></div>
+    <div class="pwa-toast-copy">
+        <div class="pwa-toast-title">ติดตั้ง <?= htmlspecialchars($app_name) ?></div>
+        <div class="pwa-toast-subtitle">เพิ่มไว้บนหน้าจอเพื่อเปิดใช้งานได้สะดวกขึ้น</div>
     </div>
-    <div class="d-flex flex-column gap-2">
-        <button id="btnInstallPwa" class="btn btn-sm btn-primary fw-bold rounded-pill px-3 shadow-sm">ติดตั้ง</button>
-        <button id="btnDismissPwa" class="btn btn-sm btn-light text-muted rounded-pill px-3 border" style="font-size: 11px;">ภายหลัง</button>
+    <div class="pwa-toast-actions">
+        <button id="btnDismissPwa" class="btn btn-light border">ภายหลัง</button>
+        <button id="btnInstallPwa" class="btn btn-primary shadow-sm">ติดตั้ง</button>
     </div>
 </div>
 
@@ -720,13 +810,18 @@ $header_page_icon = $page_context[2];
     let deferredPrompt;
 
     window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault(); 
+        e.preventDefault();
         deferredPrompt = e;
-        if(!sessionStorage.getItem('pwaDismissed')) {
-            setTimeout(() => { 
+
+        const dismissedAt = parseInt(localStorage.getItem('pwaDismissedAt') || '0', 10);
+        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+        const canShow = !dismissedAt || (Date.now() - dismissedAt) > sevenDays;
+
+        if (canShow) {
+            setTimeout(() => {
                 const toast = document.getElementById('pwaInstallToast');
-                if(toast) toast.classList.add('show'); 
-            }, 3000);
+                if (toast) toast.classList.add('show');
+            }, 2500);
         }
     });
 
@@ -746,10 +841,11 @@ $header_page_icon = $page_context[2];
         }
 
         const btnDismiss = document.getElementById('btnDismissPwa');
-        if(btnDismiss) {
+        if (btnDismiss) {
             btnDismiss.addEventListener('click', () => {
-                document.getElementById('pwaInstallToast').classList.remove('show');
-                sessionStorage.setItem('pwaDismissed', 'true');
+                const toast = document.getElementById('pwaInstallToast');
+                if (toast) toast.classList.remove('show');
+                localStorage.setItem('pwaDismissedAt', String(Date.now()));
             });
         }
     });
