@@ -127,7 +127,7 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261004-ui-v16">
+<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v18">
     <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/themes.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/wizard.css?v=20261004-ui-v16">
@@ -154,7 +154,7 @@ $rpPageMap = [
     'profile' => [$rpAction === 'schedule' ? 'ปฏิทินเวรของฉัน' : 'ข้อมูลส่วนบุคคล', $rpAction === 'schedule' ? 'ตรวจสอบวันเวรและกิจกรรมของคุณ' : 'จัดการข้อมูลประวัติและข้อมูลการทำงาน', $rpAction === 'schedule' ? 'bi-calendar-heart-fill' : 'bi-person-vcard-fill'],
     'staff' => ['บุคลากร', 'จัดการรายชื่อและข้อมูลบุคลากรในหน่วยบริการ', 'bi-people-fill'],
     'users' => ['ผู้ใช้งานและสิทธิ์', 'จัดการบัญชี สิทธิ์ และการเข้าถึงระบบ', 'bi-person-gear'],
-    'hospitals' => ['หน่วยบริการ รพ.สต.', 'จัดการข้อมูลหน่วยบริการและเครือข่าย', 'bi-hospital-fill'],
+    'hospitals' => ['หน่วยบริการ รพ.สต.', 'จัดการข้อมูลหน่วยบริการและเครือข่าย', 'bi-hospital'],
     'settings' => ['ตั้งค่าระบบ', 'กำหนดค่าการใช้งานและข้อมูลส่วนกลาง', 'bi-sliders2'],
     'hr' => ['งานทรัพยากรบุคคล', 'ตรวจสอบและจัดการข้อมูลบุคลากร', 'bi-person-workspace'],
     'logs' => ['ประวัติการใช้งาน', 'ตรวจสอบกิจกรรมและเหตุการณ์ในระบบ', 'bi-clock-history'],
