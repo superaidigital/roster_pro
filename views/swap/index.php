@@ -96,14 +96,14 @@ try {
     <!-- Alerts -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 border-start border-success border-4 fw-bold shadow-sm">
-            <i class="bi bi-check-circle-fill fs-5 me-3"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill fs-5 me-3"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 border-start border-danger border-4 fw-bold shadow-sm">
-            <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
