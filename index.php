@@ -37,6 +37,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// One per-session CSRF token. Rotating the session ID on login keeps the token
+// bound to the authenticated browser session.
+if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Baseline security headers. CSP is intentionally not forced here because the
 // current UI still uses several inline scripts/styles and third-party CDNs.
 header('X-Content-Type-Options: nosniff');
@@ -73,6 +79,35 @@ if (
 ) {
     http_response_code(404);
     exit('ไม่พบหน้าที่ร้องขอ');
+}
+
+// CSRF protection for every state-changing POST routed through index.php.
+// HTML forms send _csrf; JSON/fetch requests send X-CSRF-Token.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    $postedToken = $_POST['_csrf'] ?? null;
+    $headerToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+    $requestToken = is_string($postedToken)
+        ? $postedToken
+        : (is_string($headerToken) ? $headerToken : '');
+
+    if (
+        $requestToken === ''
+        || !hash_equals((string) $_SESSION['csrf_token'], $requestToken)
+    ) {
+        http_response_code(403);
+
+        $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+        if (str_contains($accept, 'application/json')) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(
+                ['status' => 'error', 'message' => 'Invalid CSRF token'],
+                JSON_UNESCAPED_UNICODE
+            );
+        } else {
+            echo 'คำขอหมดอายุหรือไม่ถูกต้อง กรุณารีเฟรชหน้าแล้วลองใหม่';
+        }
+        exit;
+    }
 }
 
 $route = $controllers[$controllerKey];
