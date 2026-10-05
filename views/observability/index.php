@@ -268,18 +268,19 @@ $statusClass = $overall === 'OK' ? 'success' : ($overall === 'DEGRADED' ? 'warni
                 <div class="p-3 p-md-4 border-bottom"><h5 class="fw-bolder mb-0">Health Snapshot History</h5></div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
-                        <thead class="table-light"><tr><th>Status</th><th>Queue</th><th>Errors</th><th>Captured</th></tr></thead>
+                        <thead class="table-light"><tr><th>Status</th><th>DR</th><th>Queue</th><th>Errors</th><th>Captured</th></tr></thead>
                         <tbody>
                         <?php foreach (array_slice($snapshots ?? [],0,15) as $snap): ?>
                             <?php $sc = $snap['overall_status'] === 'OK' ? 'success' : ($snap['overall_status'] === 'DEGRADED' ? 'warning' : 'danger'); ?>
                             <tr>
                                 <td><span class="badge text-bg-<?= $sc ?>"><?= htmlspecialchars((string)$snap['overall_status'], ENT_QUOTES, 'UTF-8') ?></span></td>
+                                <td class="small"><?= htmlspecialchars((string)($snap['dr_status'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= (int)$snap['queue_pending'] ?> / failed <?= (int)$snap['queue_failed'] ?></td>
                                 <td><?= (int)$snap['open_errors_24h'] ?></td>
                                 <td class="small"><?= htmlspecialchars((string)$snap['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
                             </tr>
                         <?php endforeach; ?>
-                        <?php if (empty($snapshots)): ?><tr><td colspan="4" class="text-muted text-center py-4">ยังไม่มี Health Snapshot</td></tr><?php endif; ?>
+                        <?php if (empty($snapshots)): ?><tr><td colspan="5" class="text-muted text-center py-4">ยังไม่มี Health Snapshot</td></tr><?php endif; ?>
                         </tbody>
                     </table>
                 </div>
