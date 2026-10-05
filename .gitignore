@@ -35,3 +35,6 @@ public/uploads/**/*.sql
 # Runtime cutover / maintenance state
 /storage/runtime/*
 !/storage/runtime/.gitkeep
+
+# Generated security/SBOM artifacts
+/build/
