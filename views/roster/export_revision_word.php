@@ -92,6 +92,10 @@ table.roster th { background: #fff7b2; }
 .signature-table td { width: 33.33%; text-align: center; vertical-align: top; border: none; font-size: 13pt; line-height: 1.25; padding: 4px; }
 .sig-box { height: 58px; display: block; }
 .integrity { margin-top: 14px; border: 1px solid #b8c2cc; background: #f8fafc; padding: 6px 8px; font-size: 9pt; word-break: break-all; }
+.verification-table { width:100%; border-collapse:collapse; margin-top:12px; }
+.verification-table td { border:1px solid #b8c2cc; padding:8px; vertical-align:middle; }
+.verification-code { font-family:Consolas,monospace; font-size:10pt; letter-spacing:.5px; word-break:break-all; }
+.verify-url { font-size:8pt; word-break:break-all; color:#334155; }
 </style>
 </head>
 <body>
@@ -223,6 +227,30 @@ table.roster th { background: #fff7b2; }
                 (<?= htmlspecialchars((string)($revision['approved_name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)<br>
                 <?= htmlspecialchars((string)($revision['approved_position'] ?? ''), ENT_QUOTES, 'UTF-8') ?><br>
                 <span class="small"><?= htmlspecialchars((string)($revision['approved_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+            </td>
+        </tr>
+    </table>
+
+    <table class="verification-table">
+        <tr>
+            <td style="width:150px;text-align:center;">
+                <img src="<?= htmlspecialchars((string)($qrImageUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                     alt="QR Code ตรวจสอบเอกสาร"
+                     width="130" height="130">
+            </td>
+            <td>
+                <div style="font-size:12pt;font-weight:bold;margin-bottom:6px;">สแกน QR เพื่อตรวจสอบเอกสาร</div>
+                <div style="font-size:9pt;margin-bottom:5px;">Verification Code</div>
+                <div class="verification-code">
+                    <?= htmlspecialchars((string)($revision['verification_code'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                </div>
+                <div style="font-size:9pt;margin-top:8px;">Verification URL</div>
+                <div class="verify-url">
+                    <?= htmlspecialchars((string)($verificationUrl ?? ''), ENT_QUOTES, 'UTF-8') ?>
+                </div>
+                <div style="font-size:8pt;margin-top:7px;color:#64748b;">
+                    QR Code มีเฉพาะ URL สำหรับตรวจสอบ Revision และไม่บรรจุข้อมูลตารางเวรหรือค่าตอบแทน
+                </div>
             </td>
         </tr>
     </table>
