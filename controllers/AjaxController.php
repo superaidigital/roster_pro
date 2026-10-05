@@ -43,8 +43,10 @@ class AjaxController {
             "Authorization: Bearer " . $line_token
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         
         $result = curl_exec($ch);
         curl_close($ch);
@@ -56,18 +58,38 @@ class AjaxController {
     // 🛡️ Helper: ตรวจสอบสิทธิ์การจัดการตารางเวร
     // ==========================================
     private function canEditRoster($hospital_id, $month_year) {
-        $role = $_SESSION['user']['role'];
-        
-        // แอดมินและซุปเปอร์แอดมินจัดการได้อิสระ
-        if (in_array($role, ['ADMIN', 'SUPERADMIN'])) return true;
-        if ($role === 'STAFF') return false;
+        if (!isset($_SESSION['user'])) {
+            return false;
+        }
+
+        $role = strtoupper((string) ($_SESSION['user']['role'] ?? 'STAFF'));
+        $hospital_id = (int) $hospital_id;
+        $myHospitalId = (int) ($_SESSION['user']['hospital_id'] ?? 0);
+
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', (string) $month_year)) {
+            return false;
+        }
+
+        // Central admins may manage any hospital.
+        if (in_array($role, ['ADMIN', 'SUPERADMIN'], true)) {
+            return $hospital_id > 0;
+        }
+
+        // Only roster managers may edit, and they are strictly scoped to
+        // their own hospital (prevents cross-hospital IDOR).
+        if (!in_array($role, ['SCHEDULER', 'DIRECTOR'], true)) {
+            return false;
+        }
+
+        if ($hospital_id <= 0 || $hospital_id !== $myHospitalId) {
+            return false;
+        }
 
         $db = (new Database())->getConnection();
         $shiftModel = new ShiftModel($db);
         $status = $shiftModel->getRosterStatus($hospital_id, $month_year);
-        
-        if ($status === 'SUBMITTED' || $status === 'APPROVED' || $status === 'REQUEST_EDIT') return false;
-        return true; 
+
+        return !in_array($status, ['SUBMITTED', 'APPROVED', 'REQUEST_EDIT'], true);
     }
 
     // ==========================================
@@ -114,8 +136,10 @@ class AjaxController {
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['message' => $message]));
         curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/x-www-form-urlencoded", "Authorization: Bearer " . $token]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         
         $result = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -133,11 +157,32 @@ class AjaxController {
     // 🌟 API: บันทึกเวร (Save Shift)
     // ==========================================
     public function save_shift() {
-        error_reporting(0); // 🌟 ปิด Warning
-        header('Content-Type: application/json');
-        
+        error_reporting(0);
+        header('Content-Type: application/json; charset=utf-8');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+            exit;
+        }
+
         $data = json_decode(file_get_contents("php://input"));
-        if (!isset($_SESSION['user'])) { echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit; }
+        if (!is_object($data) || json_last_error() !== JSON_ERROR_NONE) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'ข้อมูล JSON ไม่ถูกต้อง']);
+            exit;
+        }
+
+        if (
+            !isset($data->date)
+            || !is_string($data->date)
+            || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data->date)
+            || strtotime($data->date) === false
+        ) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'วันที่ไม่ถูกต้อง']);
+            exit;
+        }
 
         $db = (new Database())->getConnection();
         $shiftModel = new ShiftModel($db);
@@ -206,7 +251,9 @@ class AjaxController {
                 }
                 exit;
             } catch (Exception $e) {
-                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); exit;
+                error_log('save_shift failed: ' . $e->getMessage());
+                echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถบันทึกเวรได้']);
+                exit;
             }
         }
         echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
@@ -218,9 +265,15 @@ class AjaxController {
     public function update_order() {
         header('Content-Type: application/json');
         
-        // อนุญาตเฉพาะ POST Request และต้องล็อกอิน
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
-            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+        // User ordering is an administrative operation.
+        $role = strtoupper((string) ($_SESSION['user']['role'] ?? ''));
+        if (
+            $_SERVER['REQUEST_METHOD'] !== 'POST'
+            || !isset($_SESSION['user'])
+            || !in_array($role, ['SUPERADMIN', 'ADMIN', 'HR'], true)
+        ) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
             exit;
         }
 
@@ -367,16 +420,49 @@ class AjaxController {
     // ==========================================
     public function change_status() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
-            header("Location: index.php?c=roster"); exit;
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $role = strtoupper((string) ($_SESSION['user']['role'] ?? 'STAFF'));
+        if (!in_array($role, ['SCHEDULER', 'DIRECTOR', 'ADMIN', 'SUPERADMIN'], true)) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์เปลี่ยนสถานะตารางเวร";
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $month_year = is_string($_POST['month_year'] ?? null) ? $_POST['month_year'] : '';
+        $new_status = is_string($_POST['status'] ?? null) ? strtoupper($_POST['status']) : '';
+        $allowedStatuses = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REQUEST_EDIT'];
+
+        if (
+            !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month_year)
+            || !in_array($new_status, $allowedStatuses, true)
+        ) {
+            $_SESSION['error_msg'] = "ข้อมูลสถานะตารางเวรไม่ถูกต้อง";
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $myHospitalId = (int) ($_SESSION['user']['hospital_id'] ?? 0);
+        $requestedHospitalId = filter_var($_POST['hospital_id'] ?? null, FILTER_VALIDATE_INT);
+
+        // Non-admin users can never act on another hospital, even if they tamper
+        // with hospital_id in the POST body.
+        $hospital_id = in_array($role, ['ADMIN', 'SUPERADMIN'], true) && $requestedHospitalId
+            ? (int) $requestedHospitalId
+            : $myHospitalId;
+
+        if ($hospital_id <= 0) {
+            $_SESSION['error_msg'] = "ไม่พบหน่วยบริการที่สามารถจัดการได้";
+            header("Location: index.php?c=roster");
+            exit;
         }
 
         $db = (new Database())->getConnection();
         $shiftModel = new ShiftModel($db);
         $notifModel = new NotificationModel($db);
-
-        $month_year = $_POST['month_year'];
-        $new_status = $_POST['status']; 
-        $hospital_id = $_POST['hospital_id'] ?? $_SESSION['user']['hospital_id'];
 
         $stmt_hosp = $db->prepare("SELECT name FROM hospitals WHERE id = ?");
         $stmt_hosp->execute([$hospital_id]);
