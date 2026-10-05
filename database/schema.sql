@@ -400,13 +400,15 @@ CREATE TABLE `roster_revisions` (
   `shifts_json` longtext NOT NULL,
   `pay_summary_json` longtext DEFAULT NULL,
   `content_hash` char(64) NOT NULL,
+  `verification_code` char(32) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_roster_revision_number` (`hospital_id`,`month_year`,`revision_no`),
   KEY `idx_roster_revision_month` (`hospital_id`,`month_year`,`created_at`),
   KEY `idx_roster_revision_code` (`revision_code`),
   KEY `idx_roster_revision_snapshot` (`snapshot_id`),
-  KEY `idx_roster_revision_approved` (`approved_by`,`approved_at`)
+  KEY `idx_roster_revision_approved` (`approved_by`,`approved_at`),
+  UNIQUE KEY `uq_roster_revision_verification_code` (`verification_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
