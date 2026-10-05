@@ -1,0 +1,118 @@
+name: Disaster Recovery Drill
+
+on:
+  pull_request:
+  push:
+    branches:
+      - security-hardening-v1
+
+permissions:
+  contents: read
+
+jobs:
+  disaster-recovery-drill:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: roster_dr_source
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: roster_dr_source
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_TIMEZONE: '+07:00'
+      BACKUP_DIR: storage/backups
+      DR_DB_ADMIN_USER: root
+      DR_DB_ADMIN_PASSWORD: root
+      DB_CLIENT_BIN: mariadb
+      DR_MAX_RPO_SECONDS: 3600
+      DR_MAX_RTO_SECONDS: 120
+      DR_MAX_DRILL_AGE_DAYS: 1
+      DR_BACKUP_LABEL: scheduled
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, zlib
+          coverage: none
+
+      - name: Install MariaDB client
+        run: sudo apt-get update && sudo apt-get install -y mariadb-client
+
+      - name: Load canonical source schema
+        run: mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_dr_source < database/schema.sql
+
+      - name: Baseline source migration history
+        run: php scripts/migrate.php --baseline --confirm=SCHEMA-LOADED
+
+      - name: Seed continuity marker
+        run: |
+          mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_dr_source -e "
+            INSERT INTO system_settings (setting_key, setting_value, description)
+            VALUES ('dr_ci_marker', 'restore-me', 'DR CI continuity marker')
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
+          "
+
+      - name: Create scheduled backup
+        run: php scripts/backup_database.php --label=scheduled
+
+      - name: Verify backup integrity and format
+        shell: bash
+        run: |
+          set -euo pipefail
+          backup="$(ls -1t storage/backups/roster_dr_source_scheduled_*.sql.gz | head -n1)"
+          php scripts/verify_backup.php --file="$backup"
+          grep -q '"format_version": 2' "$backup.json"
+          grep -q '"restore_scope": "database_contents"' "$backup.json"
+          grep -q '"contains_database_ddl": false' "$backup.json"
+
+      - name: Run isolated restore drill
+        shell: bash
+        run: |
+          set -euo pipefail
+          backup="$(ls -1t storage/backups/roster_dr_source_scheduled_*.sql.gz | head -n1)"
+          php scripts/restore_drill.php --file="$backup"
+
+      - name: Verify recovery readiness gate
+        run: php scripts/recovery_check.php
+
+      - name: Verify drill result and no leftover database
+        run: |
+          mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_dr_source -e "
+            SELECT id, status, rpo_seconds, rto_ms, tables_verified, critical_tables_verified
+            FROM disaster_recovery_drills
+            ORDER BY id DESC
+            LIMIT 1;
+          "
+          count="$(mariadb -N -h 127.0.0.1 -P 3306 -uroot -proot -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME LIKE 'dr_drill_%';")"
+          test "$count" = "0"
+
+      - name: Reject tampered backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          backup="$(ls -1t storage/backups/roster_dr_source_scheduled_*.sql.gz | head -n1)"
+          cp "$backup" storage/backups/tampered.sql.gz
+          cp "$backup.sha256" storage/backups/tampered.sql.gz.sha256
+          printf 'tamper' >> storage/backups/tampered.sql.gz
+          if php scripts/verify_backup.php --file=storage/backups/tampered.sql.gz; then
+            echo "Tampered backup was incorrectly accepted" >&2
+            exit 1
+          fi

@@ -69,6 +69,7 @@ $candidates = $binaryOverride !== ''
     ? [$binaryOverride]
     : ['mariadb-dump', 'mysqldump'];
 
+$backupStartedAt = date(DATE_ATOM);
 $timestamp = date('Ymd_His');
 $safeDb = preg_replace('/[^A-Za-z0-9_-]+/', '_', $dbName) ?: 'database';
 $filename = "{$safeDb}_{$label}_{$timestamp}.sql.gz";
@@ -88,7 +89,7 @@ $baseArgs = [
     '--events',
     '--hex-blob',
     '--default-character-set=utf8mb4',
-    '--databases',
+    '--no-tablespaces',
     $dbName,
 ];
 
@@ -187,13 +188,17 @@ file_put_contents($checksumPath, $checksum . '  ' . $filename . PHP_EOL, LOCK_EX
 @chmod($checksumPath, 0600);
 
 $manifest = [
+    'format_version' => 2,
+    'restore_scope' => 'database_contents',
     'filename' => $filename,
     'sha256' => $checksum,
     'size_bytes' => filesize($finalPath),
+    'started_at' => $backupStartedAt,
     'created_at' => date(DATE_ATOM),
     'database' => $dbName,
     'label' => $label,
     'dump_binary' => basename($usedBinary),
+    'contains_database_ddl' => false,
 ];
 $manifestPath = $finalPath . '.json';
 file_put_contents(

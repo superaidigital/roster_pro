@@ -56,6 +56,7 @@ class ObservabilityController {
             $failedJobs = $jobModel->getFailedJobs(100);
             $recentJobs = $jobModel->getRecentJobs(50);
             $snapshots = $service->recentSnapshots(48);
+            $recoveryDrills = $service->recentRecoveryDrills(20);
         } catch (Throwable $e) {
             error_log('Observability dashboard load failed: ' . $e->getMessage());
             $summary = [
@@ -65,11 +66,24 @@ class ObservabilityController {
                 'queue' => ['pending' => 0, 'running' => 0, 'failed' => 0, 'done' => 0, 'delayed' => 0],
                 'events' => ['open_total' => 0, 'critical_open' => 0, 'error_open' => 0, 'events_24h' => 0, 'open_24h' => 0],
                 'disk_free_mb' => null,
+                'disaster_recovery' => [
+                    'status' => 'UNKNOWN',
+                    'enforced' => false,
+                    'max_drill_age_days' => 7,
+                    'rpo_target_seconds' => 86400,
+                    'rto_target_ms' => 900000,
+                    'latest' => null,
+                    'latest_successful' => null,
+                    'last_success_age_hours' => null,
+                    'total' => 0,
+                    'failed_30d' => 0,
+                ],
             ];
             $openEvents = [];
             $failedJobs = [];
             $recentJobs = [];
             $snapshots = [];
+            $recoveryDrills = [];
             $_SESSION['error_msg'] = 'ไม่สามารถโหลดข้อมูลติดตามระบบได้ครบถ้วน';
         }
 

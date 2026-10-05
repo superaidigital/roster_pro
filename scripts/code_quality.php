@@ -648,6 +648,101 @@ if (is_file($simpleCachePath)) {
     }
 }
 
+// 5.12) Disaster recovery and business continuity guards.
+$drFiles = [
+    'lib/BackupVerifier.php',
+    'models/DisasterRecoveryDrillModel.php',
+    'scripts/backup_if_due.php',
+    'scripts/restore_drill.php',
+    'scripts/recovery_check.php',
+    'database/migrations/20261005_disaster_recovery.sql',
+    '.github/workflows/disaster-recovery.yml',
+    'docs/DISASTER_RECOVERY.md',
+];
+foreach ($drFiles as $relativePath) {
+    if (!is_file($root . '/' . $relativePath)) {
+        addError($errors, 'Missing disaster recovery file: ' . $relativePath);
+    }
+}
+
+$backupScriptPath = $root . '/scripts/backup_database.php';
+if (is_file($backupScriptPath)) {
+    $backupScript = (string) file_get_contents($backupScriptPath);
+    foreach ([
+        "'format_version' => 2",
+        "'restore_scope' => 'database_contents'",
+        "'contains_database_ddl' => false",
+        "'--no-tablespaces'",
+    ] as $token) {
+        if (strpos($backupScript, $token) === false) {
+            addError($errors, "scripts/backup_database.php: missing restore-safe backup token {$token}");
+        }
+    }
+    if (strpos($backupScript, "'--databases'") !== false) {
+        addError($errors, 'scripts/backup_database.php: --databases must not be used by restore-safe backup format');
+    }
+}
+
+$backupVerifierPath = $root . '/lib/BackupVerifier.php';
+if (is_file($backupVerifierPath)) {
+    $backupVerifier = (string) file_get_contents($backupVerifierPath);
+    foreach ([
+        'hash_equals',
+        'assertRestoreSafeDump',
+        'CREATE|DROP|ALTER',
+        "preg_match('/^\\\\s*USE\\\\s+/i'",
+        'backupRoot',
+    ] as $token) {
+        if (strpos($backupVerifier, $token) === false) {
+            addError($errors, "lib/BackupVerifier.php: missing restore safety token {$token}");
+        }
+    }
+}
+
+$restoreDrillPath = $root . '/scripts/restore_drill.php';
+if (is_file($restoreDrillPath)) {
+    $restoreDrill = (string) file_get_contents($restoreDrillPath);
+    foreach ([
+        "PHP_SAPI !== 'cli'",
+        'BackupVerifier::verify',
+        'BackupVerifier::assertRestoreSafeDump',
+        "str_starts_with(\$targetDatabase, 'dr_drill_')",
+        'DROP DATABASE',
+        'DR_MAX_RPO_SECONDS',
+        'DR_MAX_RTO_SECONDS',
+        'critical_tables_verified',
+    ] as $token) {
+        if (strpos($restoreDrill, $token) === false) {
+            addError($errors, "scripts/restore_drill.php: missing DR safety token {$token}");
+        }
+    }
+}
+
+$recoveryCheckPath = $root . '/scripts/recovery_check.php';
+if (is_file($recoveryCheckPath)) {
+    $recoveryCheck = (string) file_get_contents($recoveryCheckPath);
+    foreach ([
+        'DR_MAX_RPO_SECONDS',
+        'DR_MAX_RTO_SECONDS',
+        'DR_MAX_DRILL_AGE_DAYS',
+        'latestSuccessful',
+        'RECOVERY_CHECK_OK',
+    ] as $token) {
+        if (strpos($recoveryCheck, $token) === false) {
+            addError($errors, "scripts/recovery_check.php: missing recovery gate token {$token}");
+        }
+    }
+}
+
+$observabilityServiceDrPath = $root . '/lib/ObservabilityService.php';
+if (is_file($observabilityServiceDrPath)) {
+    $observabilityServiceDr = (string) file_get_contents($observabilityServiceDrPath);
+    if (strpos($observabilityServiceDr, 'disasterRecoverySummary') === false
+        || strpos($observabilityServiceDr, 'recentRecoveryDrills') === false) {
+        addError($errors, 'lib/ObservabilityService.php: disaster recovery posture must remain integrated');
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',

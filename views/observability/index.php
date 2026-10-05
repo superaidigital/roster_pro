@@ -3,6 +3,9 @@ $summary = $summary ?? [];
 $queue = $summary['queue'] ?? [];
 $events = $summary['events'] ?? [];
 $migration = $summary['migration'] ?? [];
+$dr = $summary['disaster_recovery'] ?? [];
+$drStatus = strtoupper((string)($dr['status'] ?? 'UNKNOWN'));
+$drClass = $drStatus === 'PASS' ? 'success' : ($drStatus === 'UNKNOWN' ? 'secondary' : 'warning');
 $overall = strtoupper((string)($summary['overall_status'] ?? 'UNKNOWN'));
 $statusClass = $overall === 'OK' ? 'success' : ($overall === 'DEGRADED' ? 'warning' : 'danger');
 ?>
@@ -81,6 +84,85 @@ $statusClass = $overall === 'OK' ? 'success' : ($overall === 'DEGRADED' ? 'warni
             </div>
         </div>
         <?php endforeach; ?>
+    </div>
+
+    <div class="obs-card mb-4 overflow-hidden border-start border-4 border-<?= $drClass ?>">
+        <div class="p-3 p-md-4 border-bottom d-flex flex-column flex-lg-row justify-content-between gap-3">
+            <div>
+                <div class="text-primary fw-bold small mb-1">BUSINESS CONTINUITY</div>
+                <h5 class="fw-bolder mb-1">Disaster Recovery Readiness</h5>
+                <div class="small text-muted">ติดตามการซ้อมกู้คืน, RPO, RTO และความสดของ Restore Drill ล่าสุด</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge text-bg-<?= $drClass ?> rounded-pill px-3 py-2"><?= htmlspecialchars($drStatus, ENT_QUOTES, 'UTF-8') ?></span>
+                <?php if (!empty($dr['enforced'])): ?>
+                    <span class="badge bg-dark rounded-pill px-3 py-2">Health Gate ON</span>
+                <?php else: ?>
+                    <span class="badge bg-light text-dark border rounded-pill px-3 py-2">Health Gate OFF</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="p-3 p-md-4">
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-lg-3">
+                    <div class="bg-light rounded-4 p-3 h-100">
+                        <div class="metric-label">Last Success</div>
+                        <div class="fs-4 fw-bolder"><?= isset($dr['last_success_age_hours']) && $dr['last_success_age_hours'] !== null ? number_format((int)$dr['last_success_age_hours']) . ' ชม.' : '-' ?></div>
+                        <div class="small text-muted">เป้าหมาย ≤ <?= number_format((int)($dr['max_drill_age_days'] ?? 7)) ?> วัน</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="bg-light rounded-4 p-3 h-100">
+                        <div class="metric-label">RPO</div>
+                        <div class="fs-4 fw-bolder"><?= isset($dr['latest_successful']['rpo_seconds']) ? number_format((int)$dr['latest_successful']['rpo_seconds']) . ' s' : '-' ?></div>
+                        <div class="small text-muted">เป้าหมาย ≤ <?= number_format((int)($dr['rpo_target_seconds'] ?? 86400)) ?> s</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="bg-light rounded-4 p-3 h-100">
+                        <div class="metric-label">RTO</div>
+                        <div class="fs-4 fw-bolder"><?= isset($dr['latest_successful']['rto_ms']) ? number_format((int)$dr['latest_successful']['rto_ms']) . ' ms' : '-' ?></div>
+                        <div class="small text-muted">เป้าหมาย ≤ <?= number_format((int)($dr['rto_target_ms'] ?? 900000)) ?> ms</div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="bg-light rounded-4 p-3 h-100">
+                        <div class="metric-label">Drills</div>
+                        <div class="fs-4 fw-bolder"><?= number_format((int)($dr['total'] ?? 0)) ?></div>
+                        <div class="small text-muted">Failed 30d: <?= number_format((int)($dr['failed_30d'] ?? 0)) ?></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Status</th><th>Backup</th><th>RPO</th><th>RTO</th><th>Verified</th><th>Completed</th></tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach (array_slice($recoveryDrills ?? [], 0, 10) as $drill): ?>
+                        <?php $dc = strtoupper((string)$drill['status']) === 'PASS' ? 'success' : 'danger'; ?>
+                        <tr>
+                            <td><span class="badge text-bg-<?= $dc ?>"><?= htmlspecialchars((string)$drill['status'], ENT_QUOTES, 'UTF-8') ?></span></td>
+                            <td class="small">
+                                <div class="fw-semibold"><?= htmlspecialchars((string)$drill['backup_filename'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php if (!empty($drill['failure_code'])): ?>
+                                    <div class="text-danger"><?= htmlspecialchars((string)$drill['failure_code'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= $drill['rpo_seconds'] === null ? '-' : number_format((int)$drill['rpo_seconds']) . ' s' ?></td>
+                            <td><?= $drill['rto_ms'] === null ? '-' : number_format((int)$drill['rto_ms']) . ' ms' ?></td>
+                            <td><?= number_format((int)$drill['critical_tables_verified']) ?>/<?= number_format((int)$drill['tables_verified']) ?></td>
+                            <td class="small"><?= htmlspecialchars((string)$drill['completed_at'], ENT_QUOTES, 'UTF-8') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($recoveryDrills)): ?>
+                        <tr><td colspan="6" class="text-center text-muted py-4">ยังไม่มีผล Restore Drill</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <div class="obs-card mb-4 overflow-hidden">
@@ -186,18 +268,19 @@ $statusClass = $overall === 'OK' ? 'success' : ($overall === 'DEGRADED' ? 'warni
                 <div class="p-3 p-md-4 border-bottom"><h5 class="fw-bolder mb-0">Health Snapshot History</h5></div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
-                        <thead class="table-light"><tr><th>Status</th><th>Queue</th><th>Errors</th><th>Captured</th></tr></thead>
+                        <thead class="table-light"><tr><th>Status</th><th>DR</th><th>Queue</th><th>Errors</th><th>Captured</th></tr></thead>
                         <tbody>
                         <?php foreach (array_slice($snapshots ?? [],0,15) as $snap): ?>
                             <?php $sc = $snap['overall_status'] === 'OK' ? 'success' : ($snap['overall_status'] === 'DEGRADED' ? 'warning' : 'danger'); ?>
                             <tr>
                                 <td><span class="badge text-bg-<?= $sc ?>"><?= htmlspecialchars((string)$snap['overall_status'], ENT_QUOTES, 'UTF-8') ?></span></td>
+                                <td class="small"><?= htmlspecialchars((string)($snap['dr_status'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></td>
                                 <td><?= (int)$snap['queue_pending'] ?> / failed <?= (int)$snap['queue_failed'] ?></td>
                                 <td><?= (int)$snap['open_errors_24h'] ?></td>
                                 <td class="small"><?= htmlspecialchars((string)$snap['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
                             </tr>
                         <?php endforeach; ?>
-                        <?php if (empty($snapshots)): ?><tr><td colspan="4" class="text-muted text-center py-4">ยังไม่มี Health Snapshot</td></tr><?php endif; ?>
+                        <?php if (empty($snapshots)): ?><tr><td colspan="5" class="text-muted text-center py-4">ยังไม่มี Health Snapshot</td></tr><?php endif; ?>
                         </tbody>
                     </table>
                 </div>
