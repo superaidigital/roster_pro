@@ -351,13 +351,17 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
     </div>
 </nav>
 
-<!-- PWA Install Card -->
+<!-- PWA Install Dialog -->
+<div id="pwaInstallBackdrop" class="rp-pwa-backdrop" aria-hidden="true"></div>
+
 <div id="pwaInstallToast"
      class="pwa-toast"
      role="dialog"
-     aria-modal="false"
+     aria-modal="true"
+     aria-hidden="true"
      aria-labelledby="pwaInstallTitle"
-     aria-describedby="pwaInstallDescription">
+     aria-describedby="pwaInstallDescription"
+     tabindex="-1">
     <button type="button"
             class="rp-pwa-close"
             id="btnDismissPwaClose"
@@ -372,16 +376,16 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
         </div>
 
         <div class="rp-pwa-copy">
-            <div class="rp-pwa-eyebrow">ติดตั้งเป็นแอป</div>
+            <div class="rp-pwa-eyebrow">ROSTER PRO APP</div>
             <h2 class="rp-pwa-title" id="pwaInstallTitle">ติดตั้ง <?= htmlspecialchars($app_name, ENT_QUOTES, 'UTF-8') ?></h2>
             <p class="rp-pwa-description" id="pwaInstallDescription">
-                เปิดใช้งาน Roster Pro ได้รวดเร็วจากหน้าจอหลัก พร้อมพื้นที่ทำงานแบบเต็มจอ
+                เพิ่ม Roster Pro ไว้บนอุปกรณ์เพื่อเปิดใช้งานได้รวดเร็ว และทำงานแบบเต็มหน้าจอเหมือนแอป
             </p>
 
             <div class="rp-pwa-benefits" aria-label="ประโยชน์ของการติดตั้ง">
-                <span><i class="bi bi-lightning-charge-fill" aria-hidden="true"></i> เปิดเร็ว</span>
-                <span><i class="bi bi-window-stack" aria-hidden="true"></i> เต็มจอ</span>
-                <span><i class="bi bi-pin-angle-fill" aria-hidden="true"></i> เข้าถึงง่าย</span>
+                <span><i class="bi bi-lightning-charge-fill" aria-hidden="true"></i><strong>เปิดเร็ว</strong><small>เข้าใช้งานทันที</small></span>
+                <span><i class="bi bi-window-stack" aria-hidden="true"></i><strong>เต็มจอ</strong><small>พื้นที่ทำงานมากขึ้น</small></span>
+                <span><i class="bi bi-pin-angle-fill" aria-hidden="true"></i><strong>เข้าถึงง่าย</strong><small>อยู่บนหน้าจอหลัก</small></span>
             </div>
         </div>
     </div>
@@ -389,11 +393,16 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
     <div class="rp-pwa-actions">
         <button id="btnInstallPwa" type="button" class="rp-pwa-btn rp-pwa-btn-primary">
             <i class="bi bi-download" aria-hidden="true"></i>
-            <span>ติดตั้งแอป</span>
+            <span>ติดตั้ง Roster Pro</span>
         </button>
         <button id="btnDismissPwa" type="button" class="rp-pwa-btn rp-pwa-btn-secondary">
             ไว้ภายหลัง
         </button>
+    </div>
+
+    <div class="rp-pwa-footnote">
+        <i class="bi bi-shield-check" aria-hidden="true"></i>
+        ติดตั้งได้จากเบราว์เซอร์โดยไม่กระทบข้อมูลในระบบ
     </div>
 </div>
 
@@ -438,22 +447,47 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
     // 2. จัดการหน้าต่าง Install PWA
     let deferredPrompt;
 
+    const showPwaInstall = () => {
+        const dialog = document.getElementById('pwaInstallToast');
+        const backdrop = document.getElementById('pwaInstallBackdrop');
+        if (!dialog) return;
+
+        dialog.classList.add('show');
+        dialog.setAttribute('aria-hidden', 'false');
+        backdrop?.classList.add('show');
+        document.body.classList.add('rp-pwa-dialog-open');
+
+        window.setTimeout(() => {
+            document.getElementById('btnInstallPwa')?.focus({ preventScroll: true });
+        }, 80);
+    };
+
+    const hidePwaInstall = (remember = true) => {
+        const dialog = document.getElementById('pwaInstallToast');
+        const backdrop = document.getElementById('pwaInstallBackdrop');
+
+        dialog?.classList.remove('show');
+        dialog?.setAttribute('aria-hidden', 'true');
+        backdrop?.classList.remove('show');
+        document.body.classList.remove('rp-pwa-dialog-open');
+
+        if (remember) {
+            sessionStorage.setItem('pwaDismissed', 'true');
+        }
+    };
+
     window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault(); 
+        e.preventDefault();
         deferredPrompt = e;
-        if(!sessionStorage.getItem('pwaDismissed')) {
-            setTimeout(() => { 
-                const toast = document.getElementById('pwaInstallToast');
-                if(toast) toast.classList.add('show'); 
-            }, 3000);
+
+        if (!sessionStorage.getItem('pwaDismissed')) {
+            window.setTimeout(showPwaInstall, 1200);
         }
     });
 
     window.addEventListener('appinstalled', () => {
         deferredPrompt = null;
-        const toast = document.getElementById('pwaInstallToast');
-        if (toast) toast.classList.remove('show');
-        sessionStorage.setItem('pwaDismissed', 'true');
+        hidePwaInstall(true);
     });
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -461,27 +495,40 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
         modals.forEach(modal => { document.body.appendChild(modal); });
 
         const btnInstall = document.getElementById('btnInstallPwa');
-        if(btnInstall) {
+        if (btnInstall) {
             btnInstall.addEventListener('click', async () => {
-                document.getElementById('pwaInstallToast').classList.remove('show');
-                if (deferredPrompt) { 
-                    deferredPrompt.prompt(); 
-                    deferredPrompt = null; 
+                if (!deferredPrompt) {
+                    hidePwaInstall(true);
+                    return;
+                }
+
+                try {
+                    deferredPrompt.prompt();
+                    await deferredPrompt.userChoice;
+                } finally {
+                    deferredPrompt = null;
+                    hidePwaInstall(true);
                 }
             });
         }
 
-        const dismissPwaInstall = () => {
-            const toast = document.getElementById('pwaInstallToast');
-            if (toast) toast.classList.remove('show');
-            sessionStorage.setItem('pwaDismissed', 'true');
-        };
+        const dismissPwaInstall = () => hidePwaInstall(true);
 
         const btnDismiss = document.getElementById('btnDismissPwa');
         if (btnDismiss) btnDismiss.addEventListener('click', dismissPwaInstall);
 
         const btnDismissClose = document.getElementById('btnDismissPwaClose');
         if (btnDismissClose) btnDismissClose.addEventListener('click', dismissPwaInstall);
+
+        const pwaBackdrop = document.getElementById('pwaInstallBackdrop');
+        if (pwaBackdrop) pwaBackdrop.addEventListener('click', dismissPwaInstall);
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape'
+                && document.getElementById('pwaInstallToast')?.classList.contains('show')) {
+                dismissPwaInstall();
+            }
+        });
     });
 
     // 3. ระบบเช็คการแจ้งเตือน Real-time

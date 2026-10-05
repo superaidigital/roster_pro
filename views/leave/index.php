@@ -111,6 +111,113 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     .btn-gradient-primary:hover, .btn-gradient-success:hover, .btn-gradient-warning:hover, .btn-gradient-danger:hover, .btn-gradient-secondary:hover { 
         opacity: 0.9; color: white; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
+
+    /* Compact leave wallet */
+    .leave-wallet-shell {
+        margin-bottom: 1.25rem;
+        border: 1px solid #dbe5eb;
+        border-radius: 1rem;
+        background: #fff;
+        box-shadow: 0 .25rem .85rem rgba(15,23,42,.035);
+        overflow: hidden;
+    }
+    .leave-wallet-toggle {
+        width: 100%;
+        min-height: 4.35rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .85rem 1rem;
+        border: 0;
+        background: linear-gradient(135deg, #ffffff 0%, #f7fbfd 100%);
+        color: #1e293b;
+        text-align: left;
+        transition: background-color .16s ease, box-shadow .16s ease;
+    }
+    .leave-wallet-toggle:hover {
+        background: #f8fbfd;
+    }
+    .leave-wallet-toggle:focus-visible {
+        outline: none;
+        box-shadow: inset 0 0 0 .2rem rgba(37,99,235,.14);
+    }
+    .leave-wallet-toggle-main {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+    }
+    .leave-wallet-icon {
+        display: grid;
+        place-items: center;
+        width: 2.65rem;
+        height: 2.65rem;
+        flex: 0 0 2.65rem;
+        border-radius: .78rem;
+        color: #0369a1;
+        background: #ecfeff;
+        border: 1px solid #bae6fd;
+        font-size: 1.08rem;
+    }
+    .leave-wallet-title {
+        margin: 0 0 .15rem;
+        color: #0f172a;
+        font-size: .92rem;
+        font-weight: 800;
+        line-height: 1.3;
+    }
+    .leave-wallet-meta {
+        color: #64748b;
+        font-size: .73rem;
+        line-height: 1.35;
+    }
+    .leave-wallet-toggle-side {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        color: #0f6cbd;
+        font-size: .75rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+    .leave-wallet-chevron {
+        display: inline-grid;
+        place-items: center;
+        width: 1.8rem;
+        height: 1.8rem;
+        border-radius: .55rem;
+        background: #eff6ff;
+        transition: transform .18s ease;
+    }
+    .leave-wallet-toggle[aria-expanded="true"] .leave-wallet-chevron {
+        transform: rotate(180deg);
+    }
+    .leave-wallet-details {
+        padding: .25rem 1rem 1rem;
+        border-top: 1px solid #edf2f7;
+        background: #fbfdff;
+    }
+    .leave-wallet-details .row {
+        margin-top: .1rem;
+    }
+    @media (max-width: 575.98px) {
+        .leave-wallet-toggle {
+            align-items: flex-start;
+            padding: .8rem;
+        }
+        .leave-wallet-toggle-side > span:first-child {
+            display: none;
+        }
+        .leave-wallet-icon {
+            width: 2.4rem;
+            height: 2.4rem;
+            flex-basis: 2.4rem;
+        }
+        .leave-wallet-details {
+            padding-inline: .75rem;
+        }
+    }
 </style>
 
 <div class="container-fluid px-4 py-4">
@@ -394,12 +501,37 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     <!-- ========================================== -->
     <!-- 🌟 ส่วนที่ 3: กระเป๋าวันลาคงเหลือ -->
     <!-- ========================================== -->
-    <hr class="text-muted opacity-25 mt-2 mb-4">
-    <div class="d-flex align-items-center mb-3 px-2">
-        <div class="icon-box-sm bg-info bg-opacity-10 text-info me-3"><i class="bi bi-wallet2"></i></div><h4 class="mb-0 fw-bold text-dark">กระเป๋าสิทธิ์วันลาคงเหลือของคุณ</h4>
-    </div>
+    <?php
+        $visible_balance_count = 0;
+        foreach (($leave_balances ?? []) as $wallet_balance) {
+            if (!empty($selected_leave_type_req) && ($wallet_balance['leave_type_name'] ?? '') !== $selected_leave_type_req) continue;
+            $visible_balance_count++;
+        }
+    ?>
+    <section class="leave-wallet-shell" aria-labelledby="leaveWalletTitle">
+        <button type="button"
+                class="leave-wallet-toggle"
+                data-bs-toggle="collapse"
+                data-bs-target="#leaveWalletDetails"
+                aria-expanded="false"
+                aria-controls="leaveWalletDetails">
+            <span class="leave-wallet-toggle-main">
+                <span class="leave-wallet-icon"><i class="bi bi-wallet2" aria-hidden="true"></i></span>
+                <span>
+                    <span class="leave-wallet-title d-block" id="leaveWalletTitle">กระเป๋าสิทธิ์วันลาคงเหลือของคุณ</span>
+                    <span class="leave-wallet-meta d-block">
+                        <?= $visible_balance_count > 0 ? 'มีข้อมูลสิทธิ์ ' . number_format($visible_balance_count) . ' ประเภท' : 'ยังไม่มีข้อมูลสิทธิ์วันลา' ?> · ย่อไว้เพื่อประหยัดพื้นที่หน้าจอ
+                    </span>
+                </span>
+            </span>
+            <span class="leave-wallet-toggle-side">
+                <span>ดูรายละเอียด</span>
+                <span class="leave-wallet-chevron"><i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+            </span>
+        </button>
 
-    <div class="row g-3 mb-4">
+        <div class="collapse leave-wallet-details" id="leaveWalletDetails">
+            <div class="row g-3 mb-0">
         <?php if (!empty($leave_balances)): ?>
             <?php 
                 $has_shown_card = false;
@@ -442,7 +574,9 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
         <?php else: ?>
             <div class="col-12"><div class="alert alert-modern alert-info px-4 py-3 d-flex align-items-center shadow-sm"><i class="bi bi-info-circle-fill fs-4 text-info me-3"></i> <div><h6 class="fw-bold mb-1">ยังไม่มีข้อมูลบัญชีวันลา</h6><p class="mb-0 small text-muted">ระบบกำลังประมวลผลกระเป๋าวันลาของคุณ กรุณาติดต่อผู้ดูแลระบบหากไม่พบข้อมูลเกิน 24 ชั่วโมง</p></div></div></div>
         <?php endif; ?>
-    </div>
+            </div>
+        </div>
+    </section>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>

@@ -1115,6 +1115,53 @@ if (is_file($styleUiPath)) {
     }
 }
 
+// 5.16) PWA dialog and leave wallet UI guards.
+$pwaHeaderPath = $root . '/views/layouts/header.php';
+if (is_file($pwaHeaderPath)) {
+    $pwaHeader = (string) file_get_contents($pwaHeaderPath);
+    foreach ([
+        'id="pwaInstallBackdrop"',
+        'aria-modal="true"',
+        'showPwaInstall',
+        'hidePwaInstall',
+        'ROSTER PRO APP',
+    ] as $token) {
+        if (strpos($pwaHeader, $token) === false) {
+            addError($errors, "views/layouts/header.php: missing centered PWA dialog token {$token}");
+        }
+    }
+}
+
+$pwaStylePath = $root . '/public/css/style.css';
+if (is_file($pwaStylePath)) {
+    $pwaStyle = (string) file_get_contents($pwaStylePath);
+    foreach ([
+        'PWA centered install dialog',
+        '.rp-pwa-backdrop',
+        'top: 50% !important',
+        'translate(-50%, -50%)',
+    ] as $token) {
+        if (strpos($pwaStyle, $token) === false) {
+            addError($errors, "public/css/style.css: missing centered PWA style token {$token}");
+        }
+    }
+}
+
+$leaveWalletPath = $root . '/views/leave/index.php';
+if (is_file($leaveWalletPath)) {
+    $leaveWallet = (string) file_get_contents($leaveWalletPath);
+    foreach ([
+        'class="leave-wallet-shell"',
+        'data-bs-target="#leaveWalletDetails"',
+        'aria-expanded="false"',
+        'class="collapse leave-wallet-details"',
+    ] as $token) {
+        if (strpos($leaveWallet, $token) === false) {
+            addError($errors, "views/leave/index.php: missing collapsed leave wallet token {$token}");
+        }
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
