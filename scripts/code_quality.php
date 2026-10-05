@@ -690,7 +690,7 @@ if (is_file($backupVerifierPath)) {
         'hash_equals',
         'assertRestoreSafeDump',
         'CREATE|DROP|ALTER',
-        "preg_match('/^\\s*USE\\s+/i'",
+        "preg_match('/^\\\\s*USE\\\\s+/i'",
         'backupRoot',
     ] as $token) {
         if (strpos($backupVerifier, $token) === false) {
@@ -706,7 +706,7 @@ if (is_file($restoreDrillPath)) {
         "PHP_SAPI !== 'cli'",
         'BackupVerifier::verify',
         'BackupVerifier::assertRestoreSafeDump',
-        "str_starts_with($targetDatabase, 'dr_drill_')",
+        "str_starts_with(\$targetDatabase, 'dr_drill_')",
         'DROP DATABASE',
         'DR_MAX_RPO_SECONDS',
         'DR_MAX_RTO_SECONDS',
