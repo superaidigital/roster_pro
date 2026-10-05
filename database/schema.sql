@@ -369,6 +369,49 @@ CREATE TABLE `roster_audit_logs` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `roster_revisions`
+--
+
+CREATE TABLE `roster_revisions` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `hospital_id` int(11) NOT NULL,
+  `hospital_name` varchar(255) NOT NULL,
+  `month_year` varchar(7) NOT NULL,
+  `revision_no` int(11) NOT NULL,
+  `revision_code` varchar(40) NOT NULL,
+  `snapshot_id` bigint NOT NULL,
+  `prepared_by` int(11) DEFAULT NULL,
+  `prepared_name` varchar(255) DEFAULT NULL,
+  `prepared_position` varchar(255) DEFAULT NULL,
+  `prepared_signature` longtext DEFAULT NULL,
+  `prepared_at` datetime DEFAULT NULL,
+  `reviewed_by` int(11) DEFAULT NULL,
+  `reviewed_name` varchar(255) DEFAULT NULL,
+  `reviewed_position` varchar(255) DEFAULT NULL,
+  `reviewed_signature` longtext DEFAULT NULL,
+  `reviewed_at` datetime DEFAULT NULL,
+  `approved_by` int(11) NOT NULL,
+  `approved_name` varchar(255) NOT NULL,
+  `approved_position` varchar(255) DEFAULT NULL,
+  `approved_signature` longtext DEFAULT NULL,
+  `approved_at` datetime NOT NULL,
+  `staff_json` longtext NOT NULL,
+  `holidays_json` longtext NOT NULL,
+  `shifts_json` longtext NOT NULL,
+  `pay_summary_json` longtext DEFAULT NULL,
+  `content_hash` char(64) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_roster_revision_number` (`hospital_id`,`month_year`,`revision_no`),
+  KEY `idx_roster_revision_month` (`hospital_id`,`month_year`,`created_at`),
+  KEY `idx_roster_revision_code` (`revision_code`),
+  KEY `idx_roster_revision_snapshot` (`snapshot_id`),
+  KEY `idx_roster_revision_approved` (`approved_by`,`approved_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `roster_snapshots`
 --
 

@@ -9,6 +9,7 @@ require_once 'models/UserModel.php';
 require_once 'models/LeaveModel.php';
 require_once 'models/RosterSnapshotModel.php';
 require_once 'models/RosterAuditModel.php';
+require_once 'models/RosterRevisionModel.php';
 require_once 'controllers/LogsController.php'; // 🌟 นำเข้า Logs Controller
 
 class AjaxController {
@@ -594,6 +595,17 @@ class AjaxController {
             exit;
         }
 
+        if (in_array($new_status, ['SUBMITTED', 'APPROVED'], true)) {
+            $signatureStmt = $db->prepare("SELECT signature_path FROM users WHERE id = ? LIMIT 1");
+            $signatureStmt->execute([(int)$_SESSION['user']['id']]);
+            $actorSignature = trim((string)($signatureStmt->fetchColumn() ?: ''));
+            if ($actorSignature === '') {
+                $_SESSION['error_msg'] = 'กรุณาบันทึกลายเซ็นอิเล็กทรอนิกส์ในโปรไฟล์ก่อนส่งหรืออนุมัติตารางเวร';
+                header("Location: index.php?c=profile");
+                exit;
+            }
+        }
+
         $current_status = strtoupper((string)$shiftModel->getRosterStatus($hospital_id, $month_year));
         if ($current_status === 'NOT_STARTED') {
             $current_status = 'DRAFT';
@@ -633,8 +645,42 @@ class AjaxController {
         $hospital_name = $stmt_hosp->fetch(PDO::FETCH_ASSOC)['name'] ?? 'รพ.สต.';
 
         try {
+            $db->beginTransaction();
             $approvedVersionId = null;
+            $approvedRevisionId = null;
+            $approvedRevisionCode = null;
+
             $shiftModel->updateRosterStatus($hospital_id, $month_year, $new_status);
+
+            if ($new_status === 'SUBMITTED') {
+                $workflowStmt = $db->prepare(
+                    "UPDATE roster_status
+                     SET creator_id = ?, submitted_at = NOW(), reviewer_id = NULL, director_id = NULL
+                     WHERE hospital_id = ? AND month_year = ?"
+                );
+                $workflowStmt->execute([(int)$_SESSION['user']['id'], $hospital_id, $month_year]);
+            } elseif ($new_status === 'APPROVED') {
+                if ($role === 'DIRECTOR') {
+                    $workflowStmt = $db->prepare(
+                        "UPDATE roster_status
+                         SET reviewer_id = ?, director_id = ?
+                         WHERE hospital_id = ? AND month_year = ?"
+                    );
+                    $workflowStmt->execute([
+                        (int)$_SESSION['user']['id'],
+                        (int)$_SESSION['user']['id'],
+                        $hospital_id,
+                        $month_year
+                    ]);
+                } else {
+                    $workflowStmt = $db->prepare(
+                        "UPDATE roster_status
+                         SET reviewer_id = ?
+                         WHERE hospital_id = ? AND month_year = ?"
+                    );
+                    $workflowStmt->execute([(int)$_SESSION['user']['id'], $hospital_id, $month_year]);
+                }
+            }
 
             LogsController::addLog($db, $_SESSION['user']['id'], 'APPROVE', "เปลี่ยนสถานะตารางเวร รพ.สต. {$hospital_name} เดือน {$month_year} เป็น {$new_status}");
 
@@ -693,6 +739,23 @@ class AjaxController {
                     'APPROVE',
                     "เก็บ Approved Roster Snapshot #{$approvedVersionId} เดือน {$month_year}"
                 );
+
+                $revisionModel = new RosterRevisionModel($db);
+                $approvedRevisionId = $revisionModel->createApprovedRevision(
+                    $hospital_id,
+                    $month_year,
+                    $approvedVersionId,
+                    (int)$_SESSION['user']['id']
+                );
+                $approvedRevision = $revisionModel->getRevision($approvedRevisionId, $hospital_id);
+                $approvedRevisionCode = (string)($approvedRevision['revision_code'] ?? '');
+
+                LogsController::addLog(
+                    $db,
+                    $_SESSION['user']['id'],
+                    'APPROVE',
+                    "สร้างฉบับตารางเวรทางการ {$approvedRevisionCode} (Revision ID: {$approvedRevisionId})"
+                );
                 
             } elseif ($new_status === 'DRAFT' || $new_status === 'REQUEST_EDIT') {
                 $stmt_snap = $db->prepare("UPDATE roster_status SET pay_summary = NULL WHERE hospital_id = ? AND month_year = ?");
@@ -703,6 +766,10 @@ class AjaxController {
             $auditMetadata = [];
             if ($approvedVersionId !== null) {
                 $auditMetadata['approved_snapshot_id'] = (int)$approvedVersionId;
+            }
+            if ($approvedRevisionId !== null) {
+                $auditMetadata['approved_revision_id'] = (int)$approvedRevisionId;
+                $auditMetadata['revision_code'] = $approvedRevisionCode;
             }
             $auditModel->record(
                 $hospital_id,
@@ -716,6 +783,7 @@ class AjaxController {
                 null,
                 'WORKFLOW'
             );
+            $db->commit();
 
             $thai_months = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
             $m = (int)substr($month_year, 5, 2);
@@ -745,9 +813,10 @@ class AjaxController {
                 $msg = "ตารางเวรเดือน {$month_name} ได้รับการอนุมัติเรียบร้อยแล้ว";
                 $this->notifyRole($hospital_id, 'SCHEDULER', 'SUCCESS', 'อนุมัติตารางเวรแล้ว', $msg, $target_link);
                 $this->notifyRole($hospital_id, 'STAFF', 'SUCCESS', 'ประกาศตารางเวรใหม่', $msg, "index.php?c=profile&a=schedule");
-                $_SESSION['success_msg'] = "อนุมัติตารางเวรเดือน {$month_name} เรียบร้อยแล้ว";
+                $_SESSION['success_msg'] = "อนุมัติตารางเวรเดือน {$month_name} เรียบร้อยแล้ว" . ($approvedRevisionCode ? " · {$approvedRevisionCode}" : "");
             }
         } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
             error_log('AjaxController error: ' . $e->getMessage());
             $_SESSION['error_msg'] = "เกิดข้อผิดพลาดภายในระบบ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ";
         }

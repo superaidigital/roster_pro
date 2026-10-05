@@ -6,6 +6,7 @@ require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 require_once 'models/RosterSnapshotModel.php';
 require_once 'models/RosterAuditModel.php';
+require_once 'models/RosterRevisionModel.php';
 
 class RosterController {
 
@@ -166,6 +167,16 @@ class RosterController {
             }
         }
 
+        $roster_revisions = [];
+        if ($hosp_id_safe > 0 && $this->canManageRosterVersions()) {
+            try {
+                $revisionModel = new RosterRevisionModel($db);
+                $roster_revisions = $revisionModel->listRevisions($hosp_id_safe, $selected_month, 20);
+            } catch (Throwable $e) {
+                error_log('Roster revision list failed: ' . $e->getMessage());
+            }
+        }
+
         // โหลด View หน้ากระดานจัดเวร
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
@@ -259,6 +270,58 @@ class RosterController {
     // ====================================================
     // 🗑️ 3. ฟังก์ชันล้างตารางเวรทั้งหมดของเดือนนั้น
     // ====================================================
+    public function export_revision_word() {
+        $this->checkAuth();
+
+        if (!$this->canManageRosterVersions()) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = 'คุณไม่มีสิทธิ์เปิดฉบับตารางเวรที่อนุมัติแล้ว';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $revisionId = (int)($_GET['revision_id'] ?? 0);
+        $hospitalId = $this->resolveTargetHospitalId(isset($_GET['hospital_id']) ? (int)$_GET['hospital_id'] : null);
+
+        if ($revisionId <= 0 || $hospitalId <= 0) {
+            $_SESSION['error_msg'] = 'ไม่พบฉบับตารางเวรที่ต้องการ';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $revisionModel = new RosterRevisionModel($db);
+        $revision = $revisionModel->getRevision($revisionId, $hospitalId);
+
+        if (!$revision) {
+            http_response_code(404);
+            $_SESSION['error_msg'] = 'ไม่พบฉบับตารางเวร หรือไม่มีสิทธิ์เข้าถึง';
+            header("Location: index.php?c=roster");
+            exit;
+        }
+
+        if (!$revisionModel->verifyRevision($revisionId, $hospitalId)) {
+            http_response_code(409);
+            $_SESSION['error_msg'] = 'ตรวจสอบความถูกต้องของฉบับตารางเวรไม่ผ่าน กรุณาติดต่อผู้ดูแลระบบ';
+            header(
+                "Location: index.php?c=roster&month=" .
+                urlencode((string)$revision['month_year']) .
+                "&hospital_id=" . $hospitalId
+            );
+            exit;
+        }
+
+        LogsController::addLog(
+            $db,
+            $_SESSION['user']['id'],
+            LogsController::ACTION_EXPORT,
+            "ดาวน์โหลดฉบับตารางเวรทางการ {$revision['revision_code']}"
+        );
+
+        require_once 'views/roster/export_revision_word.php';
+        exit;
+    }
+
     public function clear_roster() {
         $this->requireMutation();
         $this->checkAuth();

@@ -12,6 +12,7 @@ require_once __DIR__ . '/../models/NotificationModel.php';
 require_once __DIR__ . '/../models/RosterModel.php';
 require_once __DIR__ . '/../models/RosterSnapshotModel.php';
 require_once __DIR__ . '/../models/RosterAuditModel.php';
+require_once __DIR__ . '/../models/RosterRevisionModel.php';
 require_once __DIR__ . '/../models/FieldVisitModel.php';
 require_once __DIR__ . '/../controllers/StaffController.php';
 require_once __DIR__ . '/../controllers/ProfileController.php';
@@ -254,6 +255,123 @@ try {
     $integrityRejected = str_contains($e->getMessage(), 'integrity');
 }
 ok($integrityRejected, 'tampered roster snapshot is rejected by checksum verification');
+
+// Immutable approved roster revision regression.
+$signatureOne = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+$signatureTwo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2X0sAAAAASUVORK5CYII=';
+ok($users->updateSignature($uid1, $signatureOne), 'preparer digital signature fixture saved');
+ok($users->updateSignature($uid2, $signatureOne), 'approver digital signature fixture saved');
+
+$shiftModel->addShift('2026-11-05', 'บ', $uid1, $hospitalId);
+$shiftModel->addShift('2026-11-06', 'ร', $uid2, $hospitalId);
+
+$db->prepare(
+    "INSERT INTO holidays (hospital_id, status, holiday_date, holiday_name, holiday_type, is_active)
+     VALUES (?, 'APPROVED', '2026-11-10', 'Synthetic Revision Holiday', 'SPECIAL', 1)"
+)->execute([$hospitalId]);
+
+$revisionPay = json_encode([
+    $uid1 => ['pay' => 1000],
+    $uid2 => ['pay' => 1500],
+], JSON_UNESCAPED_UNICODE);
+
+$db->prepare(
+    "UPDATE roster_status
+     SET status = 'APPROVED',
+         creator_id = ?,
+         reviewer_id = ?,
+         director_id = ?,
+         submitted_at = '2026-11-01 08:00:00',
+         pay_summary = ?
+     WHERE hospital_id = ? AND month_year = '2026-11'"
+)->execute([$uid1, $uid2, $uid2, $revisionPay, $hospitalId]);
+
+$approvedSnapshot1 = $snapshotModel->createSnapshot(
+    $hospitalId,
+    '2026-11',
+    $uid2,
+    'APPROVED',
+    'Runtime approved revision 1',
+    true
+);
+
+$revisionModel = new RosterRevisionModel($db);
+$db->beginTransaction();
+$revisionId1 = $revisionModel->createApprovedRevision(
+    $hospitalId,
+    '2026-11',
+    $approvedSnapshot1,
+    $uid2
+);
+$db->commit();
+
+$revision1 = $revisionModel->getRevision($revisionId1, $hospitalId);
+ok(is_array($revision1), 'first immutable approved revision loaded');
+ok($revision1['revision_code'] === 'REV-2026-11-001', 'immutable approved revision REV-2026-11-001 created');
+ok($revisionModel->verifyRevision($revisionId1, $hospitalId), 'first approved revision hash verifies');
+ok(count($revision1['shifts'] ?? []) === 2, 'approved revision freezes shift payload');
+ok(count($revision1['holidays'] ?? []) === 1, 'approved revision freezes holiday payload');
+ok(($revision1['pay_summary'][$uid1]['pay'] ?? null) === 1000, 'approved revision freezes pay summary');
+ok(($revision1['prepared_signature'] ?? '') === $signatureOne, 'approved revision freezes preparer signature');
+ok(($revision1['approved_signature'] ?? '') === $signatureOne, 'approved revision freezes approver signature');
+ok(!method_exists($revisionModel, 'delete'), 'roster revision model exposes no delete API');
+ok(!method_exists($revisionModel, 'update'), 'roster revision model exposes no update API');
+
+// Mutate live data and signatures. REV-001 must remain unchanged.
+$db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date LIKE '2026-11-%'")
+   ->execute([$hospitalId]);
+$shiftModel->addShift('2026-11-20', 'ย', $uid1, $hospitalId);
+ok($users->updateSignature($uid1, $signatureTwo), 'live preparer signature changed after approval');
+
+$revision1AfterLiveEdit = $revisionModel->getRevision($revisionId1, $hospitalId);
+ok(count($revision1AfterLiveEdit['shifts'] ?? []) === 2, 'REV-001 remains unchanged after live roster edits');
+ok(($revision1AfterLiveEdit['prepared_signature'] ?? '') === $signatureOne, 'REV-001 keeps original signature after profile signature change');
+ok($revisionModel->verifyRevision($revisionId1, $hospitalId), 'REV-001 still verifies after live data changes');
+
+// Re-approve the edited live roster and create a new official revision.
+$db->prepare(
+    "UPDATE roster_status
+     SET status = 'APPROVED',
+         creator_id = ?,
+         reviewer_id = ?,
+         director_id = ?,
+         submitted_at = '2026-11-15 08:00:00',
+         pay_summary = ?
+     WHERE hospital_id = ? AND month_year = '2026-11'"
+)->execute([$uid1, $uid2, $uid2, $revisionPay, $hospitalId]);
+
+$approvedSnapshot2 = $snapshotModel->createSnapshot(
+    $hospitalId,
+    '2026-11',
+    $uid2,
+    'APPROVED',
+    'Runtime approved revision 2',
+    true
+);
+
+$db->beginTransaction();
+$revisionId2 = $revisionModel->createApprovedRevision(
+    $hospitalId,
+    '2026-11',
+    $approvedSnapshot2,
+    $uid2
+);
+$db->commit();
+
+$revision2 = $revisionModel->getRevision($revisionId2, $hospitalId);
+ok($revision2['revision_code'] === 'REV-2026-11-002', 'second approval creates REV-2026-11-002 instead of overwriting REV-001');
+ok(count($revision2['shifts'] ?? []) === 1, 'REV-002 contains newly approved live roster');
+ok($revisionModel->verifyRevision($revisionId2, $hospitalId), 'second approved revision hash verifies');
+
+$revisionList = $revisionModel->listRevisions($hospitalId, '2026-11', 10);
+ok(count($revisionList) === 2, 'official revision history retains both approvals');
+ok($revisionList[0]['revision_code'] === 'REV-2026-11-002', 'official revision history sorts newest revision first');
+
+// Direct database tampering must be detectable.
+$db->prepare("UPDATE roster_revisions SET hospital_name = ? WHERE id = ?")
+   ->execute(['Tampered Hospital Name', $revisionId1]);
+ok(!$revisionModel->verifyRevision($revisionId1, $hospitalId), 'tampered official revision fails SHA-256 verification');
+
 
 $swapModel = new SwapModel($db);
 $swapData = [
