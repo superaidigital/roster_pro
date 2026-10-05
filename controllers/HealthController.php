@@ -14,11 +14,14 @@ class HealthController {
     public function live(): void {
         $this->sendHeaders();
 
+        $maintenance = MaintenanceMode::safeStatus();
+
         http_response_code(200);
         echo json_encode([
             'status' => 'alive',
             'release_id' => ReleaseIdentity::current(),
-            'maintenance' => MaintenanceMode::isEnabled(),
+            'maintenance' => (bool)($maintenance['enabled'] ?? false),
+            'control_plane_ok' => empty($maintenance['control_plane_error']),
             'timestamp' => date(DATE_ATOM),
         ], JSON_UNESCAPED_SLASHES);
         exit;
@@ -27,7 +30,7 @@ class HealthController {
     public function ready(): void {
         $this->sendHeaders();
 
-        $maintenance = MaintenanceMode::status();
+        $maintenance = MaintenanceMode::safeStatus();
         if (($maintenance['enabled'] ?? false) === true) {
             http_response_code(503);
             header('Retry-After: ' . (int)$maintenance['retry_after']);
