@@ -17,6 +17,7 @@ try {
         'status' => $result['status'],
         'checks' => $result['checks'],
         'migrations' => $result['migration_summary'],
+            'reliability' => $result['reliability'] ?? null,
         'timestamp' => date(DATE_ATOM),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 
