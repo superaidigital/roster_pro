@@ -153,6 +153,7 @@ foreach ($roster_coverage as $coverage) {
         width: 192px !important;
         min-width: 192px !important;
         max-width: 192px !important;
+        box-sizing: border-box;
     }
     #rosterTable .roster-day-col,
     #rosterTable .date-header-cell,
@@ -162,14 +163,61 @@ foreach ($roster_coverage as $coverage) {
         max-width: 48px !important;
         box-sizing: border-box;
     }
-    #rosterTable .roster-day-cell {
+
+    /* Horizontal-scroll stacking contract.
+       Day cells must always pass underneath the frozen staff column. */
+    .rp-roster-table-wrap {
+        position: relative;
+        isolation: isolate;
+        background: #fff;
+    }
+    #rosterTable {
+        position: relative;
+        isolation: isolate;
+    }
+    #rosterTable .roster-staff-sticky-head,
+    #rosterTable .roster-staff-sticky-cell {
+        position: sticky !important;
+        left: 0 !important;
         overflow: hidden;
+        background: #fff !important;
+        background-clip: padding-box;
+        border-right: 2px solid #dbe5eb !important;
+        box-shadow: 8px 0 12px -12px rgba(15, 23, 42, .42);
+    }
+    #rosterTable .roster-staff-sticky-head {
+        z-index: 40 !important;
+    }
+    #rosterTable .roster-staff-sticky-cell {
+        z-index: 30 !important;
+    }
+    #rosterTable .date-header-cell {
+        position: relative;
+        z-index: 5;
+    }
+    #rosterTable .roster-day-cell {
+        position: relative !important;
+        z-index: 1;
+        overflow: hidden;
+        background-clip: padding-box;
+    }
+    #rosterTable .roster-day-cell .shift-cell {
+        position: relative;
+        z-index: 1 !important;
+    }
+    #rosterTable .roster-day-cell .fatigue-warn {
+        z-index: 2 !important;
+    }
+    #rosterTable .roster-staff-sticky-cell .text-truncate,
+    #rosterTable .roster-staff-sticky-head {
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .date-header-cell { transition: all 0.2s ease; }
-    .date-header-cell:hover { background-color: #e0f2fe !important; color: #0284c7 !important; z-index: 10; box-shadow: inset 0 -2px 0 #38bdf8; }
+    .date-header-cell:hover { background-color: #e0f2fe !important; color: #0284c7 !important; z-index: 6; box-shadow: inset 0 -2px 0 #38bdf8; }
     
     .shift-cell { font-size: 15px !important; font-weight: 800 !important; border-radius: 6px !important; transition: all 0.15s ease; background-color: transparent !important; width: 100%; height: 100%; }
-    .shift-cell:hover { background-color: #f0f9ff !important; z-index: 5; box-shadow: inset 0 0 0 2px rgba(14,165,233,.35); }
+    .shift-cell:hover { background-color: #f0f9ff !important; z-index: 2 !important; box-shadow: inset 0 0 0 2px rgba(14,165,233,.35); }
     
     .leave-badge-cell { font-size: 10px; padding: 2px 5px; border-radius: 4px; line-height: 1.2; margin-bottom: 2px; display: inline-block; max-width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     
@@ -182,7 +230,7 @@ foreach ($roster_coverage as $coverage) {
     .sortable-ghost { background-color: #eff6ff !important; opacity: 0.9; }
     .sortable-ghost td { background-color: #eff6ff !important; border-top: 1px dashed #3b82f6; border-bottom: 1px dashed #3b82f6; }
     
-    .fatigue-warn { border: 2px solid #ef4444 !important; background-color: #fef2f2 !important; position: relative; animation: blinkWarning 1s infinite alternate; z-index: 10; }
+    .fatigue-warn { border: 2px solid #ef4444 !important; background-color: #fef2f2 !important; position: relative; animation: blinkWarning 1s infinite alternate; z-index: 2 !important; }
     @keyframes blinkWarning { from { box-shadow: 0 0 0px #ef4444; } to { box-shadow: 0 0 8px #ef4444; } }
 
     .pay-cell-clickable { transition: all 0.2s; cursor: pointer; }
@@ -650,7 +698,7 @@ foreach ($roster_coverage as $coverage) {
                                 </colgroup>
                                 <thead class="sticky-top" style="z-index: 10;">
                                     <tr>
-                                        <th rowspan="2" class="align-middle shadow-sm bg-white roster-staff-col" style="left: 0; position: sticky; z-index: 11; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
+                                        <th rowspan="2" class="align-middle bg-white roster-staff-col roster-staff-sticky-head" style="border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
                                         <th colspan="<?= $days_in_month ?>" class="bg-light border-bottom text-dark">วันที่ปฏิบัติงาน เดือน <?= $display_month_text ?></th>
                                     </tr>
                                     <tr>
@@ -746,7 +794,7 @@ foreach ($roster_coverage as $coverage) {
                                         ?>
                                         <!-- 🌟 แนบ data-id ไว้ให้ SortableJS -->
                                         <tr class="roster-staff-row" id="row-staff-<?= htmlspecialchars($staff['id']) ?>" data-id="<?= htmlspecialchars($staff['id']) ?>">
-                                            <td class="text-start px-3 shadow-sm bg-white roster-staff-col" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0;">
+                                            <td class="text-start px-3 bg-white roster-staff-col roster-staff-sticky-cell">
                                                 <div class="fw-bold text-dark d-flex align-items-center justify-content-between">
                                                     <div class="d-flex align-items-center text-truncate pe-2">
                                                         <?php if ($canEdit): ?>
