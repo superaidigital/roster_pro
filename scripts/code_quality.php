@@ -318,8 +318,8 @@ $ajaxRevisionPath = $root . '/controllers/AjaxController.php';
 if (is_file($ajaxRevisionPath)) {
     $ajaxRevision = (string) file_get_contents($ajaxRevisionPath);
     if (strpos($ajaxRevision, 'createApprovedRevision(') === false
-        || strpos($ajaxRevision, 'กรุณาบันทึกลายเซ็นอิเล็กทรอนิกส์ในโปรไฟล์') === false) {
-        addError($errors, 'controllers/AjaxController.php: approval must require a signature and create an official revision');
+        || strpos($ajaxRevision, 'ElectronicSignature::isValid') === false) {
+        addError($errors, 'controllers/AjaxController.php: approval must validate a signature and create an official revision');
     }
 }
 
@@ -465,7 +465,7 @@ foreach ([
 
 if (is_file($frontControllerPath)) {
     $frontController = (string) file_get_contents($frontControllerPath);
-    if (strpos($frontController, "$publicHealthActions = ['index', 'live', 'ready'];") === false
+    if (strpos($frontController, "\$publicHealthActions = ['index', 'live', 'ready'];") === false
         || strpos($frontController, '$isHealthRoute') === false) {
         addError($errors, 'index.php: public health endpoints must remain limited to index/live/ready');
     }
