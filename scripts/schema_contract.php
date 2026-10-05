@@ -33,6 +33,9 @@ $required = [
     'roster_snapshots' => ['id','hospital_id','month_year','snapshot_kind','status_snapshot','shift_count','shifts_json','checksum','is_protected','created_by','created_at'],
     'roster_audit_logs' => ['id','hospital_id','month_year','actor_user_id','action_type','entity_type','before_json','after_json','metadata_json','created_at'],
     'roster_revisions' => ['id','hospital_id','hospital_name','month_year','revision_no','revision_code','snapshot_id','prepared_by','reviewed_by','approved_by','staff_json','holidays_json','shifts_json','pay_summary_json','content_hash','verification_code','created_at'],
+    'observability_events' => ['id','fingerprint','severity','category','message','exception_class','source_file','source_line','route','request_id','user_id','hospital_id','context_json','occurrence_count','status','first_seen_at','last_seen_at','resolved_at','resolved_by'],
+    'background_jobs' => ['id','job_type','dedupe_key','payload_json','status','priority','attempts','max_attempts','available_at','locked_at','lock_token','last_error','created_at','updated_at','completed_at'],
+    'system_health_snapshots' => ['id','overall_status','db_status','migration_pending','migration_blocking','queue_pending','queue_failed','open_errors_24h','disk_free_mb','created_at'],
 ];
 
 $errors = [];
