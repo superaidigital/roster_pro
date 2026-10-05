@@ -156,8 +156,7 @@ $header_page_icon = $page_context[2];
         const token = meta ? meta.content : '';
         if (!token) return;
 
-        document.addEventListener('submit', (event) => {
-            const form = event.target;
+        const ensureFormToken = (form) => {
             if (!(form instanceof HTMLFormElement)) return;
             if ((form.method || 'get').toLowerCase() !== 'post') return;
 
@@ -169,7 +168,25 @@ $header_page_icon = $page_context[2];
                 form.appendChild(input);
             }
             input.value = token;
+        };
+
+        // Cover normal user submits and forms created after page load.
+        document.addEventListener('submit', (event) => {
+            ensureFormToken(event.target);
         }, true);
+
+        // Cover legacy code that calls form.submit() directly (which normally
+        // bypasses the submit event).
+        const nativeFormSubmit = HTMLFormElement.prototype.submit;
+        HTMLFormElement.prototype.submit = function() {
+            ensureFormToken(this);
+            return nativeFormSubmit.call(this);
+        };
+
+        // Pre-populate existing forms so browser-native and library submits work.
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(ensureFormToken);
+        });
 
         const nativeFetch = window.fetch.bind(window);
         window.fetch = (input, init = {}) => {
