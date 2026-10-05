@@ -67,6 +67,12 @@ try {
     CommandRunner::run('Performance contract', [PHP_BINARY, 'scripts/performance_check.php']);
     $checks['performance'] = 'PASS';
 
+    CommandRunner::run(
+        'Security compliance',
+        [PHP_BINARY, '-d', 'display_errors=0', '-d', 'expose_php=0', 'scripts/security_check.php', '--strict']
+    );
+    $checks['security'] = 'PASS';
+
     if (!$skipRecovery) {
         CommandRunner::run('Recovery readiness', [PHP_BINARY, 'scripts/recovery_check.php']);
         $checks['recovery'] = 'PASS';
