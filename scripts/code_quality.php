@@ -328,6 +328,53 @@ if (!is_file($officialExportPath)) {
     addError($errors, 'views/roster/export_revision_word.php: immutable official roster export must remain available');
 }
 
+// 5.8) Public document verification must stay narrow and privacy-minimized.
+$frontControllerPath = $root . '/index.php';
+if (is_file($frontControllerPath)) {
+    $frontController = (string) file_get_contents($frontControllerPath);
+    if (strpos($frontController, "\$publicVerifyActions = ['index', 'revision'];") === false) {
+        addError($errors, 'index.php: Public verification route must remain narrowly allowlisted');
+    }
+}
+
+$verifyControllerPath = $root . '/controllers/VerifyController.php';
+$verifyViewPath = $root . '/views/verify/revision.php';
+if (!is_file($verifyControllerPath) || !is_file($verifyViewPath)) {
+    addError($errors, 'Public roster verification controller/view must remain available');
+} else {
+    $verifyController = (string) file_get_contents($verifyControllerPath);
+    $verifyView = (string) file_get_contents($verifyViewPath);
+
+    if (strpos($verifyController, 'getPublicVerification(') === false) {
+        addError($errors, 'controllers/VerifyController.php: must use privacy-minimized public verification lookup');
+    }
+
+    foreach (['staff_json', 'shifts_json', 'pay_summary_json', 'prepared_signature', 'reviewed_signature', 'approved_signature'] as $sensitiveToken) {
+        if (strpos($verifyView, $sensitiveToken) !== false) {
+            addError($errors, "views/verify/revision.php: public verification leaks sensitive token {$sensitiveToken}");
+        }
+    }
+}
+
+$revisionVerifyModelPath = $root . '/models/RosterRevisionModel.php';
+if (is_file($revisionVerifyModelPath)) {
+    $revisionVerifyModel = (string) file_get_contents($revisionVerifyModelPath);
+    foreach (['verificationCodeForHash', 'getPublicVerification', 'verification_code_valid'] as $token) {
+        if (strpos($revisionVerifyModel, $token) === false) {
+            addError($errors, "models/RosterRevisionModel.php: missing public verification integrity token {$token}");
+        }
+    }
+}
+
+$revisionExportPath = $root . '/views/roster/export_revision_word.php';
+if (is_file($revisionExportPath)) {
+    $revisionExport = (string) file_get_contents($revisionExportPath);
+    if (strpos($revisionExport, '$qrImageUrl') === false
+        || strpos($revisionExport, "revision['verification_code']") === false) {
+        addError($errors, 'views/roster/export_revision_word.php: official export must include QR verification and readable code');
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',

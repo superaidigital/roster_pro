@@ -182,3 +182,33 @@ function security_check_login_rate_limit(PDO $db, string $username, int $maxAtte
 
     return ['allowed' => false, 'attempts' => $attempts, 'retry_after' => $retryAfter];
 }
+
+
+/**
+ * Build a same-application absolute URL for printed documents and public verification links.
+ * Prefer APP_BASE_URL when configured. Otherwise derive a conservative same-origin base URL.
+ */
+function security_absolute_app_url(string $relativePath): string {
+    $relativePath = ltrim($relativePath, '/');
+
+    $configured = trim((string)(getenv('APP_BASE_URL') ?: ''));
+    if ($configured !== '' && filter_var($configured, FILTER_VALIDATE_URL)) {
+        $parts = parse_url($configured);
+        $scheme = strtolower((string)($parts['scheme'] ?? ''));
+        if (in_array($scheme, ['http', 'https'], true)) {
+            return rtrim($configured, '/') . '/' . $relativePath;
+        }
+    }
+
+    $scheme = security_is_https() ? 'https' : 'http';
+    $host = trim((string)($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+    if (!preg_match('/^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/', $host)) {
+        $host = 'localhost';
+    }
+
+    $scriptName = (string)($_SERVER['SCRIPT_NAME'] ?? '/index.php');
+    $basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/.');
+    $prefix = $basePath !== '' ? $basePath . '/' : '/';
+
+    return $scheme . '://' . $host . $prefix . $relativePath;
+}

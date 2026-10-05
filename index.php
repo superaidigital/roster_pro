@@ -33,8 +33,13 @@ if (!security_is_valid_route_token($c) || !security_is_valid_route_token($a)) {
     renderRouteError(400, 'คำขอไม่ถูกต้อง', 'รูปแบบเส้นทางที่ร้องขอไม่ถูกต้อง');
 }
 
-// ถ้าไม่ได้ล็อกอิน และพยายามเข้าหน้าอื่นที่ไม่ใช่ auth ให้เด้งกลับไปหน้า login
-if ($c !== 'auth' && !isset($_SESSION['user'])) {
+// Public routes are intentionally narrow.
+// Verification exposes only minimal official-document metadata; roster contents remain private.
+$publicVerifyActions = ['index', 'revision'];
+$isPublicRoute = $c === 'auth'
+    || ($c === 'verify' && in_array($a, $publicVerifyActions, true));
+
+if (!$isPublicRoute && !isset($_SESSION['user'])) {
     header("Location: index.php?c=auth&a=index");
     exit;
 }

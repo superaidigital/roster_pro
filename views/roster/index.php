@@ -1218,12 +1218,23 @@ foreach ($roster_coverage as $coverage) {
                                         <i class="bi bi-shield-check me-1"></i>
                                         SHA-256 <?= htmlspecialchars(substr($hash, 0, 16), ENT_QUOTES, 'UTF-8') ?>…
                                     </div>
+                                    <div class="small text-muted mt-1 font-monospace">
+                                        Verification Code:
+                                        <?= htmlspecialchars((string)($officialRevision['verification_code'] ?? '-'), ENT_QUOTES, 'UTF-8') ?>
+                                    </div>
                                 </div>
 
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="badge text-bg-light border px-3 py-2">
                                         Snapshot #<?= (int)$officialRevision['snapshot_id'] ?>
                                     </span>
+                                    <?php if (!empty($officialRevision['verification_code'])): ?>
+                                    <a class="btn btn-outline-primary fw-bold text-nowrap"
+                                       target="_blank" rel="noopener noreferrer"
+                                       href="index.php?c=verify&a=revision&code=<?= rawurlencode((string)$officialRevision['verification_code']) ?>">
+                                        <i class="bi bi-qr-code-scan me-1"></i> ตรวจสอบเอกสาร
+                                    </a>
+                                    <?php endif; ?>
                                     <a class="btn btn-success fw-bold text-nowrap"
                                        href="index.php?c=roster&a=export_revision_word&revision_id=<?= (int)$officialRevision['id'] ?>&hospital_id=<?= (int)($hospital_id ?? 0) ?>">
                                         <i class="bi bi-file-earmark-word-fill me-1"></i> ดาวน์โหลดฉบับทางการ

@@ -39,6 +39,14 @@ ok(
     'local application redirect accepted'
 );
 
+putenv('APP_BASE_URL=https://roster.example.test/app');
+ok(
+    security_absolute_app_url('index.php?c=verify&a=revision&code=ABC') ===
+        'https://roster.example.test/app/index.php?c=verify&a=revision&code=ABC',
+    'absolute app URL helper honors configured public base URL'
+);
+putenv('APP_BASE_URL');
+
 $db->exec("INSERT INTO hospitals (hospital_code, name, short_name, is_active) VALUES ('T001', 'Synthetic Test Hospital', 'TEST', 1)");
 $hospitalId = (int)$db->lastInsertId();
 ok($hospitalId > 0, 'synthetic hospital created');
@@ -309,6 +317,18 @@ $revision1 = $revisionModel->getRevision($revisionId1, $hospitalId);
 ok(is_array($revision1), 'first immutable approved revision loaded');
 ok($revision1['revision_code'] === 'REV-2026-11-001', 'immutable approved revision REV-2026-11-001 created');
 ok($revisionModel->verifyRevision($revisionId1, $hospitalId), 'first approved revision hash verifies');
+$verificationCode1 = (string)($revision1['verification_code'] ?? '');
+ok(
+    preg_match('/^[A-F0-9]{32}$/', $verificationCode1) === 1,
+    'first revision exposes a 32-character public verification code'
+);
+$publicVerification1 = $revisionModel->getPublicVerification($verificationCode1);
+ok(is_array($publicVerification1), 'public verification resolves REV-001 without roster payload');
+ok(!empty($publicVerification1['integrity_valid']), 'public verification validates REV-001 integrity');
+ok(!empty($publicVerification1['is_latest']), 'REV-001 is latest before a second approval');
+ok(!array_key_exists('staff_json', $publicVerification1), 'public verification does not expose staff payload');
+ok(!array_key_exists('shifts_json', $publicVerification1), 'public verification does not expose shift payload');
+ok(!array_key_exists('pay_summary_json', $publicVerification1), 'public verification does not expose pay payload');
 ok(count($revision1['shifts'] ?? []) === 2, 'approved revision freezes shift payload');
 ok(count($revision1['holidays'] ?? []) === 1, 'approved revision freezes holiday payload');
 ok(($revision1['pay_summary'][$uid1]['pay'] ?? null) === 1000, 'approved revision freezes pay summary');
@@ -362,6 +382,27 @@ $revision2 = $revisionModel->getRevision($revisionId2, $hospitalId);
 ok($revision2['revision_code'] === 'REV-2026-11-002', 'second approval creates REV-2026-11-002 instead of overwriting REV-001');
 ok(count($revision2['shifts'] ?? []) === 1, 'REV-002 contains newly approved live roster');
 ok($revisionModel->verifyRevision($revisionId2, $hospitalId), 'second approved revision hash verifies');
+$verificationCode2 = (string)($revision2['verification_code'] ?? '');
+ok(
+    preg_match('/^[A-F0-9]{32}$/', $verificationCode2) === 1
+        && $verificationCode2 !== $verificationCode1,
+    'REV-002 receives a distinct verification code'
+);
+$publicVerificationOld = $revisionModel->getPublicVerification($verificationCode1);
+ok(
+    is_array($publicVerificationOld)
+        && !empty($publicVerificationOld['integrity_valid'])
+        && empty($publicVerificationOld['is_latest'])
+        && ($publicVerificationOld['latest_revision_code'] ?? '') === 'REV-2026-11-002',
+    'REV-001 public verification becomes superseded after REV-002'
+);
+$publicVerificationLatest = $revisionModel->getPublicVerification($verificationCode2);
+ok(
+    is_array($publicVerificationLatest)
+        && !empty($publicVerificationLatest['integrity_valid'])
+        && !empty($publicVerificationLatest['is_latest']),
+    'REV-002 public verification is valid and latest'
+);
 
 $revisionList = $revisionModel->listRevisions($hospitalId, '2026-11', 10);
 ok(count($revisionList) === 2, 'official revision history retains both approvals');
@@ -371,6 +412,29 @@ ok($revisionList[0]['revision_code'] === 'REV-2026-11-002', 'official revision h
 $db->prepare("UPDATE roster_revisions SET hospital_name = ? WHERE id = ?")
    ->execute(['Tampered Hospital Name', $revisionId1]);
 ok(!$revisionModel->verifyRevision($revisionId1, $hospitalId), 'tampered official revision fails SHA-256 verification');
+$publicAfterTamper = $revisionModel->getPublicVerification($verificationCode1);
+ok(
+    is_array($publicAfterTamper) && empty($publicAfterTamper['integrity_valid']),
+    'public verification reports tampered revision as invalid'
+);
+
+$tamperedVerificationCode = str_repeat('A', 32);
+if ($tamperedVerificationCode === $verificationCode2) {
+    $tamperedVerificationCode = str_repeat('B', 32);
+}
+$db->prepare("UPDATE roster_revisions SET verification_code = ? WHERE id = ?")
+   ->execute([$tamperedVerificationCode, $revisionId2]);
+$publicCodeTamper = $revisionModel->getPublicVerification($tamperedVerificationCode);
+ok(
+    is_array($publicCodeTamper)
+        && empty($publicCodeTamper['verification_code_valid'])
+        && empty($publicCodeTamper['integrity_valid']),
+    'public verification rejects a database-tampered verification code'
+);
+ok(
+    $revisionModel->getPublicVerification('NOT-A-VALID-CODE') === null,
+    'public verification rejects malformed codes without database enumeration'
+);
 
 
 $swapModel = new SwapModel($db);
