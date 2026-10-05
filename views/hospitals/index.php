@@ -87,71 +87,459 @@ if (!empty($hospital_ids)) {
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <style>
-    body { background-color: #f4f6f9; }
-    .card-modern { border: none; border-radius: 1.25rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); background: #ffffff; }
-    .table-modern th { font-weight: 600; color: #475569; font-size: 13px; background-color: #f8fafc; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; letter-spacing: 0.5px; padding: 1rem 0.75rem; }
-    .table-modern td { vertical-align: middle; font-size: 14.5px; border-bottom: 1px solid #f1f5f9; padding: 1rem 0.75rem; background-color: #ffffff; transition: background-color 0.2s; }
-    .table-modern tbody tr:hover td { background-color: #f8fafc; }
-    
-    .search-box { border: 1px solid #e2e8f0; background: #fff; transition: all 0.2s; border-radius: 1rem; overflow: hidden; }
-    .search-box:focus-within { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-    .search-box input { border: none; box-shadow: none; background: transparent; font-size: 14px; }
-    .search-box input:focus { outline: none; }
-    
-    .btn-action { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.2s; }
-    .btn-action:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    
-    .size-badge { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 800; font-size: 13px; }
-    .size-s { background-color: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
-    .size-m { background-color: #e0e7ff; color: #4f46e5; border: 1px solid #c7d2fe; }
-    .size-l { background-color: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
-    .size-xl { background-color: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
-    .size-unknown { background-color: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+    .rp-hosp-page {
+        max-width: 100rem;
+        margin-inline: auto;
+    }
 
-    .drag-handle { cursor: grab; font-size: 1.2rem; color: #94a3b8; transition: color 0.2s; }
-    .drag-handle:hover { color: #3b82f6; }
-    .drag-handle:active { cursor: grabbing; color: #2563eb; }
-    .sortable-ghost td { background-color: #eff6ff !important; border-top: 2px dashed #3b82f6; border-bottom: 2px dashed #3b82f6; }
+    .rp-hosp-hero {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .rp-hosp-heading {
+        display: flex;
+        align-items: flex-start;
+        gap: .8rem;
+        min-width: 0;
+    }
+
+    .rp-hosp-heading-icon {
+        display: grid;
+        place-items: center;
+        width: 2.55rem;
+        height: 2.55rem;
+        flex: 0 0 2.55rem;
+        border: 1px solid #d9e7ef;
+        border-radius: .78rem;
+        color: #0f6cbd;
+        background: linear-gradient(145deg, #edf7ff, #effcf8);
+        font-size: 1.05rem;
+    }
+
+    .rp-hosp-title {
+        margin: 0 0 .2rem;
+        color: #0f172a;
+        font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+        font-weight: 800;
+        letter-spacing: -.02em;
+        line-height: 1.25;
+    }
+
+    .rp-hosp-subtitle {
+        margin: 0;
+        color: #64748b;
+        font-size: .82rem;
+        line-height: 1.45;
+    }
+
+    .rp-hosp-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: .5rem;
+        min-width: 0;
+    }
+
+    .rp-hosp-search {
+        display: flex;
+        align-items: center;
+        min-width: min(22rem, 100%);
+        min-height: 2.65rem;
+        overflow: hidden;
+        border: 1px solid #d7e3ea;
+        border-radius: .75rem;
+        background: #fff;
+        transition: border-color .18s ease, box-shadow .18s ease;
+    }
+
+    .rp-hosp-search:focus-within {
+        border-color: #7fb1d2;
+        box-shadow: 0 0 0 .2rem rgba(15,108,189,.10);
+    }
+
+    .rp-hosp-search-icon {
+        display: grid;
+        place-items: center;
+        width: 2.6rem;
+        flex: 0 0 2.6rem;
+        color: #64748b;
+        font-size: .95rem;
+    }
+
+    .rp-hosp-search input {
+        width: 100%;
+        min-width: 0;
+        border: 0 !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        padding: .55rem .75rem .55rem 0;
+        color: #0f172a;
+        font-size: .84rem;
+    }
+
+    .rp-hosp-search input::placeholder { color: #94a3b8; }
+
+    .rp-toolbar-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .45rem;
+        min-height: 2.65rem;
+        padding: .55rem .85rem;
+        border-radius: .72rem !important;
+        font-size: .8rem;
+        font-weight: 800;
+        white-space: nowrap;
+        box-shadow: none !important;
+    }
+
+    .rp-toolbar-btn i {
+        margin: 0 !important;
+        font-size: .95rem;
+        line-height: 1;
+    }
+
+    .rp-toolbar-btn.is-export {
+        color: #166534 !important;
+        border: 1px solid #bbdfc6 !important;
+        background: #f6fcf8 !important;
+    }
+    .rp-toolbar-btn.is-export:hover {
+        color: #14532d !important;
+        border-color: #8fc79f !important;
+        background: #ecf8ef !important;
+    }
+
+    .rp-toolbar-btn.is-import {
+        color: #0f766e !important;
+        border: 1px solid #b9e2dc !important;
+        background: #f0fdfa !important;
+    }
+    .rp-toolbar-btn.is-import:hover {
+        color: #115e59 !important;
+        border-color: #83ccc2 !important;
+        background: #e7f9f5 !important;
+    }
+
+    .rp-toolbar-btn.is-primary {
+        color: #fff !important;
+        border: 1px solid #0f6cbd !important;
+        background: #0f6cbd !important;
+    }
+    .rp-toolbar-btn.is-primary:hover {
+        border-color: #0b5a9d !important;
+        background: #0b5a9d !important;
+    }
+
+    .rp-toolbar-btn.is-danger {
+        color: #b91c1c !important;
+        border: 1px solid #fecaca !important;
+        background: #fff7f7 !important;
+    }
+
+    .rp-hosp-kpi {
+        position: relative;
+        height: 100%;
+        min-height: 5.5rem;
+        overflow: hidden;
+        border: 1px solid #dce6ed;
+        border-radius: .95rem;
+        background: #fff;
+        box-shadow: 0 .2rem .65rem rgba(15,23,42,.025);
+    }
+
+    .rp-hosp-kpi::before {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: .2rem;
+        background: var(--kpi-accent, #2563eb);
+    }
+
+    .rp-hosp-kpi-body {
+        display: flex;
+        align-items: center;
+        gap: .8rem;
+        min-height: 5.5rem;
+        padding: .85rem 1rem;
+    }
+
+    .rp-hosp-kpi-icon {
+        display: grid;
+        place-items: center;
+        width: 2.6rem;
+        height: 2.6rem;
+        flex: 0 0 2.6rem;
+        border-radius: .75rem;
+        font-size: 1.05rem;
+    }
+
+    .rp-tone-blue { color: #1d4ed8; background: #eff6ff; }
+    .rp-tone-cyan { color: #0369a1; background: #ecfeff; }
+    .rp-tone-green { color: #15803d; background: #f0fdf4; }
+    .rp-tone-red { color: #b91c1c; background: #fef2f2; }
+
+    .rp-hosp-kpi-value {
+        margin: 0 0 .12rem;
+        color: #0f172a;
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: -.025em;
+        line-height: 1;
+    }
+
+    .rp-hosp-kpi-label {
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 700;
+        line-height: 1.25;
+    }
+
+    .rp-hosp-panel {
+        border: 1px solid #dce6ed !important;
+        border-radius: 1rem !important;
+        background: #fff !important;
+        box-shadow: 0 .35rem 1rem rgba(15,23,42,.035) !important;
+    }
+
+    .rp-hosp-panel .card-header {
+        min-height: 3.35rem;
+        padding: .75rem 1rem !important;
+        background: #fff !important;
+        border-bottom: 1px solid #e5edf2 !important;
+    }
+
+    .rp-panel-title {
+        display: inline-flex;
+        align-items: center;
+        gap: .55rem;
+        margin: 0;
+        color: #1e293b;
+        font-size: .86rem;
+        font-weight: 800;
+    }
+
+    .rp-panel-title-icon {
+        display: grid;
+        place-items: center;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: .5rem;
+        color: #0f6cbd;
+        background: #eff6ff;
+        font-size: .85rem;
+    }
+
+    .rp-sort-hint {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .4rem .65rem;
+        border: 1px solid #d7e3ea;
+        border-radius: .65rem;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: .7rem;
+        font-weight: 700;
+    }
+
+    .table-modern th {
+        padding: .75rem .7rem !important;
+        color: #64748b !important;
+        background: #f8fafc !important;
+        border-bottom: 1px solid #dce6ed !important;
+        font-size: .7rem !important;
+        font-weight: 800 !important;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+    }
+
+    .table-modern td {
+        padding: .78rem .7rem !important;
+        color: #334155;
+        background: #fff;
+        border-bottom: 1px solid #edf2f5 !important;
+        font-size: .82rem;
+        vertical-align: middle;
+    }
+
+    .table-modern tbody tr:hover td { background: #fbfdff; }
+
+    .hospital-name {
+        color: #0f172a !important;
+        font-size: .84rem !important;
+        font-weight: 800 !important;
+        line-height: 1.35;
+    }
+
+    .hospital-code {
+        display: flex;
+        align-items: center;
+        gap: .3rem;
+        color: #94a3b8 !important;
+        font-size: .69rem !important;
+    }
+
+    .size-badge {
+        display: inline-grid;
+        place-items: center;
+        width: 1.9rem;
+        height: 1.9rem;
+        border-radius: .55rem;
+        font-size: .68rem;
+        font-weight: 800;
+    }
+    .size-s { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+    .size-m { background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; }
+    .size-l { background:#fffbeb; color:#b45309; border:1px solid #fde68a; }
+    .size-xl { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+    .size-unknown { background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; }
+
+    .drag-handle {
+        color: #94a3b8;
+        cursor: grab;
+        font-size: 1rem;
+        transition: color .18s ease;
+    }
+    .drag-handle:hover { color: #0f6cbd; }
+    .drag-handle:active { cursor: grabbing; }
+    .sortable-ghost td {
+        background: #eff6ff !important;
+        border-top: 1px dashed #60a5fa !important;
+        border-bottom: 1px dashed #60a5fa !important;
+    }
+
+    .rp-row-actions {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: .35rem;
+    }
+
+    .btn-action {
+        display: inline-grid;
+        place-items: center;
+        width: 2rem;
+        height: 2rem;
+        padding: 0 !important;
+        border-radius: .6rem !important;
+        box-shadow: none !important;
+        transition: border-color .18s ease, background .18s ease, color .18s ease;
+    }
+
+    .btn-action i {
+        margin: 0 !important;
+        font-size: .82rem;
+        line-height: 1;
+    }
+
+    .btn-action.is-edit {
+        color: #a16207 !important;
+        border: 1px solid #fde68a !important;
+        background: #fffbeb !important;
+    }
+    .btn-action.is-edit:hover { background:#fef3c7 !important; border-color:#facc15 !important; }
+
+    .btn-action.is-config {
+        color: #1d4ed8 !important;
+        border: 1px solid #bfdbfe !important;
+        background: #eff6ff !important;
+    }
+    .btn-action.is-config:hover { background:#dbeafe !important; border-color:#93c5fd !important; }
+
+    .btn-action.is-delete {
+        color: #b91c1c !important;
+        border: 1px solid #fecaca !important;
+        background: #fef2f2 !important;
+    }
+    .btn-action.is-delete:hover { background:#fee2e2 !important; border-color:#fca5a5 !important; }
+
     .dataTables_filter { display: none; }
+
+    @media (max-width: 1199.98px) {
+        .rp-hosp-hero { flex-direction: column; }
+        .rp-hosp-toolbar { width: 100%; justify-content: flex-start; }
+    }
+
+    @media (max-width: 767.98px) {
+        .rp-hosp-toolbar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .rp-hosp-search { width: 100%; min-width: 0; }
+
+        .rp-hosp-toolbar-actions {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0,1fr));
+            width: 100%;
+        }
+
+        .rp-toolbar-btn { width: 100%; }
+
+        .rp-hosp-kpi-body { padding: .78rem .85rem; }
+
+        .rp-sort-hint { display: none; }
+    }
+
+    @media (max-width: 479.98px) {
+        .rp-hosp-heading-icon { display: none; }
+        .rp-hosp-toolbar-actions { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .btn-action,
+        .rp-hosp-search { transition: none; }
+    }
 </style>
 
-<div class="container-fluid px-3 px-md-4 py-4 min-vh-100 d-flex flex-column">
+<div class="container-fluid px-2 px-md-3 py-3 min-vh-100 d-flex flex-column rp-hosp-page">
     
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-        <div>
-            <h4 class="fw-bold text-dark mb-1">
-                <i class="bi bi-hospital-fill text-danger me-2"></i> จัดการหน่วยบริการ (รพ.สต.)
-            </h4>
-            <p class="text-muted mb-0" style="font-size: 14px;">ตั้งค่า เพิ่ม แก้ไข ข้อมูลโรงพยาบาลส่งเสริมสุขภาพตำบลในเครือข่าย</p>
-        </div>
-        
-        <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
-            <div class="input-group shadow-sm" style="min-width: 250px;">
-                <span class="input-group-text bg-white text-muted border-end-0 rounded-start-pill"><i class="bi bi-search"></i></span>
-                <input type="text" id="hospitalSearch" class="form-control border-start-0 rounded-end-pill" placeholder="ค้นหารหัส หรือชื่อ รพ.สต.">
+    <section class="rp-hosp-hero" aria-labelledby="hospitalPageTitle">
+        <div class="rp-hosp-heading">
+            <span class="rp-hosp-heading-icon" aria-hidden="true"><i class="bi bi-hospital"></i></span>
+            <div>
+                <h2 class="rp-hosp-title" id="hospitalPageTitle">จัดการหน่วยบริการ (รพ.สต.)</h2>
+                <p class="rp-hosp-subtitle">ตั้งค่า เพิ่ม แก้ไข และดูแลข้อมูลโรงพยาบาลส่งเสริมสุขภาพตำบลในเครือข่าย</p>
             </div>
-            
-            <div class="d-flex gap-2">
-                <button class="btn btn-danger fw-bold shadow-sm d-none align-items-center justify-content-center flex-grow-1 text-nowrap rounded-pill" id="btn-bulk-delete" onclick="bulkDelete()">
-                    <i class="bi bi-trash me-1"></i> ลบ (<span id="selected-count">0</span>)
+        </div>
+
+        <div class="rp-hosp-toolbar" role="group" aria-label="เครื่องมือจัดการหน่วยบริการ">
+            <label class="rp-hosp-search" for="hospitalSearch">
+                <span class="rp-hosp-search-icon"><i class="bi bi-search" aria-hidden="true"></i></span>
+                <input type="search" id="hospitalSearch" placeholder="ค้นหารหัส หรือชื่อ รพ.สต." autocomplete="off">
+            </label>
+
+            <div class="d-flex gap-2 rp-hosp-toolbar-actions">
+                <button class="rp-toolbar-btn is-danger d-none" id="btn-bulk-delete" type="button" onclick="bulkDelete()">
+                    <i class="bi bi-trash3" aria-hidden="true"></i>
+                    <span>ลบ (<span id="selected-count">0</span>)</span>
                 </button>
 
-                <button class="btn btn-outline-success fw-bold shadow-sm d-flex align-items-center justify-content-center flex-grow-1 text-nowrap rounded-pill bg-white" onclick="exportTableToExcel('hospitalsTable', 'ข้อมูลหน่วยบริการ_รพสต')">
-                    <i class="bi bi-file-earmark-excel-fill me-1"></i> ส่งออก
+                <button class="rp-toolbar-btn is-export" type="button" onclick="exportTableToExcel('hospitalsTable', 'ข้อมูลหน่วยบริการ_รพสต')">
+                    <i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i>
+                    <span>ส่งออก</span>
                 </button>
 
-                <?php if($isAdmin): ?>
-                <button class="btn btn-success fw-bold shadow-sm d-flex align-items-center justify-content-center flex-grow-1 text-nowrap rounded-pill" data-bs-toggle="modal" data-bs-target="#uploadExcelModal">
-                    <i class="bi bi-cloud-arrow-up-fill me-1"></i> นำเข้า
+                <?php if ($isAdmin): ?>
+                <button class="rp-toolbar-btn is-import" type="button" data-bs-toggle="modal" data-bs-target="#uploadExcelModal">
+                    <i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i>
+                    <span>นำเข้า</span>
                 </button>
-                
-                <button class="btn btn-primary fw-bold shadow-sm d-flex align-items-center justify-content-center flex-grow-1 text-nowrap rounded-pill" data-bs-toggle="modal" data-bs-target="#addHospitalModal">
-                    <i class="bi bi-plus-lg me-1"></i> เพิ่ม รพ.สต.
+
+                <button class="rp-toolbar-btn is-primary" type="button" data-bs-toggle="modal" data-bs-target="#addHospitalModal">
+                    <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                    <span>เพิ่ม รพ.สต.</span>
                 </button>
                 <?php endif; ?>
             </div>
         </div>
-    </div>
+    </section>
 
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-success border-4">
@@ -168,73 +556,61 @@ if (!empty($hospital_ids)) {
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
-    <div class="row g-3 mb-4">
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white overflow-hidden">
-                <div class="card-body p-3 d-flex align-items-center">
-                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 48px; height: 48px;">
-                        <i class="bi bi-building fs-4"></i>
-                    </div>
+    <section class="row g-2 g-md-3 mb-3" aria-label="สรุปข้อมูลหน่วยบริการ">
+        <div class="col-6 col-xl-3">
+            <div class="rp-hosp-kpi" style="--kpi-accent:#2563eb;">
+                <div class="rp-hosp-kpi-body">
+                    <span class="rp-hosp-kpi-icon rp-tone-blue"><i class="bi bi-buildings" aria-hidden="true"></i></span>
                     <div>
-                        <h4 class="fw-bold mb-0 text-dark"><?= number_format($total_hospitals) ?></h4>
-                        <div class="text-muted" style="font-size: 12px;">หน่วยบริการ (แห่ง)</div>
+                        <p class="rp-hosp-kpi-value"><?= number_format($total_hospitals) ?></p>
+                        <div class="rp-hosp-kpi-label">หน่วยบริการ (แห่ง)</div>
                     </div>
                 </div>
-                <div class="bg-primary" style="height: 3px; width: 100%;"></div>
-            </div>
-        </div>
-        
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white overflow-hidden">
-                <div class="card-body p-3 d-flex align-items-center">
-                    <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 48px; height: 48px;">
-                        <i class="bi bi-people-fill fs-4 text-primary"></i>
-                    </div>
-                    <div>
-                        <h4 class="fw-bold mb-0 text-dark"><?= number_format($total_staff) ?></h4>
-                        <div class="text-muted" style="font-size: 12px;">บุคลากรทั้งหมด (คน)</div>
-                    </div>
-                </div>
-                <div class="bg-info" style="height: 3px; width: 100%;"></div>
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white overflow-hidden">
-                <div class="card-body p-3 d-flex align-items-center">
-                    <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 48px; height: 48px;">
-                        <i class="bi bi-person-workspace fs-4"></i>
-                    </div>
+        <div class="col-6 col-xl-3">
+            <div class="rp-hosp-kpi" style="--kpi-accent:#0891b2;">
+                <div class="rp-hosp-kpi-body">
+                    <span class="rp-hosp-kpi-icon rp-tone-cyan"><i class="bi bi-people" aria-hidden="true"></i></span>
                     <div>
-                        <h4 class="fw-bold mb-0 text-dark"><?= number_format($on_duty_today) ?></h4>
-                        <div class="text-muted" style="font-size: 12px;">ขึ้นเวรวันนี้ (คน)</div>
+                        <p class="rp-hosp-kpi-value"><?= number_format($total_staff) ?></p>
+                        <div class="rp-hosp-kpi-label">บุคลากรทั้งหมด (คน)</div>
                     </div>
                 </div>
-                <div class="bg-success" style="height: 3px; width: 100%;"></div>
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white overflow-hidden">
-                <div class="card-body p-3 d-flex align-items-center">
-                    <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 48px; height: 48px;">
-                        <i class="bi bi-person-dash-fill fs-4"></i>
-                    </div>
+        <div class="col-6 col-xl-3">
+            <div class="rp-hosp-kpi" style="--kpi-accent:#16a34a;">
+                <div class="rp-hosp-kpi-body">
+                    <span class="rp-hosp-kpi-icon rp-tone-green"><i class="bi bi-person-check" aria-hidden="true"></i></span>
                     <div>
-                        <h4 class="fw-bold mb-0 text-dark"><?= number_format($on_leave_today) ?></h4>
-                        <div class="text-muted" style="font-size: 12px;">ลางาน/หยุดพัก วันนี้ (คน)</div>
+                        <p class="rp-hosp-kpi-value"><?= number_format($on_duty_today) ?></p>
+                        <div class="rp-hosp-kpi-label">ขึ้นเวรวันนี้ (คน)</div>
                     </div>
                 </div>
-                <div class="bg-danger" style="height: 3px; width: 100%;"></div>
             </div>
         </div>
-    </div>
 
-    <div class="card card-modern flex-grow-1 overflow-hidden d-flex flex-column mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="rp-hosp-kpi" style="--kpi-accent:#dc2626;">
+                <div class="rp-hosp-kpi-body">
+                    <span class="rp-hosp-kpi-icon rp-tone-red"><i class="bi bi-person-dash" aria-hidden="true"></i></span>
+                    <div>
+                        <p class="rp-hosp-kpi-value"><?= number_format($on_leave_today) ?></p>
+                        <div class="rp-hosp-kpi-label">ลางาน / หยุดพักวันนี้ (คน)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="card rp-hosp-panel flex-grow-1 overflow-hidden d-flex flex-column mb-4">
         <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-list-stars text-danger me-2"></i>รายชื่อหน่วยบริการ</h6>
+            <h3 class="rp-panel-title"><span class="rp-panel-title-icon"><i class="bi bi-list-ul" aria-hidden="true"></i></span>รายชื่อหน่วยบริการ</h3>
             <?php if($isAdmin): ?>
-            <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill shadow-sm"><i class="bi bi-grip-vertical"></i> ลากที่ไอคอนเพื่อเรียงลำดับ</span>
+            <span class="rp-sort-hint"><i class="bi bi-grip-vertical" aria-hidden="true"></i>ลากเพื่อเรียงลำดับ</span>
             <?php endif; ?>
         </div>
         <div class="card-body p-0 d-flex flex-column flex-grow-1">
@@ -290,10 +666,10 @@ if (!empty($hospital_ids)) {
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <div class="fw-bold text-dark hospital-name" style="font-size: 15px;">
+                                    <div class="hospital-name">
                                         <?= htmlspecialchars($h['name']) ?>
                                     </div>
-                                    <div class="text-muted mt-1 hospital-code font-monospace" style="font-size: 12px;">
+                                    <div class="hospital-code font-monospace mt-1">
                                         <i class="bi bi-upc-scan text-primary opacity-75 me-1"></i> <?= htmlspecialchars($h['hospital_code'] ?? 'ไม่มีรหัส') ?>
                                     </div>
                                 </td>
@@ -319,14 +695,14 @@ if (!empty($hospital_ids)) {
                                         <span class="text-muted">-</span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="text-center pe-4 text-nowrap">
+                                <td class="text-center pe-4 text-nowrap"><div class="rp-row-actions">
                                     <?php if($canEdit): ?>
-                                        <button type="button" class="btn-action bg-warning bg-opacity-10 text-dark border border-warning border-opacity-50 me-1" title="เปลี่ยนชื่อ/รหัส"
+                                        <button type="button" class="btn-action is-edit" title="เปลี่ยนชื่อ/รหัส"
                                                 onclick="openEditModal('<?= htmlspecialchars($h['id']) ?>', '<?= htmlspecialchars($h['hospital_code'] ?? '') ?>', '<?= htmlspecialchars($h['name'], ENT_QUOTES) ?>')">
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         
-                                        <a href="index.php?c=settings&a=hospital&id=<?= urlencode($h['id']) ?>" class="btn-action bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 me-1" title="ตั้งค่าข้อมูลพื้นฐาน/พิกัด">
+                                        <a href="index.php?c=settings&a=hospital&id=<?= urlencode($h['id']) ?>" class="btn-action is-config" title="ตั้งค่าข้อมูลพื้นฐาน/พิกัด">
                                             <i class="bi bi-gear-fill"></i>
                                         </a>
                                     <?php endif; ?>
@@ -335,14 +711,14 @@ if (!empty($hospital_ids)) {
                                         <form action="index.php?c=hospitals&a=delete" method="POST" class="d-inline" onsubmit="return confirm('คำเตือน: ยืนยันการลบ <?= htmlspecialchars($h['name'], ENT_QUOTES) ?> ?');">
                                             <?= security_csrf_input() ?>
                                             <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
-                                            <button type="submit" class="btn-action bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25" title="ลบ">
+                                            <button type="submit" class="btn-action is-delete" title="ลบ">
                                                 <i class="bi bi-trash-fill"></i>
                                             </button>
                                         </form>
                                     <?php elseif(!$canEdit): ?>
                                         <span class="text-muted small" title="คุณไม่มีสิทธิ์แก้ไขหน่วยบริการนี้"><i class="bi bi-lock-fill"></i> ไม่มีสิทธิ์</span>
                                     <?php endif; ?>
-                                </td>
+                                </div></td>
                             </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
