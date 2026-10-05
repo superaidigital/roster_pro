@@ -994,6 +994,7 @@ if (is_file($goLiveSecurityPath)) {
 $signatureFiles = [
     'lib/ElectronicSignature.php',
     'database/migrations/20261005_electronic_signatures.sql',
+    'database/migrations/20261005_signature_pdpa_ack.sql',
 ];
 foreach ($signatureFiles as $relativePath) {
     if (!is_file($root . '/' . $relativePath)) {
@@ -1011,6 +1012,7 @@ if (is_file($signatureServicePath)) {
         'IMAGETYPE_JPEG',
         "hash('sha256'",
         "['DRAW', 'UPLOAD']",
+        'PRIVACY_NOTICE_VERSION',
     ] as $token) {
         if (strpos($signatureService, $token) === false) {
             addError($errors, "lib/ElectronicSignature.php: missing signature validation token {$token}");
@@ -1026,6 +1028,8 @@ if (is_file($userModelSignaturePath)) {
         'signature_sha256',
         'signature_method',
         'signature_updated_at',
+        'signature_pdpa_notice_version',
+        'signature_pdpa_ack_at',
         'clearSignature',
         'getSignatureRecord',
     ] as $token) {
@@ -1045,6 +1049,9 @@ if (is_file($profileSignatureControllerPath)) {
         'public function signature_image()',
         'getSignatureRecord',
         'ElectronicSignature::normalize',
+        'PRIVACY_NOTICE_VERSION',
+        'signature_pdpa_ack',
+        'signature_pdpa_notice_version',
         'security_is_valid_post_csrf',
     ] as $token) {
         if (strpos($profileSignatureController, $token) === false) {
@@ -1064,6 +1071,10 @@ if (is_file($profileSignatureViewPath)) {
         'save_signature',
         'delete_signature',
         'a=signature_image',
+        'signature_pdpa_ack',
+        'signature_pdpa_notice_version',
+        'ยืนยันการรับทราบข้อมูลส่วนบุคคล (PDPA)',
+        'pdpaSignatureConfirm',
         '$is_signature_owner',
     ] as $token) {
         if (strpos($profileSignatureView, $token) === false) {
