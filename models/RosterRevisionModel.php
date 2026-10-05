@@ -161,6 +161,26 @@ class RosterRevisionModel {
         $revisionCode = sprintf('REV-%s-%03d', $monthYear, $revisionNo);
         $staffJson = $this->encode($staffRows);
 
+        $holidayStmt = $this->conn->prepare(
+            "SELECT holiday_date, holiday_name, holiday_type
+             FROM holidays
+             WHERE is_active = 1
+               AND status = 'APPROVED'
+               AND (hospital_id = ? OR hospital_id IS NULL OR hospital_id = 0)
+               AND holiday_date LIKE ?
+             ORDER BY holiday_date ASC, id ASC"
+        );
+        $holidayStmt->execute([$hospitalId, $monthYear . '-%']);
+        $holidayRows = array_map(
+            static fn(array $row): array => [
+                'holiday_date' => (string)$row['holiday_date'],
+                'holiday_name' => (string)$row['holiday_name'],
+                'holiday_type' => (string)($row['holiday_type'] ?? 'REGULAR'),
+            ],
+            $holidayStmt->fetchAll(PDO::FETCH_ASSOC)
+        );
+        $holidaysJson = $this->encode($holidayRows);
+
         $paySummary = null;
         if (!empty($status['pay_summary'])) {
             $decodedPay = json_decode((string)$status['pay_summary'], true);
@@ -189,6 +209,7 @@ class RosterRevisionModel {
             'approved' => $approved,
             'approved_at' => $approvedAt,
             'staff' => $staffRows,
+            'holidays' => $holidayRows,
             'shifts' => $decodedShifts,
             'pay_summary' => $paySummary,
         ];
@@ -200,12 +221,12 @@ class RosterRevisionModel {
                  prepared_by, prepared_name, prepared_position, prepared_signature, prepared_at,
                  reviewed_by, reviewed_name, reviewed_position, reviewed_signature, reviewed_at,
                  approved_by, approved_name, approved_position, approved_signature, approved_at,
-                 staff_json, shifts_json, pay_summary_json, content_hash)
+                 staff_json, holidays_json, shifts_json, pay_summary_json, content_hash)
              VALUES (?, ?, ?, ?, ?, ?,
                      ?, ?, ?, ?, ?,
                      ?, ?, ?, ?, ?,
                      ?, ?, ?, ?, ?,
-                     ?, ?, ?, ?)"
+                     ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             $hospitalId,
@@ -230,6 +251,7 @@ class RosterRevisionModel {
             $approved['signature'],
             $approvedAt,
             $staffJson,
+            $holidaysJson,
             $shiftsJson,
             $paySummaryJson,
             $contentHash,
@@ -281,7 +303,7 @@ class RosterRevisionModel {
             return null;
         }
 
-        foreach (['staff_json' => 'staff', 'shifts_json' => 'shifts', 'pay_summary_json' => 'pay_summary'] as $jsonKey => $decodedKey) {
+        foreach (['staff_json' => 'staff', 'holidays_json' => 'holidays', 'shifts_json' => 'shifts', 'pay_summary_json' => 'pay_summary'] as $jsonKey => $decodedKey) {
             $decoded = null;
             if ($row[$jsonKey] !== null && $row[$jsonKey] !== '') {
                 $decoded = json_decode((string)$row[$jsonKey], true);
@@ -334,6 +356,7 @@ class RosterRevisionModel {
             ],
             'approved_at' => $revision['approved_at'],
             'staff' => $revision['staff'] ?? [],
+            'holidays' => $revision['holidays'] ?? [],
             'shifts' => $revision['shifts'] ?? [],
             'pay_summary' => $revision['pay_summary'],
         ];
