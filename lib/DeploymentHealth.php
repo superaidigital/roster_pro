@@ -39,31 +39,40 @@ final class DeploymentHealth {
             'error_open' => 0,
         ];
 
-        try {
-            if (self::tableExists($db, 'background_jobs')) {
+        if (self::tableExists($db, 'background_jobs')) {
+            try {
                 $row = $db->query(
                     "SELECT
-                        SUM(status IN ('PENDING','RETRY')) AS pending,
-                        SUM(status = 'FAILED') AS failed,
-                        SUM(status IN ('PENDING','RETRY') AND available_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)) AS delayed
+                        SUM(CASE WHEN status IN ('PENDING','RETRY') THEN 1 ELSE 0 END) AS pending_jobs,
+                        SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failed_jobs,
+                        SUM(CASE
+                            WHEN status IN ('PENDING','RETRY')
+                             AND available_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                            THEN 1 ELSE 0
+                        END) AS delayed_jobs
                      FROM background_jobs"
                 )->fetch(PDO::FETCH_ASSOC) ?: [];
 
-                $reliability['queue_pending'] = (int)($row['pending'] ?? 0);
-                $reliability['queue_failed'] = (int)($row['failed'] ?? 0);
-                $reliability['queue_delayed'] = (int)($row['delayed'] ?? 0);
+                $reliability['queue_pending'] = (int)($row['pending_jobs'] ?? 0);
+                $reliability['queue_failed'] = (int)($row['failed_jobs'] ?? 0);
+                $reliability['queue_delayed'] = (int)($row['delayed_jobs'] ?? 0);
                 $checks['queue'] = ($reliability['queue_failed'] === 0 && $reliability['queue_delayed'] === 0)
                     ? 'ok'
                     : 'attention';
-            } else {
-                $checks['queue'] = 'not_installed';
+            } catch (Throwable $e) {
+                error_log('Deployment health queue check failed: ' . $e->getMessage());
+                $checks['queue'] = 'failed';
             }
+        } else {
+            $checks['queue'] = 'not_installed';
+        }
 
-            if (self::tableExists($db, 'observability_events')) {
+        if (self::tableExists($db, 'observability_events')) {
+            try {
                 $row = $db->query(
                     "SELECT
-                        SUM(status = 'OPEN' AND severity = 'CRITICAL') AS critical_open,
-                        SUM(status = 'OPEN' AND severity = 'ERROR') AS error_open
+                        SUM(CASE WHEN status = 'OPEN' AND severity = 'CRITICAL' THEN 1 ELSE 0 END) AS critical_open,
+                        SUM(CASE WHEN status = 'OPEN' AND severity = 'ERROR' THEN 1 ELSE 0 END) AS error_open
                      FROM observability_events"
                 )->fetch(PDO::FETCH_ASSOC) ?: [];
 
@@ -72,12 +81,12 @@ final class DeploymentHealth {
                 $checks['events'] = $reliability['critical_open'] > 0
                     ? 'failed'
                     : ($reliability['error_open'] > 0 ? 'attention' : 'ok');
-            } else {
-                $checks['events'] = 'not_installed';
+            } catch (Throwable $e) {
+                error_log('Deployment health event check failed: ' . $e->getMessage());
+                $checks['events'] = 'failed';
             }
-        } catch (Throwable $e) {
-            $checks['queue'] = $checks['queue'] === 'unknown' ? 'failed' : $checks['queue'];
-            $checks['events'] = $checks['events'] === 'unknown' ? 'failed' : $checks['events'];
+        } else {
+            $checks['events'] = 'not_installed';
         }
 
         $status = 'ok';
