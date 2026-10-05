@@ -2874,3 +2874,139 @@ h1, h2, h3, h4, h5, h6,
     gap: .25rem !important;
   }
 }
+
+
+/* Topbar control standard — 2026-10-05 */
+.top-navbar .rp-page-icon {
+  display: grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  flex: 0 0 2.55rem;
+  border-radius: .72rem;
+  color: #0f6cbd;
+  background: #eff6ff;
+  border: 1px solid #d6e5ef;
+  box-shadow: none;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.top-navbar .rp-page-icon > i {
+  display: block;
+  margin: 0;
+  line-height: 1;
+}
+
+.top-navbar .nav-icon-btn,
+.top-navbar .rp-user-menu-btn {
+  width: 2.55rem !important;
+  height: 2.55rem !important;
+  min-width: 2.55rem !important;
+  min-height: 2.55rem !important;
+  flex: 0 0 2.55rem !important;
+  padding: 0 !important;
+  border: 1px solid #d8e4eb !important;
+  border-radius: .72rem !important;
+  background: #fff !important;
+  color: #365366 !important;
+  box-shadow: none !important;
+}
+
+.top-navbar .nav-icon-btn:hover,
+.top-navbar .rp-user-menu-btn:hover,
+.top-navbar .nav-icon-btn:focus-visible,
+.top-navbar .rp-user-menu-btn:focus-visible {
+  border-color: #b7cfdd !important;
+  background: #f3f8fb !important;
+  color: #0f6cbd !important;
+}
+
+.rp-user-menu-btn {
+  display: inline-grid;
+  place-items: center;
+  position: relative;
+  line-height: 1;
+}
+
+.rp-user-menu-btn .user-avatar {
+  display: grid;
+  place-items: center;
+  width: 1.85rem !important;
+  height: 1.85rem !important;
+  min-width: 1.85rem;
+  flex: 0 0 1.85rem;
+  border-radius: .56rem !important;
+  background: #eaf4fb !important;
+  color: #0f6cbd !important;
+  border: 1px solid #cfe2ee;
+  box-shadow: none !important;
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rp-user-dropdown {
+  width: min(19rem, calc(100vw - 1rem));
+  padding: .45rem;
+  border: 1px solid #dbe5eb !important;
+  border-radius: .9rem !important;
+  box-shadow: 0 1rem 2.5rem rgba(15,23,42,.12) !important;
+}
+
+.rp-user-dropdown .rp-user-summary {
+  border-radius: .7rem;
+  background: #f8fafc;
+}
+
+.rp-user-dropdown .rp-user-avatar-lg {
+  display: grid;
+  place-items: center;
+  width: 2.45rem !important;
+  height: 2.45rem !important;
+  flex: 0 0 2.45rem;
+  border-radius: .7rem !important;
+  background: #eaf4fb !important;
+  color: #0f6cbd !important;
+  border: 1px solid #cfe2ee;
+  box-shadow: none !important;
+  font-size: .85rem;
+  font-weight: 800;
+}
+
+.rp-user-dropdown .dropdown-item {
+  min-height: 2.45rem;
+  display: flex;
+  align-items: center;
+  border-radius: .58rem;
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+.rp-user-dropdown .dropdown-item:hover {
+  background: #f1f7fb;
+}
+
+.top-navbar .rp-system-online {
+  min-height: 2.15rem;
+  padding: .35rem .62rem;
+  border-radius: .65rem;
+  font-size: .72rem;
+}
+
+@media (max-width: 639.98px) {
+  .top-navbar .nav-icon-btn,
+  .top-navbar .rp-user-menu-btn {
+    width: 2.35rem !important;
+    height: 2.35rem !important;
+    min-width: 2.35rem !important;
+    min-height: 2.35rem !important;
+    flex-basis: 2.35rem !important;
+    border-radius: .65rem !important;
+  }
+
+  .top-navbar .rp-user-menu-btn .user-avatar {
+    width: 1.7rem !important;
+    height: 1.7rem !important;
+  }
+}
