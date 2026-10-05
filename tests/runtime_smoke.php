@@ -14,6 +14,11 @@ require_once __DIR__ . '/../models/RosterSnapshotModel.php';
 require_once __DIR__ . '/../models/RosterAuditModel.php';
 require_once __DIR__ . '/../models/RosterRevisionModel.php';
 require_once __DIR__ . '/../models/FieldVisitModel.php';
+require_once __DIR__ . '/../models/AppEventModel.php';
+require_once __DIR__ . '/../models/BackgroundJobModel.php';
+require_once __DIR__ . '/../lib/ObservabilityService.php';
+require_once __DIR__ . '/../lib/BackupRetention.php';
+require_once __DIR__ . '/../lib/AppMonitor.php';
 require_once __DIR__ . '/../controllers/StaffController.php';
 require_once __DIR__ . '/../controllers/ProfileController.php';
 
@@ -154,6 +159,173 @@ ok(
 
 // Restore a normal staff session for the rest of the smoke flow.
 $_SESSION['user'] = $user1;
+
+// Production observability + reliability regression.
+$eventModel = new AppEventModel($db);
+$eventFingerprint = hash('sha256', 'runtime-observability-dedupe');
+$eventPayload = [
+    'fingerprint' => $eventFingerprint,
+    'severity' => 'ERROR',
+    'category' => 'RUNTIME_TEST',
+    'message' => 'Synthetic repeated runtime event',
+    'exception_class' => 'RuntimeException',
+    'source_file' => 'tests/runtime_smoke.php',
+    'source_line' => __LINE__,
+    'route' => 'runtime::smoke',
+    'request_id' => 'runtime-smoke-request',
+    'user_id' => $uid1,
+    'hospital_id' => $hospitalId,
+    'context' => ['fixture' => true],
+];
+$eventId1 = $eventModel->record($eventPayload);
+$eventId2 = $eventModel->record($eventPayload);
+ok($eventId1 > 0 && $eventId1 === $eventId2, 'observability event deduplicates by fingerprint');
+
+$eventStmt = $db->prepare("SELECT occurrence_count, status FROM observability_events WHERE id = ?");
+$eventStmt->execute([$eventId1]);
+$eventRow = $eventStmt->fetch(PDO::FETCH_ASSOC);
+ok((int)($eventRow['occurrence_count'] ?? 0) === 2, 'observability event increments occurrence count');
+ok(($eventRow['status'] ?? '') === 'OPEN', 'observability event is open before resolution');
+ok($eventModel->resolve($eventId1, $uid1), 'observability event can be resolved');
+
+AppMonitor::record(
+    'ERROR',
+    'RUNTIME_PRIVACY',
+    'token=runtime-secret-value',
+    [
+        'password' => 'super-secret-password',
+        'source_file' => __FILE__,
+        'source_line' => __LINE__,
+    ]
+);
+$privacyStmt = $db->query(
+    "SELECT id, message, context_json
+     FROM observability_events
+     WHERE category = 'RUNTIME_PRIVACY'
+     ORDER BY id DESC LIMIT 1"
+);
+$privacyEvent = $privacyStmt->fetch(PDO::FETCH_ASSOC);
+$privacyContext = json_decode((string)($privacyEvent['context_json'] ?? '{}'), true);
+ok(str_contains((string)($privacyEvent['message'] ?? ''), '[REDACTED]'), 'app monitor redacts secrets from error messages');
+ok(
+    (($privacyContext['context']['password'] ?? '') === '[REDACTED]'),
+    'app monitor redacts sensitive context values'
+);
+ok($eventModel->resolve((int)$privacyEvent['id'], $uid1), 'privacy test event resolved');
+
+$jobModel = new BackgroundJobModel($db);
+$retryJobId = $jobModel->enqueue(
+    'RUNTIME_RETRY_TEST',
+    ['fixture' => true],
+    1,
+    10,
+    null,
+    'runtime-retry-job'
+);
+ok(is_int($retryJobId) && $retryJobId > 0, 'retryable background job enqueued');
+ok(
+    $jobModel->enqueue('RUNTIME_RETRY_TEST', ['fixture' => true], 1, 10, null, 'runtime-retry-job') === null,
+    'background job dedupe key prevents duplicate enqueue'
+);
+
+$claimedRetry = $jobModel->claimNext();
+ok(
+    is_array($claimedRetry) && (int)$claimedRetry['id'] === $retryJobId,
+    'background queue claims next available job'
+);
+$retryStatus = $jobModel->fail(
+    (int)$claimedRetry['id'],
+    (string)$claimedRetry['lock_token'],
+    'Synthetic worker failure'
+);
+ok($retryStatus === 'FAILED', 'job reaches FAILED after max attempts');
+ok($jobModel->retryFailed($retryJobId), 'failed job can be manually returned to retry queue');
+
+$claimedRetryAgain = $jobModel->claimNext();
+ok(
+    is_array($claimedRetryAgain) && (int)$claimedRetryAgain['id'] === $retryJobId,
+    'manually retried job becomes claimable'
+);
+ok(
+    $jobModel->complete((int)$claimedRetryAgain['id'], (string)$claimedRetryAgain['lock_token']),
+    'retried background job can complete'
+);
+
+$notificationModel = new NotificationModel($db);
+$queuedNotificationId = $notificationModel->queueNotification(
+    $uid1,
+    'INFO',
+    'Queued runtime notification',
+    'Synthetic queued notification payload',
+    'index.php?c=notification',
+    'runtime-notification-' . $uid1
+);
+ok(is_int($queuedNotificationId) && $queuedNotificationId > 0, 'notification retry queue API enqueues durable job');
+
+$notificationJob = $jobModel->claimNext();
+ok(
+    is_array($notificationJob)
+        && (int)$notificationJob['id'] === $queuedNotificationId
+        && ($notificationJob['job_type'] ?? '') === 'IN_APP_NOTIFICATION',
+    'queued notification is claimed as an IN_APP_NOTIFICATION job'
+);
+$notificationPayload = $notificationJob['payload'] ?? [];
+ok(
+    $notificationModel->addNotification(
+        (int)$notificationPayload['user_id'],
+        (string)$notificationPayload['type'],
+        (string)$notificationPayload['title'],
+        (string)$notificationPayload['message'],
+        (string)$notificationPayload['link']
+    ),
+    'queued notification handler persists in-app notification'
+);
+ok(
+    $jobModel->complete((int)$notificationJob['id'], (string)$notificationJob['lock_token']),
+    'queued notification job marked complete'
+);
+$userNotifications = $notificationModel->getUserNotifications($uid1, 10);
+ok(
+    (bool)array_filter(
+        $userNotifications,
+        static fn(array $row): bool => ($row['title'] ?? '') === 'Queued runtime notification'
+    ),
+    'queued notification becomes visible to target user'
+);
+
+$observabilityService = new ObservabilityService($db);
+$healthSnapshotId = $observabilityService->captureHealthSnapshot();
+ok($healthSnapshotId > 0, 'system health snapshot captured');
+$healthSnapshots = $observabilityService->recentSnapshots(5);
+ok(
+    count($healthSnapshots) >= 1 && (int)$healthSnapshots[0]['id'] === $healthSnapshotId,
+    'health snapshot history returns newest snapshot first'
+);
+
+$retentionDir = sys_get_temp_dir() . '/roster_backup_retention_' . bin2hex(random_bytes(4));
+mkdir($retentionDir, 0700, true);
+$retentionFiles = [
+    $retentionDir . '/backup_oldest.sql.gz',
+    $retentionDir . '/backup_old.sql.gz',
+    $retentionDir . '/backup_keep.sql.gz',
+];
+foreach ($retentionFiles as $index => $file) {
+    file_put_contents($file, 'synthetic-backup-' . $index);
+    touch($file, time() - ((60 - ($index * 10)) * 86400));
+}
+file_put_contents($retentionFiles[0] . '.sha256', str_repeat('a', 64) . "  backup_oldest.sql.gz\n");
+$retentionResult = BackupRetention::cleanup($retentionDir, 30, 1);
+ok((int)$retentionResult['deleted'] === 2, 'backup retention removes expired backups beyond minimum keep count');
+ok(is_file($retentionFiles[2]), 'backup retention preserves minimum newest backup');
+ok(!is_file($retentionFiles[0] . '.sha256'), 'backup retention removes checksum sidecar with expired backup');
+foreach (glob($retentionDir . '/*') ?: [] as $file) {
+    @unlink($file);
+}
+@rmdir($retentionDir);
+
+$jobSummaryAfter = $jobModel->summary();
+ok((int)$jobSummaryAfter['failed'] === 0, 'runtime reliability flow leaves no failed jobs');
+
 
 $shiftModel = new ShiftModel($db);
 $shift1 = $shiftModel->addShift('2026-10-10', 'บ', $uid1, $hospitalId);
