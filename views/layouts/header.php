@@ -127,7 +127,7 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v19">
+<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v20">
     <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/themes.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/wizard.css?v=20261004-ui-v16">
@@ -211,7 +211,6 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
                 <i class="bi <?= htmlspecialchars($rpPage[2], ENT_QUOTES, 'UTF-8') ?>"></i>
             </div>
             <div class="min-w-0">
-                <div class="rp-page-kicker">ROSTER PRO WORKSPACE</div>
                 <h1 class="rp-page-title mb-0"><?= htmlspecialchars($rpPage[0], ENT_QUOTES, 'UTF-8') ?></h1>
                 <div class="rp-page-subtitle d-none d-md-block"><?= htmlspecialchars($rpPage[1], ENT_QUOTES, 'UTF-8') ?></div>
             </div>
