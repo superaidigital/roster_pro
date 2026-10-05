@@ -383,11 +383,18 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem('sidebarState', collapsed ? 'collapsed' : 'expanded');
 
         if (toggleBtn) {
+            const label = collapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง';
+            const icon = toggleBtn.querySelector('[data-rp-sidebar-icon]');
+
             toggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-            toggleBtn.setAttribute(
-                'aria-label',
-                collapsed ? 'ขยายเมนูด้านข้าง' : 'ย่อเมนูด้านข้าง'
-            );
+            toggleBtn.setAttribute('aria-label', label);
+            toggleBtn.setAttribute('title', label);
+            toggleBtn.classList.toggle('is-collapsed', collapsed);
+
+            if (icon) {
+                icon.classList.toggle('bi-layout-sidebar-inset', !collapsed);
+                icon.classList.toggle('bi-layout-sidebar', collapsed);
+            }
         }
 
         desktopSidebar.querySelectorAll('.sidebar-menu .nav-link, .rp-sidebar-footer .nav-link').forEach(link => {
@@ -443,6 +450,19 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleBtn.addEventListener('click', function(e) {
             e.preventDefault();
             syncSidebarState(!desktopSidebar.classList.contains('collapsed'));
+        });
+    }
+
+    const mobileToggleBtn = document.getElementById('mobileSidebarToggleBtn');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    if (mobileToggleBtn && mobileSidebar) {
+        mobileSidebar.addEventListener('show.bs.offcanvas', () => {
+            mobileToggleBtn.setAttribute('aria-expanded', 'true');
+            mobileToggleBtn.setAttribute('title', 'ปิดเมนู');
+        });
+        mobileSidebar.addEventListener('hidden.bs.offcanvas', () => {
+            mobileToggleBtn.setAttribute('aria-expanded', 'false');
+            mobileToggleBtn.setAttribute('title', 'เปิดเมนู');
         });
     }
 });
