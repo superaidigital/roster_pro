@@ -217,6 +217,88 @@ if (isset($_SESSION['user'])) {
             width: 90%; max-width: 380px; border: 1px solid #e2e8f0;
         }
         .pwa-toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* =========================================================
+           ROSTER PRO - MODERN TOPBAR / SIDEBAR TOGGLE
+           ========================================================= */
+        .top-navbar {
+            min-height: var(--navbar-height);
+            padding-left: 14px !important;
+            padding-right: 20px !important;
+            background: rgba(255, 255, 255, 0.97);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid #e8eef5;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.03);
+        }
+
+        .nav-icon-btn {
+            width: 42px;
+            min-width: 42px;
+            height: 42px;
+            padding: 0;
+            border: 1px solid #dbe5ef;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            color: #475569;
+            font-size: 18px;
+            transition:
+                background-color .2s ease,
+                border-color .2s ease,
+                color .2s ease,
+                transform .2s ease,
+                box-shadow .2s ease;
+        }
+
+        .nav-icon-btn > i {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .nav-icon-btn:hover {
+            background: #f0f9ff;
+            border-color: #bae6fd;
+            color: #0284c7;
+            box-shadow: 0 5px 14px rgba(14, 165, 233, 0.10);
+            transform: translateY(-1px);
+        }
+
+        .nav-icon-btn:active {
+            transform: scale(.96);
+        }
+
+        .sidebar-toggle-btn {
+            background: #f8fafc;
+        }
+
+        .sidebar-toggle-btn:hover {
+            background: #ecfeff;
+            border-color: #a5f3fc;
+            color: #0891b2;
+        }
+
+        .sidebar-toggle-btn i {
+            font-size: 18px !important;
+        }
+
+        @media (max-width: 767.98px) {
+            .top-navbar {
+                padding-left: 10px !important;
+                padding-right: 10px !important;
+            }
+
+            .nav-icon-btn {
+                width: 40px;
+                min-width: 40px;
+                height: 40px;
+                border-radius: 11px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -227,8 +309,8 @@ if (isset($_SESSION['user'])) {
         <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
             <i class="bi bi-list fs-4"></i>
         </button>
-        <button class="nav-icon-btn d-none d-md-flex" id="sidebarToggleBtn" type="button">
-            <i class="bi bi-list fs-4"></i>
+        <button class="nav-icon-btn sidebar-toggle-btn d-none d-md-flex" id="sidebarToggleBtn" type="button" title="ย่อ/ขยายเมนู" aria-label="ย่อหรือขยายเมนูด้านข้าง">
+            <i class="bi bi-layout-sidebar-inset" id="sidebarToggleIcon"></i>
         </button>
         
         <!-- 🌟 โลโก้และชื่อระบบ -->
