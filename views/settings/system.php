@@ -4,6 +4,8 @@
 $role = strtoupper($_SESSION['user']['role'] ?? '');
 $is_superadmin = ($role === 'SUPERADMIN');
 $settings = $settings ?? []; // รับค่าจาก Controller
+$maintenance_state = $maintenance_state ?? ['enabled' => false];
+$release_id = $release_id ?? 'unknown';
 ?>
 
 <style>
