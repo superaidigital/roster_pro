@@ -46,9 +46,6 @@ try {
             'idx_users_hospital_roster',
             'idx_users_active_scope',
         ],
-        'employee_licenses' => [
-            'idx_employee_licenses_status_expire_user',
-        ],
     ];
 
     $indexStmt = $db->prepare(
