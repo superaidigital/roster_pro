@@ -137,7 +137,7 @@ if ($appEnv === 'production') {
 }
 
 try {
-    $db = (new Database())->getConnection();
+    $db = (new Database())->getConnectionOrThrow();
     $db->query('SELECT 1')->fetchColumn();
     $pass('Database connection healthy');
 
