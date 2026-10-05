@@ -364,7 +364,13 @@ class SettingsController {
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
-        $holidays = $holidayModel->getAllHolidays();
+
+        $year = filter_var($_GET['year'] ?? date('Y'), FILTER_VALIDATE_INT);
+        if (!$year || $year < 2000 || $year > 2100) {
+            $year = (int) date('Y');
+        }
+
+        $holidays = $holidayModel->getAllHolidays($year);
 
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
@@ -379,42 +385,96 @@ class SettingsController {
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
         
-        if (!empty($_POST['holiday_date']) && !empty($_POST['holiday_name'])) {
-            $holidayModel->addHoliday($_POST['holiday_date'], $_POST['holiday_name']);
-            
-            // 🌟 บันทึก Log: เพิ่มวันหยุด
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มวันหยุดนักขัตฤกษ์ด้วยตนเอง: " . $_POST['holiday_name']);
-            $_SESSION['success_msg'] = "เพิ่มวันหยุดเรียบร้อยแล้ว";
+        $holidayDate = is_string($_POST['holiday_date'] ?? null) ? $_POST['holiday_date'] : '';
+        $holidayName = is_string($_POST['holiday_name'] ?? null) ? trim($_POST['holiday_name']) : '';
+        $holidayType = is_string($_POST['holiday_type'] ?? null) ? strtoupper($_POST['holiday_type']) : 'REGULAR';
+        $allowedTypes = ['REGULAR', 'COMPENSATION', 'SPECIAL'];
+
+        $dateObj = DateTime::createFromFormat('!Y-m-d', $holidayDate);
+        $validDate = $dateObj && $dateObj->format('Y-m-d') === $holidayDate;
+
+        if (
+            $validDate
+            && $holidayName !== ''
+            && mb_strlen($holidayName, 'UTF-8') <= 255
+            && in_array($holidayType, $allowedTypes, true)
+        ) {
+            if ($holidayModel->addHoliday($holidayDate, $holidayName, $holidayType)) {
+                LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มวันหยุดนักขัตฤกษ์ด้วยตนเอง");
+                $_SESSION['success_msg'] = "เพิ่มวันหยุดเรียบร้อยแล้ว";
+            } else {
+                $_SESSION['error_msg'] = "ไม่สามารถเพิ่มวันหยุดได้ หรืออาจมีวันที่ซ้ำ";
+            }
+        } else {
+            $_SESSION['error_msg'] = "ข้อมูลวันหยุดไม่ถูกต้อง";
         }
+        header("Location: index.php?c=settings&a=holidays");
+        exit;
+    }
+
+    public function toggle_holiday() {
+        $this->requirePost();
+        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+
+        $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+        $status = filter_var($_POST['status'] ?? null, FILTER_VALIDATE_INT);
+
+        if (!$id || !in_array($status, [0, 1], true)) {
+            $_SESSION['error_msg'] = "ข้อมูลสถานะวันหยุดไม่ถูกต้อง";
+            header("Location: index.php?c=settings&a=holidays");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        require_once 'models/HolidayModel.php';
+        $holidayModel = new HolidayModel($db);
+
+        if ($holidayModel->toggleStatus($id, $status)) {
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "เปลี่ยนสถานะวันหยุด ID: {$id}");
+            $_SESSION['success_msg'] = "อัปเดตสถานะวันหยุดเรียบร้อยแล้ว";
+        } else {
+            $_SESSION['error_msg'] = "ไม่สามารถอัปเดตสถานะวันหยุดได้";
+        }
+
         header("Location: index.php?c=settings&a=holidays");
         exit;
     }
 
     public function delete_holiday() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+
+        $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$id) {
+            $_SESSION['error_msg'] = "เลขอ้างอิงวันหยุดไม่ถูกต้อง";
+            header("Location: index.php?c=settings&a=holidays");
+            exit;
+        }
+
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
-        
-        if (isset($_GET['id'])) {
-            // ดึงชื่อวันหยุดมาเพื่อบันทึก Log ให้ชัดเจน
-            $stmt = $db->prepare("SELECT holiday_name FROM holidays WHERE id = ?");
-            $stmt->execute([$_GET['id']]);
-            $holiday_name = $stmt->fetchColumn() ?: "ID: " . $_GET['id'];
-            
-            $holidayModel->deleteHoliday($_GET['id']);
-            
-            // 🌟 บันทึก Log: ลบวันหยุด
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบวันหยุดนักขัตฤกษ์: {$holiday_name}");
+
+        if ($holidayModel->deleteHoliday($id)) {
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบวันหยุดนักขัตฤกษ์ ID: {$id}");
             $_SESSION['success_msg'] = "ลบวันหยุดเรียบร้อยแล้ว";
+        } else {
+            $_SESSION['error_msg'] = "ไม่สามารถลบวันหยุดได้";
         }
+
         header("Location: index.php?c=settings&a=holidays");
         exit;
     }
 
     public function sync_api() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
-        $year = isset($_GET['year']) ? $_GET['year'] : date('Y');
+        $year = filter_var($_POST['year'] ?? date('Y'), FILTER_VALIDATE_INT);
+        if (!$year || $year < 2000 || $year > 2100) {
+            $_SESSION['error_msg'] = "ปีที่ต้องการซิงค์ไม่ถูกต้อง";
+            header("Location: index.php?c=settings&a=holidays");
+            exit;
+        }
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
