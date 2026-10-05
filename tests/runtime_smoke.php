@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/security.php';
+require_once __DIR__ . '/../lib/ElectronicSignature.php';
 require_once __DIR__ . '/../models/UserModel.php';
 require_once __DIR__ . '/../models/HospitalModel.php';
 require_once __DIR__ . '/../models/ShiftModel.php';
@@ -451,8 +452,27 @@ ok($integrityRejected, 'tampered roster snapshot is rejected by checksum verific
 // Immutable approved roster revision regression.
 $signatureOne = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 $signatureTwo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2X0sAAAAASUVORK5CYII=';
-ok($users->updateSignature($uid1, $signatureOne), 'preparer digital signature fixture saved');
-ok($users->updateSignature($uid2, $signatureOne), 'approver digital signature fixture saved');
+ok(ElectronicSignature::isValid($signatureOne), 'electronic signature validator accepts PNG fixture');
+ok(
+    !ElectronicSignature::isValid('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='),
+    'electronic signature validator rejects SVG payloads'
+);
+ok($users->updateSignature($uid1, $signatureOne, 'DRAW'), 'preparer digital signature fixture saved');
+ok($users->updateSignature($uid2, $signatureOne, 'UPLOAD'), 'approver digital signature fixture saved');
+
+$signatureMetaStmt = $db->prepare(
+    "SELECT signature_sha256, signature_method, signature_updated_at
+     FROM users
+     WHERE id = ?"
+);
+$signatureMetaStmt->execute([$uid1]);
+$signatureMeta = $signatureMetaStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+ok(
+    preg_match('/^[a-f0-9]{64}$/', (string)($signatureMeta['signature_sha256'] ?? '')) === 1,
+    'signature SHA-256 metadata persisted'
+);
+ok(($signatureMeta['signature_method'] ?? '') === 'DRAW', 'signature capture method persisted');
+ok(!empty($signatureMeta['signature_updated_at']), 'signature update timestamp persisted');
 
 $shiftModel->addShift('2026-11-05', 'บ', $uid1, $hospitalId);
 $shiftModel->addShift('2026-11-06', 'ร', $uid2, $hospitalId);
