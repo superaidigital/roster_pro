@@ -320,6 +320,16 @@ class ProfileController {
                 throw new RuntimeException('Unable to save signature.');
             }
 
+            $savedSignature = $userModel->getSignatureRecord($targetUserId);
+            if (!is_array($savedSignature)
+                || !ElectronicSignature::isValid((string)($savedSignature['signature_path'] ?? ''))
+                || !hash_equals(
+                    (string)$signature['sha256'],
+                    (string)($savedSignature['signature_sha256'] ?? '')
+                )) {
+                throw new RuntimeException('Signature database readback verification failed.');
+            }
+
             if ((int)($_SESSION['user']['id'] ?? 0) === $targetUserId) {
                 $_SESSION['user']['signature_path'] = $signature['data_url'];
                 $_SESSION['user']['signature_sha256'] = $signature['sha256'];
@@ -344,6 +354,50 @@ class ProfileController {
 
         header('Location: index.php?c=profile&id=' . $targetUserId . '#nav-signature');
         exit;
+    }
+
+    public function signature_image() {
+        $this->checkAuth();
+
+        $targetUserId = (int)($_GET['id'] ?? 0);
+        $currentUserId = (int)($_SESSION['user']['id'] ?? 0);
+
+        if ($targetUserId <= 0 || $targetUserId !== $currentUserId) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            exit;
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $userModel = new UserModel($db);
+            $record = $userModel->getSignatureRecord($targetUserId);
+            $normalized = ElectronicSignature::normalize(
+                (string)($record['signature_path'] ?? ''),
+                (string)($record['signature_method'] ?? 'DRAW')
+            );
+
+            $parts = explode(',', (string)$normalized['data_url'], 2);
+            $binary = isset($parts[1]) ? base64_decode($parts[1], true) : false;
+            if (!is_string($binary) || $binary === '') {
+                throw new RuntimeException('Signature image decoding failed.');
+            }
+
+            header('Content-Type: ' . $normalized['mime']);
+            header('Content-Length: ' . strlen($binary));
+            header('Cache-Control: private, no-store, max-age=0');
+            header('Pragma: no-cache');
+            header('X-Content-Type-Options: nosniff');
+            echo $binary;
+            exit;
+        } catch (Throwable $e) {
+            error_log('Electronic signature image read failed: ' . $e->getMessage());
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Signature not found';
+            exit;
+        }
     }
 
     public function delete_signature() {
