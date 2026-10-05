@@ -127,7 +127,7 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v21">
+<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v22">
     <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/themes.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/wizard.css?v=20261004-ui-v16">
@@ -356,6 +356,7 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
      class="pwa-toast"
      role="dialog"
      aria-modal="false"
+     aria-hidden="true"
      aria-labelledby="pwaInstallTitle"
      aria-describedby="pwaInstallDescription">
     <button type="button"
@@ -366,30 +367,40 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
         <i class="bi bi-x-lg" aria-hidden="true"></i>
     </button>
 
-    <div class="rp-pwa-main">
+    <div class="rp-pwa-header">
         <div class="rp-pwa-app-icon" aria-hidden="true">
             <img src="public/icons/roster-pro.svg" alt="">
         </div>
 
         <div class="rp-pwa-copy">
-            <div class="rp-pwa-eyebrow">ติดตั้งเป็นแอป</div>
-            <h2 class="rp-pwa-title" id="pwaInstallTitle">ติดตั้ง <?= htmlspecialchars($app_name, ENT_QUOTES, 'UTF-8') ?></h2>
-            <p class="rp-pwa-description" id="pwaInstallDescription">
-                เปิดใช้งาน Roster Pro ได้รวดเร็วจากหน้าจอหลัก พร้อมพื้นที่ทำงานแบบเต็มจอ
-            </p>
-
-            <div class="rp-pwa-benefits" aria-label="ประโยชน์ของการติดตั้ง">
-                <span><i class="bi bi-lightning-charge-fill" aria-hidden="true"></i> เปิดเร็ว</span>
-                <span><i class="bi bi-window-stack" aria-hidden="true"></i> เต็มจอ</span>
-                <span><i class="bi bi-pin-angle-fill" aria-hidden="true"></i> เข้าถึงง่าย</span>
+            <div class="rp-pwa-eyebrow">
+                <span class="rp-pwa-eyebrow-dot" aria-hidden="true"></span>
+                ติดตั้งเป็นแอป
             </div>
+            <h2 class="rp-pwa-title" id="pwaInstallTitle">
+                <?= htmlspecialchars($app_name, ENT_QUOTES, 'UTF-8') ?>
+            </h2>
+            <p class="rp-pwa-description" id="pwaInstallDescription">
+                เปิดใช้งานได้รวดเร็วเหมือนแอปบนเครื่อง โดยไม่ต้องเปิดผ่านแท็บเบราว์เซอร์ทุกครั้ง
+            </p>
         </div>
+    </div>
+
+    <div class="rp-pwa-benefits" aria-label="ประโยชน์ของการติดตั้ง">
+        <span><i class="bi bi-lightning-charge" aria-hidden="true"></i> เปิดเร็ว</span>
+        <span><i class="bi bi-aspect-ratio" aria-hidden="true"></i> เต็มหน้าจอ</span>
+        <span><i class="bi bi-pin-angle" aria-hidden="true"></i> เข้าถึงง่าย</span>
+    </div>
+
+    <div class="rp-pwa-note">
+        <i class="bi bi-shield-check" aria-hidden="true"></i>
+        <span>ติดตั้งจากระบบเดิม ข้อมูลและสิทธิ์การใช้งานยังคงเหมือนเดิม</span>
     </div>
 
     <div class="rp-pwa-actions">
         <button id="btnInstallPwa" type="button" class="rp-pwa-btn rp-pwa-btn-primary">
             <i class="bi bi-download" aria-hidden="true"></i>
-            <span>ติดตั้งแอป</span>
+            <span>ติดตั้งตอนนี้</span>
         </button>
         <button id="btnDismissPwa" type="button" class="rp-pwa-btn rp-pwa-btn-secondary">
             ไว้ภายหลัง
@@ -444,7 +455,10 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
         if(!sessionStorage.getItem('pwaDismissed')) {
             setTimeout(() => { 
                 const toast = document.getElementById('pwaInstallToast');
-                if(toast) toast.classList.add('show'); 
+                if (toast) {
+                    toast.classList.add('show');
+                    toast.setAttribute('aria-hidden', 'false');
+                } 
             }, 3000);
         }
     });
@@ -452,7 +466,10 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
     window.addEventListener('appinstalled', () => {
         deferredPrompt = null;
         const toast = document.getElementById('pwaInstallToast');
-        if (toast) toast.classList.remove('show');
+        if (toast) {
+            toast.classList.remove('show');
+            toast.setAttribute('aria-hidden', 'true');
+        }
         sessionStorage.setItem('pwaDismissed', 'true');
     });
 
@@ -463,7 +480,11 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
         const btnInstall = document.getElementById('btnInstallPwa');
         if(btnInstall) {
             btnInstall.addEventListener('click', async () => {
-                document.getElementById('pwaInstallToast').classList.remove('show');
+                const installToast = document.getElementById('pwaInstallToast');
+                if (installToast) {
+                    installToast.classList.remove('show');
+                    installToast.setAttribute('aria-hidden', 'true');
+                }
                 if (deferredPrompt) { 
                     deferredPrompt.prompt(); 
                     deferredPrompt = null; 
@@ -473,7 +494,10 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
 
         const dismissPwaInstall = () => {
             const toast = document.getElementById('pwaInstallToast');
-            if (toast) toast.classList.remove('show');
+            if (toast) {
+                toast.classList.remove('show');
+                toast.setAttribute('aria-hidden', 'true');
+            }
             sessionStorage.setItem('pwaDismissed', 'true');
         };
 
