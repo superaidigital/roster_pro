@@ -318,8 +318,8 @@ $ajaxRevisionPath = $root . '/controllers/AjaxController.php';
 if (is_file($ajaxRevisionPath)) {
     $ajaxRevision = (string) file_get_contents($ajaxRevisionPath);
     if (strpos($ajaxRevision, 'createApprovedRevision(') === false
-        || strpos($ajaxRevision, 'กรุณาบันทึกลายเซ็นอิเล็กทรอนิกส์ในโปรไฟล์') === false) {
-        addError($errors, 'controllers/AjaxController.php: approval must require a signature and create an official revision');
+        || strpos($ajaxRevision, 'ElectronicSignature::isValid') === false) {
+        addError($errors, 'controllers/AjaxController.php: approval must validate a signature and create an official revision');
     }
 }
 
@@ -465,7 +465,7 @@ foreach ([
 
 if (is_file($frontControllerPath)) {
     $frontController = (string) file_get_contents($frontControllerPath);
-    if (strpos($frontController, "$publicHealthActions = ['index', 'live', 'ready'];") === false
+    if (strpos($frontController, "\$publicHealthActions = ['index', 'live', 'ready'];") === false
         || strpos($frontController, '$isHealthRoute') === false) {
         addError($errors, 'index.php: public health endpoints must remain limited to index/live/ready');
     }
@@ -990,6 +990,131 @@ if (is_file($goLiveSecurityPath)) {
     }
 }
 
+// 5.15) Electronic signature and topbar regression guards.
+$signatureFiles = [
+    'lib/ElectronicSignature.php',
+    'database/migrations/20261005_electronic_signatures.sql',
+    'database/migrations/20261005_signature_pdpa_ack.sql',
+];
+foreach ($signatureFiles as $relativePath) {
+    if (!is_file($root . '/' . $relativePath)) {
+        addError($errors, 'Missing electronic signature file: ' . $relativePath);
+    }
+}
+
+$signatureServicePath = $root . '/lib/ElectronicSignature.php';
+if (is_file($signatureServicePath)) {
+    $signatureService = (string) file_get_contents($signatureServicePath);
+    foreach ([
+        'MAX_BYTES',
+        'getimagesizefromstring',
+        'IMAGETYPE_PNG',
+        'IMAGETYPE_JPEG',
+        "hash('sha256'",
+        "['DRAW', 'UPLOAD']",
+        'PRIVACY_NOTICE_VERSION',
+    ] as $token) {
+        if (strpos($signatureService, $token) === false) {
+            addError($errors, "lib/ElectronicSignature.php: missing signature validation token {$token}");
+        }
+    }
+}
+
+$userModelSignaturePath = $root . '/models/UserModel.php';
+if (is_file($userModelSignaturePath)) {
+    $userModelSignature = (string) file_get_contents($userModelSignaturePath);
+    foreach ([
+        'ElectronicSignature::normalize',
+        'signature_sha256',
+        'signature_method',
+        'signature_updated_at',
+        'signature_pdpa_notice_version',
+        'signature_pdpa_ack_at',
+        'clearSignature',
+        'getSignatureRecord',
+    ] as $token) {
+        if (strpos($userModelSignature, $token) === false) {
+            addError($errors, "models/UserModel.php: missing signature persistence token {$token}");
+        }
+    }
+}
+
+$profileSignatureControllerPath = $root . '/controllers/ProfileController.php';
+if (is_file($profileSignatureControllerPath)) {
+    $profileSignatureController = (string) file_get_contents($profileSignatureControllerPath);
+    foreach ([
+        'requireSignatureOwner',
+        'public function save_signature()',
+        'public function delete_signature()',
+        'public function signature_image()',
+        'getSignatureRecord',
+        'ElectronicSignature::normalize',
+        'PRIVACY_NOTICE_VERSION',
+        'signature_pdpa_ack',
+        'signature_pdpa_notice_version',
+        'security_is_valid_post_csrf',
+    ] as $token) {
+        if (strpos($profileSignatureController, $token) === false) {
+            addError($errors, "controllers/ProfileController.php: missing signature workflow token {$token}");
+        }
+    }
+}
+
+$profileSignatureViewPath = $root . '/views/profile/index.php';
+if (is_file($profileSignatureViewPath)) {
+    $profileSignatureView = (string) file_get_contents($profileSignatureViewPath);
+    foreach ([
+        'id="nav-signature"',
+        'id="signatureCanvas"',
+        'id="signatureUpload"',
+        'id="signatureForm"',
+        'save_signature',
+        'delete_signature',
+        'a=signature_image',
+        'signature_pdpa_ack',
+        'signature_pdpa_notice_version',
+        'ยืนยันการรับทราบข้อมูลส่วนบุคคล (PDPA)',
+        'pdpaSignatureConfirm',
+        '$is_signature_owner',
+    ] as $token) {
+        if (strpos($profileSignatureView, $token) === false) {
+            addError($errors, "views/profile/index.php: missing electronic signature UI token {$token}");
+        }
+    }
+}
+
+$ajaxSignaturePath = $root . '/controllers/AjaxController.php';
+if (is_file($ajaxSignaturePath)) {
+    $ajaxSignature = (string) file_get_contents($ajaxSignaturePath);
+    if (strpos($ajaxSignature, 'ElectronicSignature::isValid') === false) {
+        addError($errors, 'controllers/AjaxController.php: roster submission/approval must validate the electronic signature image');
+    }
+}
+
+$headerUiPath = $root . '/views/layouts/header.php';
+if (is_file($headerUiPath)) {
+    $headerUi = (string) file_get_contents($headerUiPath);
+    if (strpos($headerUi, 'ROSTER PRO WORKSPACE') !== false) {
+        addError($errors, 'views/layouts/header.php: obsolete ROSTER PRO WORKSPACE kicker must remain removed');
+    }
+}
+
+$styleUiPath = $root . '/public/css/style.css';
+if (is_file($styleUiPath)) {
+    $styleUi = (string) file_get_contents($styleUiPath);
+    foreach ([
+        'Sidebar toggle visibility contract',
+        '.top-navbar .rp-mobile-menu-btn',
+        '.top-navbar .rp-desktop-menu-btn',
+        '@media (min-width: 1024px)',
+        '@media (max-width: 1023.98px)',
+    ] as $token) {
+        if (strpos($styleUi, $token) === false) {
+            addError($errors, "public/css/style.css: missing sidebar visibility contract token {$token}");
+        }
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
@@ -998,6 +1123,7 @@ $mutationActions = [
     'delete_notif','delete_all_notif','logout','import_csv','do_backup',
     'do_server_backup','delete_server_backup','save_holiday','toggle_holiday',
     'delete_holiday','update_system','save_hospital','test_line','test_line_notify',
+    'save_signature','delete_signature',
     'complete_followup','create_snapshot','restore_snapshot',
     'resolve_event','retry_job','capture_health'
 ];

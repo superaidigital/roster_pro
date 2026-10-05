@@ -15,6 +15,13 @@ function formatDateThai($date) {
 $u_color = $target_user['color_theme'] ?? 'primary';
 $u_name = $target_user['name'] ?? 'ไม่มีชื่อ';
 $initial = mb_substr($u_name, 0, 1, 'UTF-8');
+$signature_is_valid = ElectronicSignature::isValid($target_user['signature_path'] ?? null);
+$signature_fingerprint = $signature_is_valid
+    ? ((string)($target_user['signature_sha256'] ?? '') ?: (string)ElectronicSignature::fingerprint($target_user['signature_path']))
+    : '';
+$signature_method = strtoupper((string)($target_user['signature_method'] ?? ''));
+$signature_updated_at = (string)($target_user['signature_updated_at'] ?? '');
+$is_signature_owner = (int)($target_user_id ?? 0) === (int)($_SESSION['user']['id'] ?? 0);
 
 // ==========================================
 // 🌟 ระบบ Smart Auto-fill (ปรับปรุงให้ดึงชื่อหลักมาใช้เสมอ)
@@ -69,6 +76,145 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
     .table-modern th { background-color: #f8fafc; font-weight: 600; color: #475569; font-size: 13px; }
     .table-modern td { vertical-align: middle; font-size: 14px; }
     .empty-state { padding: 3rem 1rem; text-align: center; color: #94a3b8; }
+
+    .signature-status-card {
+        border: 1px solid #dbe5eb;
+        border-radius: 1rem;
+        background: linear-gradient(145deg, #fff, #f8fbfd);
+    }
+    .signature-preview {
+        min-height: 10rem;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        border: 1px dashed #cbd5e1;
+        border-radius: .85rem;
+        background:
+            linear-gradient(#fff, #fff) padding-box,
+            repeating-linear-gradient(0deg, transparent, transparent 23px, #f1f5f9 24px) border-box;
+    }
+    .signature-preview img {
+        max-width: 100%;
+        max-height: 9rem;
+        object-fit: contain;
+    }
+    .signature-pad-shell {
+        overflow: hidden;
+        border: 1px solid #cbd5e1;
+        border-radius: .9rem;
+        background: #fff;
+        box-shadow: inset 0 1px 2px rgba(15,23,42,.04);
+    }
+    #signatureCanvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 3 / 1;
+        cursor: crosshair;
+        touch-action: none;
+        background:
+            linear-gradient(to bottom, transparent 84%, #dbe5eb 84%, #dbe5eb 85%, transparent 85%);
+    }
+    .signature-help {
+        color: #64748b;
+        font-size: .78rem;
+        line-height: 1.55;
+    }
+    .signature-meta {
+        display: grid;
+        gap: .35rem;
+        color: #64748b;
+        font-size: .76rem;
+    }
+    .signature-meta code {
+        color: #334155;
+        word-break: break-all;
+    }
+
+    .pdpa-confirm-row {
+        display: flex;
+        align-items: flex-start;
+        gap: .8rem;
+        width: 100%;
+        margin: 0;
+        padding: .95rem 1rem;
+        border: 1px solid #bfdbfe;
+        border-radius: .8rem;
+        background: #eff6ff;
+        color: #1e293b;
+        cursor: pointer;
+        text-align: left;
+        transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
+    }
+
+    .pdpa-confirm-row:hover {
+        border-color: #93c5fd;
+        background: #eaf4ff;
+    }
+
+    .pdpa-confirm-row:focus-within {
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 .2rem rgba(59,130,246,.12);
+    }
+
+    .pdpa-confirm-checkbox {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 1.2rem;
+        height: 1.2rem;
+        flex: 0 0 1.2rem;
+        margin: .12rem 0 0;
+        border: 2px solid #93c5fd;
+        border-radius: .34rem;
+        background: #fff;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        outline: none;
+    }
+
+    .pdpa-confirm-checkbox::after {
+        content: '';
+        width: .56rem;
+        height: .32rem;
+        border-left: 2px solid #fff;
+        border-bottom: 2px solid #fff;
+        transform: rotate(-45deg) scale(0);
+        transform-origin: center;
+        transition: transform .12s ease;
+    }
+
+    .pdpa-confirm-checkbox:checked {
+        border-color: #2563eb;
+        background: #2563eb;
+    }
+
+    .pdpa-confirm-checkbox:checked::after {
+        transform: rotate(-45deg) scale(1);
+    }
+
+    .pdpa-confirm-checkbox:focus-visible {
+        box-shadow: 0 0 0 .18rem rgba(37,99,235,.18);
+    }
+
+    .pdpa-confirm-copy {
+        min-width: 0;
+        color: #1e293b;
+        font-size: .88rem;
+        font-weight: 700;
+        line-height: 1.55;
+    }
+
+    @media (max-width: 575.98px) {
+        .pdpa-confirm-row {
+            gap: .65rem;
+            padding: .85rem;
+        }
+
+        .pdpa-confirm-copy {
+            font-size: .83rem;
+        }
+    }
 </style>
 
 <div class="container-fluid px-3 px-md-4 py-4">
@@ -147,6 +293,12 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#nav-training" type="button"><i class="bi bi-award me-2"></i>ประวัติการฝึกอบรม (CPE)</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#nav-signature" type="button">
+                <i class="bi bi-pen me-2"></i>ลายเซ็นอิเล็กทรอนิกส์
+                <?php if ($signature_is_valid): ?><span class="badge text-bg-success ms-1">พร้อมใช้</span><?php endif; ?>
+            </button>
         </li>
     </ul>
 
@@ -483,6 +635,139 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
             </div>
         </div>
 
+        <!-- ============================================== -->
+        <!-- TAB 5: ลายเซ็นอิเล็กทรอนิกส์ -->
+        <!-- ============================================== -->
+        <div class="tab-pane fade" id="nav-signature" role="tabpanel">
+            <div class="row g-3 g-lg-4">
+                <div class="col-12 col-lg-4">
+                    <div class="card card-modern signature-status-card h-100">
+                        <div class="card-body p-4">
+                            <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                                <div>
+                                    <h5 class="fw-bold text-dark mb-1"><i class="bi bi-patch-check me-2 text-primary"></i>ลายเซ็นปัจจุบัน</h5>
+                                    <div class="small text-muted">ใช้สำหรับลงนามใน Workflow และเอกสารฉบับอนุมัติ</div>
+                                </div>
+                                <?php if ($signature_is_valid): ?>
+                                    <span class="badge text-bg-success">พร้อมใช้งาน</span>
+                                <?php else: ?>
+                                    <span class="badge text-bg-secondary">ยังไม่ได้บันทึก</span>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="signature-preview mb-3">
+                                <?php if ($signature_is_valid && $is_signature_owner): ?>
+                                    <img src="index.php?c=profile&amp;a=signature_image&amp;id=<?= (int)$target_user_id ?>&amp;v=<?= htmlspecialchars(substr((string)$signature_fingerprint, 0, 16), ENT_QUOTES, 'UTF-8') ?>"
+                                         alt="ลายเซ็นอิเล็กทรอนิกส์ของ <?= htmlspecialchars((string)$target_user['name'], ENT_QUOTES, 'UTF-8') ?>"
+                                         loading="eager"
+                                         decoding="async">
+                                <?php elseif ($signature_is_valid): ?>
+                                    <div class="text-center text-success">
+                                        <i class="bi bi-patch-check-fill display-6 opacity-75 d-block mb-2"></i>
+                                        <div class="fw-semibold">มีลายเซ็นอิเล็กทรอนิกส์แล้ว</div>
+                                        <div class="small text-muted">แสดงภาพเฉพาะเจ้าของบัญชีเพื่อความเป็นส่วนตัว</div>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="text-center text-muted">
+                                        <i class="bi bi-pen display-6 opacity-25 d-block mb-2"></i>
+                                        <div class="fw-semibold">ยังไม่มีลายเซ็น</div>
+                                        <div class="small">วาดหรือเลือกรูปในพื้นที่ด้านขวา</div>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <?php if ($signature_is_valid): ?>
+                                <div class="signature-meta mb-3">
+                                    <div><strong>วิธีบันทึก:</strong> <?= $signature_method === 'UPLOAD' ? 'อัปโหลดรูปภาพ' : ($signature_method === 'DRAW' ? 'วาดผ่านระบบ' : 'ข้อมูลเดิม') ?></div>
+                                    <div><strong>อัปเดต:</strong> <?= $signature_updated_at !== '' ? htmlspecialchars($signature_updated_at, ENT_QUOTES, 'UTF-8') : 'ไม่ระบุ' ?></div>
+                                    <?php if ($signature_fingerprint !== ''): ?>
+                                        <div><strong>SHA-256:</strong> <code><?= htmlspecialchars(substr($signature_fingerprint, 0, 24), ENT_QUOTES, 'UTF-8') ?>…</code></div>
+                                    <?php endif; ?>
+                                </div>
+
+                                <?php if ($is_signature_owner): ?>
+                                <form action="index.php?c=profile&a=delete_signature" method="POST"
+                                      onsubmit="return confirm('ยืนยันการลบลายเซ็นอิเล็กทรอนิกส์? เอกสาร Revision เดิมที่อนุมัติแล้วจะไม่เปลี่ยนแปลง');">
+                                    <?= security_csrf_input() ?>
+                                    <input type="hidden" name="user_id" value="<?= (int)$target_user_id ?>">
+                                    <button type="submit" class="btn btn-outline-danger w-100">
+                                        <i class="bi bi-trash3 me-2"></i>ลบลายเซ็นปัจจุบัน
+                                    </button>
+                                </form>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-8">
+                    <?php if ($is_signature_owner): ?>
+                    <div class="card card-modern h-100">
+                        <div class="card-body p-4">
+                            <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-3">
+                                <div>
+                                    <h5 class="fw-bold text-dark mb-1"><i class="bi bi-vector-pen me-2 text-primary"></i>สร้าง / เปลี่ยนลายเซ็น</h5>
+                                    <div class="signature-help">วาดด้วยเมาส์ นิ้ว หรือปากกา หรือเลือกรูป PNG/JPG ระบบจะบันทึกเฉพาะรูปภาพลายเซ็นที่ผ่านการตรวจสอบ</div>
+                                </div>
+                                <label class="btn btn-outline-primary mb-0" for="signatureUpload">
+                                    <i class="bi bi-image me-2"></i>เลือกรูปลายเซ็น
+                                </label>
+                            </div>
+
+                            <form action="index.php?c=profile&a=save_signature" method="POST" id="signatureForm">
+                                <?= security_csrf_input() ?>
+                                <input type="hidden" name="user_id" value="<?= (int)$target_user_id ?>">
+                                <input type="hidden" name="signature_data" id="signatureData" value="">
+                                <input type="hidden" name="signature_method" id="signatureMethod" value="DRAW">
+                                <input type="hidden" name="signature_pdpa_ack" id="signaturePdpaAck" value="0">
+                                <input type="hidden" name="signature_pdpa_notice_version" id="signaturePdpaNoticeVersion"
+                                       value="<?= htmlspecialchars(ElectronicSignature::PRIVACY_NOTICE_VERSION, ENT_QUOTES, 'UTF-8') ?>">
+                                <input type="file" id="signatureUpload" accept="image/png,image/jpeg" class="visually-hidden">
+
+                                <div class="signature-pad-shell mb-3">
+                                    <canvas id="signatureCanvas" width="900" height="300"
+                                            aria-label="พื้นที่วาดลายเซ็นอิเล็กทรอนิกส์"></canvas>
+                                </div>
+
+                                <div class="d-flex flex-column flex-sm-row justify-content-between gap-2">
+                                    <button type="button" class="btn btn-light border" id="clearSignatureCanvas">
+                                        <i class="bi bi-eraser me-2"></i>ล้างพื้นที่วาด
+                                    </button>
+                                    <button type="submit" class="btn btn-primary px-4">
+                                        <i class="bi bi-shield-check me-2"></i>บันทึกลายเซ็น
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div class="alert alert-info border-0 mt-4 mb-0 small">
+                                <i class="bi bi-info-circle me-2"></i>
+                                เมื่อส่งหรืออนุมัติตารางเวร ระบบจะตรึงลายเซ็น ณ เวลานั้นไว้ใน Official Revision
+                                การเปลี่ยนลายเซ็นภายหลังจะไม่แก้ไขเอกสารที่อนุมัติไปแล้ว
+                            </div>
+                        </div>
+                    </div>
+                    <?php else: ?>
+                    <div class="card card-modern h-100">
+                        <div class="card-body p-4 d-flex align-items-center">
+                            <div class="alert alert-light border w-100 mb-0">
+                                <div class="d-flex gap-3 align-items-start">
+                                    <i class="bi bi-shield-lock fs-4 text-primary"></i>
+                                    <div>
+                                        <div class="fw-bold text-dark mb-1">ลายเซ็นจัดการโดยเจ้าของบัญชีเท่านั้น</div>
+                                        <div class="small text-muted">
+                                            เพื่อป้องกันการลงนามแทน ผู้ดูแลและ HR สามารถตรวจสอบสถานะได้
+                                            แต่ไม่สามารถสร้าง เปลี่ยน หรือลบลายเซ็นของบุคลากรรายนี้
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -731,10 +1016,208 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    let activeTab = localStorage.getItem('activeProfileTab');
+    let activeTab = window.location.hash === '#nav-signature'
+        ? '#nav-signature'
+        : localStorage.getItem('activeProfileTab');
     if (activeTab) {
         let tab = document.querySelector('button[data-bs-target="' + activeTab + '"]');
         if(tab) { new bootstrap.Tab(tab).show(); }
     }
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const signatureCanvas = document.getElementById('signatureCanvas');
+    const signatureForm = document.getElementById('signatureForm');
+    const signatureData = document.getElementById('signatureData');
+    const signatureMethod = document.getElementById('signatureMethod');
+    const signatureUpload = document.getElementById('signatureUpload');
+    const clearButton = document.getElementById('clearSignatureCanvas');
+    const signaturePdpaAck = document.getElementById('signaturePdpaAck');
+    const signaturePdpaNoticeVersion = document.getElementById('signaturePdpaNoticeVersion');
+
+    if (!signatureCanvas || !signatureForm || !signatureData || !signatureMethod) return;
+
+    const ctx = signatureCanvas.getContext('2d');
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    let drawing = false;
+    let hasInk = false;
+
+    const canvasPoint = (event) => {
+        const rect = signatureCanvas.getBoundingClientRect();
+        return {
+            x: (event.clientX - rect.left) * (signatureCanvas.width / rect.width),
+            y: (event.clientY - rect.top) * (signatureCanvas.height / rect.height)
+        };
+    };
+
+    const clearCanvas = () => {
+        ctx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+        signatureData.value = '';
+        signatureMethod.value = 'DRAW';
+        hasInk = false;
+    };
+
+    signatureCanvas.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        drawing = true;
+        hasInk = true;
+        signatureMethod.value = 'DRAW';
+        signatureCanvas.setPointerCapture?.(event.pointerId);
+        const point = canvasPoint(event);
+        ctx.beginPath();
+        ctx.moveTo(point.x, point.y);
+    });
+
+    signatureCanvas.addEventListener('pointermove', (event) => {
+        if (!drawing) return;
+        event.preventDefault();
+        const point = canvasPoint(event);
+        ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+    });
+
+    const endStroke = (event) => {
+        if (!drawing) return;
+        drawing = false;
+        ctx.closePath();
+        if (event?.pointerId !== undefined) {
+            try { signatureCanvas.releasePointerCapture?.(event.pointerId); } catch (e) {}
+        }
+    };
+
+    signatureCanvas.addEventListener('pointerup', endStroke);
+    signatureCanvas.addEventListener('pointercancel', endStroke);
+    signatureCanvas.addEventListener('pointerleave', endStroke);
+
+    clearButton?.addEventListener('click', clearCanvas);
+
+    signatureUpload?.addEventListener('change', function () {
+        const file = this.files?.[0];
+        if (!file) return;
+
+        if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+            this.value = '';
+            if (window.Swal) {
+                Swal.fire('ไฟล์ไม่ถูกต้อง', 'รองรับเฉพาะ PNG/JPG ขนาดไม่เกิน 2 MB', 'warning');
+            } else {
+                alert('รองรับเฉพาะ PNG/JPG ขนาดไม่เกิน 2 MB');
+            }
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const image = new Image();
+            image.onload = () => {
+                clearCanvas();
+
+                const margin = 30;
+                const maxW = signatureCanvas.width - (margin * 2);
+                const maxH = signatureCanvas.height - (margin * 2);
+                const scale = Math.min(maxW / image.width, maxH / image.height, 1);
+                const width = image.width * scale;
+                const height = image.height * scale;
+                const x = (signatureCanvas.width - width) / 2;
+                const y = (signatureCanvas.height - height) / 2;
+
+                ctx.drawImage(image, x, y, width, height);
+                hasInk = true;
+                signatureMethod.value = 'UPLOAD';
+                signatureData.value = signatureCanvas.toDataURL('image/png');
+            };
+            image.onerror = () => {
+                if (window.Swal) Swal.fire('ไม่สามารถอ่านรูปได้', 'กรุณาเลือกไฟล์รูปภาพใหม่', 'error');
+            };
+            image.src = String(reader.result || '');
+        };
+        reader.readAsDataURL(file);
+    });
+
+    signatureForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+
+        if (!hasInk) {
+            if (window.Swal) {
+                await Swal.fire('ยังไม่มีลายเซ็น', 'กรุณาวาดหรือเลือกรูปลายเซ็นก่อนบันทึก', 'info');
+            } else {
+                alert('กรุณาวาดหรือเลือกรูปลายเซ็นก่อนบันทึก');
+            }
+            return;
+        }
+
+        signatureData.value = signatureCanvas.toDataURL('image/png');
+        signaturePdpaAck.value = '0';
+
+        let confirmed = false;
+
+        if (window.Swal) {
+            const result = await Swal.fire({
+                title: 'ยืนยันการรับทราบข้อมูลส่วนบุคคล (PDPA)',
+                icon: 'info',
+                width: '46rem',
+                showCancelButton: true,
+                confirmButtonText: '<i class="bi bi-shield-check me-1"></i> ยืนยันและบันทึก',
+                cancelButtonText: 'ยกเลิก',
+                focusConfirm: false,
+                allowOutsideClick: false,
+                reverseButtons: true,
+                html: `
+                    <div class="text-start" style="font-size:.9rem;line-height:1.65;color:#334155;">
+                        <div class="p-3 mb-3 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                            <div class="fw-bold text-dark mb-2">ประกาศการประมวลผลข้อมูลส่วนบุคคลสำหรับลายเซ็นอิเล็กทรอนิกส์</div>
+                            <div>ระบบจะประมวลผลข้อมูลลายเซ็นของท่านเพื่อใช้ยืนยันตัวผู้ลงนามในกระบวนการจัดตารางเวร การเสนอ/อนุมัติ และเอกสารฉบับทางการของระบบ Roster Pro</div>
+                        </div>
+
+                        <div class="fw-bold text-dark mb-1">ข้อมูลที่จัดเก็บ</div>
+                        <div class="mb-3">ภาพลายเซ็นอิเล็กทรอนิกส์, ค่า SHA-256 สำหรับตรวจสอบความถูกต้อง, วิธีการบันทึก, รหัสผู้ใช้งาน และวันเวลาที่บันทึก/รับทราบประกาศ</div>
+
+                        <div class="fw-bold text-dark mb-1">วัตถุประสงค์การใช้ข้อมูล</div>
+                        <div class="mb-3">เพื่อยืนยันผู้ลงนาม ประกอบการอนุมัติเอกสาร ตรวจสอบความถูกต้องย้อนหลัง และเก็บหลักฐานการดำเนินงานตามหน้าที่ของหน่วยงาน</div>
+
+                        <div class="fw-bold text-dark mb-1">การเข้าถึงและการจัดเก็บ</div>
+                        <div class="mb-3">ข้อมูลจะถูกใช้ภายในระบบโดยผู้มีสิทธิ์ตามหน้าที่ และอาจถูกตรึงไว้ใน Official Revision เมื่อเอกสารได้รับอนุมัติแล้ว การเก็บรักษาและการเปิดเผยข้อมูลเป็นไปตามนโยบายของหน่วยงานและกฎหมายที่ใช้บังคับ</div>
+
+                        <div class="fw-bold text-dark mb-1">สิทธิ์ของเจ้าของข้อมูล</div>
+                        <div class="mb-3">ท่านสามารถติดต่อผู้ควบคุมข้อมูลส่วนบุคคล/หน่วยงานต้นสังกัดเพื่อขอใช้สิทธิตามกฎหมายคุ้มครองข้อมูลส่วนบุคคล ทั้งนี้เป็นไปตามเงื่อนไขและข้อยกเว้นที่กฎหมายกำหนด</div>
+
+                        <label class="pdpa-confirm-row" for="pdpaSignatureConfirm">
+                            <input class="pdpa-confirm-checkbox" type="checkbox" value="1" id="pdpaSignatureConfirm">
+                            <span class="pdpa-confirm-copy">
+                                ข้าพเจ้ายืนยันว่าลายเซ็นนี้เป็นของข้าพเจ้า และได้อ่าน/รับทราบรายละเอียดการประมวลผลข้อมูลส่วนบุคคลข้างต้นแล้ว
+                            </span>
+                        </label>
+
+                        <div class="mt-2 text-muted" style="font-size:.75rem;">
+                            เวอร์ชันประกาศ: ${signaturePdpaNoticeVersion?.value || '-'} · การกดยืนยันไม่ตัดสิทธิ์ของท่านตามกฎหมาย
+                        </div>
+                    </div>
+                `,
+                preConfirm: () => {
+                    const checkbox = document.getElementById('pdpaSignatureConfirm');
+                    if (!checkbox || !checkbox.checked) {
+                        Swal.showValidationMessage('กรุณาติ๊กยืนยันว่าได้อ่านและรับทราบข้อมูลส่วนบุคคลก่อนบันทึก');
+                        return false;
+                    }
+                    return true;
+                }
+            });
+
+            confirmed = result.isConfirmed;
+        } else {
+            confirmed = window.confirm(
+                'ยืนยันว่าลายเซ็นนี้เป็นของท่าน และท่านได้รับทราบการประมวลผลข้อมูลส่วนบุคคลเพื่อใช้ในกระบวนการจัดเวรและเอกสารอนุมัติแล้วหรือไม่?'
+            );
+        }
+
+        if (!confirmed) return;
+
+        signaturePdpaAck.value = '1';
+        signatureForm.submit();
+    });
 });
 </script>

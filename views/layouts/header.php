@@ -127,7 +127,7 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v19">
+<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v21">
     <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/themes.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/wizard.css?v=20261004-ui-v16">
@@ -211,7 +211,6 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
                 <i class="bi <?= htmlspecialchars($rpPage[2], ENT_QUOTES, 'UTF-8') ?>"></i>
             </div>
             <div class="min-w-0">
-                <div class="rp-page-kicker">ROSTER PRO WORKSPACE</div>
                 <h1 class="rp-page-title mb-0"><?= htmlspecialchars($rpPage[0], ENT_QUOTES, 'UTF-8') ?></h1>
                 <div class="rp-page-subtitle d-none d-md-block"><?= htmlspecialchars($rpPage[1], ENT_QUOTES, 'UTF-8') ?></div>
             </div>
@@ -352,16 +351,49 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
     </div>
 </nav>
 
-<!-- 🌟 PWA Toast -->
-<div id="pwaInstallToast" class="pwa-toast">
-    <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center fs-4 shadow-sm" style="width: 45px; height: 45px;"><i class="bi bi-app-indicator"></i></div>
-    <div class="flex-grow-1">
-        <h6 class="fw-bold mb-1" style="font-size: 15px;">ติดตั้ง <?= htmlspecialchars($app_name) ?></h6>
-        <div class="text-muted" style="font-size: 12px;">เพิ่มลงหน้าจอหลักเพื่อใช้งานเต็มจอ</div>
+<!-- PWA Install Card -->
+<div id="pwaInstallToast"
+     class="pwa-toast"
+     role="dialog"
+     aria-modal="false"
+     aria-labelledby="pwaInstallTitle"
+     aria-describedby="pwaInstallDescription">
+    <button type="button"
+            class="rp-pwa-close"
+            id="btnDismissPwaClose"
+            aria-label="ปิดคำแนะนำการติดตั้ง"
+            title="ปิด">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+
+    <div class="rp-pwa-main">
+        <div class="rp-pwa-app-icon" aria-hidden="true">
+            <img src="public/icons/roster-pro.svg" alt="">
+        </div>
+
+        <div class="rp-pwa-copy">
+            <div class="rp-pwa-eyebrow">ติดตั้งเป็นแอป</div>
+            <h2 class="rp-pwa-title" id="pwaInstallTitle">ติดตั้ง <?= htmlspecialchars($app_name, ENT_QUOTES, 'UTF-8') ?></h2>
+            <p class="rp-pwa-description" id="pwaInstallDescription">
+                เปิดใช้งาน Roster Pro ได้รวดเร็วจากหน้าจอหลัก พร้อมพื้นที่ทำงานแบบเต็มจอ
+            </p>
+
+            <div class="rp-pwa-benefits" aria-label="ประโยชน์ของการติดตั้ง">
+                <span><i class="bi bi-lightning-charge-fill" aria-hidden="true"></i> เปิดเร็ว</span>
+                <span><i class="bi bi-window-stack" aria-hidden="true"></i> เต็มจอ</span>
+                <span><i class="bi bi-pin-angle-fill" aria-hidden="true"></i> เข้าถึงง่าย</span>
+            </div>
+        </div>
     </div>
-    <div class="d-flex flex-column gap-2">
-        <button id="btnInstallPwa" class="btn btn-sm btn-primary fw-bold rounded-pill px-3 shadow-sm">ติดตั้ง</button>
-        <button id="btnDismissPwa" class="btn btn-sm btn-light text-muted rounded-pill px-3 border" style="font-size: 11px;">ภายหลัง</button>
+
+    <div class="rp-pwa-actions">
+        <button id="btnInstallPwa" type="button" class="rp-pwa-btn rp-pwa-btn-primary">
+            <i class="bi bi-download" aria-hidden="true"></i>
+            <span>ติดตั้งแอป</span>
+        </button>
+        <button id="btnDismissPwa" type="button" class="rp-pwa-btn rp-pwa-btn-secondary">
+            ไว้ภายหลัง
+        </button>
     </div>
 </div>
 
@@ -417,6 +449,13 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
         }
     });
 
+    window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        const toast = document.getElementById('pwaInstallToast');
+        if (toast) toast.classList.remove('show');
+        sessionStorage.setItem('pwaDismissed', 'true');
+    });
+
     document.addEventListener('DOMContentLoaded', function() {
         const modals = document.querySelectorAll('.modal');
         modals.forEach(modal => { document.body.appendChild(modal); });
@@ -432,13 +471,17 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
             });
         }
 
+        const dismissPwaInstall = () => {
+            const toast = document.getElementById('pwaInstallToast');
+            if (toast) toast.classList.remove('show');
+            sessionStorage.setItem('pwaDismissed', 'true');
+        };
+
         const btnDismiss = document.getElementById('btnDismissPwa');
-        if(btnDismiss) {
-            btnDismiss.addEventListener('click', () => {
-                document.getElementById('pwaInstallToast').classList.remove('show');
-                sessionStorage.setItem('pwaDismissed', 'true');
-            });
-        }
+        if (btnDismiss) btnDismiss.addEventListener('click', dismissPwaInstall);
+
+        const btnDismissClose = document.getElementById('btnDismissPwaClose');
+        if (btnDismissClose) btnDismissClose.addEventListener('click', dismissPwaInstall);
     });
 
     // 3. ระบบเช็คการแจ้งเตือน Real-time

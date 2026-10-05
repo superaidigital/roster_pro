@@ -5,7 +5,8 @@ require_once 'config/database.php';
 require_once 'config/security.php';
 require_once 'models/UserModel.php';
 require_once 'models/ProfileModel.php';
-require_once 'controllers/LogsController.php'; 
+require_once 'controllers/LogsController.php';
+require_once 'lib/ElectronicSignature.php'; 
 
 class ProfileController {
     
@@ -95,6 +96,18 @@ class ProfileController {
             exit;
         }
     }
+    private function requireSignatureOwner(int $targetUserId): void {
+        security_start_session();
+
+        $currentUserId = (int)($_SESSION['user']['id'] ?? 0);
+        if ($targetUserId <= 0 || $targetUserId !== $currentUserId) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = 'ลายเซ็นอิเล็กทรอนิกส์ต้องบันทึกหรือลบโดยเจ้าของบัญชีเท่านั้น';
+            header('Location: index.php?c=profile&id=' . $currentUserId . '#nav-signature');
+            exit;
+        }
+    }
+
 
     // ====================================================
     // 🌟 1. โหลดหน้า Dashboard แฟ้มประวัติ (Profile View)
@@ -282,6 +295,163 @@ class ProfileController {
             header("Location: index.php?c=profile&id=" . $target_user_id);
             exit;
         }
+    }
+
+    // ====================================================
+    // ✍️ 2.5 ลายเซ็นอิเล็กทรอนิกส์
+    // ====================================================
+    public function save_signature() {
+        $this->checkAuth();
+        $this->requirePostAndCsrf();
+
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $this->requireSignatureOwner($targetUserId);
+
+        $dataUrl = trim((string)($_POST['signature_data'] ?? ''));
+        $method = strtoupper(trim((string)($_POST['signature_method'] ?? 'DRAW')));
+        $pdpaAcknowledged = (string)($_POST['signature_pdpa_ack'] ?? '') === '1';
+        $noticeVersion = trim((string)($_POST['signature_pdpa_notice_version'] ?? ''));
+
+        if (!$pdpaAcknowledged
+            || $noticeVersion === ''
+            || !hash_equals(ElectronicSignature::PRIVACY_NOTICE_VERSION, $noticeVersion)) {
+            $_SESSION['error_msg'] = 'กรุณาอ่านและยืนยันการรับทราบประกาศการประมวลผลข้อมูลส่วนบุคคลก่อนบันทึกลายเซ็น';
+            header('Location: index.php?c=profile&id=' . $targetUserId . '#nav-signature');
+            exit;
+        }
+
+        try {
+            $signature = ElectronicSignature::normalize($dataUrl, $method);
+
+            $db = (new Database())->getConnection();
+            $userModel = new UserModel($db);
+
+            if (!$userModel->updateSignature(
+                $targetUserId,
+                $signature['data_url'],
+                $signature['method'],
+                ElectronicSignature::PRIVACY_NOTICE_VERSION
+            )) {
+                throw new RuntimeException('Unable to save signature.');
+            }
+
+            $savedSignature = $userModel->getSignatureRecord($targetUserId);
+            if (!is_array($savedSignature)
+                || !ElectronicSignature::isValid((string)($savedSignature['signature_path'] ?? ''))
+                || !hash_equals(
+                    (string)$signature['sha256'],
+                    (string)($savedSignature['signature_sha256'] ?? '')
+                )
+                || (string)($savedSignature['signature_pdpa_notice_version'] ?? '') !== ElectronicSignature::PRIVACY_NOTICE_VERSION
+                || empty($savedSignature['signature_pdpa_ack_at'])) {
+                throw new RuntimeException('Signature database readback verification failed.');
+            }
+
+            if ((int)($_SESSION['user']['id'] ?? 0) === $targetUserId) {
+                $_SESSION['user']['signature_path'] = $signature['data_url'];
+                $_SESSION['user']['signature_sha256'] = $signature['sha256'];
+                $_SESSION['user']['signature_method'] = $signature['method'];
+                $_SESSION['user']['signature_updated_at'] = date('Y-m-d H:i:s');
+                $_SESSION['user']['signature_pdpa_notice_version'] = ElectronicSignature::PRIVACY_NOTICE_VERSION;
+                $_SESSION['user']['signature_pdpa_ack_at'] = date('Y-m-d H:i:s');
+            }
+
+            LogsController::addLog(
+                $db,
+                (int)$_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                'บันทึกลายเซ็นอิเล็กทรอนิกส์ user_id=' . $targetUserId
+                    . ' method=' . $signature['method']
+                    . ' sha256=' . substr($signature['sha256'], 0, 16)
+                    . ' pdpa_notice=' . ElectronicSignature::PRIVACY_NOTICE_VERSION
+                    . ' pdpa_ack=1'
+            );
+
+            $_SESSION['success_msg'] = 'บันทึกลายเซ็นอิเล็กทรอนิกส์เรียบร้อยแล้ว';
+        } catch (Throwable $e) {
+            error_log('Electronic signature save rejected: ' . $e->getMessage());
+            $_SESSION['error_msg'] = 'ไม่สามารถบันทึกลายเซ็นได้ กรุณาวาดใหม่หรือใช้ไฟล์ PNG/JPG ที่ถูกต้อง';
+        }
+
+        header('Location: index.php?c=profile&id=' . $targetUserId . '#nav-signature');
+        exit;
+    }
+
+    public function signature_image() {
+        $this->checkAuth();
+
+        $targetUserId = (int)($_GET['id'] ?? 0);
+        $currentUserId = (int)($_SESSION['user']['id'] ?? 0);
+
+        if ($targetUserId <= 0 || $targetUserId !== $currentUserId) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            exit;
+        }
+
+        try {
+            $db = (new Database())->getConnection();
+            $userModel = new UserModel($db);
+            $record = $userModel->getSignatureRecord($targetUserId);
+            $normalized = ElectronicSignature::normalize(
+                (string)($record['signature_path'] ?? ''),
+                (string)($record['signature_method'] ?? 'DRAW')
+            );
+
+            $parts = explode(',', (string)$normalized['data_url'], 2);
+            $binary = isset($parts[1]) ? base64_decode($parts[1], true) : false;
+            if (!is_string($binary) || $binary === '') {
+                throw new RuntimeException('Signature image decoding failed.');
+            }
+
+            header('Content-Type: ' . $normalized['mime']);
+            header('Content-Length: ' . strlen($binary));
+            header('Cache-Control: private, no-store, max-age=0');
+            header('Pragma: no-cache');
+            header('X-Content-Type-Options: nosniff');
+            echo $binary;
+            exit;
+        } catch (Throwable $e) {
+            error_log('Electronic signature image read failed: ' . $e->getMessage());
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Signature not found';
+            exit;
+        }
+    }
+
+    public function delete_signature() {
+        $this->checkAuth();
+        $this->requirePostAndCsrf();
+
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $this->requireSignatureOwner($targetUserId);
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+
+        if ($userModel->clearSignature($targetUserId)) {
+            if ((int)($_SESSION['user']['id'] ?? 0) === $targetUserId) {
+                $_SESSION['user']['signature_path'] = null;
+                $_SESSION['user']['signature_sha256'] = null;
+                $_SESSION['user']['signature_method'] = null;
+                $_SESSION['user']['signature_updated_at'] = date('Y-m-d H:i:s');
+            }
+
+            LogsController::addLog(
+                $db,
+                (int)$_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                'ลบลายเซ็นอิเล็กทรอนิกส์ user_id=' . $targetUserId
+            );
+            $_SESSION['success_msg'] = 'ลบลายเซ็นอิเล็กทรอนิกส์แล้ว';
+        } else {
+            $_SESSION['error_msg'] = 'ไม่สามารถลบลายเซ็นได้';
+        }
+
+        header('Location: index.php?c=profile&id=' . $targetUserId . '#nav-signature');
+        exit;
     }
 
     // ====================================================
