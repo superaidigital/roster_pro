@@ -25,38 +25,40 @@ class Database {
         $this->timezone = getenv('DB_TIMEZONE') ?: '+07:00';
     }
 
-    public function getConnection(): PDO {
+    public function getConnectionOrThrow(): PDO {
         if ($this->conn instanceof PDO) {
             return $this->conn;
         }
 
+        $dsn = sprintf(
+            'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
+            $this->host,
+            $this->port,
+            $this->db_name
+        );
+
+        $options = [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ];
+
+        $this->conn = new PDO($dsn, $this->username, $this->password, $options);
+
+        if (!preg_match('/^[+-](?:0\d|1\d|2[0-3]):[0-5]\d$/', $this->timezone)) {
+            $this->timezone = '+07:00';
+        }
+
+        $quotedTimezone = $this->conn->quote($this->timezone);
+        $this->conn->exec("SET time_zone = {$quotedTimezone}");
+        $this->conn->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+        return $this->conn;
+    }
+
+    public function getConnection(): PDO {
         try {
-            $dsn = sprintf(
-                'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
-                $this->host,
-                $this->port,
-                $this->db_name
-            );
-
-            $options = [
-                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES   => false,
-            ];
-
-            $this->conn = new PDO($dsn, $this->username, $this->password, $options);
-
-            // จำกัดรูปแบบ timezone ให้ปลอดภัยก่อนนำไปใช้กับคำสั่ง SET
-            if (!preg_match('/^[+-](?:0\d|1\d|2[0-3]):[0-5]\d$/', $this->timezone)) {
-                $this->timezone = '+07:00';
-            }
-
-            $quotedTimezone = $this->conn->quote($this->timezone);
-            $this->conn->exec("SET time_zone = {$quotedTimezone}");
-            $this->conn->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
-
-            return $this->conn;
-
+            return $this->getConnectionOrThrow();
         } catch (PDOException $exception) {
             error_log(
                 sprintf(
@@ -72,8 +74,9 @@ class Database {
             die("<div style='font-family:Tahoma,Arial,sans-serif;padding:40px;text-align:center;color:#dc2626;'>
                     <h2>⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล</h2>
                     <p>ไม่สามารถติดต่อฐานข้อมูลของระบบ Roster Pro ได้ในขณะนี้</p>
-                    <p style='color:#64748b;font-size:14px;'>กรุณาตรวจสอบว่า MySQL ใน XAMPP เปิดใช้งานอยู่ และมีฐานข้อมูล <b>roster_pro_db</b></p>
+                    <p style='color:#64748b;font-size:14px;'>กรุณาตรวจสอบการตั้งค่าฐานข้อมูลและสถานะ MariaDB/MySQL</p>
                  </div>");
         }
     }
+
 }
