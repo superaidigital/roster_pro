@@ -130,7 +130,6 @@ logs.idx_logs_created_action_user
 roster_status.idx_roster_status_month_status_hospital
 shift_swaps.idx_shift_swaps_status_hospital_created
 users.idx_users_active_scope
-employee_licenses.idx_employee_licenses_status_expire_user
 ~~~
 
 ตรวจ Production:
