@@ -113,6 +113,40 @@ jobs:
           DB_NAME: roster_upgrade_test
         run: php scripts/health_check.php
 
+      - name: Run reliability scheduler
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/schedule_jobs.php
+
+      - name: Process reliability queue
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/job_worker.php --max-jobs=20
+
+      - name: Verify reliability queue drained
+        env:
+          DB_NAME: roster_upgrade_test
+        run: |
+          php -r '
+            require "config/database.php";
+            require "models/BackgroundJobModel.php";
+            $db=(new Database())->getConnectionOrThrow();
+            $s=(new BackgroundJobModel($db))->summary();
+            if ($s["failed"] !== 0 || $s["pending"] !== 0 || $s["running"] !== 0) {
+                fwrite(STDERR, json_encode($s) . PHP_EOL);
+                exit(1);
+            }
+            echo json_encode($s) . PHP_EOL;
+          '
+
+      - name: Verify observability tables and snapshot
+        run: |
+          mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_upgrade_test -e "
+            SELECT COUNT(*) AS health_snapshots FROM system_health_snapshots;
+            SELECT COUNT(*) AS background_jobs FROM background_jobs;
+            SELECT COUNT(*) AS observability_events FROM observability_events;
+          "
+
       - name: Test guarded deployment orchestrator
         env:
           DB_NAME: roster_upgrade_test
