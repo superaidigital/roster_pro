@@ -104,37 +104,71 @@ class SettingsController {
         
         $logo_path = null;
 
-        if (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
-            $fileTmpPath = $_FILES['logo']['tmp_name'];
-            $fileName = $_FILES['logo']['name'];
-            $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            
-            $allowedExtensions = ['jpg', 'jpeg', 'png'];
-            if (in_array($fileExtension, $allowedExtensions)) {
-                $uploadDir = 'public/uploads/logos/';
-                if (!is_dir($uploadDir)) { 
-                    mkdir($uploadDir, 0777, true); 
-                }
-                
-                $newFileName = 'logo_' . ($id ? $id : 'new') . '_' . time() . '.' . $fileExtension;
-                $destPath = $uploadDir . $newFileName;
+        if (isset($_FILES['logo']) && ($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $file = $_FILES['logo'];
 
-                if (move_uploaded_file($fileTmpPath, $destPath)) {
-                    $logo_path = $destPath;
-                    
-                    if (!empty($id)) {
-                        $current = $hospitalModel->getHospitalById($id);
-                        if ($current && !empty($current['logo']) && file_exists($current['logo'])) {
-                            if (strpos($current['logo'], 'default') === false) {
-                                unlink($current['logo']);
-                            }
-                        }
-                    }
-                }
-            } else {
-                $_SESSION['error_msg'] = "ชนิดไฟล์รูปภาพไม่ถูกต้อง (อนุญาตเฉพาะ JPG และ PNG)";
-                header("Location: index.php?c=settings&a=hospital" . ($id ? "&id=" . urlencode($id) : ""));
+            if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+                $_SESSION['error_msg'] = "อัปโหลดโลโก้ไม่สำเร็จ";
+                header("Location: index.php?c=settings&a=hospital" . ($id ? "&id=" . urlencode((string)$id) : ""));
                 exit;
+            }
+
+            // Security: validate upload size and MIME from file content, not the filename.
+            $maxBytes = 2 * 1024 * 1024;
+            if (($file['size'] ?? 0) <= 0 || ($file['size'] ?? 0) > $maxBytes || !is_uploaded_file($file['tmp_name'])) {
+                $_SESSION['error_msg'] = "ไฟล์โลโก้ต้องมีขนาดไม่เกิน 2 MB";
+                header("Location: index.php?c=settings&a=hospital" . ($id ? "&id=" . urlencode((string)$id) : ""));
+                exit;
+            }
+
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file['tmp_name']);
+            $allowedMime = [
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+            ];
+
+            if (!isset($allowedMime[$mime])) {
+                $_SESSION['error_msg'] = "ชนิดไฟล์รูปภาพไม่ถูกต้อง (อนุญาตเฉพาะ JPG และ PNG)";
+                header("Location: index.php?c=settings&a=hospital" . ($id ? "&id=" . urlencode((string)$id) : ""));
+                exit;
+            }
+
+            $uploadDir = 'public/uploads/logos/';
+            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0750, true) && !is_dir($uploadDir)) {
+                $_SESSION['error_msg'] = "ระบบไม่สามารถเตรียมพื้นที่จัดเก็บโลโก้ได้";
+                header("Location: index.php?c=settings&a=hospital" . ($id ? "&id=" . urlencode((string)$id) : ""));
+                exit;
+            }
+
+            $newFileName = sprintf(
+                'logo_%s_%s.%s',
+                $id ? (string)(int)$id : 'new',
+                bin2hex(random_bytes(12)),
+                $allowedMime[$mime]
+            );
+            $destPath = $uploadDir . $newFileName;
+
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                $_SESSION['error_msg'] = "ไม่สามารถบันทึกไฟล์โลโก้ได้";
+                header("Location: index.php?c=settings&a=hospital" . ($id ? "&id=" . urlencode((string)$id) : ""));
+                exit;
+            }
+
+            $logo_path = $destPath;
+
+            // Delete only an existing logo inside the expected logo directory.
+            if (!empty($id)) {
+                $current = $hospitalModel->getHospitalById($id);
+                $oldLogo = $current['logo'] ?? '';
+                if (
+                    is_string($oldLogo)
+                    && str_starts_with($oldLogo, $uploadDir)
+                    && strpos($oldLogo, 'default') === false
+                    && is_file($oldLogo)
+                ) {
+                    @unlink($oldLogo);
+                }
             }
         }
 
