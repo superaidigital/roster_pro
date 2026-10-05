@@ -1,0 +1,26 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Runtime / uploaded data
+/uploads/
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# Database backups must never be committed
+/roster_pro_monthly_*.sql
+/backups/
+*.sql.gz
+*.sql.zip
+
+# Runtime logs/cache
+*.log
+/cache/
+/tmp/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
