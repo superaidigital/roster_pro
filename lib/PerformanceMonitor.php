@@ -28,7 +28,7 @@ final class PerformanceMonitor {
             AppMonitor::record(
                 'WARNING',
                 'PERFORMANCE_SLOW_REQUEST',
-                sprintf('Slow request detected: %.1f ms', $elapsedMs),
+                sprintf('Slow request detected on %s: %.1f ms', $route !== '' ? $route : 'unknown', $elapsedMs),
                 [
                     'route' => $route,
                     'duration_ms' => round($elapsedMs, 1),
