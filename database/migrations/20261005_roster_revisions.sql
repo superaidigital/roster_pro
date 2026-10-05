@@ -1,0 +1,39 @@
+-- Immutable Approved Roster Revisions
+-- Date: 2026-10-05
+-- Each approval creates a new append-only official revision.
+
+CREATE TABLE IF NOT EXISTS roster_revisions (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  hospital_id INT NOT NULL,
+  hospital_name VARCHAR(255) NOT NULL,
+  month_year VARCHAR(7) NOT NULL,
+  revision_no INT NOT NULL,
+  revision_code VARCHAR(40) NOT NULL,
+  snapshot_id BIGINT NOT NULL,
+  prepared_by INT NULL,
+  prepared_name VARCHAR(255) NULL,
+  prepared_position VARCHAR(255) NULL,
+  prepared_signature LONGTEXT NULL,
+  prepared_at DATETIME NULL,
+  reviewed_by INT NULL,
+  reviewed_name VARCHAR(255) NULL,
+  reviewed_position VARCHAR(255) NULL,
+  reviewed_signature LONGTEXT NULL,
+  reviewed_at DATETIME NULL,
+  approved_by INT NOT NULL,
+  approved_name VARCHAR(255) NOT NULL,
+  approved_position VARCHAR(255) NULL,
+  approved_signature LONGTEXT NULL,
+  approved_at DATETIME NOT NULL,
+  staff_json LONGTEXT NOT NULL,
+  shifts_json LONGTEXT NOT NULL,
+  pay_summary_json LONGTEXT NULL,
+  content_hash CHAR(64) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_roster_revision_number (hospital_id, month_year, revision_no),
+  KEY idx_roster_revision_month (hospital_id, month_year, created_at),
+  KEY idx_roster_revision_code (revision_code),
+  KEY idx_roster_revision_snapshot (snapshot_id),
+  KEY idx_roster_revision_approved (approved_by, approved_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
