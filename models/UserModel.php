@@ -239,21 +239,33 @@ class UserModel {
     // ====================================================
     // 🌟 5. ฟังก์ชันใหม่: อัปเดตลายเซ็นอิเล็กทรอนิกส์ลงฐานข้อมูล
     // ====================================================
-    public function updateSignature($id, $signature_base64, string $method = 'DRAW') {
+    public function updateSignature(
+        $id,
+        $signature_base64,
+        string $method,
+        string $privacyNoticeVersion
+    ) {
         try {
+            if ($privacyNoticeVersion !== ElectronicSignature::PRIVACY_NOTICE_VERSION) {
+                throw new InvalidArgumentException('Electronic signature privacy notice version is invalid.');
+            }
+
             $signature = ElectronicSignature::normalize((string)$signature_base64, $method);
 
             $query = "UPDATE " . $this->table_name . "
                       SET signature_path = :signature,
                           signature_sha256 = :sha256,
                           signature_method = :method,
-                          signature_updated_at = NOW()
+                          signature_updated_at = NOW(),
+                          signature_pdpa_notice_version = :notice_version,
+                          signature_pdpa_ack_at = NOW()
                       WHERE id = :id";
 
             $stmt = $this->conn->prepare($query);
             $stmt->bindValue(':signature', $signature['data_url'], PDO::PARAM_STR);
             $stmt->bindValue(':sha256', $signature['sha256'], PDO::PARAM_STR);
             $stmt->bindValue(':method', $signature['method'], PDO::PARAM_STR);
+            $stmt->bindValue(':notice_version', $privacyNoticeVersion, PDO::PARAM_STR);
             $stmt->bindValue(':id', (int)$id, PDO::PARAM_INT);
 
             return $stmt->execute();
@@ -264,7 +276,8 @@ class UserModel {
     }
 
     public function getSignatureRecord(int $id): ?array {
-        $query = "SELECT signature_path, signature_sha256, signature_method, signature_updated_at
+        $query = "SELECT signature_path, signature_sha256, signature_method, signature_updated_at,
+                         signature_pdpa_notice_version, signature_pdpa_ack_at
                   FROM " . $this->table_name . "
                   WHERE id = :id AND deleted_at IS NULL
                   LIMIT 1";
