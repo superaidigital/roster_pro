@@ -13,6 +13,7 @@
     "20261005_roster_revision_verification.sql",
     "20261005_observability_reliability.sql",
     "20261005_performance_scalability.sql",
-    "20261005_disaster_recovery.sql"
+    "20261005_disaster_recovery.sql",
+    "20261005_electronic_signatures.sql"
   ]
 }
