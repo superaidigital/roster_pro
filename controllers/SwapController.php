@@ -196,7 +196,7 @@ class SwapController {
                     }
                 }
             }
-        }
+
         header("Location: index.php?c=swap&a=index");
         exit;
     }
