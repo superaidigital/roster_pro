@@ -45,9 +45,9 @@ $actor = (string)(getenv('DEPLOY_ACTOR') ?: get_current_user());
 $maintenanceEnabledByThisRun = false;
 
 try {
-    $preGate = [PHP_BINARY, 'scripts/go_live_check.php'];
+    $preGate = [PHP_BINARY, 'scripts/cutover_precheck.php'];
     if (isset($options['skip-recovery'])) $preGate[] = '--skip-recovery';
-    CommandRunner::run('Pre-cutover go-live gate', $preGate);
+    CommandRunner::run('Pre-cutover gate', $preGate);
 
     MaintenanceMode::enable($reason, $retryAfter, $releaseId, $actor);
     $maintenanceEnabledByThisRun = true;
