@@ -138,6 +138,382 @@ $allowed_controllers = array_unique($allowed_controllers);
     }
 </style>
 
+<style>
+    /* =========================================================
+       ROSTER PRO - MODERN SIDEBAR 2026
+       ========================================================= */
+    :root {
+        --rp-sidebar-expanded: 260px;
+        --rp-sidebar-collapsed: 78px;
+        --rp-sidebar-dark: #0b2d40;
+        --rp-sidebar-dark-2: #092638;
+        --rp-icon-size: 42px;
+        --rp-active: #14b8a6;
+        --rp-active-soft: rgba(20, 184, 166, .14);
+        --rp-sidebar-text: #d5e2eb;
+        --rp-sidebar-muted: #7f98a8;
+    }
+
+    #desktopSidebar {
+        width: var(--rp-sidebar-expanded);
+        min-width: var(--rp-sidebar-expanded);
+        max-width: var(--rp-sidebar-expanded);
+        position: relative;
+        background: linear-gradient(180deg, var(--rp-sidebar-dark) 0%, var(--rp-sidebar-dark-2) 100%) !important;
+        border-right: 1px solid rgba(255,255,255,.05) !important;
+        overflow: hidden !important;
+        transition:
+            width .25s cubic-bezier(.4,0,.2,1),
+            min-width .25s cubic-bezier(.4,0,.2,1),
+            max-width .25s cubic-bezier(.4,0,.2,1);
+    }
+
+    #desktopSidebar.collapsed {
+        width: var(--rp-sidebar-collapsed);
+        min-width: var(--rp-sidebar-collapsed);
+        max-width: var(--rp-sidebar-collapsed);
+    }
+
+    #desktopSidebar .sidebar-scroll-area {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    #desktopSidebar .sidebar-menu {
+        list-style: none;
+        padding: 13px 10px;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    #desktopSidebar .nav-item {
+        position: relative;
+        width: 100%;
+    }
+
+    #desktopSidebar .nav-link {
+        width: 100%;
+        min-height: 50px;
+        padding: 4px 8px;
+        display: flex;
+        align-items: center;
+        border-radius: 13px;
+        color: var(--rp-sidebar-text);
+        background: transparent;
+        font-weight: 500;
+        text-decoration: none;
+        white-space: nowrap;
+        transition:
+            background-color .2s ease,
+            color .2s ease,
+            transform .2s ease,
+            box-shadow .2s ease;
+    }
+
+    #desktopSidebar .nav-link:hover {
+        background: rgba(255,255,255,.065);
+        color: #ffffff;
+    }
+
+    /* กล่อง Icon ทุกเมนูให้ขนาดเท่ากัน */
+    #desktopSidebar .nav-link > i,
+    #desktopSidebar .nav-link > div > i:first-child {
+        width: var(--rp-icon-size) !important;
+        min-width: var(--rp-icon-size) !important;
+        height: var(--rp-icon-size) !important;
+        margin: 0 11px 0 0 !important;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        background: rgba(255,255,255,.06);
+        color: #a8bdca !important;
+        font-size: 18px !important;
+        line-height: 1 !important;
+        transition:
+            background .2s ease,
+            color .2s ease,
+            transform .2s ease,
+            box-shadow .2s ease;
+    }
+
+    #desktopSidebar .nav-link > div {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        flex: 1;
+    }
+
+    #desktopSidebar .nav-link:hover > i,
+    #desktopSidebar .nav-link:hover > div > i:first-child {
+        background: rgba(255,255,255,.10);
+        color: #ffffff !important;
+        transform: translateY(-1px);
+    }
+
+    #desktopSidebar .nav-link.active {
+        position: relative;
+        background: linear-gradient(135deg, rgba(20,184,166,.20), rgba(6,182,212,.10));
+        color: #ffffff;
+        box-shadow:
+            inset 0 0 0 1px rgba(45,212,191,.34),
+            0 7px 18px rgba(0,0,0,.08);
+    }
+
+    #desktopSidebar .nav-link.active::before {
+        content: '';
+        position: absolute;
+        left: -5px;
+        top: 12px;
+        bottom: 12px;
+        width: 3px;
+        background: #2dd4bf;
+        border-radius: 0 4px 4px 0;
+        box-shadow: 0 0 10px rgba(45,212,191,.55);
+    }
+
+    #desktopSidebar .nav-link.active > i,
+    #desktopSidebar .nav-link.active > div > i:first-child {
+        background: linear-gradient(135deg, #14b8a6, #06b6d4);
+        color: #ffffff !important;
+        box-shadow: 0 6px 15px rgba(20,184,166,.25);
+    }
+
+    #desktopSidebar .sidebar-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    #desktopSidebar .sidebar-heading {
+        padding: 15px 11px 6px;
+        color: #718697;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: .08em;
+    }
+
+    #desktopSidebar .dropdown-arrow {
+        margin-left: auto !important;
+        margin-right: 5px !important;
+        width: auto !important;
+        min-width: auto !important;
+        height: auto !important;
+        background: transparent !important;
+        color: #78909f !important;
+        font-size: 11px !important;
+        box-shadow: none !important;
+        transition: transform .25s ease;
+    }
+
+    #desktopSidebar [aria-expanded="true"] .dropdown-arrow {
+        transform: rotate(180deg);
+    }
+
+    /* Submenu ตอน Sidebar ขยาย */
+    #desktopSidebar:not(.collapsed) .collapse .sidebar-menu {
+        margin: 3px 0 4px 53px !important;
+        padding: 4px !important;
+        border-left: 1px solid rgba(255,255,255,.10);
+    }
+
+    #desktopSidebar:not(.collapsed) .submenu-item {
+        min-height: 36px;
+        padding: 7px 10px !important;
+        border-radius: 9px;
+        font-size: 12px;
+        color: #9db0bd;
+        background: transparent;
+    }
+
+    #desktopSidebar:not(.collapsed) .submenu-item:hover {
+        background: rgba(255,255,255,.06);
+        color: #ffffff;
+    }
+
+    #desktopSidebar:not(.collapsed) .submenu-item.active {
+        color: #5eead4 !important;
+        background: rgba(20,184,166,.08) !important;
+    }
+
+    #desktopSidebar .submenu-item.active::before {
+        display: none;
+    }
+
+    /* =====================================================
+       COLLAPSED SIDEBAR
+       ===================================================== */
+    #desktopSidebar.collapsed .sidebar-menu {
+        padding: 12px 8px;
+        align-items: center;
+    }
+
+    #desktopSidebar.collapsed .sidebar-text,
+    #desktopSidebar.collapsed .sidebar-heading,
+    #desktopSidebar.collapsed .dropdown-arrow {
+        display: none !important;
+    }
+
+    #desktopSidebar.collapsed > .sidebar-scroll-area > .sidebar-menu > .nav-item {
+        width: 54px;
+        min-width: 54px;
+    }
+
+    #desktopSidebar.collapsed .sidebar-menu > .nav-item > .nav-link {
+        width: 54px;
+        height: 54px;
+        min-height: 54px;
+        padding: 6px !important;
+        justify-content: center !important;
+        border-radius: 14px;
+    }
+
+    #desktopSidebar.collapsed .nav-link > i,
+    #desktopSidebar.collapsed .nav-link > div > i:first-child {
+        width: 42px !important;
+        min-width: 42px !important;
+        height: 42px !important;
+        margin: 0 !important;
+        border-radius: 12px;
+        font-size: 18px !important;
+    }
+
+    #desktopSidebar.collapsed .nav-link > div {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #desktopSidebar.collapsed .nav-link.active {
+        background: rgba(20,184,166,.12);
+    }
+
+    /* ลบกฎเดิมที่ซ่อนเมนูย่อยทั้งหมดตอนพับ */
+    #desktopSidebar.collapsed .leave-dropdown-container ul,
+    #desktopSidebar.collapsed .hr-dropdown-container ul {
+        display: flex !important;
+    }
+
+    /* Floating submenu - ใช้ fixed เพื่อไม่โดน scroll container ตัด */
+    #desktopSidebar.collapsed .leave-dropdown-container > .collapse,
+    #desktopSidebar.collapsed .hr-dropdown-container > .collapse {
+        display: block !important;
+        position: fixed;
+        width: 238px;
+        margin: 0 !important;
+        padding: 8px;
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-6px);
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        box-shadow:
+            0 18px 45px rgba(15,23,42,.18),
+            0 3px 10px rgba(15,23,42,.06);
+        z-index: 2000;
+        transition:
+            opacity .16s ease,
+            transform .16s ease,
+            visibility .16s ease;
+    }
+
+    #desktopSidebar.collapsed .leave-dropdown-container.flyout-open > .collapse,
+    #desktopSidebar.collapsed .hr-dropdown-container.flyout-open > .collapse,
+    #desktopSidebar.collapsed .leave-dropdown-container > .collapse:hover,
+    #desktopSidebar.collapsed .hr-dropdown-container > .collapse:hover {
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(0);
+    }
+
+    #desktopSidebar.collapsed .leave-dropdown-container > .collapse::before,
+    #desktopSidebar.collapsed .hr-dropdown-container > .collapse::before {
+        content: '';
+        position: absolute;
+        left: -6px;
+        top: 20px;
+        width: 12px;
+        height: 12px;
+        background: #ffffff;
+        border-left: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+        transform: rotate(45deg);
+    }
+
+    #desktopSidebar.collapsed .leave-dropdown-container > .collapse .sidebar-menu,
+    #desktopSidebar.collapsed .hr-dropdown-container > .collapse .sidebar-menu {
+        width: 100%;
+        margin: 0 !important;
+        padding: 0 !important;
+        gap: 3px;
+        align-items: stretch;
+    }
+
+    #desktopSidebar.collapsed .leave-dropdown-container > .collapse .nav-item,
+    #desktopSidebar.collapsed .hr-dropdown-container > .collapse .nav-item {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+
+    #desktopSidebar.collapsed .submenu-item {
+        display: flex !important;
+        width: 100% !important;
+        min-height: 38px !important;
+        height: auto !important;
+        padding: 8px 11px !important;
+        justify-content: flex-start !important;
+        border-radius: 9px !important;
+        color: #475569 !important;
+        background: transparent;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    #desktopSidebar.collapsed .submenu-item:hover {
+        background: #f0fdfa !important;
+        color: #0f766e !important;
+        transform: none;
+    }
+
+    #desktopSidebar.collapsed .submenu-item.active {
+        background: #ecfdf5 !important;
+        color: #0f766e !important;
+        font-weight: 700;
+    }
+
+    /* Footer Logout */
+    #desktopSidebar > .mt-auto {
+        background: transparent !important;
+        border-color: rgba(255,255,255,.07) !important;
+    }
+
+    #desktopSidebar > .mt-auto .nav-link {
+        color: #fda4af !important;
+    }
+
+    /* Mobile ยังคงเป็น Offcanvas เดิม */
+    @media (max-width: 767.98px) {
+        #mobileSidebar .sidebar-menu {
+            padding: 12px;
+        }
+
+        #mobileSidebar .nav-link {
+            min-height: 48px;
+            border-radius: 12px;
+        }
+    }
+</style>
+
 <?php
 // ฟังก์ชันสร้างเมนูด้านซ้าย เพื่อเรียกใช้ซ้ำทั้งแบบ Desktop และ Mobile
 if (!function_exists('renderSidebarMenu')) {
@@ -328,7 +704,7 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 1. Desktop Sidebar -->
 <!-- ========================================== -->
-<aside id="desktopSidebar" class="d-none d-md-flex flex-column h-100 bg-white">
+<aside id="desktopSidebar" class="d-none d-md-flex flex-column h-100" aria-label="เมนูหลัก">
     <!-- Script ป้องกันการกระพริบของเมนูตอนโหลดหน้าเว็บ -->
     <script>
         if (localStorage.getItem('sidebarState') === 'collapsed') {
@@ -336,7 +712,7 @@ if (!function_exists('renderSidebarMenu')) {
         }
     </script>
     
-    <div class="flex-grow-1 overflow-auto custom-scrollbar pb-3">
+    <div class="flex-grow-1 custom-scrollbar pb-3 sidebar-scroll-area">
         <?php renderSidebarMenu($c, $a, $role, $allowed_controllers); ?>
     </div>
     
@@ -370,35 +746,154 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- 🌟 3. JavaScript ควบคุมพฤติกรรม Sidebar -->
 <!-- ========================================== -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
+    const sidebar = document.getElementById('desktopSidebar');
     const toggleBtn = document.getElementById('sidebarToggleBtn');
-    const desktopSidebar = document.getElementById('desktopSidebar');
-    
-    if (toggleBtn && desktopSidebar) {
-        toggleBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            desktopSidebar.classList.toggle('collapsed');
-            
-            // บันทึกสถานะลงใน Browser
-            if (desktopSidebar.classList.contains('collapsed')) {
-                localStorage.setItem('sidebarState', 'collapsed');
-                
-                // สั่งปิดเมนู Dropdown อัตโนมัติเวลาพับ Sidebar
-                const menusToCollapse = ['leaveMenu', 'hrMenu'];
-                menusToCollapse.forEach(menuId => {
-                    const menuElement = document.getElementById(menuId);
-                    if(menuElement && menuElement.classList.contains('show')) {
-                        const bsCollapse = new bootstrap.Collapse(menuElement, {toggle: false});
-                        bsCollapse.hide();
-                        const menuBtn = document.querySelector(`[href="#${menuId}"]`);
-                        if(menuBtn) menuBtn.setAttribute('aria-expanded', 'false');
-                    }
-                });
+    const toggleIcon = document.getElementById('sidebarToggleIcon');
 
-            } else {
-                localStorage.setItem('sidebarState', 'expanded');
+    if (!sidebar) return;
+
+    function updateSidebarIcon() {
+        if (!toggleIcon) return;
+
+        toggleIcon.className = sidebar.classList.contains('collapsed')
+            ? 'bi bi-layout-sidebar-inset-reverse'
+            : 'bi bi-layout-sidebar-inset';
+    }
+
+    function closeBootstrapSubmenus() {
+        ['leaveMenu', 'hrMenu'].forEach(function (menuId) {
+            const element = document.getElementById(menuId);
+            if (!element) return;
+
+            element.classList.remove('show');
+
+            const trigger = sidebar.querySelector('[href="#' + menuId + '"]');
+            if (trigger) {
+                trigger.setAttribute('aria-expanded', 'false');
+                trigger.classList.add('collapsed');
             }
         });
+    }
+
+    function positionFlyout(container) {
+        if (!sidebar.classList.contains('collapsed')) return;
+
+        const flyout = container.querySelector(':scope > .collapse');
+        if (!flyout) return;
+
+        const itemRect = container.getBoundingClientRect();
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const estimatedHeight = Math.min(flyout.scrollHeight || 280, 420);
+
+        let top = itemRect.top;
+        if (top + estimatedHeight > viewportHeight - 12) {
+            top = Math.max(12, viewportHeight - estimatedHeight - 12);
+        }
+
+        flyout.style.left = (sidebarRect.right + 8) + 'px';
+        flyout.style.top = top + 'px';
+        flyout.style.maxHeight = Math.max(180, viewportHeight - top - 12) + 'px';
+        flyout.style.overflowY = 'auto';
+    }
+
+    updateSidebarIcon();
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+
+            sidebar.classList.toggle('collapsed');
+            const isCollapsed = sidebar.classList.contains('collapsed');
+
+            localStorage.setItem(
+                'sidebarState',
+                isCollapsed ? 'collapsed' : 'expanded'
+            );
+
+            sidebar.querySelectorAll('.flyout-open').forEach(function (item) {
+                item.classList.remove('flyout-open');
+            });
+
+            if (isCollapsed) {
+                closeBootstrapSubmenus();
+            }
+
+            updateSidebarIcon();
+        });
+    }
+
+    const flyoutContainers = sidebar.querySelectorAll(
+        '.leave-dropdown-container, .hr-dropdown-container'
+    );
+
+    flyoutContainers.forEach(function (container) {
+        const trigger = container.querySelector(':scope > .nav-link');
+        const flyout = container.querySelector(':scope > .collapse');
+        let closeTimer = null;
+
+        function openFlyout() {
+            if (!sidebar.classList.contains('collapsed')) return;
+
+            if (closeTimer) {
+                clearTimeout(closeTimer);
+                closeTimer = null;
+            }
+
+            positionFlyout(container);
+            container.classList.add('flyout-open');
+        }
+
+        function scheduleClose() {
+            if (!sidebar.classList.contains('collapsed')) return;
+
+            closeTimer = setTimeout(function () {
+                container.classList.remove('flyout-open');
+            }, 120);
+        }
+
+        container.addEventListener('mouseenter', openFlyout);
+        container.addEventListener('mouseleave', scheduleClose);
+
+        if (flyout) {
+            flyout.addEventListener('mouseenter', function () {
+                if (closeTimer) {
+                    clearTimeout(closeTimer);
+                    closeTimer = null;
+                }
+                container.classList.add('flyout-open');
+            });
+
+            flyout.addEventListener('mouseleave', scheduleClose);
+        }
+
+        if (trigger) {
+            trigger.addEventListener('click', function (event) {
+                if (sidebar.classList.contains('collapsed')) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation();
+                    openFlyout();
+                    return false;
+                }
+            }, true);
+        }
+    });
+
+    window.addEventListener('resize', function () {
+        sidebar.querySelectorAll('.flyout-open').forEach(function (container) {
+            positionFlyout(container);
+        });
+    });
+
+    const scrollArea = sidebar.querySelector('.sidebar-scroll-area');
+    if (scrollArea) {
+        scrollArea.addEventListener('scroll', function () {
+            sidebar.querySelectorAll('.flyout-open').forEach(function (container) {
+                positionFlyout(container);
+            });
+        }, { passive: true });
     }
 });
 </script>
