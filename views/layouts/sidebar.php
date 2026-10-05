@@ -589,16 +589,29 @@ $allowed_controllers = array_unique($allowed_controllers);
     }
 
     #desktopSidebar .nav-link.active {
-        background: linear-gradient(135deg,rgba(20,184,166,.18),rgba(14,165,233,.10)) !important;
+        background: linear-gradient(135deg,rgba(20,184,166,.12),rgba(14,165,233,.06)) !important;
         color: #ffffff !important;
-        box-shadow: inset 0 0 0 1px rgba(45,212,191,.30);
+        box-shadow: inset 0 0 0 1px rgba(45,212,191,.16) !important;
+    }
+
+    /* Active indicator แบบบาง ไม่เป็นกรอบสองชั้น */
+    #desktopSidebar .nav-link.active::before {
+        content: '';
+        position: absolute;
+        left: 1px;
+        top: 13px;
+        bottom: 13px;
+        width: 2px;
+        border-radius: 4px;
+        background: #2dd4bf;
+        box-shadow: none;
     }
 
     #desktopSidebar .nav-link.active > i:not(.dropdown-arrow),
     #desktopSidebar .nav-link.active > div > i:first-child {
-        background: linear-gradient(135deg,#14b8a6,#06b6d4) !important;
+        background: linear-gradient(135deg,#0f766e,#0891b2) !important;
         color: #ffffff !important;
-        box-shadow: 0 6px 14px rgba(20,184,166,.20);
+        box-shadow: 0 4px 12px rgba(8,145,178,.16);
     }
 
     #desktopSidebar .sidebar-text {
@@ -697,6 +710,50 @@ $allowed_controllers = array_unique($allowed_controllers);
         justify-content: center !important;
     }
 
+    /* Active ตอนย่อ: ใช้เฉพาะ icon + indicator เล็ก */
+    #desktopSidebar.collapsed .nav-link.active {
+        background: rgba(20,184,166,.07) !important;
+        box-shadow: inset 0 0 0 1px rgba(45,212,191,.10) !important;
+    }
+
+    #desktopSidebar.collapsed .nav-link.active::before {
+        left: -1px;
+        top: 15px;
+        bottom: 15px;
+        width: 2px;
+    }
+
+    /* บอกผู้ใช้ว่าเมนูนี้มี Submenu เมื่อ Sidebar ถูกย่อ */
+    #desktopSidebar.collapsed .sidebar-dropdown-container > .nav-link::after {
+        content: '›';
+        position: absolute;
+        top: 5px;
+        right: 2px;
+        width: 15px;
+        height: 15px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #164e63;
+        color: #67e8f9;
+        border: 1px solid rgba(103,232,249,.34);
+        font-family: Arial, sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        box-shadow: 0 2px 5px rgba(0,0,0,.12);
+        z-index: 3;
+        transition: transform .18s ease, background .18s ease;
+    }
+
+    #desktopSidebar.collapsed .sidebar-dropdown-container:hover > .nav-link::after,
+    #desktopSidebar.collapsed .sidebar-dropdown-container.flyout-open > .nav-link::after {
+        transform: translateX(2px);
+        background: #0e7490;
+        color: #ffffff;
+    }
+
     /* Generic floating submenu when collapsed */
     #desktopSidebar.collapsed .sidebar-dropdown-container > .collapse {
         display: block !important;
@@ -707,12 +764,14 @@ $allowed_controllers = array_unique($allowed_controllers);
         visibility: hidden;
         opacity: 0;
         pointer-events: none;
-        transform: translateX(-6px);
-        background: rgba(255,255,255,.98);
-        backdrop-filter: blur(12px);
-        border: 1px solid #e2e8f0;
+        transform: translateX(-6px) scale(.985);
+        transform-origin: left top;
+        background: rgba(255,255,255,.985);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid #dce5ee;
         border-radius: 14px;
-        box-shadow: 0 20px 45px rgba(15,23,42,.18);
+        box-shadow: 0 18px 42px rgba(15,23,42,.16), 0 3px 10px rgba(15,23,42,.05);
         z-index: 2000;
         transition: opacity .16s ease, transform .16s ease, visibility .16s ease;
     }
@@ -722,7 +781,7 @@ $allowed_controllers = array_unique($allowed_controllers);
         visibility: visible;
         opacity: 1;
         pointer-events: auto;
-        transform: translateX(0);
+        transform: translateX(0) scale(1);
     }
 
     #desktopSidebar.collapsed .sidebar-dropdown-container > .collapse::before {
