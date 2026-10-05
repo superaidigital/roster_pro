@@ -120,7 +120,7 @@ jobs:
           php scripts/maintenance.php status | grep -q '"enabled": false'
 
       - name: Run successful cutover orchestration
-        run: php scripts/cutover.php --confirm=CUTOVER --release=ci-ha-release-2 --skip-recovery
+        run: php scripts/cutover.php --confirm=CUTOVER --release=ci-ha-release-1 --skip-recovery
 
       - name: Verify successful cutover leaves traffic enabled
         shell: bash
