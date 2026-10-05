@@ -457,11 +457,13 @@ ok(
     !ElectronicSignature::isValid('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='),
     'electronic signature validator rejects SVG payloads'
 );
-ok($users->updateSignature($uid1, $signatureOne, 'DRAW'), 'preparer digital signature fixture saved');
-ok($users->updateSignature($uid2, $signatureOne, 'UPLOAD'), 'approver digital signature fixture saved');
+ok(!$users->updateSignature($uid1, $signatureOne, 'DRAW', 'WRONG-NOTICE'), 'signature save rejects invalid PDPA notice version');
+ok($users->updateSignature($uid1, $signatureOne, 'DRAW', ElectronicSignature::PRIVACY_NOTICE_VERSION), 'preparer digital signature fixture saved');
+ok($users->updateSignature($uid2, $signatureOne, 'UPLOAD', ElectronicSignature::PRIVACY_NOTICE_VERSION), 'approver digital signature fixture saved');
 
 $signatureMetaStmt = $db->prepare(
-    "SELECT signature_sha256, signature_method, signature_updated_at
+    "SELECT signature_sha256, signature_method, signature_updated_at,
+            signature_pdpa_notice_version, signature_pdpa_ack_at
      FROM users
      WHERE id = ?"
 );
@@ -473,6 +475,8 @@ ok(
 );
 ok(($signatureMeta['signature_method'] ?? '') === 'DRAW', 'signature capture method persisted');
 ok(!empty($signatureMeta['signature_updated_at']), 'signature update timestamp persisted');
+ok(($signatureMeta['signature_pdpa_notice_version'] ?? '') === ElectronicSignature::PRIVACY_NOTICE_VERSION, 'PDPA notice version persisted with signature');
+ok(!empty($signatureMeta['signature_pdpa_ack_at']), 'PDPA acknowledgement timestamp persisted with signature');
 
 $signatureReadback = $users->getSignatureRecord($uid1);
 ok(is_array($signatureReadback), 'signature readback helper returns saved record');
@@ -559,7 +563,7 @@ ok(!method_exists($revisionModel, 'update'), 'roster revision model exposes no u
 $db->prepare("DELETE FROM shifts WHERE hospital_id = ? AND shift_date LIKE '2026-11-%'")
    ->execute([$hospitalId]);
 $shiftModel->addShift('2026-11-20', 'ย', $uid1, $hospitalId);
-ok($users->updateSignature($uid1, $signatureTwo), 'live preparer signature changed after approval');
+ok($users->updateSignature($uid1, $signatureTwo, 'DRAW', ElectronicSignature::PRIVACY_NOTICE_VERSION), 'live preparer signature changed after approval');
 
 $revision1AfterLiveEdit = $revisionModel->getRevision($revisionId1, $hospitalId);
 ok(count($revision1AfterLiveEdit['shifts'] ?? []) === 2, 'REV-001 remains unchanged after live roster edits');
