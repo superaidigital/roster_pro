@@ -311,6 +311,24 @@ class RosterController {
             exit;
         }
 
+        $verificationCode = (string)($revision['verification_code'] ?? '');
+        if (!preg_match('/^[A-F0-9]{32}$/', $verificationCode)) {
+            http_response_code(409);
+            $_SESSION['error_msg'] = 'ฉบับตารางเวรยังไม่มี Verification Code ที่ถูกต้อง';
+            header(
+                "Location: index.php?c=roster&month=" .
+                urlencode((string)$revision['month_year']) .
+                "&hospital_id=" . $hospitalId
+            );
+            exit;
+        }
+
+        $verificationUrl = security_absolute_app_url(
+            'index.php?c=verify&a=revision&code=' . rawurlencode($verificationCode)
+        );
+        $qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180'
+            . '&ecc=M&qzone=4&format=png&data=' . rawurlencode($verificationUrl);
+
         LogsController::addLog(
             $db,
             $_SESSION['user']['id'],
