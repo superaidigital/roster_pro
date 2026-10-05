@@ -142,6 +142,29 @@ foreach ($roster_coverage as $coverage) {
     
     .table-roster th { font-weight: 600; color: #475569; font-size: 13px; vertical-align: middle; }
     .table-roster td { vertical-align: middle; }
+
+    /* Fixed roster grid: staff column is independent; every day is exactly equal width. */
+    #rosterTable {
+        table-layout: fixed !important;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+    #rosterTable .roster-staff-col {
+        width: 192px !important;
+        min-width: 192px !important;
+        max-width: 192px !important;
+    }
+    #rosterTable .roster-day-col,
+    #rosterTable .date-header-cell,
+    #rosterTable .roster-day-cell {
+        width: 48px !important;
+        min-width: 48px !important;
+        max-width: 48px !important;
+        box-sizing: border-box;
+    }
+    #rosterTable .roster-day-cell {
+        overflow: hidden;
+    }
     .date-header-cell { transition: all 0.2s ease; }
     .date-header-cell:hover { background-color: #e0f2fe !important; color: #0284c7 !important; z-index: 10; box-shadow: inset 0 -2px 0 #38bdf8; }
     
@@ -611,10 +634,23 @@ foreach ($roster_coverage as $coverage) {
                             </div>
                         </div>
                         <div class="table-responsive flex-grow-1 custom-scrollbar rp-roster-table-wrap" id="rosterTableScroll" style="max-height: 70vh;">
-                            <table class="table table-bordered table-hover table-roster mb-0 text-center" id="rosterTable" style="min-width: 56rem;">
+                            <?php
+                                $roster_staff_col_width = 192;
+                                $roster_day_col_width = 48;
+                                $roster_table_width = $roster_staff_col_width + ($days_in_month * $roster_day_col_width);
+                            ?>
+                            <table class="table table-bordered table-hover table-roster mb-0 text-center"
+                                   id="rosterTable"
+                                   style="width: <?= (int)$roster_table_width ?>px; min-width: <?= (int)$roster_table_width ?>px;">
+                                <colgroup>
+                                    <col class="roster-staff-col">
+                                    <?php for ($colDay = 1; $colDay <= $days_in_month; $colDay++): ?>
+                                        <col class="roster-day-col">
+                                    <?php endfor; ?>
+                                </colgroup>
                                 <thead class="sticky-top" style="z-index: 10;">
                                     <tr>
-                                        <th rowspan="2" class="align-middle shadow-sm bg-white" style="min-width: 12rem; left: 0; position: sticky; z-index: 11; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
+                                        <th rowspan="2" class="align-middle shadow-sm bg-white roster-staff-col" style="left: 0; position: sticky; z-index: 11; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
                                         <th colspan="<?= $days_in_month ?>" class="bg-light border-bottom text-dark">วันที่ปฏิบัติงาน เดือน <?= $display_month_text ?></th>
                                     </tr>
                                     <tr>
@@ -630,9 +666,9 @@ foreach ($roster_coverage as $coverage) {
                                             $is_holiday_flag = $holidayName ? 'true' : 'false';
                                             $h_name = $holidayName ? htmlspecialchars($holidayName, ENT_QUOTES) : '';
                                         ?>
-                                            <th class="<?= $is_current_day ? 'bg-primary text-white shadow-sm' : ($is_weekend || $holidayName ? 'text-danger bg-light' : 'bg-light') ?> date-header-cell border-bottom" 
+                                            <th class="<?= $is_current_day ? 'bg-primary text-white shadow-sm' : ($is_weekend || $holidayName ? 'text-danger bg-light' : 'bg-light') ?> date-header-cell roster-day-col border-bottom" 
                                                 data-roster-date="<?= $current_date_str ?>"
-                                                style="min-width: 42px; cursor: pointer; position: relative;"
+                                                style="cursor: pointer; position: relative;"
                                                 onclick="openHolidayInfoModal('<?= $current_date_str ?>', <?= $is_holiday_flag ?>, '<?= $h_name ?>')"
                                                 title="<?= $holidayName ? 'วันหยุด: '.$holidayName : 'คลิกเพื่อเสนอวันหยุด' ?>">
                                                 <?= $i ?>
@@ -710,7 +746,7 @@ foreach ($roster_coverage as $coverage) {
                                         ?>
                                         <!-- 🌟 แนบ data-id ไว้ให้ SortableJS -->
                                         <tr class="roster-staff-row" id="row-staff-<?= htmlspecialchars($staff['id']) ?>" data-id="<?= htmlspecialchars($staff['id']) ?>">
-                                            <td class="text-start px-3 shadow-sm bg-white" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0;">
+                                            <td class="text-start px-3 shadow-sm bg-white roster-staff-col" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0;">
                                                 <div class="fw-bold text-dark d-flex align-items-center justify-content-between">
                                                     <div class="d-flex align-items-center text-truncate pe-2">
                                                         <?php if ($canEdit): ?>
@@ -752,7 +788,7 @@ foreach ($roster_coverage as $coverage) {
                                                     $td_bg_class = 'holiday-column';
                                                 }
                                             ?>
-                                                <td class="p-0 text-center border-start-0 border-end-0 border-bottom <?= $td_bg_class ?>" style="height: 52px; position: relative; border-left: 1px solid #f1f5f9 !important;">
+                                                <td class="p-0 text-center border-start-0 border-end-0 border-bottom roster-day-cell <?= $td_bg_class ?>" style="height: 52px; position: relative; border-left: 1px solid #f1f5f9 !important;">
                                                     
                                                     <?php if ($leave_txt): ?>
                                                         <div class="position-absolute w-100 d-flex justify-content-center" style="top: 3px; left: 0; z-index: 2;">
