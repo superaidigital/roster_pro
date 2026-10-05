@@ -26,8 +26,8 @@ class HealthController {
             ];
         }
 
-        $healthy = ($result['status'] ?? '') === 'ok';
-        http_response_code($healthy ? 200 : 503);
+        $ready = ($result['status'] ?? '') !== 'unhealthy';
+        http_response_code($ready ? 200 : 503);
 
         echo json_encode([
             'status' => $result['status'],
