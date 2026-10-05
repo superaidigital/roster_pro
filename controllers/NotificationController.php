@@ -42,20 +42,35 @@ class NotificationController {
     // 🌟 2. อ่านการแจ้งเตือน 1 รายการและเปลี่ยนหน้า (Redirect)
     // ==========================================
     public function read() {
-        if (isset($_GET['id'])) {
-            $id = (int)$_GET['id'];
-            $user_id = $_SESSION['user']['id'];
-            
-            // อัปเดตสถานะในฐานข้อมูลว่า "อ่านแล้ว"
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            exit('Method Not Allowed');
+        }
+
+        $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+        $user_id = (int)$_SESSION['user']['id'];
+
+        if (!$id) {
+            header("Location: index.php?c=notification");
+            exit;
+        }
+
+        $notification = $this->notifModel->getByIdForUser($id, $user_id);
+        if ($notification) {
             $this->notifModel->markAsRead($id, $user_id);
         }
 
-        // ตรวจสอบว่ามีลิงก์แนบมาด้วยหรือไม่ ถ้ามีให้วิ่งไปที่ลิงก์นั้น
-        if (!empty($_GET['url'])) {
-            $target_url = urldecode($_GET['url']);
-            header("Location: " . $target_url);
+        // Redirect only to app-local relative links stored by the server.
+        $target = is_array($notification) ? (string)($notification['link'] ?? '') : '';
+        if (
+            $target !== ''
+            && !str_contains($target, '://')
+            && !str_starts_with($target, '//')
+            && str_starts_with($target, 'index.php')
+        ) {
+            header("Location: " . $target);
         } else {
-            // ถ้าไม่มีลิงก์ ให้กลับไปที่หน้ารวมการแจ้งเตือน
             header("Location: index.php?c=notification");
         }
         exit;
@@ -65,18 +80,18 @@ class NotificationController {
     // 🌟 3. ทำเครื่องหมายว่าอ่านทั้งหมด (กรณีเรียกจาก Header Dropdown)
     // ==========================================
     public function read_all() {
-        $user_id = $_SESSION['user']['id'];
-        
-        // สั่งเคลียร์ให้อ่านทั้งหมด
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            exit('Method Not Allowed');
+        }
+
+        $user_id = (int)$_SESSION['user']['id'];
         $this->notifModel->markAllAsRead($user_id);
-        
-        // พยายามพากลับไปหน้าเดิมที่ผู้ใช้กด (Referer) ถ้าไม่มีให้ไปหน้า Dashboard
-        $referer = $_SERVER['HTTP_REFERER'] ?? 'index.php?c=dashboard';
-        
-        // ใส่ Alert แจ้งเตือนความสำเร็จ (ถ้ามีระบบรองรับใน View)
         $_SESSION['success_msg'] = "ทำเครื่องหมายว่าอ่านแล้วทั้งหมดเรียบร้อย";
-        
-        header("Location: " . $referer);
+
+        // Fixed local redirect avoids Host/Referer based open redirects.
+        header("Location: index.php?c=notification");
         exit;
     }
 }
