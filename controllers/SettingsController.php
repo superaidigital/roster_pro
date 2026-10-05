@@ -7,6 +7,7 @@ require_once 'controllers/LogsController.php';
 require_once 'lib/MaintenanceMode.php';
 require_once 'lib/ReleaseIdentity.php';
 require_once 'lib/SecureUpload.php';
+require_once 'lib/SecurityCompliance.php';
 
 class SettingsController {
 
@@ -346,6 +347,7 @@ class SettingsController {
             $status_data['maintenance_enabled'] = (bool)($maintenanceState['enabled'] ?? false);
             $status_data['maintenance_started_at'] = (string)($maintenanceState['started_at'] ?? '');
             $status_data['release_id'] = ReleaseIdentity::current();
+            $status_data['security_assessment'] = SecurityCompliance::assess($db);
 
         } catch (Exception $e) {
             error_log('System status check failed: ' . $e->getMessage());
