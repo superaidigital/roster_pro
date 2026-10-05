@@ -36,6 +36,39 @@ class SettingsController {
         }
     }
 
+    private function getBackupDir() {
+        $configured = getenv('BACKUP_DIR');
+        $dir = ($configured !== false && trim($configured) !== '')
+            ? rtrim($configured, DIRECTORY_SEPARATOR)
+            : dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'backups';
+
+        return $dir . DIRECTORY_SEPARATOR;
+    }
+
+    private function resolveBackupFile($filename) {
+        if (!is_string($filename)) return null;
+
+        $filename = basename($filename);
+        if (!preg_match('/^roster_pro_(?:monthly|autobackup)_[A-Za-z0-9_\-]+\.sql$/', $filename)) {
+            return null;
+        }
+
+        $dir = $this->getBackupDir();
+        $path = $dir . $filename;
+
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $realDir = realpath($dir);
+        $realFile = realpath($path);
+        if ($realDir === false || $realFile === false || !str_starts_with($realFile, $realDir . DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+
+        return $realFile;
+    }
+
     // ========================================================
     // 🚦 ส่วนที่ 2: ระบบนำทางหลัก (Router)
     // ========================================================
@@ -728,7 +761,7 @@ class SettingsController {
 
         // ดึงรายการไฟล์ Backup ที่อยู่ในเซิร์ฟเวอร์
         $server_backups = [];
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = $this->getBackupDir();
         if (is_dir($backup_dir)) {
             $files = scandir($backup_dir);
             foreach ($files as $file) {
@@ -737,8 +770,7 @@ class SettingsController {
                     $server_backups[] = [
                         'filename' => $file,
                         'size' => round(filesize($filepath) / 1024, 2), // KB
-                        'date' => date("d/m/Y H:i:s", filemtime($filepath)),
-                        'path' => $filepath
+                        'date' => date("d/m/Y H:i:s", filemtime($filepath))
                     ];
                 }
             }
@@ -833,7 +865,8 @@ class SettingsController {
             exit;
 
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการสำรองข้อมูล: " . $e->getMessage();
+            error_log('Database backup download failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการสำรองข้อมูล";
             header("Location: index.php?c=settings&a=backup");
             exit;
         }
@@ -848,11 +881,11 @@ class SettingsController {
         ini_set('memory_limit', '256M');
 
         $db = (new Database())->getConnection();
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = $this->getBackupDir();
 
         try {
             if (!is_dir($backup_dir)) {
-                mkdir($backup_dir, 0777, true);
+                mkdir($backup_dir, 0700, true);
             }
 
             $sqlScript = $this->generateSqlScript($db);
@@ -866,55 +899,81 @@ class SettingsController {
                 LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "สำรองข้อมูลจัดเก็บลงเซิร์ฟเวอร์ ({$backup_file_name})");
                 $_SESSION['success_msg'] = "บันทึกไฟล์สำรองข้อมูลลงเซิร์ฟเวอร์เรียบร้อยแล้ว";
             } else {
-                $_SESSION['error_msg'] = "ไม่สามารถเขียนไฟล์ลงในโฟลเดอร์ public/uploads/Backup/ ได้ โปรดตรวจสอบ Permission (CHMOD 777)";
+                $_SESSION['error_msg'] = "ไม่สามารถเขียนไฟล์สำรองข้อมูลได้ โปรดตรวจสอบสิทธิ์โฟลเดอร์ Backup";
             }
 
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+            error_log('Server backup failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการสำรองข้อมูลบนเซิร์ฟเวอร์";
         }
 
         header("Location: index.php?c=settings&a=backup");
         exit;
     }
 
-    // ฟังก์ชันใหม่: ลบไฟล์ Backup ใน Server
-    public function delete_server_backup() {
+    public function download_server_backup() {
         $this->requireAccess(['SUPERADMIN']);
-        $filename = $_GET['file'] ?? '';
-        $filepath = 'public/uploads/Backup/' . basename($filename);
 
-        if (!empty($filename) && file_exists($filepath)) {
-            unlink($filepath);
-            $db = (new Database())->getConnection();
-            
-            // 🌟 บันทึก Log: ลบไฟล์สำรองข้อมูล
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบไฟล์สำรองข้อมูลในเซิร์ฟเวอร์ ({$filename})");
-            $_SESSION['success_msg'] = "ลบไฟล์ {$filename} เรียบร้อยแล้ว";
-        } else {
-            $_SESSION['error_msg'] = "ไม่พบไฟล์ที่ต้องการลบ";
+        $filepath = $this->resolveBackupFile($_GET['file'] ?? '');
+        if ($filepath === null) {
+            http_response_code(404);
+            exit('Backup file not found');
         }
+
+        $filename = basename($filepath);
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . filesize($filepath));
+        header('Cache-Control: no-store, private');
+        header('X-Content-Type-Options: nosniff');
+
+        readfile($filepath);
+        exit;
+    }
+
+    // ลบไฟล์ Backup ใน Server
+    public function delete_server_backup() {
+        $this->requirePost();
+        $this->requireAccess(['SUPERADMIN']);
+
+        $filepath = $this->resolveBackupFile($_POST['file'] ?? '');
+        if ($filepath !== null && @unlink($filepath)) {
+            $db = (new Database())->getConnection();
+            $filename = basename($filepath);
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบไฟล์สำรองข้อมูลในเซิร์ฟเวอร์ ({$filename})");
+            $_SESSION['success_msg'] = "ลบไฟล์สำรองข้อมูลเรียบร้อยแล้ว";
+        } else {
+            $_SESSION['error_msg'] = "ไม่พบไฟล์ที่ต้องการลบ หรือไม่สามารถลบได้";
+        }
+
         header("Location: index.php?c=settings&a=backup");
         exit;
     }
 
     // ฟังก์ชันใหม่: URL สำหรับให้ Cron Job เรียกใช้งาน (ไม่ต้อง Login)
     public function cron_monthly_backup() {
-        $secret_key = "ROSTER_PRO_CRON_2026"; 
-        $provided_key = $_GET['key'] ?? '';
+        $secret_key = getenv('CRON_BACKUP_KEY');
+        $provided_key = $_SERVER['HTTP_X_CRON_KEY'] ?? '';
 
-        if ($provided_key !== $secret_key) {
-            die("Access Denied: Invalid Cron Key.");
+        if (
+            !is_string($secret_key)
+            || strlen($secret_key) < 32
+            || !is_string($provided_key)
+            || !hash_equals($secret_key, $provided_key)
+        ) {
+            http_response_code(403);
+            exit("Access Denied");
         }
 
         set_time_limit(300); 
         ini_set('memory_limit', '256M');
 
         $db = (new Database())->getConnection();
-        $backup_dir = 'public/uploads/Backup/';
+        $backup_dir = $this->getBackupDir();
 
         try {
             if (!is_dir($backup_dir)) {
-                mkdir($backup_dir, 0777, true);
+                mkdir($backup_dir, 0700, true);
             }
 
             // เช็คว่าเดือนนี้มีไฟล์แล้วหรือยัง
@@ -945,7 +1004,9 @@ class SettingsController {
             }
 
         } catch (Exception $e) {
-            echo "Cron Backup Error: " . $e->getMessage();
+            error_log('Cron backup failed: ' . $e->getMessage());
+            http_response_code(500);
+            echo "Cron Backup Error";
         }
         exit;
     }
@@ -998,8 +1059,9 @@ class SettingsController {
             $_SESSION['success_msg'] = "ล้างข้อมูลตารางเวรและประวัติต่างๆ เรียบร้อยแล้ว ระบบพร้อมสำหรับการเริ่มต้นใหม่";
 
         } catch (Exception $e) {
-            $db->exec("SET FOREIGN_KEY_CHECKS=1;"); 
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการล้างข้อมูล: " . $e->getMessage();
+            $db->exec("SET FOREIGN_KEY_CHECKS=1;");
+            error_log('Factory reset failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการล้างข้อมูล";
         }
 
         header("Location: index.php?c=settings&a=system");
