@@ -465,7 +465,7 @@ foreach ([
 
 if (is_file($frontControllerPath)) {
     $frontController = (string) file_get_contents($frontControllerPath);
-    if (strpos($frontController, "($c === 'health' && $a === 'index')") === false) {
+    if (strpos($frontController, "(\$c === 'health' && \$a === 'index')") === false) {
         addError($errors, 'index.php: public health endpoint must remain limited to health::index');
     }
 }
