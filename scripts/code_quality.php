@@ -863,6 +863,133 @@ if (is_file($goLivePath)) {
     }
 }
 
+// 5.14) Production security and compliance guards.
+$securityHardeningFiles = [
+    'lib/SecurityCompliance.php',
+    'lib/SecureUpload.php',
+    'scripts/security_check.php',
+    'scripts/secret_scan.php',
+    'scripts/generate_sbom.php',
+    '.github/workflows/production-security.yml',
+    'docs/PRODUCTION_SECURITY.md',
+];
+foreach ($securityHardeningFiles as $relativePath) {
+    if (!is_file($root . '/' . $relativePath)) {
+        addError($errors, 'Missing production security file: ' . $relativePath);
+    }
+}
+
+$securityConfigPath = $root . '/config/security.php';
+if (is_file($securityConfigPath)) {
+    $securityConfig = (string) file_get_contents($securityConfigPath);
+    foreach ([
+        'security_is_trusted_proxy_request',
+        'TRUSTED_PROXY_IPS',
+        'Content-Security-Policy-Report-Only',
+        'SESSION_IDLE_TIMEOUT_SECONDS',
+        'session.use_strict_mode',
+        'session.use_trans_sid',
+        "session_name('ROSTERSESSID')",
+        'security_mark_authenticated_session',
+        'security_destroy_session',
+        'security_login_identity_fingerprint',
+    ] as $token) {
+        if (strpos($securityConfig, $token) === false) {
+            addError($errors, "config/security.php: missing production hardening token {$token}");
+        }
+    }
+
+    if (strpos($securityConfig, "HTTP_X_FORWARDED_PROTO") !== false
+        && strpos($securityConfig, 'security_is_trusted_proxy_request()') === false) {
+        addError($errors, 'config/security.php: forwarded proto must remain behind explicit trusted-proxy validation');
+    }
+}
+
+$authSecurityPath = $root . '/controllers/AuthController.php';
+if (is_file($authSecurityPath)) {
+    $authSecurity = (string) file_get_contents($authSecurityPath);
+    foreach (['security_mark_authenticated_session();', 'security_destroy_session();'] as $token) {
+        if (strpos($authSecurity, $token) === false) {
+            addError($errors, "controllers/AuthController.php: missing session lifecycle token {$token}");
+        }
+    }
+}
+
+$headerSecurityPath = $root . '/views/layouts/header.php';
+if (is_file($headerSecurityPath)) {
+    $headerSecurity = (string) file_get_contents($headerSecurityPath);
+    if (strpos($headerSecurity, "\$sys_settings['maintenance_mode']") !== false) {
+        addError($errors, 'views/layouts/header.php: legacy DB maintenance control must not return');
+    }
+}
+
+$settingsSecurityPath = $root . '/controllers/SettingsController.php';
+if (is_file($settingsSecurityPath)) {
+    $settingsSecurity = (string) file_get_contents($settingsSecurityPath);
+
+    if (strpos($settingsSecurity, "\$_GET['key']") !== false) {
+        addError($errors, 'controllers/SettingsController.php: cron/API secrets must not be accepted from query strings');
+    }
+    foreach ([
+        'array_intersect_key',
+        'HTTP_X_ROSTER_CRON_KEY',
+        'security_is_production()',
+        'SecurityCompliance::assess',
+        'SecureUpload::store',
+    ] as $token) {
+        if (strpos($settingsSecurity, $token) === false) {
+            addError($errors, "controllers/SettingsController.php: missing settings/upload security token {$token}");
+        }
+    }
+}
+
+$settingsSecurityViewPath = $root . '/views/settings/system.php';
+if (is_file($settingsSecurityViewPath)) {
+    $settingsSecurityView = (string) file_get_contents($settingsSecurityViewPath);
+    if (strpos($settingsSecurityView, "value=\"<?= htmlspecialchars(\$settings['line_notify_token']") !== false) {
+        addError($errors, 'views/settings/system.php: stored integration secret must not be rendered into HTML');
+    }
+    if (strpos($settingsSecurityView, 'autocomplete="new-password"') === false) {
+        addError($errors, 'views/settings/system.php: secret input must remain non-prefilled');
+    }
+}
+
+$secureUploadPath = $root . '/lib/SecureUpload.php';
+if (is_file($secureUploadPath)) {
+    $secureUpload = (string) file_get_contents($secureUploadPath);
+    foreach ([
+        'is_uploaded_file',
+        'FILEINFO_MIME_TYPE',
+        'getimagesize',
+        "signature !== '%PDF-'",
+        'random_bytes',
+        'Private uploads must not be stored under public/',
+        'move_uploaded_file',
+    ] as $token) {
+        if (strpos($secureUpload, $token) === false) {
+            addError($errors, "lib/SecureUpload.php: missing upload safety token {$token}");
+        }
+    }
+}
+
+$leaveUploadPath = $root . '/controllers/LeaveController.php';
+if (is_file($leaveUploadPath)) {
+    $leaveUpload = (string) file_get_contents($leaveUploadPath);
+    if (strpos($leaveUpload, 'SecureUpload::store') === false
+        || strpos($leaveUpload, "'storage/private/med_certs'") === false) {
+        addError($errors, 'controllers/LeaveController.php: medical certificates must use private SecureUpload storage');
+    }
+}
+
+$goLiveSecurityPath = $root . '/scripts/go_live_check.php';
+if (is_file($goLiveSecurityPath)) {
+    $goLiveSecurity = (string) file_get_contents($goLiveSecurityPath);
+    if (strpos($goLiveSecurity, 'scripts/security_check.php') === false
+        || strpos($goLiveSecurity, "\$securityCommand[] = '--strict';") === false) {
+        addError($errors, 'scripts/go_live_check.php: Production security compliance must remain a traffic gate');
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
