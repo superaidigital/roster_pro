@@ -57,6 +57,7 @@ $run = static function(string $label, array $command) use ($root): void {
     stream_set_blocking($pipes[1], false);
     stream_set_blocking($pipes[2], false);
 
+    $observedExitCode = null;
     while (true) {
         $status = proc_get_status($process);
 
@@ -68,6 +69,7 @@ $run = static function(string $label, array $command) use ($root): void {
         }
 
         if (!$status['running']) {
+            $observedExitCode = isset($status['exitcode']) ? (int)$status['exitcode'] : null;
             break;
         }
         usleep(50_000);
@@ -81,7 +83,11 @@ $run = static function(string $label, array $command) use ($root): void {
         fclose($pipes[$index]);
     }
 
-    $exitCode = proc_close($process);
+    $closeExitCode = proc_close($process);
+    $exitCode = $closeExitCode !== -1
+        ? $closeExitCode
+        : ($observedExitCode ?? -1);
+
     if ($exitCode !== 0) {
         throw new RuntimeException("Step failed: {$label} (exit {$exitCode})");
     }
