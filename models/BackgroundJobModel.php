@@ -248,20 +248,24 @@ final class BackgroundJobModel {
     public function summary(): array {
         $row = $this->db->query(
             "SELECT
-                SUM(status IN ('PENDING', 'RETRY')) AS pending,
-                SUM(status = 'RUNNING') AS running,
-                SUM(status = 'FAILED') AS failed,
-                SUM(status = 'DONE') AS done,
-                SUM(status IN ('PENDING','RETRY') AND available_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)) AS delayed
+                SUM(CASE WHEN status IN ('PENDING', 'RETRY') THEN 1 ELSE 0 END) AS pending_jobs,
+                SUM(CASE WHEN status = 'RUNNING' THEN 1 ELSE 0 END) AS running_jobs,
+                SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failed_jobs,
+                SUM(CASE WHEN status = 'DONE' THEN 1 ELSE 0 END) AS done_jobs,
+                SUM(CASE
+                    WHEN status IN ('PENDING', 'RETRY')
+                     AND available_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                    THEN 1 ELSE 0
+                END) AS delayed_jobs
              FROM background_jobs"
         )->fetch(PDO::FETCH_ASSOC) ?: [];
 
         return [
-            'pending' => (int)($row['pending'] ?? 0),
-            'running' => (int)($row['running'] ?? 0),
-            'failed' => (int)($row['failed'] ?? 0),
-            'done' => (int)($row['done'] ?? 0),
-            'delayed' => (int)($row['delayed'] ?? 0),
+            'pending' => (int)($row['pending_jobs'] ?? 0),
+            'running' => (int)($row['running_jobs'] ?? 0),
+            'failed' => (int)($row['failed_jobs'] ?? 0),
+            'done' => (int)($row['done_jobs'] ?? 0),
+            'delayed' => (int)($row['delayed_jobs'] ?? 0),
         ];
     }
 
