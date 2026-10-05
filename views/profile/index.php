@@ -21,6 +21,7 @@ $signature_fingerprint = $signature_is_valid
     : '';
 $signature_method = strtoupper((string)($target_user['signature_method'] ?? ''));
 $signature_updated_at = (string)($target_user['signature_updated_at'] ?? '');
+$is_signature_owner = (int)($target_user_id ?? 0) === (int)($_SESSION['user']['id'] ?? 0);
 
 // ==========================================
 // 🌟 ระบบ Smart Auto-fill (ปรับปรุงให้ดึงชื่อหลักมาใช้เสมอ)
@@ -591,6 +592,7 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                                     <?php endif; ?>
                                 </div>
 
+                                <?php if ($is_signature_owner): ?>
                                 <form action="index.php?c=profile&a=delete_signature" method="POST"
                                       onsubmit="return confirm('ยืนยันการลบลายเซ็นอิเล็กทรอนิกส์? เอกสาร Revision เดิมที่อนุมัติแล้วจะไม่เปลี่ยนแปลง');">
                                     <?= security_csrf_input() ?>
@@ -599,12 +601,14 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                                         <i class="bi bi-trash3 me-2"></i>ลบลายเซ็นปัจจุบัน
                                     </button>
                                 </form>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-12 col-lg-8">
+                    <?php if ($is_signature_owner): ?>
                     <div class="card card-modern h-100">
                         <div class="card-body p-4">
                             <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-3">
@@ -646,6 +650,24 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                             </div>
                         </div>
                     </div>
+                    <?php else: ?>
+                    <div class="card card-modern h-100">
+                        <div class="card-body p-4 d-flex align-items-center">
+                            <div class="alert alert-light border w-100 mb-0">
+                                <div class="d-flex gap-3 align-items-start">
+                                    <i class="bi bi-shield-lock fs-4 text-primary"></i>
+                                    <div>
+                                        <div class="fw-bold text-dark mb-1">ลายเซ็นจัดการโดยเจ้าของบัญชีเท่านั้น</div>
+                                        <div class="small text-muted">
+                                            เพื่อป้องกันการลงนามแทน ผู้ดูแลและ HR สามารถตรวจสอบสถานะได้
+                                            แต่ไม่สามารถสร้าง เปลี่ยน หรือลบลายเซ็นของบุคลากรรายนี้
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
