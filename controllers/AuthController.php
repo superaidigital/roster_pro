@@ -36,11 +36,21 @@ class AuthController {
             $db = $database->getConnection();
             $userModel = new UserModel($db);
 
-            $username = trim($_POST['username']);
-            $password = trim($_POST['password']);
+            // Security: validate missing/array input and DO NOT trim passwords.
+            // Trimming silently changes a legitimate password containing spaces.
+            $rawUsername = $_POST['username'] ?? '';
+            $rawPassword = $_POST['password'] ?? '';
 
-            // ตรวจสอบค่าว่างเบื้องต้น
-            if (empty($username) || empty($password)) {
+            $username = is_string($rawUsername) ? trim($rawUsername) : '';
+            $password = is_string($rawPassword) ? $rawPassword : '';
+
+            // Defensive length limits reduce abusive oversized requests.
+            if (
+                $username === ''
+                || $password === ''
+                || mb_strlen($username, 'UTF-8') > 100
+                || strlen($password) > 4096
+            ) {
                 $_SESSION['login_error'] = "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน";
                 header("Location: index.php?c=auth&a=index");
                 exit;
@@ -61,9 +71,14 @@ class AuthController {
                     exit;
                 }
 
-                // ล็อกอินสำเร็จ: บันทึกข้อมูลลง Session
+                // Security: rotate the session ID after authentication to prevent
+                // session fixation attacks.
+                session_regenerate_id(true);
+
+                // Store only the authenticated user record after the ID rotation.
                 $_SESSION['user'] = $user;
-                unset($_SESSION['login_error']); // ล้างค่า Error
+                $_SESSION['login_at'] = time();
+                unset($_SESSION['login_error']);
                 
                 // 📝 บันทึก Log: เข้าสู่ระบบสำเร็จ
                 LogsController::addLog($db, $user['id'], LogsController::ACTION_LOGIN, "เข้าสู่ระบบสำเร็จ");
@@ -79,9 +94,18 @@ class AuthController {
                 // ล็อกอินไม่สำเร็จ: ตรวจสอบว่าใน DB รหัสผ่านถูก Hash หรือยัง
                 
                 // 📝 บันทึก Log: พยายามเข้าสู่ระบบล้มเหลว (ใช้ ID = 0 สำหรับคนแปลกหน้า)
-                LogsController::addLog($db, 0, LogsController::ACTION_LOGIN, "พยายามเข้าสู่ระบบล้มเหลว (รหัสผ่านผิด) Username: {$username}");
+                // Do not write the raw username to application logs. A short hash is
+                // enough to correlate repeated failures without storing identifiers.
+                $usernameFingerprint = substr(hash('sha256', mb_strtolower($username, 'UTF-8')), 0, 12);
+                LogsController::addLog(
+                    $db,
+                    0,
+                    LogsController::ACTION_LOGIN,
+                    "พยายามเข้าสู่ระบบล้มเหลว (credential mismatch, ref: {$usernameFingerprint})"
+                );
                 
-                $_SESSION['login_error'] = "ชื่อผู้ใช้ หรือ รหัสผ่านไม่ถูกต้อง (กรุณาตรวจสอบว่ารหัสใน DB ถูกเข้ารหัสแล้ว)";
+                // Generic message avoids leaking authentication implementation details.
+                $_SESSION['login_error'] = "ชื่อผู้ใช้ หรือรหัสผ่านไม่ถูกต้อง";
                 header("Location: index.php?c=auth&a=index");
                 exit;
             }
@@ -102,6 +126,21 @@ class AuthController {
         
         session_unset();
         session_destroy();
+
+        // Expire the session cookie as well as destroying server-side session data.
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params['path'],
+                $params['domain'],
+                (bool) $params['secure'],
+                (bool) $params['httponly']
+            );
+        }
+
         header("Location: index.php?c=auth&a=index");
         exit;
     }
