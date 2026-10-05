@@ -298,6 +298,36 @@ if (is_file($rosterAuditPath)) {
     }
 }
 
+// 5.7) Approved roster revisions are append-only official records.
+$revisionModelPath = $root . '/models/RosterRevisionModel.php';
+if (!is_file($revisionModelPath)) {
+    addError($errors, 'models/RosterRevisionModel.php: immutable approved roster revision model must remain available');
+} else {
+    $revisionModel = (string) file_get_contents($revisionModelPath);
+    foreach (['createApprovedRevision', 'verifyRevision', 'revision_code', 'content_hash'] as $requiredRevisionToken) {
+        if (strpos($revisionModel, $requiredRevisionToken) === false) {
+            addError($errors, "models/RosterRevisionModel.php: missing immutable revision token {$requiredRevisionToken}");
+        }
+    }
+    if (preg_match('/public\\s+function\\s+(?:delete|update)\\s*\\(/i', $revisionModel)) {
+        addError($errors, 'models/RosterRevisionModel.php: official revisions must not expose update/delete methods');
+    }
+}
+
+$ajaxRevisionPath = $root . '/controllers/AjaxController.php';
+if (is_file($ajaxRevisionPath)) {
+    $ajaxRevision = (string) file_get_contents($ajaxRevisionPath);
+    if (strpos($ajaxRevision, 'createApprovedRevision(') === false
+        || strpos($ajaxRevision, 'กรุณาบันทึกลายเซ็นอิเล็กทรอนิกส์ในโปรไฟล์') === false) {
+        addError($errors, 'controllers/AjaxController.php: approval must require a signature and create an official revision');
+    }
+}
+
+$officialExportPath = $root . '/views/roster/export_revision_word.php';
+if (!is_file($officialExportPath)) {
+    addError($errors, 'views/roster/export_revision_word.php: immutable official roster export must remain available');
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
