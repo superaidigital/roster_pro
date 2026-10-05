@@ -9,13 +9,55 @@ require_once 'controllers/LogsController.php';
 
 class StaffController {
     
-    // ตรวจสอบสิทธิ์ (SCHEDULER ขึ้นไปสามารถใช้งานส่วนนี้ได้)
+    // ตรวจสอบสิทธิ์: เฉพาะผู้มีหน้าที่จัดการบุคลากร
     private function checkAuth() {
         if (session_status() === PHP_SESSION_NONE) session_start();
-        if (!isset($_SESSION['user'])) {
-            header("Location: index.php?c=auth&a=login");
+
+        $role = strtoupper((string) ($_SESSION['user']['role'] ?? ''));
+        if (
+            !isset($_SESSION['user'])
+            || !in_array($role, ['SCHEDULER', 'DIRECTOR', 'HR', 'ADMIN', 'SUPERADMIN'], true)
+        ) {
+            $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์เข้าถึงส่วนจัดการบุคลากร";
+            header("Location: index.php?c=dashboard&a=index");
             exit;
         }
+    }
+
+    private function canManageTarget($target) {
+        if (!is_array($target) || empty($target['id'])) return false;
+
+        $currentRole = strtoupper((string) ($_SESSION['user']['role'] ?? ''));
+        $myHospitalId = (int) ($_SESSION['user']['hospital_id'] ?? 0);
+        $targetRole = strtoupper((string) ($target['role'] ?? 'STAFF'));
+        $targetHospitalId = (int) ($target['hospital_id'] ?? 0);
+
+        if ((int)$target['id'] === (int)($_SESSION['user']['id'] ?? 0)) {
+            return false;
+        }
+
+        if ($currentRole === 'SUPERADMIN') {
+            return true;
+        }
+
+        if (in_array($currentRole, ['ADMIN', 'HR'], true)) {
+            return $targetRole !== 'SUPERADMIN';
+        }
+
+        // Local managers are strictly limited to their own hospital.
+        if ($targetHospitalId !== $myHospitalId || $myHospitalId <= 0) {
+            return false;
+        }
+
+        if ($currentRole === 'DIRECTOR') {
+            return !in_array($targetRole, ['SUPERADMIN', 'ADMIN', 'HR'], true);
+        }
+
+        if ($currentRole === 'SCHEDULER') {
+            return !in_array($targetRole, ['SUPERADMIN', 'ADMIN', 'HR', 'DIRECTOR'], true);
+        }
+
+        return false;
     }
 
     // หน้าหลัก
@@ -30,10 +72,10 @@ class StaffController {
         $current_role = strtoupper($_SESSION['user']['role']);
         $my_hosp_id = $_SESSION['user']['hospital_id'];
         
-        $is_admin_level = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR']);
+        $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR'], true);
 
-        // หากเป็นผู้จัดเวร ให้เห็นเฉพาะบุคลากรในหน่วยงานตัวเอง
-        if ($is_admin_level) {
+        // Global admins see the network. DIRECTOR/SCHEDULER stay in their hospital.
+        if ($is_global_admin) {
             $staff_list = $userModel->getAllUsers();
             $hospitals_list = $hospitalModel->getAllHospitals();
         } else {
@@ -114,7 +156,13 @@ class StaffController {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
             
-            $id = $_POST['id'];
+            $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+            if (!$id) {
+                $_SESSION['error_msg'] = "เลขอ้างอิงบุคลากรไม่ถูกต้อง";
+                header("Location: index.php?c=staff");
+                exit;
+            }
+
             $current_role = strtoupper($_SESSION['user']['role']);
             $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR']);
 
@@ -152,25 +200,15 @@ class StaffController {
                     exit;
                 }
 
-                $can_edit = true;
-                
-                // ตรวจสอบสิทธิ์เฉพาะผู้ที่ไม่ใช่แอดมินส่วนกลาง
-                if (!$is_global_admin) {
-                    // ผู้จัดเวร (SCHEDULER) ห้ามแก้ระดับที่สูงกว่า
-                    if ($current_role === 'SCHEDULER' && in_array($existing_user['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) {
-                        $can_edit = false;
-                        $_SESSION['error_msg'] = "ปฏิเสธ: ผู้จัดเวรไม่สามารถแก้ไขข้อมูลผู้อำนวยการ/แอดมินได้";
-                    } 
-                    // ผอ. (DIRECTOR) ห้ามแก้แอดมินส่วนกลาง แต่แก้ ผอ. ด้วยกัน (ตัวเอง) หรือจัดเวรได้
-                    elseif ($current_role === 'DIRECTOR' && in_array($existing_user['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) {
-                        $can_edit = false;
-                        $_SESSION['error_msg'] = "ปฏิเสธ: ผู้อำนวยการไม่สามารถแก้ไขข้อมูลแอดมินส่วนกลางได้";
-                    }
+                $can_edit = $this->canManageTarget($existing_user);
 
-                    // ป้องกันการแอบเปลี่ยน Role เป็น Admin
-                    if (in_array($data['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) {
-                        $data['role'] = $existing_user['role']; // บังคับคืนค่าเดิม
-                    }
+                if (!$can_edit) {
+                    $_SESSION['error_msg'] = "ปฏิเสธ: ไม่มีสิทธิ์แก้ไขบุคลากรรายนี้";
+                }
+
+                // Local managers may not promote accounts into central admin roles.
+                if (!$is_global_admin && in_array($data['role'], ['ADMIN', 'SUPERADMIN', 'HR'], true)) {
+                    $data['role'] = $existing_user['role'];
                 }
 
                 if ($can_edit) {
@@ -183,7 +221,8 @@ class StaffController {
                     }
                 }
             } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error: " . $e->getMessage();
+                error_log('Staff edit failed: ' . $e->getMessage());
+                $_SESSION['error_msg'] = "ไม่สามารถแก้ไขข้อมูลบุคลากรได้";
             }
         }
         header("Location: index.php?c=staff");
@@ -193,41 +232,41 @@ class StaffController {
     // ลบเดี่ยว
     public function delete() {
         $this->checkAuth();
-        if (isset($_GET['id'])) {
-            $db = (new Database())->getConnection();
-            $userModel = new UserModel($db);
-            $id = $_GET['id'];
-            $current_role = strtoupper($_SESSION['user']['role']);
-            $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR']);
 
-            try {
-                $target = $userModel->getUserById($id);
-                if (!$target) {
-                    header("Location: index.php?c=staff");
-                    exit;
-                }
-
-                $can_delete = true;
-                if (!$is_global_admin) {
-                    if ($current_role === 'SCHEDULER' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) $can_delete = false;
-                    if ($current_role === 'DIRECTOR' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) $can_delete = false;
-                }
-
-                if (!$can_delete) {
-                    $_SESSION['error_msg'] = "ปฏิเสธ: ไม่มีสิทธิ์ลบบุคลากรระดับสูง";
-                } elseif ($id == $_SESSION['user']['id']) {
-                    $_SESSION['error_msg'] = "ไม่สามารถลบบัญชีตัวเองได้";
-                } else {
-                    if ($userModel->deleteUser($id)) {
-                        // 🌟 บันทึก Log
-                        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบข้อมูลบุคลากร: " . ($target['name'] ?? "ID: $id"));
-                        $_SESSION['success_msg'] = "ลบข้อมูลสำเร็จ";
-                    }
-                }
-            } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error deleting staff.";
-            }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            exit('Method Not Allowed');
         }
+
+        $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$id) {
+            $_SESSION['error_msg'] = "เลขอ้างอิงบุคลากรไม่ถูกต้อง";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+
+        try {
+            $target = $userModel->getUserById($id);
+
+            if (!$target) {
+                $_SESSION['error_msg'] = "ไม่พบข้อมูลบุคลากร";
+            } elseif (!$this->canManageTarget($target)) {
+                $_SESSION['error_msg'] = "ปฏิเสธ: ไม่มีสิทธิ์ลบบุคลากรรายนี้";
+            } elseif ($userModel->deleteUser($id)) {
+                LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบข้อมูลบุคลากร ID: {$id}");
+                $_SESSION['success_msg'] = "ลบข้อมูลสำเร็จ";
+            } else {
+                $_SESSION['error_msg'] = "ไม่สามารถลบข้อมูลได้";
+            }
+        } catch (Exception $e) {
+            error_log('Staff delete failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถลบข้อมูลบุคลากรได้";
+        }
+
         header("Location: index.php?c=staff");
         exit;
     }
@@ -246,18 +285,9 @@ class StaffController {
             if (is_array($ids) && count($ids) > 0) {
                 $successCount = 0;
                 foreach ($ids as $id) {
-                    if ($id != $_SESSION['user']['id']) { 
-                        $target = $userModel->getUserById($id);
-                        $can_delete = true;
-                        
-                        if (!$is_global_admin && $target) {
-                            if ($current_role === 'SCHEDULER' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) $can_delete = false;
-                            if ($current_role === 'DIRECTOR' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) $can_delete = false;
-                        }
-
-                        if ($can_delete && $userModel->deleteUser($id)) {
-                            $successCount++;
-                        }
+                    $target = $userModel->getUserById($id);
+                    if ($target && $this->canManageTarget($target) && $userModel->deleteUser($id)) {
+                        $successCount++;
                     }
                 }
                 if ($successCount > 0) {
@@ -276,38 +306,35 @@ class StaffController {
     // เปิด/ปิด การใช้งาน (บัญชี)
     public function toggle() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['status'])) {
-            $db = (new Database())->getConnection();
-            $userModel = new UserModel($db);
-            $id = $_GET['id'];
-            $status = (int)$_GET['status'];
-            
-            $current_role = strtoupper($_SESSION['user']['role']);
-            $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR']);
 
-            if ($id != $_SESSION['user']['id']) {
-                $target = $userModel->getUserById($id);
-                $can_toggle = true;
-                
-                if (!$is_global_admin && $target) {
-                    if ($current_role === 'SCHEDULER' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) $can_toggle = false;
-                    if ($current_role === 'DIRECTOR' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) $can_toggle = false;
-                }
-
-                if ($can_toggle) {
-                    $userModel->updateStatus($id, $status);
-                    $actionTxt = $status === 1 ? "เปิด" : "ระงับ";
-                    
-                    // 🌟 บันทึก Log
-                    LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "{$actionTxt}การใช้งานบัญชีบุคลากร ID: {$id}");
-                    $_SESSION['success_msg'] = "เปลี่ยนสถานะสำเร็จ";
-                } else {
-                    $_SESSION['error_msg'] = "ปฏิเสธ: ไม่มีสิทธิ์ระงับบัญชีระดับสูง";
-                }
-            } else {
-                $_SESSION['error_msg'] = "ไม่สามารถระงับบัญชีตัวเองได้";
-            }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            exit('Method Not Allowed');
         }
+
+        $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+        $status = filter_var($_POST['status'] ?? null, FILTER_VALIDATE_INT);
+
+        if (!$id || !in_array($status, [0, 1], true)) {
+            $_SESSION['error_msg'] = "ข้อมูลสถานะบัญชีไม่ถูกต้อง";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+        $target = $userModel->getUserById($id);
+
+        if (!$target || !$this->canManageTarget($target)) {
+            $_SESSION['error_msg'] = "ปฏิเสธ: ไม่มีสิทธิ์เปลี่ยนสถานะบัญชีนี้";
+        } else {
+            $userModel->updateStatus($id, $status);
+            $actionTxt = $status === 1 ? "เปิด" : "ระงับ";
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "{$actionTxt}การใช้งานบัญชีบุคลากร ID: {$id}");
+            $_SESSION['success_msg'] = "เปลี่ยนสถานะสำเร็จ";
+        }
+
         header("Location: index.php?c=staff");
         exit;
     }
@@ -319,11 +346,24 @@ class StaffController {
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
-            $id = $_POST['id'] ?? 0;
-            $status = (int)($_POST['status'] ?? 1);
+            $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+            $status = filter_var($_POST['status'] ?? null, FILTER_VALIDATE_INT);
+
+            if (!$id || !in_array($status, [0, 1], true)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Invalid data']);
+                exit;
+            }
+
+            $userModel = new UserModel($db);
+            $target = $userModel->getUserById($id);
+            if (!$target || !$this->canManageTarget($target)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Forbidden']);
+                exit;
+            }
 
             try {
-                // บันทึกลงฐานข้อมูล (คอลัมน์ show_in_roster)
                 $stmt = $db->prepare("UPDATE users SET show_in_roster = ? WHERE id = ?");
                 $success = $stmt->execute([$status, $id]);
 
