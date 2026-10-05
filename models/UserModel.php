@@ -263,6 +263,19 @@ class UserModel {
         }
     }
 
+    public function getSignatureRecord(int $id): ?array {
+        $query = "SELECT signature_path, signature_sha256, signature_method, signature_updated_at
+                  FROM " . $this->table_name . "
+                  WHERE id = :id AND deleted_at IS NULL
+                  LIMIT 1";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
     public function clearSignature(int $id): bool {
         $query = "UPDATE " . $this->table_name . "
                   SET signature_path = NULL,
