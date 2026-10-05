@@ -487,6 +487,92 @@ if (is_file($backupViewPath)) {
     }
 }
 
+// 5.10) Production observability and retry reliability guards.
+$observabilityFiles = [
+    'lib/AppMonitor.php',
+    'lib/ObservabilityService.php',
+    'lib/BackupRetention.php',
+    'models/AppEventModel.php',
+    'models/BackgroundJobModel.php',
+    'controllers/ObservabilityController.php',
+    'views/observability/index.php',
+    'scripts/job_worker.php',
+    'scripts/schedule_jobs.php',
+    'database/migrations/20261005_observability_reliability.sql',
+];
+foreach ($observabilityFiles as $relativePath) {
+    if (!is_file($root . '/' . $relativePath)) {
+        addError($errors, 'Missing observability/reliability file: ' . $relativePath);
+    }
+}
+
+$frontMonitorPath = $root . '/index.php';
+if (is_file($frontMonitorPath)) {
+    $frontMonitor = (string) file_get_contents($frontMonitorPath);
+    if (strpos($frontMonitor, "require_once 'lib/AppMonitor.php';") === false
+        || strpos($frontMonitor, 'AppMonitor::register();') === false) {
+        addError($errors, 'index.php: global AppMonitor must remain registered');
+    }
+}
+
+$appMonitorPath = $root . '/lib/AppMonitor.php';
+if (is_file($appMonitorPath)) {
+    $appMonitor = (string) file_get_contents($appMonitorPath);
+    foreach (['set_exception_handler', 'register_shutdown_function', '[REDACTED]', 'fingerprint'] as $token) {
+        if (strpos($appMonitor, $token) === false) {
+            addError($errors, "lib/AppMonitor.php: missing monitoring safety token {$token}");
+        }
+    }
+}
+
+$backgroundJobPath = $root . '/models/BackgroundJobModel.php';
+if (is_file($backgroundJobPath)) {
+    $backgroundJob = (string) file_get_contents($backgroundJobPath);
+    foreach (['GET_LOCK', 'claimNext', 'retryFailed', 'recoverStale', 'max_attempts'] as $token) {
+        if (strpos($backgroundJob, $token) === false) {
+            addError($errors, "models/BackgroundJobModel.php: missing durable queue token {$token}");
+        }
+    }
+}
+
+$notificationModelPath = $root . '/models/NotificationModel.php';
+if (is_file($notificationModelPath)) {
+    $notificationModel = (string) file_get_contents($notificationModelPath);
+    if (strpos($notificationModel, 'queueNotification(') === false
+        || strpos($notificationModel, "'IN_APP_NOTIFICATION'") === false) {
+        addError($errors, 'models/NotificationModel.php: retryable notification queue API must remain available');
+    }
+}
+
+$observabilityControllerPath = $root . '/controllers/ObservabilityController.php';
+if (is_file($observabilityControllerPath)) {
+    $observabilityController = (string) file_get_contents($observabilityControllerPath);
+    if (strpos($observabilityController, "['ADMIN', 'SUPERADMIN']") === false
+        || strpos($observabilityController, 'security_is_valid_post_csrf()') === false) {
+        addError($errors, 'controllers/ObservabilityController.php: admin authorization and CSRF protection are required');
+    }
+}
+
+$observabilityViewPath = $root . '/views/observability/index.php';
+if (is_file($observabilityViewPath)) {
+    $observabilityView = (string) file_get_contents($observabilityViewPath);
+    foreach (['payload_json', 'context_json'] as $sensitiveRawField) {
+        if (strpos($observabilityView, $sensitiveRawField) !== false) {
+            addError($errors, "views/observability/index.php: raw sensitive field must not be rendered: {$sensitiveRawField}");
+        }
+    }
+}
+
+foreach (['scripts/job_worker.php', 'scripts/schedule_jobs.php'] as $cliScript) {
+    $fullPath = $root . '/' . $cliScript;
+    if (is_file($fullPath)) {
+        $cliContent = (string) file_get_contents($fullPath);
+        if (strpos($cliContent, "PHP_SAPI !== 'cli'") === false) {
+            addError($errors, "{$cliScript}: reliability worker tooling must remain CLI-only");
+        }
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
@@ -495,7 +581,8 @@ $mutationActions = [
     'delete_notif','delete_all_notif','logout','import_csv','do_backup',
     'do_server_backup','delete_server_backup','save_holiday','toggle_holiday',
     'delete_holiday','update_system','save_hospital','test_line','test_line_notify',
-    'complete_followup','create_snapshot','restore_snapshot'
+    'complete_followup','create_snapshot','restore_snapshot',
+    'resolve_event','retry_job','capture_health'
 ];
 $mutationAlternation = implode('|', array_map('preg_quote', $mutationActions));
 $getMutationPattern = '/<a\b[^>]+href=[\'"][^\'"]*index\.php\?[^\'"]*(?:&|&amp;)a=(' . $mutationAlternation . ')(?:&|&amp;|[\'"])/i';
