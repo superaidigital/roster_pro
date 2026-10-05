@@ -144,15 +144,15 @@ foreach($hospitals_list as $h) {
                     ?>
                         <!-- เพิ่ม Data Attributes เพื่อให้ JS กรองข้อมูลง่ายขึ้น -->
                         <tr class="user-row" 
-                            data-id="<?= $user['id'] ?>" 
-                            data-hospital="<?= $user['hospital_id'] ?? 0 ?>" 
-                            data-role="<?= strtoupper($user['role']) ?>" 
-                            data-status="<?= $user['is_active'] ?? 1 ?>">
+                            data-id="<?= (int)$user['id'] ?>" 
+                            data-hospital="<?= (int)($user['hospital_id'] ?? 0) ?>" 
+                            data-role="<?= htmlspecialchars(strtoupper((string)$user['role']), ENT_QUOTES, 'UTF-8') ?>" 
+                            data-status="<?= (int)($user['is_active'] ?? 1) ?>">
                             
                             <td class="text-center"><i class="bi bi-grip-vertical drag-handle"></i></td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar-circle bg-<?= $theme ?> me-3"><?= $initial ?></div>
+                                    <div class="avatar-circle bg-<?= htmlspecialchars((string)$theme, ENT_QUOTES, 'UTF-8') ?> me-3"><?= htmlspecialchars((string)$initial, ENT_QUOTES, 'UTF-8') ?></div>
                                     <div>
                                         <div class="fw-bold text-dark user-name"><?= htmlspecialchars($user['name']) ?></div>
                                         <div class="small text-muted font-monospace user-username"><i class="bi bi-person-badge me-1"></i><?= htmlspecialchars($user['username'] ?? $user['phone']) ?></div>
@@ -191,11 +191,15 @@ foreach($hospitals_list as $h) {
                             <td class="text-center">
                                 <!-- Status Toggle -->
                                 <?php if($user['id'] != $_SESSION['user']['id']): ?>
-                                    <a href="index.php?c=users&a=toggle&id=<?= $user['id'] ?>&status=<?= ($user['is_active'] ?? 1) == 1 ? 0 : 1 ?>" 
-                                       class="btn btn-sm btn-light border <?= ($user['is_active'] ?? 1) == 1 ? 'text-success' : 'text-danger' ?> rounded-circle shadow-sm" 
-                                       title="<?= ($user['is_active'] ?? 1) == 1 ? 'ระงับการใช้งาน' : 'เปิดใช้งาน' ?>">
-                                        <i class="bi bi-power"></i>
-                                    </a>
+                                    <form action="index.php?c=users&a=toggle" method="POST" class="d-inline">
+                                        <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                        <input type="hidden" name="status" value="<?= ((int)($user['is_active'] ?? 1) === 1) ? 0 : 1 ?>">
+                                        <button type="submit"
+                                                class="btn btn-sm btn-light border <?= ((int)($user['is_active'] ?? 1) === 1) ? 'text-success' : 'text-danger' ?> rounded-circle shadow-sm"
+                                                title="<?= ((int)($user['is_active'] ?? 1) === 1) ? 'ระงับการใช้งาน' : 'เปิดใช้งาน' ?>">
+                                            <i class="bi bi-power"></i>
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
 
                                 <!-- Edit Button -->
@@ -219,7 +223,12 @@ foreach($hospitals_list as $h) {
                                 
                                 <!-- Delete Button -->
                                 <?php if($user['id'] != $_SESSION['user']['id']): ?>
-                                    <a href="index.php?c=users&a=delete&id=<?= $user['id'] ?>" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm" onclick="return confirm('ยืนยันการลบผู้ใช้งานท่านนี้ออกจากระบบ? ข้อมูลเวรจะถูกลบไปด้วย');"><i class="bi bi-trash-fill"></i></a>
+                                    <form action="index.php?c=users&a=delete" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบผู้ใช้งานท่านนี้ออกจากระบบ?');">
+                                        <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
                             </td>
                         </tr>
