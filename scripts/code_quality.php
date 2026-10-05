@@ -332,7 +332,7 @@ if (!is_file($officialExportPath)) {
 $frontControllerPath = $root . '/index.php';
 if (is_file($frontControllerPath)) {
     $frontController = (string) file_get_contents($frontControllerPath);
-    if (strpos($frontController, "$publicVerifyActions = ['index', 'revision'];") === false) {
+    if (strpos($frontController, "\$publicVerifyActions = ['index', 'revision'];") === false) {
         addError($errors, 'index.php: Public verification route must remain narrowly allowlisted');
     }
 }
