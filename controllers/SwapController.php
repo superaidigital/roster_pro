@@ -84,7 +84,7 @@ class SwapController {
             } else {
                 $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกคำขอ (คุณอาจจะกำลังกดส่งคำขอซ้ำซ้อน)";
             }
-        }
+
         header("Location: index.php?c=swap&a=index");
         exit;
     }
@@ -92,14 +92,30 @@ class SwapController {
     // 🌟 จัดการสถานะการกดปุ่ม (ยอมรับ/ปฏิเสธ/อนุมัติ/ยกเลิก)
     public function action() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['act'])) {
-            $db = (new Database())->getConnection();
-            $swapModel = new SwapModel($db);
-            
-            $swap_id = $_GET['id'];
-            $action = $_GET['act'];
-            $user_id = $_SESSION['user']['id'];
-            $role = strtoupper($_SESSION['user']['role']);
+
+        // State-changing swap actions must never be triggered by GET links.
+        // Global CSRF middleware in index.php validates every POST first.
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            exit('Method Not Allowed');
+        }
+
+        $swap_id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+        $action = is_string($_POST['act'] ?? null) ? strtolower($_POST['act']) : '';
+        $allowedActions = ['accept', 'reject', 'approve', 'decline', 'cancel'];
+
+        if (!$swap_id || !in_array($action, $allowedActions, true)) {
+            $_SESSION['error_msg'] = "ข้อมูลคำขอแลกเวรไม่ถูกต้อง";
+            header("Location: index.php?c=swap&a=index");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $swapModel = new SwapModel($db);
+
+        $user_id = (int) $_SESSION['user']['id'];
+        $role = strtoupper((string) $_SESSION['user']['role']);
             
             $swap = $swapModel->getSwapById($swap_id);
             
