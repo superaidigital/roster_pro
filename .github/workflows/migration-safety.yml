@@ -1,0 +1,132 @@
+name: Migration Safety
+
+on:
+  pull_request:
+  push:
+    branches:
+      - security-hardening-v1
+
+permissions:
+  contents: read
+
+jobs:
+  migration-safety:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_TIMEZONE: '+07:00'
+      APP_ENV: development
+      APP_BASE_URL: https://roster.example.test
+      ROSTER_CRON_KEY: ci-only-secret-key-0123456789abcdef
+      DEPLOY_ACTOR: github-actions
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, zlib
+          coverage: none
+
+      - name: Install MariaDB client
+        run: sudo apt-get update && sudo apt-get install -y mariadb-client
+
+      - name: Create migration test databases
+        run: |
+          mariadb -h 127.0.0.1 -P 3306 -uroot -proot -e "
+            CREATE DATABASE roster_migration_unit CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            CREATE DATABASE roster_upgrade_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            CREATE DATABASE roster_fresh_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          "
+
+      - name: Test migration manager failure safety
+        env:
+          DB_NAME: roster_migration_unit
+        run: php tests/migration_manager_test.php
+
+      - name: Load legacy upgrade fixture
+        run: mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_upgrade_test < tests/fixtures/legacy_upgrade_base.sql
+
+      - name: Run idempotent legacy bridge
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/migrate_legacy.php
+
+      - name: Preflight legacy upgrade
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/preflight.php
+
+      - name: Back up legacy database before migration
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/backup_database.php --label=ci_upgrade
+
+      - name: Verify pre-migration backup checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          backup="$(ls -1t storage/backups/roster_upgrade_test_ci_upgrade_*.sql.gz | head -n1)"
+          php scripts/verify_backup.php --file="$backup"
+
+      - name: Apply tracked upgrade migrations
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/migrate.php
+
+      - name: Verify upgrade migration status
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/migrate.php --status
+
+      - name: Verify upgraded schema
+        run: |
+          mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_upgrade_test -e "
+            SELECT COUNT(*) AS applied_migrations
+              FROM schema_migrations
+             WHERE status = 'applied';
+            SHOW COLUMNS FROM roster_revisions LIKE 'holidays_json';
+            SHOW COLUMNS FROM roster_revisions LIKE 'verification_code';
+          "
+
+      - name: Health check upgraded database
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/health_check.php
+
+      - name: Test guarded deployment orchestrator
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/deploy_database.php --confirm=DEPLOY
+
+      - name: Load canonical fresh schema
+        run: mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_fresh_test < database/schema.sql
+
+      - name: Baseline fresh install migration history
+        env:
+          DB_NAME: roster_fresh_test
+        run: php scripts/migrate.php --baseline --confirm=SCHEMA-LOADED
+
+      - name: Verify fresh install health
+        env:
+          DB_NAME: roster_fresh_test
+        run: php scripts/health_check.php
