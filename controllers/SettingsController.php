@@ -313,6 +313,9 @@ class SettingsController {
             }
         } catch (Exception $e) {}
 
+        $maintenance_state = MaintenanceMode::safeStatus();
+        $release_id = ReleaseIdentity::current();
+
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
         require_once 'views/settings/system.php';
@@ -370,7 +373,7 @@ class SettingsController {
             }
             $status_data['performance_cache_files'] = count($cacheFiles);
             $status_data['performance_cache_mb'] = round($cacheBytes / 1024 / 1024, 2);
-            $maintenanceState = MaintenanceMode::status();
+            $maintenanceState = MaintenanceMode::safeStatus();
             $status_data['maintenance_enabled'] = (bool)($maintenanceState['enabled'] ?? false);
             $status_data['maintenance_started_at'] = (string)($maintenanceState['started_at'] ?? '');
             $status_data['release_id'] = ReleaseIdentity::current();
@@ -406,7 +409,7 @@ class SettingsController {
                 $settings_data['line_notify_on_request'] = isset($settings_data['line_notify_on_request']) ? '1' : '0';
                 $settings_data['line_notify_on_holiday'] = isset($settings_data['line_notify_on_holiday']) ? '1' : '0';
             } elseif ($section === 'general') {
-                $settings_data['maintenance_mode'] = isset($settings_data['maintenance_mode']) ? '1' : '0';
+                unset($settings_data['maintenance_mode']);
             }
 
             foreach ($settings_data as $key => $value) {
