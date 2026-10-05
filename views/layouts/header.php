@@ -127,7 +127,7 @@ if (isset($_SESSION['user'])) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <meta name="csrf-token" content="<?= htmlspecialchars(security_csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
-<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v18">
+<link rel="stylesheet" href="public/css/style.css?v=20261005-ui-v19">
     <link rel="stylesheet" href="public/css/ui-proportions.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/themes.css?v=20261004-ui-v16">
     <link rel="stylesheet" href="public/css/wizard.css?v=20261004-ui-v16">
@@ -185,11 +185,25 @@ $rpPage = $rpPageMap[$rpController] ?? ['Roster Pro', 'ระบบจัดก�
 <!-- 🌟 1. Top Navbar -->
 <nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4" aria-label="แถบนำทางด้านบน">
     <div class="rp-topbar-left d-flex align-items-center gap-2 gap-md-3 min-w-0">
-        <button class="nav-icon-btn rp-mobile-menu-btn" id="mobileSidebarToggleBtn" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูนำทาง">
-            <i class="bi bi-list fs-4"></i>
+        <button class="nav-icon-btn rp-sidebar-toggle rp-mobile-menu-btn"
+                id="mobileSidebarToggleBtn"
+                type="button"
+                data-bs-toggle="offcanvas"
+                data-bs-target="#mobileSidebar"
+                aria-controls="mobileSidebar"
+                aria-expanded="false"
+                aria-label="เปิดเมนูนำทาง"
+                title="เปิดเมนู">
+            <i class="bi bi-list" aria-hidden="true"></i>
         </button>
-        <button class="nav-icon-btn rp-desktop-menu-btn" id="sidebarToggleBtn" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง">
-            <i class="bi bi-list fs-4"></i>
+        <button class="nav-icon-btn rp-sidebar-toggle rp-desktop-menu-btn"
+                id="sidebarToggleBtn"
+                type="button"
+                aria-controls="desktopSidebar"
+                aria-expanded="true"
+                aria-label="ย่อเมนูด้านข้าง"
+                title="ย่อเมนูด้านข้าง">
+            <i class="bi bi-layout-sidebar-inset" data-rp-sidebar-icon aria-hidden="true"></i>
         </button>
         
         <div class="rp-page-context d-flex align-items-center gap-3 min-w-0">
