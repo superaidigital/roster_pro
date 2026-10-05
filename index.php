@@ -4,6 +4,7 @@
 require_once 'config/security.php';
 require_once 'lib/AppMonitor.php';
 require_once 'lib/PerformanceMonitor.php';
+require_once 'lib/MaintenanceMode.php';
 
 // 🌟 1. เริ่มต้น Session และตั้งค่าพื้นฐาน
 security_start_session();
@@ -40,9 +41,15 @@ if (!security_is_valid_route_token($c) || !security_is_valid_route_token($a)) {
 // Public routes are intentionally narrow.
 // Verification exposes only minimal official-document metadata; roster contents remain private.
 $publicVerifyActions = ['index', 'revision'];
+$publicHealthActions = ['index', 'live', 'ready'];
+$isHealthRoute = $c === 'health' && in_array($a, $publicHealthActions, true);
 $isPublicRoute = $c === 'auth'
     || ($c === 'verify' && in_array($a, $publicVerifyActions, true))
-    || ($c === 'health' && $a === 'index');
+    || $isHealthRoute;
+
+if (!$isHealthRoute && MaintenanceMode::isEnabled()) {
+    MaintenanceMode::renderUnavailable();
+}
 
 if (!$isPublicRoute && !isset($_SESSION['user'])) {
     header("Location: index.php?c=auth&a=index");
