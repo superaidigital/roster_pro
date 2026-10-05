@@ -49,7 +49,7 @@ if ($actor === '') {
 $actor = mb_substr($actor, 0, 190, 'UTF-8');
 
 try {
-    $db = (new Database())->getConnection();
+    $db = (new Database())->getConnectionOrThrow();
     $manager = new MigrationManager($db);
 
     $printStatus = static function(MigrationManager $manager): array {
