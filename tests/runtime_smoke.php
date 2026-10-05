@@ -474,6 +474,20 @@ ok(
 ok(($signatureMeta['signature_method'] ?? '') === 'DRAW', 'signature capture method persisted');
 ok(!empty($signatureMeta['signature_updated_at']), 'signature update timestamp persisted');
 
+$signatureReadback = $users->getSignatureRecord($uid1);
+ok(is_array($signatureReadback), 'signature readback helper returns saved record');
+ok(
+    ElectronicSignature::isValid((string)($signatureReadback['signature_path'] ?? '')),
+    'signature readback helper returns a renderable image'
+);
+ok(
+    hash_equals(
+        (string)($signatureMeta['signature_sha256'] ?? ''),
+        (string)($signatureReadback['signature_sha256'] ?? '')
+    ),
+    'signature readback preserves SHA-256 integrity metadata'
+);
+
 $shiftModel->addShift('2026-11-05', 'บ', $uid1, $hospitalId);
 $shiftModel->addShift('2026-11-06', 'ร', $uid2, $hospitalId);
 
