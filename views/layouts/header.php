@@ -7,7 +7,8 @@ $app_name = "Roster Pro"; // ค่าเริ่มต้นกรณีหา
 $app_subtitle = "ระบบจัดการตารางปฏิบัติงานและลางาน"; // 🌟 ค่าเริ่มต้นของชื่อย่อย
 
 // ========================================================
-// 🛑 ดึงตั้งค่าระบบจากฐานข้อมูล และตรวจสอบ Maintenance Mode
+// ดึงตั้งค่าระบบและตรวจสอบสถานะบัญชี
+// Production Maintenance ถูกควบคุมที่ front controller ผ่าน MaintenanceMode
 // ========================================================
 require_once 'config/database.php';
 
@@ -41,24 +42,7 @@ try {
         
         $current_user_id = $_SESSION['user']['id'];
         
-        // 1. เช็ค Maintenance Mode
-        $is_maintenance = $sys_settings['maintenance_mode'] ?? '0';
-        if ($is_maintenance === '1' && !in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) {
-            
-            // 📝 บันทึก Log ก่อนล้าง Session
-            if (class_exists('LogsController')) {
-                LogsController::addLog($db_check, $current_user_id, 'LOGOUT', "ถูกบังคับออกจากระบบ (เข้าสู่ Maintenance Mode)");
-            }
-            
-            session_unset();
-            session_destroy();
-            session_start(); 
-            $_SESSION['error_msg'] = "🚧 ขณะนี้ระบบกำลังอยู่ในช่วงปิดปรับปรุง (Maintenance Mode) ขออภัยในความไม่สะดวกครับ";
-            header("Location: index.php");
-            exit;
-        }
-
-        // 2. 🌟 เช็คสถานะการระงับบัญชี (is_active) แบบ Real-time
+        // เช็คสถานะการระงับบัญชี (is_active) แบบ Real-time
         try {
             $stmt_status = $db_check->prepare("SELECT is_active FROM users WHERE id = ?");
             $stmt_status->execute([$current_user_id]);
