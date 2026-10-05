@@ -35,7 +35,6 @@ try {
             'idx_logs_created_action_user',
         ],
         'roster_status' => [
-            'hosp_month_unique',
             'idx_roster_status_month_status_hospital',
         ],
         'shift_swaps' => [
