@@ -24,8 +24,25 @@ final class MaintenanceMode {
         ];
     }
 
+    public static function safeStatus(): array {
+        try {
+            return self::status();
+        } catch (Throwable $e) {
+            error_log('Maintenance control plane unavailable: ' . $e->getMessage());
+            return [
+                'enabled' => true,
+                'reason' => 'ระบบควบคุมการเปิดใช้งานไม่พร้อม จึงหยุดรับ traffic ชั่วคราว',
+                'started_at' => '',
+                'retry_after' => 120,
+                'release_id' => '',
+                'actor' => '',
+                'control_plane_error' => true,
+            ];
+        }
+    }
+
     public static function isEnabled(): bool {
-        return (bool)(self::status()['enabled'] ?? false);
+        return (bool)(self::safeStatus()['enabled'] ?? false);
     }
 
     public static function enable(
