@@ -145,6 +145,49 @@ $header_page_icon = $page_context[2];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="csrf-token" content="<?= htmlspecialchars((string)($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+
+    <script>
+    // Central CSRF client helper:
+    // - POST forms receive a hidden _csrf field at submit time.
+    // - same-origin fetch/XHR-style requests receive X-CSRF-Token automatically.
+    (() => {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        const token = meta ? meta.content : '';
+        if (!token) return;
+
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement)) return;
+            if ((form.method || 'get').toLowerCase() !== 'post') return;
+
+            let input = form.querySelector('input[name="_csrf"]');
+            if (!input) {
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = '_csrf';
+                form.appendChild(input);
+            }
+            input.value = token;
+        }, true);
+
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = (input, init = {}) => {
+            const requestUrl = input instanceof Request ? input.url : String(input);
+            const url = new URL(requestUrl, window.location.href);
+            const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+
+            if (url.origin === window.location.origin && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+                const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+                headers.set('X-CSRF-Token', token);
+                init = { ...init, headers };
+            }
+
+            return nativeFetch(input, init);
+        };
+    })();
+    </script>
+
     <!-- 🌟 ดึงชื่อแอปมาแสดงที่ชื่อแท็บเบราว์เซอร์ -->
     <title><?= htmlspecialchars($app_name) ?> - <?= htmlspecialchars($app_subtitle) ?></title>
     
