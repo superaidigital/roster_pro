@@ -1,0 +1,4 @@
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS signature_sha256 CHAR(64) DEFAULT NULL AFTER signature_path,
+  ADD COLUMN IF NOT EXISTS signature_method VARCHAR(20) DEFAULT NULL AFTER signature_sha256,
+  ADD COLUMN IF NOT EXISTS signature_updated_at DATETIME DEFAULT NULL AFTER signature_method;
