@@ -1,4 +1,5 @@
 <?php
+require_once 'lib/ElectronicSignature.php';
 // ที่อยู่ไฟล์: controllers/AjaxController.php
 
 require_once 'config/database.php';
@@ -599,9 +600,9 @@ class AjaxController {
             $signatureStmt = $db->prepare("SELECT signature_path FROM users WHERE id = ? LIMIT 1");
             $signatureStmt->execute([(int)$_SESSION['user']['id']]);
             $actorSignature = trim((string)($signatureStmt->fetchColumn() ?: ''));
-            if ($actorSignature === '') {
-                $_SESSION['error_msg'] = 'กรุณาบันทึกลายเซ็นอิเล็กทรอนิกส์ในโปรไฟล์ก่อนส่งหรืออนุมัติตารางเวร';
-                header("Location: index.php?c=profile");
+            if (!ElectronicSignature::isValid($actorSignature)) {
+                $_SESSION['error_msg'] = 'กรุณาบันทึกลายเซ็นอิเล็กทรอนิกส์ที่ถูกต้องในโปรไฟล์ก่อนส่งหรืออนุมัติตารางเวร';
+                header("Location: index.php?c=profile#nav-signature");
                 exit;
             }
         }
