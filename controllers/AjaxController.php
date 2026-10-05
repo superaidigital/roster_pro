@@ -962,15 +962,90 @@ class AjaxController {
     }
 
     public function markNotificationAsRead() {
-        error_reporting(0); header('Content-Type: application/json');
-        if(!isset($_SESSION['user_id']) && !isset($_SESSION['user'])) { echo json_encode(['status' => 'error']); return; }
-        if (!isset($_POST['noti_id'])) { echo json_encode(['status' => 'error', 'message' => 'Missing ID']); return; }
-        $userId = $_SESSION['user_id'] ?? $_SESSION['user']['id'];
-        $notiId = $_POST['noti_id'];
+        error_reporting(0);
+        header('Content-Type: application/json; charset=utf-8');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || (!isset($_SESSION['user_id']) && !isset($_SESSION['user']))) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error']);
+            exit;
+        }
+
+        $notiId = filter_var($_POST['noti_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$notiId) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Invalid ID']);
+            exit;
+        }
+
+        $userId = (int)($_SESSION['user_id'] ?? $_SESSION['user']['id']);
         $db = (new Database())->getConnection();
         $notificationModel = new NotificationModel($db);
         $result = $notificationModel->markAsRead($notiId, $userId);
-        echo json_encode(['status' => $result ? 'success' : 'error']); exit;
+
+        echo json_encode(['status' => $result ? 'success' : 'error']);
+        exit;
+    }
+
+    public function deleteNotification() {
+        error_reporting(0);
+        header('Content-Type: application/json; charset=utf-8');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error']);
+            exit;
+        }
+
+        $notiId = filter_var($_POST['noti_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$notiId) {
+            http_response_code(400);
+            echo json_encode(['status' => 'error', 'message' => 'Invalid ID']);
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+        $result = $notificationModel->deleteForUser($notiId, (int)$_SESSION['user']['id']);
+
+        echo json_encode(['status' => $result ? 'success' : 'error']);
+        exit;
+    }
+
+    public function markAllNotificationsAsRead() {
+        error_reporting(0);
+        header('Content-Type: application/json; charset=utf-8');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error']);
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+        $result = $notificationModel->markAllAsRead((int)$_SESSION['user']['id']);
+
+        echo json_encode(['status' => $result ? 'success' : 'error']);
+        exit;
+    }
+
+    public function deleteAllNotifications() {
+        error_reporting(0);
+        header('Content-Type: application/json; charset=utf-8');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
+            http_response_code(401);
+            echo json_encode(['status' => 'error']);
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $notificationModel = new NotificationModel($db);
+        $result = $notificationModel->deleteAllForUser((int)$_SESSION['user']['id']);
+
+        echo json_encode(['status' => $result ? 'success' : 'error']);
+        exit;
     }
 }
 ?>
