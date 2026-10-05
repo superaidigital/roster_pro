@@ -26,7 +26,7 @@ $settings = $settings ?? [];
     <!-- 🌟 แจ้งเตือนสถานะ -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert alert-success border-0 shadow-sm rounded-4 py-3 px-4 mb-4 d-flex align-items-center">
-            <i class="bi bi-check-circle-fill me-3 fs-4"></i> <div class="fw-bold"><?= $_SESSION['success_msg'] ?></div>
+            <i class="bi bi-check-circle-fill me-3 fs-4"></i> <div class="fw-bold"><?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
