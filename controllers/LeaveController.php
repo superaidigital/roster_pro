@@ -8,6 +8,7 @@ require_once 'models/UserModel.php';
 require_once 'models/HolidayModel.php';
 require_once 'models/NotificationModel.php';
 require_once 'controllers/LogsController.php'; // 🌟 ระบบ Log
+require_once 'lib/SecureUpload.php';
 
 class LeaveController {
 
@@ -284,60 +285,28 @@ $leaveModel = new LeaveModel($db);
                 }
 
                 if ($hasUpload) {
-                    $uploadError = (int)($upload['error'] ?? UPLOAD_ERR_NO_FILE);
-                    $tmpName = (string)($upload['tmp_name'] ?? '');
-                    $size = (int)($upload['size'] ?? 0);
-
-                    if ($uploadError !== UPLOAD_ERR_OK || $tmpName === '' || !is_uploaded_file($tmpName)) {
-                        $_SESSION['error_msg'] = "อัปโหลดใบรับรองแพทย์ไม่สำเร็จ กรุณาลองใหม่";
-                        header("Location: index.php?c=leave&a=index");
-                        exit;
-                    }
-
-                    if ($size <= 0 || $size > 5 * 1024 * 1024) {
-                        $_SESSION['error_msg'] = "ไฟล์ใบรับรองแพทย์ต้องมีขนาดไม่เกิน 5 MB";
-                        header("Location: index.php?c=leave&a=index");
-                        exit;
-                    }
-
-                    $finfo = new finfo(FILEINFO_MIME_TYPE);
-                    $mime = (string)$finfo->file($tmpName);
-                    $allowedMime = [
-                        'image/jpeg' => 'jpg',
-                        'image/png' => 'png',
-                        'application/pdf' => 'pdf',
-                    ];
-
-                    if (!isset($allowedMime[$mime])) {
-                        $_SESSION['error_msg'] = "รองรับใบรับรองแพทย์เฉพาะ JPG, PNG หรือ PDF เท่านั้น";
-                        header("Location: index.php?c=leave&a=index");
-                        exit;
-                    }
-
-                    $upload_dir = 'storage/private/med_certs/';
-                    if (!is_dir($upload_dir) && !mkdir($upload_dir, 0750, true) && !is_dir($upload_dir)) {
-                        $_SESSION['error_msg'] = "ไม่สามารถเตรียมพื้นที่จัดเก็บใบรับรองแพทย์ได้";
-                        header("Location: index.php?c=leave&a=index");
-                        exit;
-                    }
-
                     try {
-                        $randomName = bin2hex(random_bytes(16));
+                        $stored = SecureUpload::store(
+                            $upload,
+                            'storage/private/med_certs',
+                            [
+                                'image/jpeg' => 'jpg',
+                                'image/png' => 'png',
+                                'application/pdf' => 'pdf',
+                            ],
+                            5 * 1024 * 1024,
+                            'cert_' . $user_id,
+                            true
+                        );
+
+                        $has_med_cert = 1;
+                        $med_cert_path = (string)$stored['path'];
                     } catch (Throwable $e) {
-                        $randomName = hash('sha256', uniqid((string)$user_id, true));
-                    }
-
-                    $new_name = 'cert_' . $user_id . '_' . $randomName . '.' . $allowedMime[$mime];
-                    $target_file = $upload_dir . $new_name;
-
-                    if (!move_uploaded_file($tmpName, $target_file)) {
-                        $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการอัปโหลดไฟล์ใบรับรองแพทย์";
+                        error_log('Medical certificate upload rejected: ' . $e->getMessage());
+                        $_SESSION['error_msg'] = "อัปโหลดใบรับรองแพทย์ไม่สำเร็จ รองรับเฉพาะ JPG, PNG หรือ PDF ขนาดไม่เกิน 5 MB";
                         header("Location: index.php?c=leave&a=index");
                         exit;
                     }
-
-                    $has_med_cert = 1;
-                    $med_cert_path = $target_file;
                 }
             }
 
