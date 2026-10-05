@@ -150,7 +150,7 @@ $release_id = $release_id ?? 'unknown';
             <a href="#" class="setting-card p-4" data-bs-toggle="modal" data-bs-target="#generalSettingsModal">
                 <div class="icon-box grad-blue"><i class="bi bi-sliders"></i></div>
                 <div class="card-title-modern">ข้อมูลทั่วไปของระบบ</div>
-                <p class="card-text-modern">ตั้งค่าชื่อระบบ เปิด-ปิดโหมดซ่อมบำรุง และการตั้งค่าทำงานพื้นฐาน</p>
+                <p class="card-text-modern">ตั้งค่าชื่อระบบ ตรวจสถานะ Maintenance/Cutover และการตั้งค่าทำงานพื้นฐาน</p>
             </a>
         </div>
 
