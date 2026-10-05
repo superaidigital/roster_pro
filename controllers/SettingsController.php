@@ -375,12 +375,37 @@ class SettingsController {
             $insert_stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)");
             $update_stmt = $db->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
 
+            if (!is_array($settings_data)) {
+                throw new RuntimeException('Invalid settings payload.');
+            }
+
             if ($section === 'line_notify') {
+                $allowedKeys = [
+                    'line_notify_token',
+                    'line_notify_on_submit',
+                    'line_notify_on_request',
+                    'line_notify_on_holiday',
+                ];
+                $settings_data = array_intersect_key($settings_data, array_flip($allowedKeys));
+
                 $settings_data['line_notify_on_submit'] = isset($settings_data['line_notify_on_submit']) ? '1' : '0';
                 $settings_data['line_notify_on_request'] = isset($settings_data['line_notify_on_request']) ? '1' : '0';
                 $settings_data['line_notify_on_holiday'] = isset($settings_data['line_notify_on_holiday']) ? '1' : '0';
+
+                $token = trim((string)($settings_data['line_notify_token'] ?? ''));
+                if ($token === '') {
+                    unset($settings_data['line_notify_token']);
+                } else {
+                    $settings_data['line_notify_token'] = mb_substr($token, 0, 500, 'UTF-8');
+                }
             } elseif ($section === 'general') {
+                $allowedKeys = ['system_name', 'system_short_name'];
+                $settings_data = array_intersect_key($settings_data, array_flip($allowedKeys));
+                $settings_data['system_name'] = mb_substr(trim((string)($settings_data['system_name'] ?? '')), 0, 150, 'UTF-8');
+                $settings_data['system_short_name'] = mb_substr(trim((string)($settings_data['system_short_name'] ?? '')), 0, 80, 'UTF-8');
                 unset($settings_data['maintenance_mode']);
+            } else {
+                throw new RuntimeException('Unsupported settings section.');
             }
 
             foreach ($settings_data as $key => $value) {
