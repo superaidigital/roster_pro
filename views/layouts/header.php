@@ -108,6 +108,37 @@ if (isset($_SESSION['user'])) {
         }
     }
 }
+
+// ========================================================
+// 🌟 Context ของหน้าปัจจุบันสำหรับ Topbar
+// ========================================================
+$current_controller = strtolower($_GET['c'] ?? 'dashboard');
+$current_action = strtolower($_GET['a'] ?? 'index');
+
+$page_context_map = [
+    'dashboard' => ['หน้าภาพรวม', 'สรุปข้อมูลสำคัญและงานที่ต้องดำเนินการ', 'bi-grid-1x2-fill'],
+    'roster' => ['ตารางปฏิบัติงาน', 'จัดเวร ตรวจสอบ และติดตามสถานะการอนุมัติ', 'bi-calendar3'],
+    'report' => ['ติดตามการส่งเวร', 'ตรวจสอบสถานะและรายงานการจัดเวร', 'bi-graph-up-arrow'],
+    'leave' => ['ระบบจัดการวันลา', 'ยื่นลา อนุมัติ และตรวจสอบสิทธิ์วันลา', 'bi-calendar2-check'],
+    'staff' => ['จัดการบุคลากร', 'จัดการข้อมูลและสถานะบุคลากร', 'bi-people-fill'],
+    'users' => ['ฐานข้อมูลบุคลากร', 'จัดการบัญชีผู้ใช้และข้อมูลบุคลากร', 'bi-database-fill-gear'],
+    'hr' => ['ระบบงานบุคคล', 'บริหารข้อมูลบุคลากรและรายงานฝ่ายบุคคล', 'bi-person-vcard-fill'],
+    'settings' => ['ตั้งค่าระบบ', 'จัดการค่าพื้นฐานและการทำงานของระบบ', 'bi-sliders'],
+    'hospitals' => ['จัดการหน่วยบริการ', 'บริหารข้อมูล รพ.สต. และหน่วยบริการ', 'bi-building-fill'],
+    'profile' => ['ข้อมูลของฉัน', 'โปรไฟล์และตารางปฏิบัติงานส่วนบุคคล', 'bi-person-circle'],
+    'swap' => ['คำขอแลกเวร', 'ติดตามและจัดการคำขอแลกเวร', 'bi-arrow-left-right'],
+    'notification' => ['การแจ้งเตือน', 'ติดตามรายการแจ้งเตือนล่าสุด', 'bi-bell-fill'],
+];
+
+$page_context = $page_context_map[$current_controller] ?? ['Roster Pro', 'ระบบบริหารจัดการตารางปฏิบัติงาน', 'bi-window-stack'];
+
+if ($current_controller === 'profile' && $current_action === 'schedule') {
+    $page_context = ['ปฏิทินเวรของฉัน', 'ตรวจสอบตารางปฏิบัติงานส่วนบุคคล', 'bi-calendar-heart-fill'];
+}
+
+$header_page_title = $page_context[0];
+$header_page_subtitle = $page_context[1];
+$header_page_icon = $page_context[2];
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -299,39 +330,258 @@ if (isset($_SESSION['user'])) {
                 border-radius: 11px;
             }
         }
+
+        /* =========================================================
+           ROSTER PRO - LAYOUT V2
+           Brand zone + contextual topbar + boundary toggle
+           ========================================================= */
+        :root {
+            --rp-sidebar-expanded: 260px;
+            --rp-sidebar-collapsed: 76px;
+            --rp-sidebar-brand-bg: #0b2d40;
+            --rp-sidebar-brand-bg-2: #092638;
+        }
+
+        .top-navbar {
+            padding: 0 !important;
+            display: flex !important;
+            align-items: stretch !important;
+            background: #ffffff;
+            overflow: visible;
+        }
+
+        .topbar-brand-zone {
+            width: var(--rp-sidebar-expanded);
+            min-width: var(--rp-sidebar-expanded);
+            height: var(--navbar-height);
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            background: linear-gradient(180deg, var(--rp-sidebar-brand-bg) 0%, var(--rp-sidebar-brand-bg-2) 100%);
+            border-right: 1px solid rgba(255,255,255,.05);
+            transition: width .25s cubic-bezier(.4,0,.2,1), min-width .25s cubic-bezier(.4,0,.2,1);
+        }
+
+        .topbar-brand-link {
+            width: 100%;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            text-decoration: none;
+        }
+
+        .topbar-brand-logo {
+            width: 42px;
+            min-width: 42px;
+            height: 42px;
+            border-radius: 13px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg,#2dd4bf 0%,#22d3ee 100%);
+            color: #073044;
+            box-shadow: 0 8px 20px rgba(45,212,191,.18);
+            font-size: 19px;
+        }
+
+        .topbar-brand-copy {
+            min-width: 0;
+            overflow: hidden;
+            transition: opacity .18s ease, width .18s ease;
+        }
+
+        .topbar-brand-name {
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.15;
+            white-space: nowrap;
+        }
+
+        .topbar-brand-subtitle {
+            margin-top: 3px;
+            color: #89a4b4;
+            font-size: 9px;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .topbar-main {
+            min-width: 0;
+            flex: 1;
+            height: var(--navbar-height);
+            padding: 0 14px 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .topbar-left {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .topbar-context {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .topbar-context-icon {
+            width: 36px;
+            min-width: 36px;
+            height: 36px;
+            border-radius: 11px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1px solid #dbeafe;
+            font-size: 16px;
+        }
+
+        .topbar-context-copy {
+            min-width: 0;
+        }
+
+        .topbar-context-title {
+            margin: 0;
+            color: #172033;
+            font-family: 'Kanit', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.15;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .topbar-context-subtitle {
+            margin-top: 3px;
+            max-width: 520px;
+            color: #7b8798;
+            font-size: 10px;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-toggle-btn {
+            position: relative;
+            z-index: 2;
+            border-color: #d6e0ea;
+            box-shadow: 0 4px 12px rgba(15,23,42,.06);
+        }
+
+        .sidebar-toggle-btn::after {
+            content: '';
+            position: absolute;
+            left: -11px;
+            top: 50%;
+            width: 1px;
+            height: 32px;
+            transform: translateY(-50%);
+            background: #e5eaf0;
+        }
+
+        body.sidebar-collapsed-ui .topbar-brand-zone {
+            width: var(--rp-sidebar-collapsed);
+            min-width: var(--rp-sidebar-collapsed);
+            padding-left: 10px;
+            padding-right: 10px;
+            justify-content: center;
+        }
+
+        body.sidebar-collapsed-ui .topbar-brand-link {
+            justify-content: center;
+        }
+
+        body.sidebar-collapsed-ui .topbar-brand-copy {
+            display: none;
+        }
+
+        @media (max-width: 991.98px) {
+            .topbar-context-subtitle { display: none; }
+            .topbar-context-title { max-width: 220px; }
+        }
+
+        @media (max-width: 767.98px) {
+            .topbar-brand-zone {
+                display: none;
+            }
+
+            .topbar-main {
+                width: 100%;
+                height: var(--navbar-height);
+                padding: 0 10px;
+            }
+
+            .topbar-context-icon {
+                display: none;
+            }
+
+            .topbar-context-title {
+                max-width: 170px;
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .topbar-context-copy { display: none; }
+            .topbar-main { gap: 8px; }
+        }
     </style>
 </head>
 <body>
+<script>
+    // ใช้สถานะ Sidebar ก่อนวาด Topbar เพื่อลดอาการกระพริบของ Layout
+    if (localStorage.getItem('sidebarState') === 'collapsed') {
+        document.body.classList.add('sidebar-collapsed-ui');
+    }
+</script>
 
 <!-- 🌟 1. Top Navbar -->
-<nav class="top-navbar w-100 d-flex align-items-center justify-content-between px-3 px-md-4">
-    <div class="d-flex align-items-center gap-2 gap-md-3">
-        <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
-            <i class="bi bi-list fs-4"></i>
-        </button>
-        <button class="nav-icon-btn sidebar-toggle-btn d-none d-md-flex" id="sidebarToggleBtn" type="button" title="ย่อ/ขยายเมนู" aria-label="ย่อหรือขยายเมนูด้านข้าง">
-            <i class="bi bi-layout-sidebar-inset" id="sidebarToggleIcon"></i>
-        </button>
-        
-        <!-- 🌟 โลโก้และชื่อระบบ -->
-        <a href="index.php?c=dashboard" class="text-decoration-none d-flex align-items-center gap-2 ps-1">
-            <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width:40px; height:40px;">
-                <i class="bi bi-calendar2-check-fill fs-5"></i>
-            </div>
-            <div class="d-none d-sm-block">
-                <!-- ชื่อหลัก -->
-                <h5 class="mb-0 fw-bold text-primary" style="line-height: 1.2; letter-spacing: -0.5px;">
-                    <?= htmlspecialchars($app_name) ?>
-                </h5>
-                <!-- ชื่อย่อย (Subtitle) -->
-                <div class="text-muted fw-medium" style="font-size: 11px; letter-spacing: 0.3px; line-height: 1;">
-                    <?= htmlspecialchars($app_subtitle) ?>
-                </div>
-            </div>
+<nav class="top-navbar w-100">
+    <!-- Brand zone: จัดแนวให้ตรงกับ Sidebar -->
+    <div class="topbar-brand-zone d-none d-md-flex">
+        <a href="index.php?c=dashboard" class="topbar-brand-link">
+            <span class="topbar-brand-logo"><i class="bi bi-heart-pulse-fill"></i></span>
+            <span class="topbar-brand-copy">
+                <span class="topbar-brand-name d-block"><?= htmlspecialchars($app_name) ?></span>
+                <span class="topbar-brand-subtitle d-block"><?= htmlspecialchars($app_subtitle) ?></span>
+            </span>
         </a>
     </div>
 
-    <div class="d-flex align-items-center gap-1 gap-md-2">
+    <div class="topbar-main">
+        <div class="topbar-left">
+            <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" title="เปิดเมนู">
+                <i class="bi bi-list fs-4"></i>
+            </button>
+
+            <button class="nav-icon-btn sidebar-toggle-btn d-none d-md-flex" id="sidebarToggleBtn" type="button" title="ย่อ/ขยายเมนู" aria-label="ย่อหรือขยายเมนูด้านข้าง">
+                <i class="bi bi-layout-sidebar-inset" id="sidebarToggleIcon"></i>
+            </button>
+
+            <div class="topbar-context">
+                <span class="topbar-context-icon"><i class="bi <?= htmlspecialchars($header_page_icon) ?>"></i></span>
+                <span class="topbar-context-copy">
+                    <span class="topbar-context-title d-block"><?= htmlspecialchars($header_page_title) ?></span>
+                    <span class="topbar-context-subtitle d-block"><?= htmlspecialchars($header_page_subtitle) ?></span>
+                </span>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-1 gap-md-2">
         <?php if(isset($_SESSION['user'])): ?>
         
         <!-- 🔔 Notification Dropdown -->
@@ -435,6 +685,7 @@ if (isset($_SESSION['user'])) {
             </ul>
         </div>
         <?php endif; ?>
+        </div>
     </div>
 </nav>
 
