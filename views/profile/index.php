@@ -130,6 +130,91 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
         color: #334155;
         word-break: break-all;
     }
+
+    .pdpa-confirm-row {
+        display: flex;
+        align-items: flex-start;
+        gap: .8rem;
+        width: 100%;
+        margin: 0;
+        padding: .95rem 1rem;
+        border: 1px solid #bfdbfe;
+        border-radius: .8rem;
+        background: #eff6ff;
+        color: #1e293b;
+        cursor: pointer;
+        text-align: left;
+        transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
+    }
+
+    .pdpa-confirm-row:hover {
+        border-color: #93c5fd;
+        background: #eaf4ff;
+    }
+
+    .pdpa-confirm-row:focus-within {
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 .2rem rgba(59,130,246,.12);
+    }
+
+    .pdpa-confirm-checkbox {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 1.2rem;
+        height: 1.2rem;
+        flex: 0 0 1.2rem;
+        margin: .12rem 0 0;
+        border: 2px solid #93c5fd;
+        border-radius: .34rem;
+        background: #fff;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        outline: none;
+    }
+
+    .pdpa-confirm-checkbox::after {
+        content: '';
+        width: .56rem;
+        height: .32rem;
+        border-left: 2px solid #fff;
+        border-bottom: 2px solid #fff;
+        transform: rotate(-45deg) scale(0);
+        transform-origin: center;
+        transition: transform .12s ease;
+    }
+
+    .pdpa-confirm-checkbox:checked {
+        border-color: #2563eb;
+        background: #2563eb;
+    }
+
+    .pdpa-confirm-checkbox:checked::after {
+        transform: rotate(-45deg) scale(1);
+    }
+
+    .pdpa-confirm-checkbox:focus-visible {
+        box-shadow: 0 0 0 .18rem rgba(37,99,235,.18);
+    }
+
+    .pdpa-confirm-copy {
+        min-width: 0;
+        color: #1e293b;
+        font-size: .88rem;
+        font-weight: 700;
+        line-height: 1.55;
+    }
+
+    @media (max-width: 575.98px) {
+        .pdpa-confirm-row {
+            gap: .65rem;
+            padding: .85rem;
+        }
+
+        .pdpa-confirm-copy {
+            font-size: .83rem;
+        }
+    }
 </style>
 
 <div class="container-fluid px-3 px-md-4 py-4">
@@ -1100,12 +1185,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div class="fw-bold text-dark mb-1">สิทธิ์ของเจ้าของข้อมูล</div>
                         <div class="mb-3">ท่านสามารถติดต่อผู้ควบคุมข้อมูลส่วนบุคคล/หน่วยงานต้นสังกัดเพื่อขอใช้สิทธิตามกฎหมายคุ้มครองข้อมูลส่วนบุคคล ทั้งนี้เป็นไปตามเงื่อนไขและข้อยกเว้นที่กฎหมายกำหนด</div>
 
-                        <div class="form-check p-3 rounded-3" style="background:#eff6ff;border:1px solid #bfdbfe;">
-                            <input class="form-check-input" type="checkbox" value="1" id="pdpaSignatureConfirm">
-                            <label class="form-check-label fw-semibold text-dark" for="pdpaSignatureConfirm">
+                        <label class="pdpa-confirm-row" for="pdpaSignatureConfirm">
+                            <input class="pdpa-confirm-checkbox" type="checkbox" value="1" id="pdpaSignatureConfirm">
+                            <span class="pdpa-confirm-copy">
                                 ข้าพเจ้ายืนยันว่าลายเซ็นนี้เป็นของข้าพเจ้า และได้อ่าน/รับทราบรายละเอียดการประมวลผลข้อมูลส่วนบุคคลข้างต้นแล้ว
-                            </label>
-                        </div>
+                            </span>
+                        </label>
 
                         <div class="mt-2 text-muted" style="font-size:.75rem;">
                             เวอร์ชันประกาศ: ${signaturePdpaNoticeVersion?.value || '-'} · การกดยืนยันไม่ตัดสิทธิ์ของท่านตามกฎหมาย
