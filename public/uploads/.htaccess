@@ -1,0 +1,16 @@
+# Uploaded files are data, never executable code.
+Options -Indexes
+
+<IfModule mod_mime.c>
+    RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar
+    RemoveType .php .phtml .php3 .php4 .php5 .php7 .phar
+</IfModule>
+
+<FilesMatch "(?i)\.(?:php|phtml|php3|php4|php5|php7|phar|cgi|pl|py|sh|shtml|htaccess|ini)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Content-Security-Policy "default-src 'none'; sandbox"
+</IfModule>
