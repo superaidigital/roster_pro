@@ -571,9 +571,17 @@ if (empty($first_name_th) && empty($last_name_th) && !empty($target_user['name']
                             </div>
 
                             <div class="signature-preview mb-3">
-                                <?php if ($signature_is_valid): ?>
-                                    <img src="<?= htmlspecialchars((string)$target_user['signature_path'], ENT_QUOTES, 'UTF-8') ?>"
-                                         alt="ลายเซ็นอิเล็กทรอนิกส์ของ <?= htmlspecialchars((string)$target_user['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                <?php if ($signature_is_valid && $is_signature_owner): ?>
+                                    <img src="index.php?c=profile&amp;a=signature_image&amp;id=<?= (int)$target_user_id ?>&amp;v=<?= htmlspecialchars(substr((string)$signature_fingerprint, 0, 16), ENT_QUOTES, 'UTF-8') ?>"
+                                         alt="ลายเซ็นอิเล็กทรอนิกส์ของ <?= htmlspecialchars((string)$target_user['name'], ENT_QUOTES, 'UTF-8') ?>"
+                                         loading="eager"
+                                         decoding="async">
+                                <?php elseif ($signature_is_valid): ?>
+                                    <div class="text-center text-success">
+                                        <i class="bi bi-patch-check-fill display-6 opacity-75 d-block mb-2"></i>
+                                        <div class="fw-semibold">มีลายเซ็นอิเล็กทรอนิกส์แล้ว</div>
+                                        <div class="small text-muted">แสดงภาพเฉพาะเจ้าของบัญชีเพื่อความเป็นส่วนตัว</div>
+                                    </div>
                                 <?php else: ?>
                                     <div class="text-center text-muted">
                                         <i class="bi bi-pen display-6 opacity-25 d-block mb-2"></i>
