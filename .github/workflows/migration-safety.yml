@@ -113,6 +113,11 @@ jobs:
           DB_NAME: roster_upgrade_test
         run: php scripts/health_check.php
 
+      - name: Performance contract upgraded database
+        env:
+          DB_NAME: roster_upgrade_test
+        run: php scripts/performance_check.php
+
       - name: Run reliability scheduler
         env:
           DB_NAME: roster_upgrade_test
@@ -164,3 +169,8 @@ jobs:
         env:
           DB_NAME: roster_fresh_test
         run: php scripts/health_check.php
+
+      - name: Performance contract fresh install
+        env:
+          DB_NAME: roster_fresh_test
+        run: php scripts/performance_check.php
