@@ -1083,6 +1083,32 @@ ALTER TABLE `field_visits`
 ALTER TABLE `field_visit_photos`
   ADD CONSTRAINT `fk_field_photo_visit` FOREIGN KEY (`field_visit_id`) REFERENCES `field_visits` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- --------------------------------------------------------
+-- Disaster recovery drill history
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS disaster_recovery_drills (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  backup_filename VARCHAR(255) NOT NULL,
+  backup_sha256 CHAR(64) NOT NULL,
+  backup_created_at DATETIME NULL,
+  source_database VARCHAR(64) NOT NULL,
+  restore_database VARCHAR(64) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  started_at DATETIME NOT NULL,
+  completed_at DATETIME NOT NULL,
+  rpo_seconds INT UNSIGNED NULL,
+  rto_ms INT UNSIGNED NULL,
+  tables_verified INT UNSIGNED NOT NULL DEFAULT 0,
+  critical_tables_verified INT UNSIGNED NOT NULL DEFAULT 0,
+  failure_code VARCHAR(80) NULL,
+  failure_message VARCHAR(1000) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_dr_drills_completed (completed_at),
+  KEY idx_dr_drills_status_completed (status, completed_at),
+  KEY idx_dr_drills_backup_created (backup_created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
