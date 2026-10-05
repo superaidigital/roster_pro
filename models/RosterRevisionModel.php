@@ -400,7 +400,13 @@ class RosterRevisionModel {
         $latestStmt->execute([(int)$row['hospital_id'], (string)$row['month_year']]);
         $latest = $latestStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
-        $row['integrity_valid'] = $this->verifyRevision((int)$row['id'], (int)$row['hospital_id']);
+        $expectedVerificationCode = $this->verificationCodeForHash((string)$row['content_hash']);
+        $row['verification_code_valid'] = hash_equals(
+            $expectedVerificationCode,
+            (string)$row['verification_code']
+        );
+        $row['integrity_valid'] = $row['verification_code_valid']
+            && $this->verifyRevision((int)$row['id'], (int)$row['hospital_id']);
         $row['is_latest'] = $latest
             ? (int)$latest['id'] === (int)$row['id']
             : true;
