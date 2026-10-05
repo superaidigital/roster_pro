@@ -375,6 +375,118 @@ if (is_file($revisionExportPath)) {
     }
 }
 
+// 5.9) Production deployment and migration safety guards.
+$deploymentFiles = [
+    'lib/MigrationManager.php',
+    'lib/DeploymentHealth.php',
+    'scripts/migrate.php',
+    'scripts/preflight.php',
+    'scripts/backup_database.php',
+    'scripts/verify_backup.php',
+    'scripts/deploy_database.php',
+    'scripts/health_check.php',
+    'controllers/HealthController.php',
+    'database/migrations/manifest.json',
+];
+foreach ($deploymentFiles as $relativePath) {
+    if (!is_file($root . '/' . $relativePath)) {
+        addError($errors, 'Missing deployment safety file: ' . $relativePath);
+    }
+}
+
+$migrationManifestPath = $root . '/database/migrations/manifest.json';
+if (is_file($migrationManifestPath)) {
+    $manifest = json_decode((string) file_get_contents($migrationManifestPath), true);
+    $listedMigrations = is_array($manifest['migrations'] ?? null)
+        ? array_values($manifest['migrations'])
+        : [];
+
+    if (!$listedMigrations) {
+        addError($errors, 'database/migrations/manifest.json has no migrations');
+    } else {
+        if (count($listedMigrations) !== count(array_unique($listedMigrations))) {
+            addError($errors, 'database/migrations/manifest.json contains duplicate migrations');
+        }
+
+        $diskMigrations = array_map('basename', glob($root . '/database/migrations/*.sql') ?: []);
+        sort($diskMigrations);
+        $manifestSet = $listedMigrations;
+        sort($manifestSet);
+
+        if ($diskMigrations !== $manifestSet) {
+            addError($errors, 'Migration manifest must list every .sql migration exactly once');
+        }
+
+        $position = array_flip($listedMigrations);
+        $dependencyPairs = [
+            ['20261004_field_visits.sql', '20261004_field_followup.sql'],
+            ['20261005_roster_revisions.sql', '20261005_roster_revision_verification.sql'],
+        ];
+        foreach ($dependencyPairs as [$before, $after]) {
+            if (!isset($position[$before], $position[$after]) || $position[$before] >= $position[$after]) {
+                addError($errors, "Migration dependency order invalid: {$before} must precede {$after}");
+            }
+        }
+    }
+}
+
+$revisionMigrationPath = $root . '/database/migrations/20261005_roster_revisions.sql';
+if (is_file($revisionMigrationPath)) {
+    $revisionMigration = (string) file_get_contents($revisionMigrationPath);
+    if (strpos($revisionMigration, 'holidays_json') === false) {
+        addError($errors, 'Roster revision migration must include holidays_json to match the canonical schema');
+    }
+}
+
+$schemaForDeployPath = $root . '/database/schema.sql';
+if (is_file($schemaForDeployPath)) {
+    $schemaForDeploy = (string) file_get_contents($schemaForDeployPath);
+    if (strpos($schemaForDeploy, 'CREATE TABLE `schema_migrations`') === false) {
+        addError($errors, 'database/schema.sql must include schema_migrations for fresh-install baseline tracking');
+    }
+}
+
+foreach ([
+    'scripts/migrate.php',
+    'scripts/preflight.php',
+    'scripts/backup_database.php',
+    'scripts/verify_backup.php',
+    'scripts/deploy_database.php',
+    'scripts/health_check.php',
+] as $cliScript) {
+    $fullPath = $root . '/' . $cliScript;
+    if (is_file($fullPath)) {
+        $cliContent = (string) file_get_contents($fullPath);
+        if (strpos($cliContent, "PHP_SAPI !== 'cli'") === false) {
+            addError($errors, "{$cliScript}: deployment tooling must remain CLI-only");
+        }
+    }
+}
+
+if (is_file($frontControllerPath)) {
+    $frontController = (string) file_get_contents($frontControllerPath);
+    if (strpos($frontController, "($c === 'health' && $a === 'index')") === false) {
+        addError($errors, 'index.php: public health endpoint must remain limited to health::index');
+    }
+}
+
+$healthControllerPath = $root . '/controllers/HealthController.php';
+if (is_file($healthControllerPath)) {
+    $healthController = (string) file_get_contents($healthControllerPath);
+    if (strpos($healthController, 'DeploymentHealth::check') === false
+        || strpos($healthController, "'status'") === false) {
+        addError($errors, 'controllers/HealthController.php: health endpoint must use the minimal deployment health service');
+    }
+}
+
+$backupViewPath = $root . '/views/settings/backup.php';
+if (is_file($backupViewPath)) {
+    $backupView = (string) file_get_contents($backupViewPath);
+    if (stripos($backupView, 'public/uploads/Backup') !== false) {
+        addError($errors, 'views/settings/backup.php: backup storage must not point under public/');
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
