@@ -749,8 +749,7 @@ ALTER TABLE `employee_education`
 --
 ALTER TABLE `employee_licenses`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `user_id` (`user_id`),
-  ADD KEY `idx_employee_licenses_status_expire_user` (`status`,`expire_date`,`user_id`);
+  ADD KEY `user_id` (`user_id`);
 
 --
 -- Indexes for table `employee_profiles`
