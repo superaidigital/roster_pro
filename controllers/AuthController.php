@@ -7,6 +7,83 @@ require_once 'models/UserModel.php';
 require_once 'controllers/LogsController.php'; // 🌟 นำเข้าระบบบันทึกประวัติ
 
 class AuthController {
+
+    private const LOGIN_WINDOW_SECONDS = 900; // 15 minutes
+    private const LOGIN_MAX_IDENTITY_FAILURES = 5;
+    private const LOGIN_MAX_IP_FAILURES = 20;
+
+    private function getClientIpHash() {
+        // Use REMOTE_ADDR only. Forwarded headers are forgeable unless the
+        // application is configured with a trusted reverse proxy list.
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        return hash('sha256', $ip);
+    }
+
+    private function getIdentityHash($username) {
+        return hash('sha256', mb_strtolower((string) $username, 'UTF-8'));
+    }
+
+    private function isLoginRateLimited($db, $identityHash, $ipHash) {
+        try {
+            $stmt = $db->prepare("
+                SELECT
+                    SUM(identity_hash = ?) AS identity_failures,
+                    SUM(ip_hash = ?) AS ip_failures
+                FROM login_attempts
+                WHERE attempted_at >= DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+            ");
+            $stmt->execute([$identityHash, $ipHash]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+            return (
+                (int) ($row['identity_failures'] ?? 0) >= self::LOGIN_MAX_IDENTITY_FAILURES
+                || (int) ($row['ip_failures'] ?? 0) >= self::LOGIN_MAX_IP_FAILURES
+            );
+        } catch (Throwable $e) {
+            // Graceful fallback until the migration has been applied.
+            $bucket = $_SESSION['login_rate_limit'] ?? ['started_at' => time(), 'failures' => 0];
+
+            if ((time() - (int) ($bucket['started_at'] ?? 0)) > self::LOGIN_WINDOW_SECONDS) {
+                $bucket = ['started_at' => time(), 'failures' => 0];
+                $_SESSION['login_rate_limit'] = $bucket;
+            }
+
+            return (int) ($bucket['failures'] ?? 0) >= self::LOGIN_MAX_IDENTITY_FAILURES;
+        }
+    }
+
+    private function recordFailedLogin($db, $identityHash, $ipHash) {
+        try {
+            $stmt = $db->prepare("
+                INSERT INTO login_attempts (identity_hash, ip_hash)
+                VALUES (?, ?)
+            ");
+            $stmt->execute([$identityHash, $ipHash]);
+
+            // Keep the rate-limit table bounded.
+            $db->exec("DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL 1 DAY)");
+        } catch (Throwable $e) {
+            $bucket = $_SESSION['login_rate_limit'] ?? ['started_at' => time(), 'failures' => 0];
+
+            if ((time() - (int) ($bucket['started_at'] ?? 0)) > self::LOGIN_WINDOW_SECONDS) {
+                $bucket = ['started_at' => time(), 'failures' => 0];
+            }
+
+            $bucket['failures'] = (int) ($bucket['failures'] ?? 0) + 1;
+            $_SESSION['login_rate_limit'] = $bucket;
+        }
+    }
+
+    private function clearLoginFailures($db, $identityHash) {
+        try {
+            $stmt = $db->prepare("DELETE FROM login_attempts WHERE identity_hash = ?");
+            $stmt->execute([$identityHash]);
+        } catch (Throwable $e) {
+            // Migration may not have been applied yet; session fallback is enough.
+        }
+
+        unset($_SESSION['login_rate_limit']);
+    }
     
     public function index() {
         // เช็คสถานะ Session ก่อนเริ่ม
@@ -56,6 +133,18 @@ class AuthController {
                 exit;
             }
 
+            $identityHash = $this->getIdentityHash($username);
+            $ipHash = $this->getClientIpHash();
+
+            if ($this->isLoginRateLimited($db, $identityHash, $ipHash)) {
+                // Use a generic response so attackers cannot infer whether the
+                // username exists. Retry-After is useful for API-aware clients.
+                header('Retry-After: 900');
+                $_SESSION['login_error'] = "มีการพยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่";
+                header("Location: index.php?c=auth&a=index");
+                exit;
+            }
+
             // เรียกใช้งานฟังก์ชัน login จาก UserModel
             $user = $userModel->login($username, $password);
 
@@ -65,6 +154,7 @@ class AuthController {
                     
                     // 📝 บันทึก Log: พยายามเข้าสู่ระบบด้วยบัญชีที่ถูกระงับ
                     LogsController::addLog($db, $user['id'], LogsController::ACTION_LOGIN, "พยายามเข้าสู่ระบบล้มเหลว (บัญชีถูกระงับการใช้งาน)");
+                    $this->recordFailedLogin($db, $identityHash, $ipHash);
                     
                     $_SESSION['login_error'] = "⛔ บัญชีของคุณถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ";
                     header("Location: index.php?c=auth&a=index");
@@ -78,6 +168,7 @@ class AuthController {
                 // Store only the authenticated user record after the ID rotation.
                 $_SESSION['user'] = $user;
                 $_SESSION['login_at'] = time();
+                $this->clearLoginFailures($db, $identityHash);
                 unset($_SESSION['login_error']);
                 
                 // 📝 บันทึก Log: เข้าสู่ระบบสำเร็จ
@@ -103,6 +194,7 @@ class AuthController {
                     LogsController::ACTION_LOGIN,
                     "พยายามเข้าสู่ระบบล้มเหลว (credential mismatch, ref: {$usernameFingerprint})"
                 );
+                $this->recordFailedLogin($db, $identityHash, $ipHash);
                 
                 // Generic message avoids leaking authentication implementation details.
                 $_SESSION['login_error'] = "ชื่อผู้ใช้ หรือรหัสผ่านไม่ถูกต้อง";
