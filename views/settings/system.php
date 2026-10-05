@@ -314,7 +314,7 @@ $release_id = $release_id ?? 'unknown';
                         <label class="form-label fw-bold text-dark mb-2">LINE Notify Token (สำหรับกลุ่มส่วนกลาง)</label>
                         <div class="input-group shadow-sm border border-success border-opacity-25 rounded-3 overflow-hidden focus-ring-success">
                             <span class="input-group-text bg-success bg-opacity-10 border-0 text-success"><i class="bi bi-key-fill"></i></span>
-                            <input type="text" name="settings[line_notify_token]" class="form-control border-0 bg-white" value="<?= htmlspecialchars($settings['line_notify_token'] ?? '') ?>" placeholder="กรอก Token สตริงที่ได้จากเว็บ LINE Notify...">
+                            <input type="password" name="settings[line_notify_token]" class="form-control border-0 bg-white" value="" autocomplete="new-password" placeholder="<?= !empty($settings['line_notify_token']) ? 'ตั้งค่า Token แล้ว — กรอกค่าใหม่เฉพาะเมื่อต้องการเปลี่ยน' : 'กรอก Token สำหรับการเชื่อมต่อ...' ?>">
                         </div>
                     </div>
 

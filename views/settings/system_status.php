@@ -54,6 +54,53 @@
             </div>
         </div>
 
+        <?php
+        $securityAssessment = $status_data['security_assessment'] ?? null;
+        $securityStatus = strtoupper((string)($securityAssessment['status'] ?? 'UNKNOWN'));
+        $securityClass = $securityStatus === 'PASS' ? 'success' : ($securityStatus === 'WARN' ? 'warning' : 'danger');
+        ?>
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white py-3 border-bottom d-flex flex-column flex-md-row justify-content-between gap-2 align-items-md-center">
+                    <div>
+                        <h6 class="mb-1 fw-bold"><i class="bi bi-shield-check text-primary me-2"></i> Security & Compliance Scorecard</h6>
+                        <div class="small text-muted">ตรวจ Production hardening, session, CSP, proxy trust, DB privilege และพื้นที่จัดเก็บข้อมูลสำคัญ</div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge text-bg-<?= $securityClass ?> rounded-pill px-3 py-2"><?= htmlspecialchars($securityStatus, ENT_QUOTES, 'UTF-8') ?></span>
+                        <span class="badge bg-dark rounded-pill px-3 py-2">
+                            <?= (int)($securityAssessment['score'] ?? 0) ?>/100 · Grade <?= htmlspecialchars((string)($securityAssessment['grade'] ?? '-'), ENT_QUOTES, 'UTF-8') ?>
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th class="ps-4">Control</th><th>Status</th><th>รายละเอียด</th></tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach (($securityAssessment['checks'] ?? []) as $check): ?>
+                                <?php
+                                $checkStatus = strtoupper((string)($check['status'] ?? 'INFO'));
+                                $checkClass = $checkStatus === 'PASS' ? 'success' : ($checkStatus === 'WARN' ? 'warning' : ($checkStatus === 'FAIL' ? 'danger' : 'secondary'));
+                                ?>
+                                <tr>
+                                    <td class="ps-4 fw-semibold"><?= htmlspecialchars((string)($check['label'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td><span class="badge text-bg-<?= $checkClass ?>"><?= htmlspecialchars($checkStatus, ENT_QUOTES, 'UTF-8') ?></span></td>
+                                    <td class="small text-muted"><?= htmlspecialchars((string)($check['detail'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($securityAssessment['checks'])): ?>
+                                <tr><td colspan="3" class="text-center text-muted py-4">ยังไม่มีข้อมูล Security Assessment</td></tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 🌟 ส่วนที่ 3: ข้อมูลเชิงลึก -->
         <div class="col-12">
             <div class="card border-0 shadow-sm rounded-4 overflow-hidden">

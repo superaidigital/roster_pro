@@ -6,6 +6,8 @@ require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 require_once 'lib/MaintenanceMode.php';
 require_once 'lib/ReleaseIdentity.php';
+require_once 'lib/SecureUpload.php';
+require_once 'lib/SecurityCompliance.php';
 
 class SettingsController {
 
@@ -176,64 +178,32 @@ class SettingsController {
         $old_logo_path = null;
 
         if (isset($_FILES['logo']) && (int)($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-            $file = $_FILES['logo'];
-            $uploadError = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
-
-            if ($uploadError !== UPLOAD_ERR_OK || !is_uploaded_file((string)($file['tmp_name'] ?? ''))) {
-                $_SESSION['error_msg'] = "อัปโหลดโลโก้ไม่สำเร็จ กรุณาลองใหม่";
-                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
-                exit;
-            }
-
-            if ((int)($file['size'] ?? 0) <= 0 || (int)$file['size'] > 2 * 1024 * 1024) {
-                $_SESSION['error_msg'] = "ไฟล์โลโก้ต้องมีขนาดไม่เกิน 2 MB";
-                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
-                exit;
-            }
-
-            $finfo = new finfo(FILEINFO_MIME_TYPE);
-            $mime = (string)$finfo->file((string)$file['tmp_name']);
-            $allowedMime = [
-                'image/jpeg' => 'jpg',
-                'image/png' => 'png',
-            ];
-
-            if (!isset($allowedMime[$mime])) {
-                $_SESSION['error_msg'] = "ชนิดไฟล์โลโก้ไม่ถูกต้อง อนุญาตเฉพาะ JPG และ PNG";
-                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
-                exit;
-            }
-
-            $uploadDir = 'public/uploads/logos/';
-            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
-                $_SESSION['error_msg'] = "ไม่สามารถเตรียมพื้นที่อัปโหลดโลโก้ได้";
-                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
-                exit;
-            }
-
             try {
-                $randomPart = bin2hex(random_bytes(12));
+                $storedLogo = SecureUpload::store(
+                    $_FILES['logo'],
+                    'public/uploads/logos',
+                    [
+                        'image/jpeg' => 'jpg',
+                        'image/png' => 'png',
+                    ],
+                    2 * 1024 * 1024,
+                    'logo',
+                    false
+                );
+                $logo_path = (string)$storedLogo['path'];
+
+                if ($id > 0) {
+                    $current = $hospitalModel->getHospitalById($id);
+                    $candidateOldLogo = (string)($current['logo'] ?? '');
+                    if ($candidateOldLogo !== '' && strpos($candidateOldLogo, 'default') === false) {
+                        $old_logo_path = $candidateOldLogo;
+                    }
+                }
             } catch (Throwable $e) {
-                $randomPart = hash('sha256', uniqid('', true));
-            }
-
-            $newFileName = 'logo_' . $randomPart . '.' . $allowedMime[$mime];
-            $destPath = $uploadDir . $newFileName;
-
-            if (!move_uploaded_file((string)$file['tmp_name'], $destPath)) {
-                $_SESSION['error_msg'] = "ไม่สามารถบันทึกไฟล์โลโก้ได้";
+                error_log('Hospital logo upload rejected: ' . $e->getMessage());
+                $_SESSION['error_msg'] = "อัปโหลดโลโก้ไม่สำเร็จ รองรับเฉพาะ JPG/PNG ขนาดไม่เกิน 2 MB";
                 header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
                 exit;
-            }
-
-            $logo_path = $destPath;
-
-            if ($id > 0) {
-                $current = $hospitalModel->getHospitalById($id);
-                $candidateOldLogo = (string)($current['logo'] ?? '');
-                if ($candidateOldLogo !== '' && strpos($candidateOldLogo, 'default') === false) {
-                    $old_logo_path = $candidateOldLogo;
-                }
             }
         }
 
@@ -313,6 +283,9 @@ class SettingsController {
             }
         } catch (Exception $e) {}
 
+        $maintenance_state = MaintenanceMode::safeStatus();
+        $release_id = ReleaseIdentity::current();
+
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
         require_once 'views/settings/system.php';
@@ -370,10 +343,11 @@ class SettingsController {
             }
             $status_data['performance_cache_files'] = count($cacheFiles);
             $status_data['performance_cache_mb'] = round($cacheBytes / 1024 / 1024, 2);
-            $maintenanceState = MaintenanceMode::status();
+            $maintenanceState = MaintenanceMode::safeStatus();
             $status_data['maintenance_enabled'] = (bool)($maintenanceState['enabled'] ?? false);
             $status_data['maintenance_started_at'] = (string)($maintenanceState['started_at'] ?? '');
             $status_data['release_id'] = ReleaseIdentity::current();
+            $status_data['security_assessment'] = SecurityCompliance::assess($db);
 
         } catch (Exception $e) {
             error_log('System status check failed: ' . $e->getMessage());
@@ -401,12 +375,37 @@ class SettingsController {
             $insert_stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)");
             $update_stmt = $db->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
 
+            if (!is_array($settings_data)) {
+                throw new RuntimeException('Invalid settings payload.');
+            }
+
             if ($section === 'line_notify') {
+                $allowedKeys = [
+                    'line_notify_token',
+                    'line_notify_on_submit',
+                    'line_notify_on_request',
+                    'line_notify_on_holiday',
+                ];
+                $settings_data = array_intersect_key($settings_data, array_flip($allowedKeys));
+
                 $settings_data['line_notify_on_submit'] = isset($settings_data['line_notify_on_submit']) ? '1' : '0';
                 $settings_data['line_notify_on_request'] = isset($settings_data['line_notify_on_request']) ? '1' : '0';
                 $settings_data['line_notify_on_holiday'] = isset($settings_data['line_notify_on_holiday']) ? '1' : '0';
+
+                $token = trim((string)($settings_data['line_notify_token'] ?? ''));
+                if ($token === '') {
+                    unset($settings_data['line_notify_token']);
+                } else {
+                    $settings_data['line_notify_token'] = mb_substr($token, 0, 500, 'UTF-8');
+                }
             } elseif ($section === 'general') {
-                $settings_data['maintenance_mode'] = isset($settings_data['maintenance_mode']) ? '1' : '0';
+                $allowedKeys = ['system_name', 'system_short_name'];
+                $settings_data = array_intersect_key($settings_data, array_flip($allowedKeys));
+                $settings_data['system_name'] = mb_substr(trim((string)($settings_data['system_name'] ?? '')), 0, 150, 'UTF-8');
+                $settings_data['system_short_name'] = mb_substr(trim((string)($settings_data['system_short_name'] ?? '')), 0, 80, 'UTF-8');
+                unset($settings_data['maintenance_mode']);
+            } else {
+                throw new RuntimeException('Unsupported settings section.');
             }
 
             foreach ($settings_data as $key => $value) {
@@ -999,14 +998,27 @@ class SettingsController {
 
     // ฟังก์ชันใหม่: URL สำหรับให้ Cron Job เรียกใช้งาน (ไม่ต้อง Login)
     public function cron_monthly_backup() {
-        $secret_key = (string)(getenv('ROSTER_CRON_KEY') ?: ''); 
-        $provided_key = $_GET['key'] ?? '';
-
-        if ($secret_key === '' || !hash_equals($secret_key, (string)$provided_key)) {
-            die("Access Denied: Invalid Cron Key.");
+        // Production backups are CLI-only so credentials never appear in URLs,
+        // proxy logs, browser history or Referer headers.
+        if (security_is_production()) {
+            http_response_code(404);
+            exit;
         }
 
-        set_time_limit(300); 
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            exit;
+        }
+
+        $secretKey = (string)(getenv('ROSTER_CRON_KEY') ?: '');
+        $providedKey = (string)($_SERVER['HTTP_X_ROSTER_CRON_KEY'] ?? '');
+
+        if ($secretKey === '' || $providedKey === '' || !hash_equals($secretKey, $providedKey)) {
+            http_response_code(403);
+            exit('Access denied.');
+        }
+
+        set_time_limit(300);
         ini_set('memory_limit', '256M');
 
         $db = (new Database())->getConnection();
@@ -1017,9 +1029,8 @@ class SettingsController {
                 mkdir($backup_dir, 0700, true);
             }
 
-            // เช็คว่าเดือนนี้มีไฟล์แล้วหรือยัง
             $current_month_prefix = 'roster_pro_autobackup_' . date('Y_m_');
-            $files = scandir($backup_dir);
+            $files = scandir($backup_dir) ?: [];
             $already_backed_up = false;
             foreach ($files as $file) {
                 if (strpos($file, $current_month_prefix) !== false) {
@@ -1033,18 +1044,23 @@ class SettingsController {
                 $backup_file_name = $current_month_prefix . date('d_His') . '.sql';
                 $filepath = $backup_dir . $backup_file_name;
 
-                if (file_put_contents($filepath, $sqlScript) !== false) {
-                    // 🌟 บันทึก Log: การรัน Cron Job (ใช้ ID 0)
-                    LogsController::addLog($db, 0, LogsController::ACTION_EXPORT, "[CRON JOB] สำรองข้อมูลอัตโนมัติประจำเดือน ({$backup_file_name})");
-                    echo "Cron Backup Success: {$backup_file_name}";
+                if (file_put_contents($filepath, $sqlScript, LOCK_EX) !== false) {
+                    @chmod($filepath, 0600);
+                    LogsController::addLog(
+                        $db,
+                        0,
+                        LogsController::ACTION_EXPORT,
+                        "[NON-PROD CRON] สำรองข้อมูลอัตโนมัติประจำเดือน ({$backup_file_name})"
+                    );
+                    echo "Cron Backup Success";
                 } else {
-                    echo "Cron Backup Failed: Cannot write file.";
+                    http_response_code(500);
+                    echo "Cron Backup Failed";
                 }
             } else {
-                echo "Cron Backup Skipped: Already backed up this month.";
+                echo "Cron Backup Skipped";
             }
-
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             error_log("Cron backup failed: " . $e->getMessage());
             http_response_code(500);
             echo "Cron Backup Error";

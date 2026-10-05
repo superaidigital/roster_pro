@@ -125,13 +125,41 @@ if ($appEnv === 'production') {
     $dbUser = (string)(getenv('DB_USER') ?: 'root');
     $dbPasswordRaw = getenv('DB_PASSWORD');
     $dbPassword = $dbPasswordRaw !== false ? (string)$dbPasswordRaw : '';
-    if ($dbUser === 'root') {
-        $warn('Production DB_USER is root; use a least-privilege application account');
+    if (strtolower($dbUser) === 'root') {
+        $fail('Production DB_USER must not be root; use a dedicated application account');
+    } else {
+        $pass('Production DB_USER is not root');
     }
     if ($dbPassword === '') {
         $fail('Production DB_PASSWORD must not be blank');
     } else {
         $pass('Production DB password is configured');
+    }
+
+    $trustProxy = filter_var(getenv('TRUST_PROXY_HEADERS') ?: '0', FILTER_VALIDATE_BOOLEAN);
+    $trustedProxyIps = trim((string)(getenv('TRUSTED_PROXY_IPS') ?: ''));
+    if ($trustProxy && $trustedProxyIps === '') {
+        $fail('TRUST_PROXY_HEADERS=1 requires explicit TRUSTED_PROXY_IPS');
+    } else {
+        $pass('Production proxy trust configuration is valid');
+    }
+
+    $cspMode = strtolower(trim((string)(getenv('CSP_MODE') ?: 'report-only')));
+    if (!in_array($cspMode, ['report-only', 'enforce'], true)) {
+        $fail('Production CSP_MODE must be report-only or enforce');
+    } else {
+        $pass('Production CSP mode is configured: ' . $cspMode);
+    }
+
+    $idleTimeout = (int)(getenv('SESSION_IDLE_TIMEOUT_SECONDS') ?: 28800);
+    $absoluteTimeout = (int)(getenv('SESSION_ABSOLUTE_TIMEOUT_SECONDS') ?: 43200);
+    $regenInterval = (int)(getenv('SESSION_REGEN_INTERVAL_SECONDS') ?: 900);
+    if ($idleTimeout <= 0 || $idleTimeout > 28800
+        || $absoluteTimeout < $idleTimeout || $absoluteTimeout > 43200
+        || $regenInterval <= 0 || $regenInterval > 1800) {
+        $fail('Production session timeout configuration exceeds hardening limits');
+    } else {
+        $pass('Production session timeout configuration is within hardening limits');
     }
 } else {
     $warn("APP_ENV={$appEnv}; production-only hardening checks are not enforced");
