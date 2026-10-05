@@ -88,7 +88,7 @@ $baseArgs = [
     '--events',
     '--hex-blob',
     '--default-character-set=utf8mb4',
-    '--databases',
+    '--no-tablespaces',
     $dbName,
 ];
 
@@ -187,6 +187,8 @@ file_put_contents($checksumPath, $checksum . '  ' . $filename . PHP_EOL, LOCK_EX
 @chmod($checksumPath, 0600);
 
 $manifest = [
+    'format_version' => 2,
+    'restore_scope' => 'database_contents',
     'filename' => $filename,
     'sha256' => $checksum,
     'size_bytes' => filesize($finalPath),
@@ -194,6 +196,7 @@ $manifest = [
     'database' => $dbName,
     'label' => $label,
     'dump_binary' => basename($usedBinary),
+    'contains_database_ddl' => false,
 ];
 $manifestPath = $finalPath . '.json';
 file_put_contents(
