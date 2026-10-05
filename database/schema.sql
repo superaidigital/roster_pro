@@ -672,7 +672,10 @@ CREATE TABLE `users` (
   `deleted_at` datetime DEFAULT NULL COMMENT 'เวลาที่ถูกลบ (Soft Delete)',
   `is_deleted` tinyint(1) DEFAULT 0,
   `show_in_roster` tinyint(1) DEFAULT 1,
-  `signature_path` longtext DEFAULT NULL COMMENT 'เก็บลายมือชื่ออิเล็กทรอนิกส์ (Base64)'
+  `signature_path` longtext DEFAULT NULL COMMENT 'เก็บลายมือชื่ออิเล็กทรอนิกส์ (Base64)',
+  `signature_sha256` char(64) DEFAULT NULL COMMENT 'SHA-256 ของ binary ลายเซ็น',
+  `signature_method` varchar(20) DEFAULT NULL COMMENT 'DRAW หรือ UPLOAD',
+  `signature_updated_at` datetime DEFAULT NULL COMMENT 'เวลาที่บันทึกลายเซ็นล่าสุด'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
