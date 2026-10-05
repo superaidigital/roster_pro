@@ -77,6 +77,7 @@ class AuthController {
 
                 // ล็อกอินสำเร็จ: บันทึกข้อมูลลง Session
                 $_SESSION['user'] = $user;
+                security_mark_authenticated_session();
                 unset($_SESSION['login_error']); // ล้างค่า Error
                 
                 // 📝 บันทึก Log: เข้าสู่ระบบสำเร็จ
@@ -125,8 +126,7 @@ class AuthController {
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_LOGOUT, "ออกจากระบบด้วยตนเอง");
         }
 
-        session_unset();
-        session_destroy();
+        security_destroy_session();
         header("Location: index.php?c=auth&a=index");
         exit;
     }
