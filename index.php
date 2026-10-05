@@ -47,8 +47,11 @@ $isPublicRoute = $c === 'auth'
     || ($c === 'verify' && in_array($a, $publicVerifyActions, true))
     || $isHealthRoute;
 
-if (!$isHealthRoute && MaintenanceMode::isEnabled()) {
-    MaintenanceMode::renderUnavailable();
+if (!$isHealthRoute) {
+    $maintenanceState = MaintenanceMode::safeStatus();
+    if (!empty($maintenanceState['enabled'])) {
+        MaintenanceMode::renderUnavailable($maintenanceState);
+    }
 }
 
 if (!$isPublicRoute && !isset($_SESSION['user'])) {
