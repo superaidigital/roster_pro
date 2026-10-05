@@ -10,7 +10,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../lib/DeploymentHealth.php';
 
 try {
-    $db = (new Database())->getConnection();
+    $db = (new Database())->getConnectionOrThrow();
     $result = DeploymentHealth::check($db);
 
     echo json_encode([
