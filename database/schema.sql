@@ -538,6 +538,91 @@ CREATE TABLE `schema_migrations` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `observability_events`
+--
+
+CREATE TABLE `observability_events` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `fingerprint` char(64) NOT NULL,
+  `severity` varchar(20) NOT NULL DEFAULT 'ERROR',
+  `category` varchar(50) NOT NULL DEFAULT 'APPLICATION',
+  `message` varchar(1000) NOT NULL,
+  `exception_class` varchar(190) DEFAULT NULL,
+  `source_file` varchar(500) DEFAULT NULL,
+  `source_line` int DEFAULT NULL,
+  `route` varchar(190) DEFAULT NULL,
+  `request_id` varchar(64) DEFAULT NULL,
+  `user_id` int DEFAULT NULL,
+  `hospital_id` int DEFAULT NULL,
+  `context_json` longtext DEFAULT NULL,
+  `occurrence_count` int unsigned NOT NULL DEFAULT 1,
+  `status` varchar(20) NOT NULL DEFAULT 'OPEN',
+  `first_seen_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `last_seen_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `resolved_at` datetime DEFAULT NULL,
+  `resolved_by` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_observability_fingerprint` (`fingerprint`),
+  KEY `idx_observability_status_seen` (`status`,`last_seen_at`),
+  KEY `idx_observability_severity_seen` (`severity`,`last_seen_at`),
+  KEY `idx_observability_category_seen` (`category`,`last_seen_at`),
+  KEY `idx_observability_request` (`request_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `background_jobs`
+--
+
+CREATE TABLE `background_jobs` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `job_type` varchar(80) NOT NULL,
+  `dedupe_key` varchar(190) DEFAULT NULL,
+  `payload_json` longtext NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'PENDING',
+  `priority` smallint NOT NULL DEFAULT 100,
+  `attempts` smallint unsigned NOT NULL DEFAULT 0,
+  `max_attempts` smallint unsigned NOT NULL DEFAULT 3,
+  `available_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `locked_at` datetime DEFAULT NULL,
+  `lock_token` char(32) DEFAULT NULL,
+  `last_error` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `completed_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_background_job_dedupe` (`dedupe_key`),
+  KEY `idx_background_jobs_pick` (`status`,`available_at`,`priority`,`id`),
+  KEY `idx_background_jobs_failed` (`status`,`updated_at`),
+  KEY `idx_background_jobs_type` (`job_type`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `system_health_snapshots`
+--
+
+CREATE TABLE `system_health_snapshots` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `overall_status` varchar(20) NOT NULL,
+  `db_status` varchar(20) NOT NULL,
+  `migration_pending` int unsigned NOT NULL DEFAULT 0,
+  `migration_blocking` int unsigned NOT NULL DEFAULT 0,
+  `queue_pending` int unsigned NOT NULL DEFAULT 0,
+  `queue_failed` int unsigned NOT NULL DEFAULT 0,
+  `open_errors_24h` int unsigned NOT NULL DEFAULT 0,
+  `disk_free_mb` bigint DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_health_snapshot_created` (`created_at`),
+  KEY `idx_health_snapshot_status` (`overall_status`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `system_settings`
 --
 
