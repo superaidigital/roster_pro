@@ -6,6 +6,7 @@ require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
 require_once 'lib/MaintenanceMode.php';
 require_once 'lib/ReleaseIdentity.php';
+require_once 'lib/SecureUpload.php';
 
 class SettingsController {
 
@@ -176,64 +177,32 @@ class SettingsController {
         $old_logo_path = null;
 
         if (isset($_FILES['logo']) && (int)($_FILES['logo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-            $file = $_FILES['logo'];
-            $uploadError = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
-
-            if ($uploadError !== UPLOAD_ERR_OK || !is_uploaded_file((string)($file['tmp_name'] ?? ''))) {
-                $_SESSION['error_msg'] = "อัปโหลดโลโก้ไม่สำเร็จ กรุณาลองใหม่";
-                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
-                exit;
-            }
-
-            if ((int)($file['size'] ?? 0) <= 0 || (int)$file['size'] > 2 * 1024 * 1024) {
-                $_SESSION['error_msg'] = "ไฟล์โลโก้ต้องมีขนาดไม่เกิน 2 MB";
-                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
-                exit;
-            }
-
-            $finfo = new finfo(FILEINFO_MIME_TYPE);
-            $mime = (string)$finfo->file((string)$file['tmp_name']);
-            $allowedMime = [
-                'image/jpeg' => 'jpg',
-                'image/png' => 'png',
-            ];
-
-            if (!isset($allowedMime[$mime])) {
-                $_SESSION['error_msg'] = "ชนิดไฟล์โลโก้ไม่ถูกต้อง อนุญาตเฉพาะ JPG และ PNG";
-                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
-                exit;
-            }
-
-            $uploadDir = 'public/uploads/logos/';
-            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
-                $_SESSION['error_msg'] = "ไม่สามารถเตรียมพื้นที่อัปโหลดโลโก้ได้";
-                header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
-                exit;
-            }
-
             try {
-                $randomPart = bin2hex(random_bytes(12));
+                $storedLogo = SecureUpload::store(
+                    $_FILES['logo'],
+                    'public/uploads/logos',
+                    [
+                        'image/jpeg' => 'jpg',
+                        'image/png' => 'png',
+                    ],
+                    2 * 1024 * 1024,
+                    'logo',
+                    false
+                );
+                $logo_path = (string)$storedLogo['path'];
+
+                if ($id > 0) {
+                    $current = $hospitalModel->getHospitalById($id);
+                    $candidateOldLogo = (string)($current['logo'] ?? '');
+                    if ($candidateOldLogo !== '' && strpos($candidateOldLogo, 'default') === false) {
+                        $old_logo_path = $candidateOldLogo;
+                    }
+                }
             } catch (Throwable $e) {
-                $randomPart = hash('sha256', uniqid('', true));
-            }
-
-            $newFileName = 'logo_' . $randomPart . '.' . $allowedMime[$mime];
-            $destPath = $uploadDir . $newFileName;
-
-            if (!move_uploaded_file((string)$file['tmp_name'], $destPath)) {
-                $_SESSION['error_msg'] = "ไม่สามารถบันทึกไฟล์โลโก้ได้";
+                error_log('Hospital logo upload rejected: ' . $e->getMessage());
+                $_SESSION['error_msg'] = "อัปโหลดโลโก้ไม่สำเร็จ รองรับเฉพาะ JPG/PNG ขนาดไม่เกิน 2 MB";
                 header("Location: index.php?c=settings&a=hospital" . ($id > 0 ? "&id=" . $id : ""));
                 exit;
-            }
-
-            $logo_path = $destPath;
-
-            if ($id > 0) {
-                $current = $hospitalModel->getHospitalById($id);
-                $candidateOldLogo = (string)($current['logo'] ?? '');
-                if ($candidateOldLogo !== '' && strpos($candidateOldLogo, 'default') === false) {
-                    $old_logo_path = $candidateOldLogo;
-                }
             }
         }
 
