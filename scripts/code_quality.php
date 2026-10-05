@@ -1115,6 +1115,24 @@ if (is_file($styleUiPath)) {
     }
 }
 
+// 5.16) Roster sticky-column layering guards.
+$rosterViewPath = $root . '/views/roster/index.php';
+if (is_file($rosterViewPath)) {
+    $rosterView = (string) file_get_contents($rosterViewPath);
+    foreach ([
+        'roster-staff-sticky-head',
+        'roster-staff-sticky-cell',
+        'isolation: isolate',
+        'z-index: 40 !important',
+        'z-index: 30 !important',
+        '#rosterTable .roster-day-cell .shift-cell',
+    ] as $token) {
+        if (strpos($rosterView, $token) === false) {
+            addError($errors, "views/roster/index.php: missing sticky-column safety token {$token}");
+        }
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
