@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../lib/ElectronicSignature.php';
+
 class RosterRevisionModel {
     private PDO $conn;
 
@@ -43,11 +45,13 @@ class RosterRevisionModel {
             return null;
         }
 
+        $signature = $row['signature_path'] !== null ? (string)$row['signature_path'] : null;
+
         return [
             'id' => (int)$row['id'],
             'name' => (string)$row['name'],
             'position' => (string)($row['signer_position'] ?? ''),
-            'signature' => $row['signature_path'] !== null ? (string)$row['signature_path'] : null,
+            'signature' => ElectronicSignature::isValid($signature) ? $signature : null,
         ];
     }
 
