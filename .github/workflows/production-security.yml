@@ -81,6 +81,9 @@ jobs:
           SQL
 
       - name: Baseline canonical migration history
+        env:
+          DB_USER: root
+          DB_PASSWORD: root
         run: php scripts/migrate.php --baseline --confirm=SCHEMA-LOADED
 
       - name: Production preflight
