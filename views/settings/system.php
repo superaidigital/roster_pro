@@ -4,6 +4,8 @@
 $role = strtoupper($_SESSION['user']['role'] ?? '');
 $is_superadmin = ($role === 'SUPERADMIN');
 $settings = $settings ?? []; // รับค่าจาก Controller
+$maintenance_state = $maintenance_state ?? ['enabled' => false];
+$release_id = $release_id ?? 'unknown';
 ?>
 
 <style>
@@ -148,7 +150,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
             <a href="#" class="setting-card p-4" data-bs-toggle="modal" data-bs-target="#generalSettingsModal">
                 <div class="icon-box grad-blue"><i class="bi bi-sliders"></i></div>
                 <div class="card-title-modern">ข้อมูลทั่วไปของระบบ</div>
-                <p class="card-text-modern">ตั้งค่าชื่อระบบ เปิด-ปิดโหมดซ่อมบำรุง และการตั้งค่าทำงานพื้นฐาน</p>
+                <p class="card-text-modern">ตั้งค่าชื่อระบบ ตรวจสถานะ Maintenance/Cutover และการตั้งค่าทำงานพื้นฐาน</p>
             </a>
         </div>
 
@@ -263,13 +265,26 @@ $settings = $settings ?? []; // รับค่าจาก Controller
                     </div>
                     <div class="card bg-warning bg-opacity-10 border-warning border-opacity-25 shadow-none rounded-4">
                         <div class="card-body p-4">
-                            <div class="form-check form-switch modern-switch mb-0 d-flex align-items-center">
-                                <input class="form-check-input me-3 flex-shrink-0" type="checkbox" id="maintenanceMode" name="settings[maintenance_mode]" value="1" <?= ($settings['maintenance_mode'] ?? '0') === '1' ? 'checked' : '' ?>>
+                            <div class="d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center">
                                 <div>
-                                    <label class="form-check-label fw-bolder text-dark mb-1" for="maintenanceMode">เปิดโหมดซ่อมบำรุง (Maintenance Mode)</label>
-                                    <div class="text-muted" style="font-size: 0.85rem; line-height: 1.4;">ระบบจะปิดการใช้งานชั่วคราวสำหรับผู้ใช้ทั่วไป จะสามารถล็อกอินเข้าได้เฉพาะ Admin เท่านั้น</div>
+                                    <div class="fw-bolder text-dark mb-1">Production Maintenance Control</div>
+                                    <div class="text-muted" style="font-size:.85rem;line-height:1.5">
+                                        ใช้ private runtime state แยกจากฐานข้อมูล เพื่อควบคุม traffic ได้แม้ DB กำลัง migrate
+                                    </div>
                                 </div>
+                                <?php if (!empty($maintenance_state['enabled'])): ?>
+                                    <span class="badge text-bg-warning rounded-pill px-3 py-2">MAINTENANCE ON</span>
+                                <?php else: ?>
+                                    <span class="badge text-bg-success rounded-pill px-3 py-2">TRAFFIC ENABLED</span>
+                                <?php endif; ?>
                             </div>
+                            <hr>
+                            <div class="small text-muted mb-2">Release: <span class="font-monospace"><?= htmlspecialchars((string)$release_id, ENT_QUOTES, 'UTF-8') ?></span></div>
+                            <?php if (!empty($maintenance_state['enabled'])): ?>
+                                <div class="small text-muted mb-2">เริ่ม: <?= htmlspecialchars((string)($maintenance_state['started_at'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></div>
+                                <div class="small text-muted mb-3">เหตุผล: <?= htmlspecialchars((string)($maintenance_state['reason'] ?? '-'), ENT_QUOTES, 'UTF-8') ?></div>
+                            <?php endif; ?>
+                            <div class="small text-muted">เปิด/ปิดผ่าน CLI <code>scripts/maintenance.php</code> หรือ <code>scripts/cutover.php</code> เท่านั้น เพื่อป้องกันสถานะเว็บกับ deployment ขัดกัน</div>
                         </div>
                     </div>
                 </div>

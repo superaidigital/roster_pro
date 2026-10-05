@@ -9,13 +9,14 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../lib/MigrationManager.php';
 
-$options = getopt('', ['strict', 'help']);
+$options = getopt('', ['strict', 'allow-pending', 'help']);
 if (isset($options['help'])) {
-    echo "Usage: php scripts/preflight.php [--strict]\n";
+    echo "Usage: php scripts/preflight.php [--strict] [--allow-pending]\n";
     exit(0);
 }
 
 $strict = isset($options['strict']);
+$allowPending = isset($options['allow-pending']);
 $root = dirname(__DIR__);
 $fails = [];
 $warnings = [];
@@ -172,7 +173,11 @@ try {
     }
 
     if ($summary['pending'] > 0) {
-        $warn("{$summary['pending']} migration(s) are pending");
+        if ($allowPending) {
+            $pass("{$summary['pending']} migration(s) pending and explicitly allowed for cutover");
+        } else {
+            $warn("{$summary['pending']} migration(s) are pending");
+        }
     } else {
         $pass('No pending migrations');
     }

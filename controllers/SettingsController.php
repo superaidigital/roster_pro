@@ -4,6 +4,8 @@
 require_once 'config/database.php';
 require_once 'config/security.php';
 require_once 'controllers/LogsController.php';
+require_once 'lib/MaintenanceMode.php';
+require_once 'lib/ReleaseIdentity.php';
 
 class SettingsController {
 
@@ -368,6 +370,10 @@ class SettingsController {
             }
             $status_data['performance_cache_files'] = count($cacheFiles);
             $status_data['performance_cache_mb'] = round($cacheBytes / 1024 / 1024, 2);
+            $maintenanceState = MaintenanceMode::status();
+            $status_data['maintenance_enabled'] = (bool)($maintenanceState['enabled'] ?? false);
+            $status_data['maintenance_started_at'] = (string)($maintenanceState['started_at'] ?? '');
+            $status_data['release_id'] = ReleaseIdentity::current();
 
         } catch (Exception $e) {
             error_log('System status check failed: ' . $e->getMessage());

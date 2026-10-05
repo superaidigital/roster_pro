@@ -74,6 +74,15 @@
                             <tr><td class="ps-4">Slow Request Threshold</td><td><span class="fw-bold"><?= (int)($status_data['slow_request_threshold_ms'] ?? 1500) ?> ms</span></td></tr>
                             <tr><td class="ps-4">PHP OPcache</td><td><?= htmlspecialchars((string)($status_data['opcache_enabled'] ?? 'Unknown'), ENT_QUOTES, 'UTF-8') ?></td></tr>
                             <tr><td class="ps-4">Performance Cache</td><td><?= number_format((int)($status_data['performance_cache_files'] ?? 0)) ?> ไฟล์ · <?= number_format((float)($status_data['performance_cache_mb'] ?? 0), 2) ?> MB</td></tr>
+                            <tr><td class="ps-4">Current Release</td><td><span class="font-monospace"><?= htmlspecialchars((string)($status_data['release_id'] ?? 'unknown'), ENT_QUOTES, 'UTF-8') ?></span></td></tr>
+                            <tr><td class="ps-4">Maintenance Control</td><td>
+                                <?php if (!empty($status_data['maintenance_enabled'])): ?>
+                                    <span class="badge text-bg-warning">ACTIVE</span>
+                                    <span class="small text-muted ms-2"><?= htmlspecialchars((string)($status_data['maintenance_started_at'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                                <?php else: ?>
+                                    <span class="badge text-bg-success">INACTIVE</span>
+                                <?php endif; ?>
+                            </td></tr>
                         </tbody>
                     </table>
                 </div>

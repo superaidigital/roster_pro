@@ -31,3 +31,7 @@ public/uploads/**/*.sql
 # Runtime performance cache
 /storage/cache/*
 !/storage/cache/.gitkeep
+
+# Runtime cutover / maintenance state
+/storage/runtime/*
+!/storage/runtime/.gitkeep

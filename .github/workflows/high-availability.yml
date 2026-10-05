@@ -1,0 +1,161 @@
+name: High Availability Cutover
+
+on:
+  pull_request:
+  push:
+    branches:
+      - security-hardening-v1
+
+permissions:
+  contents: read
+
+jobs:
+  high-availability-cutover:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: roster_ha_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      APP_ENV: development
+      APP_BASE_URL: http://127.0.0.1:8080
+      APP_RELEASE_ID: ci-ha-release-1
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: roster_ha_test
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_TIMEZONE: '+07:00'
+      BACKUP_DIR: storage/backups
+      MAINTENANCE_STATE_DIR: storage/runtime
+      MAINTENANCE_RETRY_AFTER: 45
+      ROSTER_CRON_KEY: ci-only-secret-key-0123456789abcdef
+      DEPLOY_ACTOR: github-actions
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, zlib
+          coverage: none
+
+      - name: Install MariaDB client
+        run: sudo apt-get update && sudo apt-get install -y mariadb-client
+
+      - name: Load canonical schema
+        run: mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_ha_test < database/schema.sql
+
+      - name: Baseline migration history
+        run: php scripts/migrate.php --baseline --confirm=SCHEMA-LOADED
+
+      - name: Verify initial cutover precheck
+        run: php scripts/cutover_precheck.php --skip-recovery
+
+      - name: Start PHP application server
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -S 127.0.0.1:8080 index.php > /tmp/roster-ha-server.log 2>&1 &
+          echo $! > /tmp/roster-ha-server.pid
+          for i in {1..30}; do
+            if curl -fsS "http://127.0.0.1:8080/?c=health&a=live" >/tmp/live.json; then
+              break
+            fi
+            sleep 1
+          done
+          cat /tmp/live.json
+
+      - name: Verify liveness and readiness split
+        shell: bash
+        run: |
+          set -euo pipefail
+          live_code="$(curl -sS -o /tmp/live.json -w '%{http_code}' 'http://127.0.0.1:8080/?c=health&a=live')"
+          ready_code="$(curl -sS -o /tmp/ready.json -w '%{http_code}' 'http://127.0.0.1:8080/?c=health&a=ready')"
+          test "$live_code" = "200"
+          test "$ready_code" = "200"
+          grep -q '"status":"alive"' /tmp/live.json
+          grep -q '"ready":true' /tmp/ready.json
+          grep -q '"release_id":"ci-ha-release-1"' /tmp/live.json
+
+      - name: Enable maintenance and verify traffic drain behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          php scripts/maintenance.php enable             --confirm=MAINTENANCE             --reason="CI cutover test"             --retry-after=45             --release=ci-ha-release-1
+
+          live_code="$(curl -sS -o /tmp/live-maint.json -w '%{http_code}' 'http://127.0.0.1:8080/?c=health&a=live')"
+          ready_code="$(curl -sS -D /tmp/ready-headers.txt -o /tmp/ready-maint.json -w '%{http_code}' 'http://127.0.0.1:8080/?c=health&a=ready')"
+          app_code="$(curl -sS -o /tmp/app-maint.html -w '%{http_code}' 'http://127.0.0.1:8080/?c=auth&a=index')"
+
+          test "$live_code" = "200"
+          test "$ready_code" = "503"
+          test "$app_code" = "503"
+          grep -qi '^Retry-After: 45' /tmp/ready-headers.txt
+          grep -q '"status":"maintenance"' /tmp/ready-maint.json
+
+      - name: Safe resume after maintenance
+        run: php scripts/resume_traffic.php --confirm=RESUME --skip-recovery
+
+      - name: Verify traffic resumes only after gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready_code="$(curl -sS -o /tmp/ready-resumed.json -w '%{http_code}' 'http://127.0.0.1:8080/?c=health&a=ready')"
+          test "$ready_code" = "200"
+          grep -q '"ready":true' /tmp/ready-resumed.json
+          php scripts/maintenance.php status | grep -q '"enabled": false'
+
+      - name: Run successful cutover orchestration
+        run: php scripts/cutover.php --confirm=CUTOVER --release=ci-ha-release-1 --skip-recovery
+
+      - name: Verify successful cutover leaves traffic enabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          php scripts/maintenance.php status | grep -q '"enabled": false'
+          php scripts/go_live_check.php --skip-recovery
+
+      - name: Simulate post-maintenance cutover failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          if BACKUP_DIR=/proc/roster-impossible php scripts/cutover.php               --confirm=CUTOVER               --release=ci-ha-release-1               --skip-recovery; then
+            echo "Cutover unexpectedly succeeded" >&2
+            exit 1
+          fi
+          php scripts/maintenance.php status | grep -q '"enabled": true'
+
+      - name: Recover from failed cutover using safe resume
+        run: php scripts/resume_traffic.php --confirm=RESUME --skip-recovery
+
+      - name: Verify final state
+        shell: bash
+        run: |
+          set -euo pipefail
+          php scripts/maintenance.php status | grep -q '"enabled": false'
+          code="$(curl -sS -o /tmp/final-ready.json -w '%{http_code}' 'http://127.0.0.1:8080/?c=health&a=ready')"
+          test "$code" = "200"
+          grep -q '"ready":true' /tmp/final-ready.json
+
+      - name: Stop PHP application server
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/roster-ha-server.pid ]; then
+            kill "$(cat /tmp/roster-ha-server.pid)" || true
+          fi
+          cat /tmp/roster-ha-server.log || true
