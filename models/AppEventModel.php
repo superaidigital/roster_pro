@@ -160,13 +160,13 @@ final class AppEventModel {
 
     public function deleteResolvedOlderThan(int $days): int {
         $days = max(7, min(3650, $days));
+        $threshold = date('Y-m-d H:i:s', time() - ($days * 86400));
         $stmt = $this->db->prepare(
             "DELETE FROM observability_events
              WHERE status = 'RESOLVED'
-               AND resolved_at < DATE_SUB(NOW(), INTERVAL ? DAY)"
+               AND resolved_at < ?"
         );
-        $stmt->bindValue(1, $days, PDO::PARAM_INT);
-        $stmt->execute();
+        $stmt->execute([$threshold]);
         return $stmt->rowCount();
     }
 }
