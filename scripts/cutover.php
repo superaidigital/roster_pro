@@ -34,8 +34,13 @@ if (($options['confirm'] ?? '') !== 'CUTOVER') {
 }
 
 $releaseId = trim((string)($options['release'] ?? ReleaseIdentity::current()));
-if ($releaseId === '' || $releaseId === 'unknown') {
-    fwrite(STDERR, "CUTOVER_REFUSED: release id is required.\n");
+$currentReleaseId = ReleaseIdentity::current();
+if ($releaseId === '' || $releaseId === 'unknown' || $currentReleaseId === 'unknown') {
+    fwrite(STDERR, "CUTOVER_REFUSED: release id is required in APP_RELEASE_ID and --release.\n");
+    exit(2);
+}
+if (!hash_equals($currentReleaseId, $releaseId)) {
+    fwrite(STDERR, "CUTOVER_REFUSED: --release does not match APP_RELEASE_ID of this instance.\n");
     exit(2);
 }
 
