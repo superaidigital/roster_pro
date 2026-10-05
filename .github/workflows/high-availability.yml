@@ -133,7 +133,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if BACKUP_DIR=/proc/roster-impossible php scripts/cutover.php               --confirm=CUTOVER               --release=ci-ha-failure               --skip-recovery; then
+          if BACKUP_DIR=/proc/roster-impossible php scripts/cutover.php               --confirm=CUTOVER               --release=ci-ha-release-1               --skip-recovery; then
             echo "Cutover unexpectedly succeeded" >&2
             exit 1
           fi
