@@ -126,7 +126,7 @@ class DashboardController {
         $dashboardCacheHit = false;
 
         try {
-            $cache = new SimpleCache();
+            $cache = new SimpleCache(getenv('PERFORMANCE_CACHE_DIR') ?: null);
             $cached = $cache->remember(
                 $cacheKey,
                 $dashboardCacheTtl,
