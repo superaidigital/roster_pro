@@ -60,13 +60,14 @@ try {
     );
 
     $userIds = [];
+    $performancePasswordHash = password_hash('PerfPass!2026', PASSWORD_DEFAULT);
     for ($i = 1; $i <= 80; $i++) {
         $hospitalId = $hospitalIds[($i - 1) % count($hospitalIds)];
         $insertUser->execute([
             $hospitalId,
             'Performance User ' . $i,
             'perf_user_' . $i,
-            password_hash('PerfPass!2026', PASSWORD_DEFAULT),
+            $performancePasswordHash,
             $payRateId,
         ]);
         $userIds[] = (int)$db->lastInsertId();
