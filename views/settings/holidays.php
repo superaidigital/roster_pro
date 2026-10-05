@@ -1,6 +1,6 @@
 <?php
 // ที่อยู่ไฟล์: views/settings/holidays.php
-$year = $_GET['year'] ?? date('Y');
+$year = isset($year) ? (int)$year : (int)date('Y');
 $holidays = $holidays ?? [];
 
 // ฟังก์ชันแปลงวันที่เป็นรูปแบบ พ.ศ. (วว/ดด/ปปปป)
@@ -36,23 +36,26 @@ function formatDateThai($dateString) {
             <a href="index.php?c=settings&a=system" class="btn btn-light border fw-bold rounded-pill shadow-sm px-4">
                 <i class="bi bi-arrow-left me-1"></i> กลับ
             </a>
-            <a href="index.php?c=settings&a=sync_api&year=<?= $year ?>" class="btn btn-primary fw-bold rounded-pill shadow-sm px-4" onclick="return confirm('ระบบจะทำการดึงข้อมูลจาก Server ส่วนกลาง (Data.go.th / Nager Date)\nต้องการดำเนินการต่อหรือไม่?');">
-                <i class="bi bi-cloud-arrow-down me-1"></i> ซิงค์ API ปี <?= $year ?>
-            </a>
+            <form action="index.php?c=settings&a=sync_api" method="POST" class="m-0" onsubmit="return confirm('ระบบจะทำการดึงข้อมูลวันหยุดจาก Server ส่วนกลาง\nต้องการดำเนินการต่อหรือไม่?');">
+                <input type="hidden" name="year" value="<?= (int)$year ?>">
+                <button type="submit" class="btn btn-primary fw-bold rounded-pill shadow-sm px-4">
+                    <i class="bi bi-cloud-arrow-down me-1"></i> ซิงค์ API ปี <?= (int)$year ?>
+                </button>
+            </form>
         </div>
     </div>
 
     <!-- Alerts -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
 
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
@@ -151,18 +154,23 @@ function formatDateThai($dateString) {
                                             ?>
                                         </td>
                                         <td class="text-center">
-                                            <?php if(isset($h['is_active']) && $h['is_active'] == 1): ?>
-                                                <a href="index.php?c=settings&a=toggle_holiday&id=<?= $h['id'] ?>&status=0" class="btn btn-sm btn-success rounded-pill" style="font-size: 11px;" title="กดเพื่อปิดใช้งาน">กำลังใช้งาน</a>
-                                            <?php else: ?>
-                                                <a href="index.php?c=settings&a=toggle_holiday&id=<?= $h['id'] ?>&status=1" class="btn btn-sm btn-secondary rounded-pill" style="font-size: 11px;" title="กดเพื่อเปิดใช้งาน">ปิดใช้งาน</a>
-                                            <?php endif; ?>
+                                            <form action="index.php?c=settings&a=toggle_holiday" method="POST" class="d-inline">
+                                                <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+                                                <input type="hidden" name="status" value="<?= (isset($h['is_active']) && (int)$h['is_active'] === 1) ? 0 : 1 ?>">
+                                                <?php if(isset($h['is_active']) && (int)$h['is_active'] === 1): ?>
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill" style="font-size: 11px;" title="กดเพื่อปิดใช้งาน">กำลังใช้งาน</button>
+                                                <?php else: ?>
+                                                    <button type="submit" class="btn btn-sm btn-secondary rounded-pill" style="font-size: 11px;" title="กดเพื่อเปิดใช้งาน">ปิดใช้งาน</button>
+                                                <?php endif; ?>
+                                            </form>
                                         </td>
                                         <td class="text-center">
-                                            <a href="index.php?c=settings&a=delete_holiday&id=<?= $h['id'] ?>" 
-                                               class="btn btn-sm btn-outline-danger rounded-circle" 
-                                               onclick="return confirm('ยืนยันการลบวันหยุดนี้?');" title="ลบ">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
+                                            <form action="index.php?c=settings&a=delete_holiday" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบวันหยุดนี้?');">
+                                                <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle" title="ลบ">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
