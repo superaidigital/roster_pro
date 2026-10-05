@@ -743,6 +743,125 @@ if (is_file($observabilityServiceDrPath)) {
     }
 }
 
+// 5.13) High availability and production cutover guards.
+$haFiles = [
+    'lib/MaintenanceMode.php',
+    'lib/ReleaseIdentity.php',
+    'lib/CommandRunner.php',
+    'scripts/maintenance.php',
+    'scripts/cutover_precheck.php',
+    'scripts/go_live_check.php',
+    'scripts/cutover.php',
+    'scripts/resume_traffic.php',
+    '.github/workflows/high-availability.yml',
+    'docs/PRODUCTION_CUTOVER.md',
+];
+foreach ($haFiles as $relativePath) {
+    if (!is_file($root . '/' . $relativePath)) {
+        addError($errors, 'Missing high-availability/cutover file: ' . $relativePath);
+    }
+}
+
+$healthControllerPath = $root . '/controllers/HealthController.php';
+if (is_file($healthControllerPath)) {
+    $healthController = (string) file_get_contents($healthControllerPath);
+    foreach ([
+        'public function live()',
+        'public function ready()',
+        'MaintenanceMode::safeStatus()',
+        "header('X-Release-ID: '",
+        "'ready' =>",
+    ] as $token) {
+        if (strpos($healthController, $token) === false) {
+            addError($errors, "controllers/HealthController.php: missing HA token {$token}");
+        }
+    }
+
+    $liveStart = strpos($healthController, 'public function live()');
+    $readyStart = strpos($healthController, 'public function ready()');
+    if ($liveStart !== false && $readyStart !== false && $readyStart > $liveStart) {
+        $liveBody = substr($healthController, $liveStart, $readyStart - $liveStart);
+        if (strpos($liveBody, 'new Database') !== false
+            || strpos($liveBody, 'DeploymentHealth::check') !== false) {
+            addError($errors, 'controllers/HealthController.php: liveness must remain database-independent');
+        }
+    }
+}
+
+$frontHaPath = $root . '/index.php';
+if (is_file($frontHaPath)) {
+    $frontHa = (string) file_get_contents($frontHaPath);
+    foreach ([
+        "'live', 'ready'",
+        'MaintenanceMode::safeStatus()',
+        'MaintenanceMode::renderUnavailable',
+    ] as $token) {
+        if (strpos($frontHa, $token) === false) {
+            addError($errors, "index.php: missing maintenance/readiness token {$token}");
+        }
+    }
+}
+
+$maintenanceLibPath = $root . '/lib/MaintenanceMode.php';
+if (is_file($maintenanceLibPath)) {
+    $maintenanceLib = (string) file_get_contents($maintenanceLibPath);
+    foreach (['storage/runtime', 'safeStatus', 'Retry-After', 'rename(', '0600', 'public/'] as $token) {
+        if (strpos($maintenanceLib, $token) === false) {
+            addError($errors, "lib/MaintenanceMode.php: missing control-plane safety token {$token}");
+        }
+    }
+}
+
+$settingsViewPath = $root . '/views/settings/system.php';
+if (is_file($settingsViewPath)) {
+    $settingsView = (string) file_get_contents($settingsViewPath);
+    if (strpos($settingsView, 'name="settings[maintenance_mode]"') !== false) {
+        addError($errors, 'views/settings/system.php: maintenance must not be controlled by legacy DB checkbox');
+    }
+}
+
+$preflightHaPath = $root . '/scripts/preflight.php';
+if (is_file($preflightHaPath)) {
+    $preflightHa = (string) file_get_contents($preflightHaPath);
+    if (strpos($preflightHa, "'allow-pending'") === false
+        || strpos($preflightHa, '$allowPending') === false) {
+        addError($errors, 'scripts/preflight.php: explicit cutover pending-migration mode is required');
+    }
+}
+
+$cutoverPath = $root . '/scripts/cutover.php';
+if (is_file($cutoverPath)) {
+    $cutover = (string) file_get_contents($cutoverPath);
+    foreach ([
+        'scripts/cutover_precheck.php',
+        'MaintenanceMode::enable',
+        'MaintenanceMode::disable',
+        'CUTOVER_FAILED_MAINTENANCE_REMAINS_ON',
+        'hash_equals($currentReleaseId, $releaseId)',
+        'scripts/go_live_check.php',
+    ] as $token) {
+        if (strpos($cutover, $token) === false) {
+            addError($errors, "scripts/cutover.php: missing cutover safety token {$token}");
+        }
+    }
+}
+
+$goLivePath = $root . '/scripts/go_live_check.php';
+if (is_file($goLivePath)) {
+    $goLive = (string) file_get_contents($goLivePath);
+    foreach ([
+        'DeploymentHealth::check',
+        'scripts/performance_check.php',
+        'scripts/recovery_check.php',
+        'recovery checks cannot be skipped in production',
+        'GO_LIVE_CHECK_OK',
+    ] as $token) {
+        if (strpos($goLive, $token) === false) {
+            addError($errors, "scripts/go_live_check.php: missing go-live token {$token}");
+        }
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',
