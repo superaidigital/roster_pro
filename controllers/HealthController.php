@@ -33,6 +33,7 @@ class HealthController {
             'status' => $result['status'],
             'checks' => $result['checks'],
             'migrations' => $result['migration_summary'],
+            'reliability' => $result['reliability'] ?? null,
             'timestamp' => date(DATE_ATOM),
         ], JSON_UNESCAPED_SLASHES);
         exit;
