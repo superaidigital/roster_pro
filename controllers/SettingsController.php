@@ -998,14 +998,27 @@ class SettingsController {
 
     // ฟังก์ชันใหม่: URL สำหรับให้ Cron Job เรียกใช้งาน (ไม่ต้อง Login)
     public function cron_monthly_backup() {
-        $secret_key = (string)(getenv('ROSTER_CRON_KEY') ?: ''); 
-        $provided_key = $_GET['key'] ?? '';
-
-        if ($secret_key === '' || !hash_equals($secret_key, (string)$provided_key)) {
-            die("Access Denied: Invalid Cron Key.");
+        // Production backups are CLI-only so credentials never appear in URLs,
+        // proxy logs, browser history or Referer headers.
+        if (security_is_production()) {
+            http_response_code(404);
+            exit;
         }
 
-        set_time_limit(300); 
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            exit;
+        }
+
+        $secretKey = (string)(getenv('ROSTER_CRON_KEY') ?: '');
+        $providedKey = (string)($_SERVER['HTTP_X_ROSTER_CRON_KEY'] ?? '');
+
+        if ($secretKey === '' || $providedKey === '' || !hash_equals($secretKey, $providedKey)) {
+            http_response_code(403);
+            exit('Access denied.');
+        }
+
+        set_time_limit(300);
         ini_set('memory_limit', '256M');
 
         $db = (new Database())->getConnection();
@@ -1016,9 +1029,8 @@ class SettingsController {
                 mkdir($backup_dir, 0700, true);
             }
 
-            // เช็คว่าเดือนนี้มีไฟล์แล้วหรือยัง
             $current_month_prefix = 'roster_pro_autobackup_' . date('Y_m_');
-            $files = scandir($backup_dir);
+            $files = scandir($backup_dir) ?: [];
             $already_backed_up = false;
             foreach ($files as $file) {
                 if (strpos($file, $current_month_prefix) !== false) {
@@ -1032,18 +1044,23 @@ class SettingsController {
                 $backup_file_name = $current_month_prefix . date('d_His') . '.sql';
                 $filepath = $backup_dir . $backup_file_name;
 
-                if (file_put_contents($filepath, $sqlScript) !== false) {
-                    // 🌟 บันทึก Log: การรัน Cron Job (ใช้ ID 0)
-                    LogsController::addLog($db, 0, LogsController::ACTION_EXPORT, "[CRON JOB] สำรองข้อมูลอัตโนมัติประจำเดือน ({$backup_file_name})");
-                    echo "Cron Backup Success: {$backup_file_name}";
+                if (file_put_contents($filepath, $sqlScript, LOCK_EX) !== false) {
+                    @chmod($filepath, 0600);
+                    LogsController::addLog(
+                        $db,
+                        0,
+                        LogsController::ACTION_EXPORT,
+                        "[NON-PROD CRON] สำรองข้อมูลอัตโนมัติประจำเดือน ({$backup_file_name})"
+                    );
+                    echo "Cron Backup Success";
                 } else {
-                    echo "Cron Backup Failed: Cannot write file.";
+                    http_response_code(500);
+                    echo "Cron Backup Failed";
                 }
             } else {
-                echo "Cron Backup Skipped: Already backed up this month.";
+                echo "Cron Backup Skipped";
             }
-
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             error_log("Cron backup failed: " . $e->getMessage());
             http_response_code(500);
             echo "Cron Backup Error";
