@@ -140,11 +140,15 @@ final class AppEventModel {
     public function summary(): array {
         $sql = "
             SELECT
-                SUM(status = 'OPEN') AS open_total,
-                SUM(status = 'OPEN' AND severity = 'CRITICAL') AS critical_open,
-                SUM(status = 'OPEN' AND severity = 'ERROR') AS error_open,
-                SUM(last_seen_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS events_24h,
-                SUM(status = 'OPEN' AND last_seen_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS open_24h
+                SUM(CASE WHEN status = 'OPEN' THEN 1 ELSE 0 END) AS open_total,
+                SUM(CASE WHEN status = 'OPEN' AND severity = 'CRITICAL' THEN 1 ELSE 0 END) AS critical_open,
+                SUM(CASE WHEN status = 'OPEN' AND severity = 'ERROR' THEN 1 ELSE 0 END) AS error_open,
+                SUM(CASE WHEN last_seen_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR) THEN 1 ELSE 0 END) AS events_24h,
+                SUM(CASE
+                    WHEN status = 'OPEN'
+                     AND last_seen_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                    THEN 1 ELSE 0
+                END) AS open_24h
             FROM observability_events
         ";
         $row = $this->db->query($sql)->fetch(PDO::FETCH_ASSOC) ?: [];
