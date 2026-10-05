@@ -3100,3 +3100,25 @@ h1, h2, h3, h4, h5, h6,
     transition: none;
   }
 }
+
+
+/* Sidebar toggle visibility contract — 2026-10-05 */
+@media (min-width: 1024px) {
+  .top-navbar .rp-mobile-menu-btn {
+    display: none !important;
+  }
+
+  .top-navbar .rp-desktop-menu-btn {
+    display: inline-grid !important;
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .top-navbar .rp-mobile-menu-btn {
+    display: inline-grid !important;
+  }
+
+  .top-navbar .rp-desktop-menu-btn {
+    display: none !important;
+  }
+}
