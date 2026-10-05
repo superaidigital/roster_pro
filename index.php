@@ -37,7 +37,8 @@ if (!security_is_valid_route_token($c) || !security_is_valid_route_token($a)) {
 // Verification exposes only minimal official-document metadata; roster contents remain private.
 $publicVerifyActions = ['index', 'revision'];
 $isPublicRoute = $c === 'auth'
-    || ($c === 'verify' && in_array($a, $publicVerifyActions, true));
+    || ($c === 'verify' && in_array($a, $publicVerifyActions, true))
+    || ($c === 'health' && $a === 'index');
 
 if (!$isPublicRoute && !isset($_SESSION['user'])) {
     header("Location: index.php?c=auth&a=index");

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS roster_revisions (
   approved_signature LONGTEXT NULL,
   approved_at DATETIME NOT NULL,
   staff_json LONGTEXT NOT NULL,
+  holidays_json LONGTEXT NOT NULL,
   shifts_json LONGTEXT NOT NULL,
   pay_summary_json LONGTEXT NULL,
   content_hash CHAR(64) NOT NULL,

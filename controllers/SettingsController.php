@@ -754,14 +754,25 @@ class SettingsController {
         if (is_dir($backup_dir)) {
             $files = scandir($backup_dir);
             foreach ($files as $file) {
-                if (pathinfo($file, PATHINFO_EXTENSION) === 'sql') {
-                    $filepath = $backup_dir . $file;
-                    $server_backups[] = [
-                        'filename' => $file,
-                        'size' => round(filesize($filepath) / 1024, 2), // KB
-                        'date' => date("d/m/Y H:i:s", filemtime($filepath)),
-                        ];
+                $lower = strtolower($file);
+                $isSql = str_ends_with($lower, '.sql');
+                $isGzipSql = str_ends_with($lower, '.sql.gz');
+                if (!$isSql && !$isGzipSql) {
+                    continue;
                 }
+
+                $filepath = $backup_dir . $file;
+                if (!is_file($filepath)) {
+                    continue;
+                }
+
+                $server_backups[] = [
+                    'filename' => $file,
+                    'size' => round(filesize($filepath) / 1024, 2),
+                    'date' => date("d/m/Y H:i:s", filemtime($filepath)),
+                    'download_url' => 'index.php?c=settings&a=download_server_backup&file=' . rawurlencode($file),
+                    'has_checksum' => is_file($filepath . '.sha256'),
+                ];
             }
             // เรียงจากใหม่ไปเก่า
             usort($server_backups, function($a, $b) {
@@ -902,26 +913,34 @@ class SettingsController {
 
     public function download_server_backup() {
         $this->requireAccess(['SUPERADMIN']);
+
         $filename = basename((string)($_GET['file'] ?? ''));
         $filepath = 'storage/backups/' . $filename;
+        $lower = strtolower($filename);
+        $isAllowed = str_ends_with($lower, '.sql') || str_ends_with($lower, '.sql.gz');
 
-        if ($filename === '' || !is_file($filepath) || strtolower(pathinfo($filename, PATHINFO_EXTENSION)) !== 'sql') {
+        if ($filename === '' || !$isAllowed || !is_file($filepath)) {
             http_response_code(404);
             exit('Backup file not found.');
         }
 
         $db = (new Database())->getConnection();
-        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "ดาวน์โหลดไฟล์สำรองข้อมูลในเซิร์ฟเวอร์ ({$filename})");
+        LogsController::addLog(
+            $db,
+            $_SESSION['user']['id'],
+            LogsController::ACTION_EXPORT,
+            "ดาวน์โหลดไฟล์สำรองข้อมูลในเซิร์ฟเวอร์ ({$filename})"
+        );
 
-        header('Content-Type: application/sql');
+        header('Content-Type: ' . (str_ends_with($lower, '.gz') ? 'application/gzip' : 'application/sql'));
         header('Content-Disposition: attachment; filename="' . rawurlencode($filename) . '"');
         header('Content-Length: ' . filesize($filepath));
         header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store, max-age=0');
         readfile($filepath);
         exit;
     }
 
-    // ฟังก์ชันใหม่: ลบไฟล์ Backup ใน Server
     public function delete_server_backup() {
         $this->requirePost();
         $this->requireAccess(['SUPERADMIN']);
@@ -930,6 +949,12 @@ class SettingsController {
 
         if (!empty($filename) && file_exists($filepath)) {
             unlink($filepath);
+            foreach (['.sha256', '.json'] as $sidecar) {
+                $sidecarPath = $filepath . $sidecar;
+                if (is_file($sidecarPath)) {
+                    unlink($sidecarPath);
+                }
+            }
             $db = (new Database())->getConnection();
             
             // 🌟 บันทึก Log: ลบไฟล์สำรองข้อมูล

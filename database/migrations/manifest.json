@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "description": "Explicit migration order for production upgrades. Do not rely on filename sorting.",
+  "migrations": [
+    "20261003_legacy_compat.sql",
+    "20261004_field_visits.sql",
+    "20261004_field_followup.sql",
+    "20261004_field_operations_v2.sql",
+    "20261004_performance_indexes.sql",
+    "20261004_roster_snapshots.sql",
+    "20261004_roster_audit_logs.sql",
+    "20261005_roster_revisions.sql",
+    "20261005_roster_revision_verification.sql"
+  ]
+}

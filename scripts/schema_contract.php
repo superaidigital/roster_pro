@@ -29,6 +29,10 @@ $required = [
     'logs' => ['id','user_id','action','details','ip_address','created_at'],
     'field_visits' => ['id','hospital_id','created_by','visit_date','patient_ref','visit_type','status','latitude','longitude','photo_consent','created_at','updated_at'],
     'field_visit_photos' => ['id','field_visit_id','stored_path','original_name','mime_type','file_size','created_at'],
+    'schema_migrations' => ['version','checksum','status','batch','applied_by','started_at','applied_at','execution_ms','error_message'],
+    'roster_snapshots' => ['id','hospital_id','month_year','snapshot_kind','status_snapshot','shift_count','shifts_json','checksum','is_protected','created_by','created_at'],
+    'roster_audit_logs' => ['id','hospital_id','month_year','actor_user_id','action_type','entity_type','before_json','after_json','metadata_json','created_at'],
+    'roster_revisions' => ['id','hospital_id','hospital_name','month_year','revision_no','revision_code','snapshot_id','prepared_by','reviewed_by','approved_by','staff_json','holidays_json','shifts_json','pay_summary_json','content_hash','verification_code','created_at'],
 ];
 
 $errors = [];

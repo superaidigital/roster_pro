@@ -517,6 +517,27 @@ CREATE TABLE `system_menus` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `schema_migrations`
+--
+
+CREATE TABLE `schema_migrations` (
+  `version` varchar(190) NOT NULL,
+  `checksum` char(64) NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'applied',
+  `batch` int unsigned NOT NULL DEFAULT 1,
+  `applied_by` varchar(190) DEFAULT NULL,
+  `started_at` datetime DEFAULT NULL,
+  `applied_at` datetime DEFAULT NULL,
+  `execution_ms` int unsigned DEFAULT NULL,
+  `error_message` text DEFAULT NULL,
+  PRIMARY KEY (`version`),
+  KEY `idx_schema_migrations_status` (`status`,`applied_at`),
+  KEY `idx_schema_migrations_batch` (`batch`,`applied_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `system_settings`
 --
 

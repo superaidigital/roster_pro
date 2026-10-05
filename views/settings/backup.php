@@ -82,7 +82,7 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                     </div>
                     <h5 class="fw-bolder text-dark mb-2">สำรองข้อมูลเก็บไว้ในเซิร์ฟเวอร์</h5>
                     <p class="text-muted mb-4" style="font-size: 13.5px; line-height: 1.6;">
-                        บันทึกไฟล์ .sql เก็บไว้ในโฟลเดอร์ <code class="bg-light px-2 py-1 rounded">public/uploads/Backup</code> อย่างปลอดภัย
+                        บันทึกไฟล์ .sql เก็บไว้ในโฟลเดอร์ <code class="bg-light px-2 py-1 rounded">storage/backups</code> อย่างปลอดภัย
                     </p>
 
                     <form action="index.php?c=settings&a=do_server_backup" method="POST" class="w-100" onsubmit="return confirm('ต้องการสร้างไฟล์สำรองข้อมูลเก็บบนเซิร์ฟเวอร์ใช่หรือไม่?');">
@@ -126,11 +126,16 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                                         <td class="py-3 fw-medium text-dark text-start ps-4">
                                             <i class="bi bi-filetype-sql text-primary me-2"></i>
                                             <?= htmlspecialchars($file['filename']) ?>
+                                            <?php if (!empty($file['has_checksum'])): ?>
+                                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 ms-1" title="มี SHA-256 checksum">
+                                                    <i class="bi bi-shield-check"></i>
+                                                </span>
+                                            <?php endif; ?>
                                         </td>
                                         <td><span class="badge bg-secondary bg-opacity-10 text-secondary border font-monospace"><?= $file['size'] ?> KB</span></td>
                                         <td class="text-muted"><?= $file['date'] ?></td>
                                         <td>
-                                            <a href="<?= htmlspecialchars($file['path']) ?>" download class="btn btn-sm btn-outline-primary rounded-circle" title="ดาวน์โหลด">
+                                            <a href="<?= htmlspecialchars($file['download_url'] ?? '#', ENT_QUOTES, 'UTF-8') ?>" class="btn btn-sm btn-outline-primary rounded-circle" title="ดาวน์โหลด">
                                                 <i class="bi bi-download"></i>
                                             </a>
                                             <form action="index.php?c=settings&a=delete_server_backup" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบไฟล์ <?= htmlspecialchars($file['filename']) ?> ?');">
