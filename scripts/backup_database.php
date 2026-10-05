@@ -69,6 +69,7 @@ $candidates = $binaryOverride !== ''
     ? [$binaryOverride]
     : ['mariadb-dump', 'mysqldump'];
 
+$backupStartedAt = date(DATE_ATOM);
 $timestamp = date('Ymd_His');
 $safeDb = preg_replace('/[^A-Za-z0-9_-]+/', '_', $dbName) ?: 'database';
 $filename = "{$safeDb}_{$label}_{$timestamp}.sql.gz";
@@ -192,6 +193,7 @@ $manifest = [
     'filename' => $filename,
     'sha256' => $checksum,
     'size_bytes' => filesize($finalPath),
+    'started_at' => $backupStartedAt,
     'created_at' => date(DATE_ATOM),
     'database' => $dbName,
     'label' => $label,
