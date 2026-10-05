@@ -396,6 +396,7 @@ CREATE TABLE `roster_revisions` (
   `approved_signature` longtext DEFAULT NULL,
   `approved_at` datetime NOT NULL,
   `staff_json` longtext NOT NULL,
+  `holidays_json` longtext NOT NULL,
   `shifts_json` longtext NOT NULL,
   `pay_summary_json` longtext DEFAULT NULL,
   `content_hash` char(64) NOT NULL,
