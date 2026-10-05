@@ -2,6 +2,8 @@
 // ที่อยู่ไฟล์: controllers/DashboardController.php
 
 require_once 'config/database.php';
+require_once 'models/DashboardMetricsModel.php';
+require_once 'lib/SimpleCache.php';
 
 class DashboardController {
     
@@ -110,180 +112,70 @@ class DashboardController {
         // ==========================================
         // 👔 3. Dashboard สำหรับผู้บริหาร (ADMIN, DIRECTOR, SCHEDULER)
         // ==========================================
-        $is_global = in_array($role, ['ADMIN', 'SUPERADMIN']);
-        
-        $total_hospitals = 1; 
-        if ($is_global) {
-            $total_hospitals = $db->query("SELECT COUNT(*) FROM hospitals WHERE id != 0 AND deleted_at IS NULL AND is_active = 1")->fetchColumn() ?: 0;
-        }
-        
-        $query_staff = "SELECT COUNT(*) FROM users WHERE role NOT IN ('SUPERADMIN', 'ADMIN') AND deleted_at IS NULL AND is_deleted = 0";
-        if (!$is_global) $query_staff .= " AND hospital_id = " . (int)$my_hosp_id;
-        $total_staff = $db->query($query_staff)->fetchColumn() ?: 0;
+        $is_global = in_array($role, ['ADMIN', 'SUPERADMIN'], true);
+        $scope_hospital_id = $is_global ? null : (int)$my_hosp_id;
 
-        $query_duty = "SELECT COUNT(DISTINCT user_id) FROM shifts WHERE shift_date = '$today' AND shift_type NOT IN ('', 'ย', 'OFF', 'L', 'O')";
-        if (!$is_global) $query_duty .= " AND hospital_id = " . (int)$my_hosp_id;
-        $on_duty_today = $db->query($query_duty)->fetchColumn() ?: 0;
+        $metricsModel = new DashboardMetricsModel($db);
+        $dashboardCacheTtl = max(5, min(300, (int)(getenv('DASHBOARD_CACHE_TTL') ?: 20)));
+        $cacheKey = 'dashboard:executive:v2:'
+            . ($scope_hospital_id === null ? 'global' : 'hospital-' . $scope_hospital_id)
+            . ':' . $current_month
+            . ':' . $today;
 
-        $query_leave = "SELECT COUNT(*) FROM leave_requests WHERE status = 'PENDING'";
-        if (!$is_global) $query_leave .= " AND user_id IN (SELECT id FROM users WHERE hospital_id = " . (int)$my_hosp_id . ")";
-        $pending_leaves = $db->query($query_leave)->fetchColumn() ?: 0;
+        $dashboardStartedAt = microtime(true);
+        $dashboardCacheHit = false;
 
-        $pending_swaps = 0;
         try {
-            $query_swaps = "SELECT COUNT(*) FROM shift_swaps WHERE status IN ('PENDING_TARGET', 'PENDING_DIRECTOR')";
-            if (!$is_global) {
-                $query_swaps .= " AND hospital_id = " . (int)$my_hosp_id;
-            }
-            $pending_swaps = (int)$db->query($query_swaps)->fetchColumn();
-        } catch (Exception $e) {
-            $pending_swaps = 0;
-        }
-
-        $estimated_budget = 0;
-        try {
-            $query_budget = "
-                SELECT s.shift_type, pr.rate_r, pr.rate_y, pr.rate_b
-                FROM shifts s
-                JOIN users u ON s.user_id = u.id
-                JOIN pay_rates pr ON u.pay_rate_id = pr.id
-                WHERE s.shift_date LIKE '$current_month-%'
-            ";
-            if (!$is_global) $query_budget .= " AND s.hospital_id = " . (int)$my_hosp_id;
-            
-            $budget_data = $db->query($query_budget)->fetchAll(PDO::FETCH_ASSOC);
-            foreach($budget_data as $b) {
-                $type = $b['shift_type'];
-                if ($type === 'ร' || $type === 'N') $estimated_budget += $b['rate_r'];
-                elseif ($type === 'บ' || $type === 'A') $estimated_budget += $b['rate_b'];
-                elseif ($type === 'ย' || $type === 'O') $estimated_budget += $b['rate_y'];
-                elseif ($type === 'บ/ร') $estimated_budget += ($b['rate_b'] + $b['rate_r']);
-                elseif ($type === 'ย/บ') $estimated_budget += ($b['rate_y'] + $b['rate_b']);
-            }
-        } catch(Exception $e) {}
-
-        $status_counts = ['APPROVED' => 0, 'SUBMITTED' => 0, 'DRAFT' => 0, 'WAITING' => 0];
-        $query_roster = "
-            SELECT h.id as hosp_id, h.name, rs.status 
-            FROM hospitals h 
-            LEFT JOIN roster_status rs ON h.id = rs.hospital_id AND rs.month_year = '$current_month'
-            WHERE h.id != 0 AND h.deleted_at IS NULL AND h.is_active = 1
-        ";
-        if (!$is_global) $query_roster .= " AND h.id = " . (int)$my_hosp_id;
-
-        $stmt_roster = $db->query($query_roster);
-        $roster_data = $stmt_roster->fetchAll(PDO::FETCH_ASSOC);
-        $waiting_hospitals = []; 
-
-        foreach ($roster_data as $row) {
-            $st = $row['status'];
-            if ($st === 'APPROVED') $status_counts['APPROVED']++;
-            elseif ($st === 'SUBMITTED') $status_counts['SUBMITTED']++;
-            elseif ($st === 'DRAFT' || $st === 'REQUEST_EDIT') $status_counts['DRAFT']++;
-            else { $status_counts['WAITING']++; $waiting_hospitals[] = $row['name']; }
+            $cache = new SimpleCache();
+            $cached = $cache->remember(
+                $cacheKey,
+                $dashboardCacheTtl,
+                static fn(): array => $metricsModel->getExecutiveAggregates(
+                    $scope_hospital_id,
+                    $current_month,
+                    $today
+                )
+            );
+            $aggregates = is_array($cached['value'] ?? null) ? $cached['value'] : [];
+            $dashboardCacheHit = (bool)($cached['hit'] ?? false);
+        } catch (Throwable $e) {
+            error_log('Dashboard aggregate cache fallback: ' . $e->getMessage());
+            $aggregates = $metricsModel->getExecutiveAggregates(
+                $scope_hospital_id,
+                $current_month,
+                $today
+            );
         }
 
-        $query_workload = "
-            SELECT h.short_name, COUNT(s.id) as total_shifts 
-            FROM shifts s JOIN hospitals h ON s.hospital_id = h.id 
-            WHERE s.shift_date LIKE '$current_month-%' AND s.shift_type NOT IN ('', 'ย', 'OFF')
-        ";
-        if (!$is_global) $query_workload .= " AND s.hospital_id = " . (int)$my_hosp_id;
-        $query_workload .= " GROUP BY s.hospital_id ORDER BY total_shifts DESC LIMIT 5";
-        $workload_data = $db->query($query_workload)->fetchAll(PDO::FETCH_ASSOC);
+        // Keep personal/recent activity out of shared file cache.
+        $liveDetails = $metricsModel->getExecutiveLiveDetails(
+            $scope_hospital_id,
+            $current_month
+        );
 
-        $leave_trends_labels = [];
-        $leave_trends_data = [];
-        try {
-            $query_leave_trends = "
-                SELECT lq.leave_type, COUNT(lr.id) as count_leave
-                FROM leave_requests lr JOIN leave_quotas lq ON lr.leave_type_id = lq.id JOIN users u ON lr.user_id = u.id
-                WHERE lr.start_date LIKE '$current_month-%' AND lr.status = 'APPROVED'
-            ";
-            if (!$is_global) $query_leave_trends .= " AND u.hospital_id = " . (int)$my_hosp_id;
-            $query_leave_trends .= " GROUP BY lq.leave_type";
+        $total_hospitals = (int)($aggregates['total_hospitals'] ?? 0);
+        $total_staff = (int)($aggregates['total_staff'] ?? 0);
+        $on_duty_today = (int)($aggregates['on_duty_today'] ?? 0);
+        $pending_leaves = (int)($aggregates['pending_leaves'] ?? 0);
+        $pending_swaps = (int)($aggregates['pending_swaps'] ?? 0);
+        $estimated_budget = (float)($aggregates['estimated_budget'] ?? 0);
+        $status_counts = $aggregates['status_counts'] ?? ['APPROVED' => 0, 'SUBMITTED' => 0, 'DRAFT' => 0, 'WAITING' => 0];
+        $waiting_hospitals = $aggregates['waiting_hospitals'] ?? [];
+        $workload_data = $aggregates['workload_data'] ?? [];
+        $leave_trends_labels = $aggregates['leave_trends_labels'] ?? [];
+        $leave_trends_data = $aggregates['leave_trends_data'] ?? [];
+        $risk_hospitals = $aggregates['risk_hospitals'] ?? [];
+        $today_usages = $aggregates['today_usages'] ?? [];
 
-            $leave_trends_result = $db->query($query_leave_trends)->fetchAll(PDO::FETCH_ASSOC);
-            foreach($leave_trends_result as $lt) {
-                $leave_trends_labels[] = $lt['leave_type'];
-                $leave_trends_data[] = $lt['count_leave'];
-            }
-        } catch(Exception $e) {}
+        $fatigue_staff = $liveDetails['fatigue_staff'] ?? [];
+        $recent_leaves = $liveDetails['recent_leaves'] ?? [];
+        $recent_logs = $liveDetails['recent_logs'] ?? [];
 
-        $fatigue_staff = [];
-        try {
-            $query_fatigue = "
-                SELECT u.name, u.type as position, h.short_name as hosp_name, COUNT(s.id) as shift_count
-                FROM shifts s JOIN users u ON s.user_id = u.id JOIN hospitals h ON u.hospital_id = h.id
-                WHERE s.shift_date LIKE '$current_month-%' AND s.shift_type NOT IN ('', 'ย', 'OFF', 'O', 'L')
-            ";
-            if (!$is_global) $query_fatigue .= " AND u.hospital_id = " . (int)$my_hosp_id;
-            $query_fatigue .= " GROUP BY s.user_id HAVING shift_count > 24 ORDER BY shift_count DESC LIMIT 5";
-            
-            $fatigue_staff = $db->query($query_fatigue)->fetchAll(PDO::FETCH_ASSOC);
-        } catch(Exception $e) {}
-
-        $query_risk = "
-            SELECT h.name, COUNT(s.id) as on_duty FROM hospitals h 
-            LEFT JOIN shifts s ON h.id = s.hospital_id AND s.shift_date = '$today' AND s.shift_type NOT IN ('', 'ย', 'OFF', 'O', 'L')
-            WHERE h.id != 0 AND h.deleted_at IS NULL AND h.is_active = 1
-        ";
-        if (!$is_global) $query_risk .= " AND h.id = " . (int)$my_hosp_id;
-        $query_risk .= " GROUP BY h.id HAVING on_duty <= 1";
-        $risk_hospitals = $db->query($query_risk)->fetchAll(PDO::FETCH_ASSOC);
-
-        $query_recent_leaves = "
-            SELECT lr.*, u.name as user_name, lq.leave_type FROM leave_requests lr
-            JOIN users u ON lr.user_id = u.id JOIN leave_quotas lq ON lr.leave_type_id = lq.id
-            WHERE lr.status = 'PENDING'
-        ";
-        if (!$is_global) $query_recent_leaves .= " AND u.hospital_id = " . (int)$my_hosp_id;
-        $query_recent_leaves .= " ORDER BY lr.created_at DESC LIMIT 5";
-        $recent_leaves = $db->query($query_recent_leaves)->fetchAll(PDO::FETCH_ASSOC);
-
-        $recent_logs = [];
-        try {
-            $query_logs = "
-                SELECT l.*, u.name as user_name 
-                FROM logs l JOIN users u ON l.user_id = u.id 
-            ";
-            if (!$is_global) $query_logs .= " WHERE u.hospital_id = " . (int)$my_hosp_id;
-            $query_logs .= " ORDER BY l.created_at DESC LIMIT 6";
-            
-            $recent_logs = $db->query($query_logs)->fetchAll(PDO::FETCH_ASSOC);
-        } catch(Exception $e) {}
-
-        // รายงานการใช้งานระบบประจำวัน
-        $today_usages = [];
-        try {
-            $query_today_usage = "
-                SELECT 
-                    h.name AS hospital_name,
-                    COUNT(l.id) AS total_actions,
-                    SUM(CASE WHEN l.action = 'LOGIN' THEN 1 ELSE 0 END) as count_login,
-                    SUM(CASE WHEN l.action IN ('CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'RESTORE') THEN 1 ELSE 0 END) as count_manage,
-                    SUM(CASE WHEN l.action = 'EXPORT' THEN 1 ELSE 0 END) as count_export,
-                    MAX(l.created_at) AS last_active
-                FROM logs l
-                JOIN users u ON l.user_id = u.id
-                LEFT JOIN hospitals h ON u.hospital_id = h.id
-                WHERE DATE(l.created_at) = :today
-            ";
-            
-            if (!$is_global) {
-                $query_today_usage .= " AND u.hospital_id = " . (int)$my_hosp_id;
-            }
-            
-            $query_today_usage .= "
-                GROUP BY h.id, h.name
-                ORDER BY total_actions DESC
-                LIMIT 15
-            ";
-            
-            $stmt_usage = $db->prepare($query_today_usage);
-            $stmt_usage->execute([':today' => $today]);
-            $today_usages = $stmt_usage->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {}
+        $dashboardDurationMs = round((microtime(true) - $dashboardStartedAt) * 1000, 1);
+        if (!headers_sent()) {
+            header('X-Dashboard-Cache: ' . ($dashboardCacheHit ? 'HIT' : 'MISS'));
+            header('Server-Timing: dashboard;dur=' . $dashboardDurationMs);
+        }
 
         // โหลด View หน้าผู้บริหาร
         require_once 'views/layouts/header.php';
