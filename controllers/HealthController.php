@@ -13,7 +13,7 @@ class HealthController {
         }
 
         try {
-            $db = (new Database())->getConnection();
+            $db = (new Database())->getConnectionOrThrow();
             $result = DeploymentHealth::check($db);
         } catch (Throwable $e) {
             $result = [
