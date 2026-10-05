@@ -573,6 +573,81 @@ foreach (['scripts/job_worker.php', 'scripts/schedule_jobs.php'] as $cliScript) 
     }
 }
 
+// 5.11) Performance and scalability guards.
+$performanceFiles = [
+    'lib/SimpleCache.php',
+    'lib/PerformanceMonitor.php',
+    'models/DashboardMetricsModel.php',
+    'scripts/performance_check.php',
+    'database/migrations/20261005_performance_scalability.sql',
+];
+foreach ($performanceFiles as $relativePath) {
+    if (!is_file($root . '/' . $relativePath)) {
+        addError($errors, 'Missing performance/scalability file: ' . $relativePath);
+    }
+}
+
+$dashboardControllerPath = $root . '/controllers/DashboardController.php';
+if (is_file($dashboardControllerPath)) {
+    $dashboardController = (string) file_get_contents($dashboardControllerPath);
+    foreach ([
+        'DashboardMetricsModel',
+        'SimpleCache',
+        'X-Dashboard-Cache',
+        'Server-Timing',
+    ] as $token) {
+        if (strpos($dashboardController, $token) === false) {
+            addError($errors, "controllers/DashboardController.php: missing performance token {$token}");
+        }
+    }
+}
+
+$dashboardMetricsPath = $root . '/models/DashboardMetricsModel.php';
+if (is_file($dashboardMetricsPath)) {
+    $dashboardMetrics = (string) file_get_contents($dashboardMetricsPath);
+
+    if (preg_match('/DATE\s*\(\s*l\.created_at\s*\)/i', $dashboardMetrics)) {
+        addError($errors, 'models/DashboardMetricsModel.php: DATE(logs.created_at) blocks range-index usage');
+    }
+    if (preg_match('/shift_date\s+LIKE/i', $dashboardMetrics)) {
+        addError($errors, 'models/DashboardMetricsModel.php: shift month queries must use date ranges, not LIKE');
+    }
+    if (strpos($dashboardMetrics, 'COALESCE(SUM(') === false) {
+        addError($errors, 'models/DashboardMetricsModel.php: budget aggregation must remain in SQL');
+    }
+}
+
+$logsControllerPath = $root . '/controllers/LogsController.php';
+if (is_file($logsControllerPath)) {
+    $logsController = (string) file_get_contents($logsControllerPath);
+    if (preg_match('/DATE\s*\(\s*l\.created_at\s*\)/i', $logsController)) {
+        addError($errors, 'controllers/LogsController.php: log date filter must remain index-friendly');
+    }
+    if (strpos($logsController, 'l.created_at >= :date_start') === false
+        || strpos($logsController, 'l.created_at < :date_end') === false) {
+        addError($errors, 'controllers/LogsController.php: missing bounded created_at date range');
+    }
+}
+
+$frontPerformancePath = $root . '/index.php';
+if (is_file($frontPerformancePath)) {
+    $frontPerformance = (string) file_get_contents($frontPerformancePath);
+    if (strpos($frontPerformance, "require_once 'lib/PerformanceMonitor.php';") === false
+        || strpos($frontPerformance, 'PerformanceMonitor::register();') === false) {
+        addError($errors, 'index.php: slow request performance monitor must remain registered');
+    }
+}
+
+$simpleCachePath = $root . '/lib/SimpleCache.php';
+if (is_file($simpleCachePath)) {
+    $simpleCache = (string) file_get_contents($simpleCachePath);
+    foreach (['flock', 'rename', 'public/', 'expires_at'] as $token) {
+        if (strpos($simpleCache, $token) === false) {
+            addError($errors, "lib/SimpleCache.php: missing cache safety token {$token}");
+        }
+    }
+}
+
 // 6) Destructive/state-changing actions must not be literal GET links.
 $mutationActions = [
     'delete','bulk_delete','toggle','action','clear_roster','randomize_roster',

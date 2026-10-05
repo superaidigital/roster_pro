@@ -27,3 +27,7 @@ public/uploads/**/*.sql
 *.sql.zip
 /storage/field_visits/*
 !/storage/field_visits/.gitkeep
+
+# Runtime performance cache
+/storage/cache/*
+!/storage/cache/.gitkeep

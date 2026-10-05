@@ -11,6 +11,7 @@
     "20261004_roster_audit_logs.sql",
     "20261005_roster_revisions.sql",
     "20261005_roster_revision_verification.sql",
-    "20261005_observability_reliability.sql"
+    "20261005_observability_reliability.sql",
+    "20261005_performance_scalability.sql"
   ]
 }

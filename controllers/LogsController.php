@@ -94,9 +94,14 @@ class LogsController {
         }
 
         if ($date_filter !== '') {
-            // ใช้ DATE() เพื่อเทียบเฉพาะส่วนของวันที่
-            $sql_base .= " AND DATE(l.created_at) = :date";
-            $params[':date'] = $date_filter;
+            $dateObj = DateTimeImmutable::createFromFormat('!Y-m-d', $date_filter);
+            if ($dateObj && $dateObj->format('Y-m-d') === $date_filter) {
+                $sql_base .= " AND l.created_at >= :date_start AND l.created_at < :date_end";
+                $params[':date_start'] = $dateObj->format('Y-m-d 00:00:00');
+                $params[':date_end'] = $dateObj->modify('+1 day')->format('Y-m-d 00:00:00');
+            } else {
+                $date_filter = '';
+            }
         }
 
         // 4. นับจำนวนแถวทั้งหมดเพื่อคำนวณหน้า (Pagination)
@@ -126,7 +131,7 @@ class LogsController {
         try {
             $sql = "SELECT l.*, u.name as user_name, u.role, h.name as hospital_name " . 
                    $sql_base . 
-                   " ORDER BY l.created_at DESC LIMIT :limit OFFSET :offset";
+                   " ORDER BY l.created_at DESC, l.id DESC LIMIT :limit OFFSET :offset";
                    
             $stmt = $db->prepare($sql);
             

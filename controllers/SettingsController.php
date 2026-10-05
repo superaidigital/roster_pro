@@ -345,6 +345,30 @@ class SettingsController {
             $status_data['db_server'] = $db->getAttribute(PDO::ATTR_SERVER_INFO);
             $status_data['db_status'] = 'Online';
 
+            $status_data['dashboard_cache_ttl'] = max(5, min(300, (int)(getenv('DASHBOARD_CACHE_TTL') ?: 20)));
+            $status_data['slow_request_threshold_ms'] = max(250, min(30000, (int)(getenv('SLOW_REQUEST_THRESHOLD_MS') ?: 1500)));
+            $status_data['opcache_enabled'] = filter_var(ini_get('opcache.enable'), FILTER_VALIDATE_BOOLEAN)
+                ? 'Enabled'
+                : 'Disabled';
+
+            $cacheDir = getenv('PERFORMANCE_CACHE_DIR') ?: 'storage/cache';
+            $projectRoot = realpath(dirname(__DIR__));
+            if ($projectRoot !== false
+                && !str_starts_with($cacheDir, DIRECTORY_SEPARATOR)
+                && !preg_match('/^[A-Za-z]:[\\\\\/]/', $cacheDir)) {
+                $cacheDir = $projectRoot . '/' . ltrim($cacheDir, '/\\');
+            }
+
+            $cacheFiles = is_dir($cacheDir) ? (glob(rtrim($cacheDir, '/\\') . '/*.json') ?: []) : [];
+            $cacheBytes = 0;
+            foreach ($cacheFiles as $cacheFile) {
+                if (is_file($cacheFile)) {
+                    $cacheBytes += (int)(filesize($cacheFile) ?: 0);
+                }
+            }
+            $status_data['performance_cache_files'] = count($cacheFiles);
+            $status_data['performance_cache_mb'] = round($cacheBytes / 1024 / 1024, 2);
+
         } catch (Exception $e) {
             error_log('System status check failed: ' . $e->getMessage());
             $status_data['db_status'] = 'Offline / Error';

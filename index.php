@@ -3,11 +3,13 @@
 
 require_once 'config/security.php';
 require_once 'lib/AppMonitor.php';
+require_once 'lib/PerformanceMonitor.php';
 
 // 🌟 1. เริ่มต้น Session และตั้งค่าพื้นฐาน
 security_start_session();
 security_send_headers();
 AppMonitor::register();
+PerformanceMonitor::register();
 
 date_default_timezone_set('Asia/Bangkok');
 

@@ -62,6 +62,17 @@ try {
         'observability-retention:' . $now->format('Ymd')
     ));
 
+    $enqueue($jobs->enqueue(
+        'CLEANUP_PERFORMANCE_CACHE',
+        [
+            'cache_dir' => (string)(getenv('PERFORMANCE_CACHE_DIR') ?: 'storage/cache'),
+        ],
+        3,
+        110,
+        null,
+        'performance-cache-cleanup:' . $now->format('Ymd')
+    ));
+
     echo "SCHEDULE_OK queued={$scheduled}\n";
     exit(0);
 } catch (Throwable $e) {

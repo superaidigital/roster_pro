@@ -70,6 +70,10 @@
                             <tr><td class="ps-4">PHP Version</td><td><?= $status_data['php_version'] ?></td></tr>
                             <tr><td class="ps-4">ระบบปฏิบัติการ (OS)</td><td><?= $status_data['os'] ?></td></tr>
                             <tr><td class="ps-4">ข้อมูลเซิร์ฟเวอร์ DB</td><td><small class="text-muted"><?= $status_data['db_server'] ?></small></td></tr>
+                            <tr><td class="ps-4">Dashboard Cache TTL</td><td><span class="fw-bold text-primary"><?= (int)($status_data['dashboard_cache_ttl'] ?? 20) ?> วินาที</span></td></tr>
+                            <tr><td class="ps-4">Slow Request Threshold</td><td><span class="fw-bold"><?= (int)($status_data['slow_request_threshold_ms'] ?? 1500) ?> ms</span></td></tr>
+                            <tr><td class="ps-4">PHP OPcache</td><td><?= htmlspecialchars((string)($status_data['opcache_enabled'] ?? 'Unknown'), ENT_QUOTES, 'UTF-8') ?></td></tr>
+                            <tr><td class="ps-4">Performance Cache</td><td><?= number_format((int)($status_data['performance_cache_files'] ?? 0)) ?> ไฟล์ · <?= number_format((float)($status_data['performance_cache_mb'] ?? 0), 2) ?> MB</td></tr>
                         </tbody>
                     </table>
                 </div>

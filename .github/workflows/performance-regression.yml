@@ -1,4 +1,4 @@
-name: Runtime Smoke
+name: Performance Regression
 
 on:
   pull_request:
@@ -10,14 +10,14 @@ permissions:
   contents: read
 
 jobs:
-  runtime-smoke:
+  performance-regression:
     runs-on: ubuntu-latest
     services:
       mariadb:
         image: mariadb:10.11
         env:
           MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: roster_pro_test
+          MARIADB_DATABASE: roster_perf_test
         ports:
           - 3306:3306
         options: >-
@@ -25,13 +25,18 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
+
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
-      DB_NAME: roster_pro_test
+      DB_NAME: roster_perf_test
       DB_USER: root
       DB_PASSWORD: root
       DB_TIMEZONE: '+07:00'
+      PERF_MAX_DASHBOARD_MS: 5000
+      PERF_MAX_LIVE_MS: 3000
+      PERF_MAX_CACHE_HIT_MS: 1000
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -46,11 +51,11 @@ jobs:
       - name: Install MariaDB client
         run: sudo apt-get update && sudo apt-get install -y mariadb-client
 
-      - name: Load schema-only database
-        run: mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_pro_test < database/schema.sql
+      - name: Load canonical schema
+        run: mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_perf_test < database/schema.sql
 
-      - name: Run performance contract
+      - name: Verify performance contract
         run: php scripts/performance_check.php
 
-      - name: Run runtime smoke test
-        run: php tests/runtime_smoke.php
+      - name: Run synthetic performance regression
+        run: php tests/performance_regression.php

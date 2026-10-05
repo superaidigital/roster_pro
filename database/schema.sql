@@ -811,7 +811,9 @@ ALTER TABLE `leave_requests`
 ALTER TABLE `logs`
   ADD PRIMARY KEY (`id`),
   ADD KEY `user_id` (`user_id`),
-  ADD KEY `idx_logs_login_rate` (`user_id`,`action`,`ip_address`,`created_at`);
+  ADD KEY `idx_logs_login_rate` (`user_id`,`action`,`ip_address`,`created_at`),
+  ADD KEY `idx_logs_created_id` (`created_at`,`id`),
+  ADD KEY `idx_logs_created_action_user` (`created_at`,`action`,`user_id`);
 
 --
 -- Indexes for table `notifications`
@@ -831,7 +833,8 @@ ALTER TABLE `pay_rates`
 --
 ALTER TABLE `roster_status`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `hosp_month_unique` (`hospital_id`,`month_year`);
+  ADD UNIQUE KEY `hosp_month_unique` (`hospital_id`,`month_year`),
+  ADD KEY `idx_roster_status_month_status_hospital` (`month_year`,`status`,`hospital_id`);
 
 --
 -- Indexes for table `shifts`
@@ -840,7 +843,8 @@ ALTER TABLE `shifts`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `user_date_unique` (`user_id`,`shift_date`),
   ADD KEY `idx_shifts_hospital_date` (`hospital_id`,`shift_date`),
-  ADD KEY `idx_shifts_hospital_user_date` (`hospital_id`,`user_id`,`shift_date`);
+  ADD KEY `idx_shifts_hospital_user_date` (`hospital_id`,`user_id`,`shift_date`),
+  ADD KEY `idx_shifts_date_hospital_user` (`shift_date`,`hospital_id`,`user_id`);
 
 --
 -- Indexes for table `shift_swaps`
@@ -851,7 +855,8 @@ ALTER TABLE `shift_swaps`
   ADD KEY `requestor_id` (`requestor_id`),
   ADD KEY `target_user_id` (`target_user_id`),
   ADD KEY `status` (`status`),
-  ADD KEY `idx_shift_swaps_hospital_status_created` (`hospital_id`,`status`,`created_at`);
+  ADD KEY `idx_shift_swaps_hospital_status_created` (`hospital_id`,`status`,`created_at`),
+  ADD KEY `idx_shift_swaps_status_hospital_created` (`status`,`hospital_id`,`created_at`);
 
 --
 -- Indexes for table `system_logs`
@@ -877,7 +882,8 @@ ALTER TABLE `system_settings`
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `username` (`username`),
-  ADD KEY `idx_users_hospital_roster` (`hospital_id`,`is_active`,`is_deleted`,`show_in_roster`,`display_order`);
+  ADD KEY `idx_users_hospital_roster` (`hospital_id`,`is_active`,`is_deleted`,`show_in_roster`,`display_order`),
+  ADD KEY `idx_users_active_scope` (`is_deleted`,`deleted_at`,`hospital_id`,`role`);
 
 
 --

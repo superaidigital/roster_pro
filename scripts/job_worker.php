@@ -12,6 +12,7 @@ require_once __DIR__ . '/../models/NotificationModel.php';
 require_once __DIR__ . '/../lib/ObservabilityService.php';
 require_once __DIR__ . '/../lib/BackupRetention.php';
 require_once __DIR__ . '/../lib/AppMonitor.php';
+require_once __DIR__ . '/../lib/SimpleCache.php';
 
 $options = getopt('', ['once', 'max-jobs:', 'help']);
 if (isset($options['help'])) {
@@ -78,6 +79,11 @@ try {
                     $eventDays = max(7, min(3650, (int)($payload['event_days'] ?? 90)));
                     $jobDays = max(7, min(3650, (int)($payload['job_days'] ?? 30)));
                     (new ObservabilityService($db))->cleanup($eventDays, $jobDays);
+                    break;
+
+                case 'CLEANUP_PERFORMANCE_CACHE':
+                    $cacheDir = (string)($payload['cache_dir'] ?? (getenv('PERFORMANCE_CACHE_DIR') ?: 'storage/cache'));
+                    (new SimpleCache($cacheDir))->clearExpired();
                     break;
 
                 default:
