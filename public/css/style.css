@@ -153,11 +153,34 @@ h5 { font-size: clamp(1rem, 1.1vw, 1.15rem); }
 }
 
 .top-navbar .nav-icon-btn {
+  position: relative !important;
+  inset: auto !important;
+  transform: none !important;
+  display: inline-grid;
+  place-items: center;
   flex: 0 0 auto;
   width: 2.625rem;
   height: 2.625rem;
+  margin: 0 !important;
   padding: 0;
+  line-height: 1;
   border-radius: .75rem;
+}
+
+.top-navbar .nav-icon-btn > i {
+  display: block;
+  margin: 0 !important;
+  line-height: 1;
+}
+
+.top-navbar .rp-topbar-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.top-navbar .rp-topbar-actions {
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .top-navbar .profile-pill {
@@ -2809,4 +2832,45 @@ h1, h2, h3, h4, h5, h6,
   }
   .rp-roster-workflow .rp-workflow-label,
   .rp-workflow-desc { max-width:none; text-align:left; }
+}
+
+
+/* Executive dashboard standards — 2026-10-05 */
+.rp-dashboard-page {
+  padding-top: 0 !important;
+}
+
+.rp-dashboard-page > :first-child {
+  margin-top: 0 !important;
+}
+
+.rp-dashboard-page .rp-action-card,
+.rp-dashboard-page .rp-kpi-card,
+.rp-dashboard-page .rp-alert-center,
+.rp-dashboard-page .rp-exec-hero {
+  -webkit-font-smoothing: antialiased;
+}
+
+.rp-dashboard-page .rp-action-icon i,
+.rp-dashboard-page .rp-kpi-icon i,
+.rp-dashboard-page .rp-alert-icon i {
+  display: block;
+  margin: 0;
+  line-height: 1;
+}
+
+@media (max-width: 1023.98px) {
+  .top-navbar .rp-topbar-left {
+    max-width: calc(100% - 7.5rem);
+  }
+}
+
+@media (max-width: 639.98px) {
+  .top-navbar .rp-topbar-left {
+    max-width: calc(100% - 5.25rem);
+  }
+
+  .top-navbar .rp-topbar-actions {
+    gap: .25rem !important;
+  }
 }

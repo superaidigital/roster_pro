@@ -56,185 +56,461 @@ $waiting_hospitals = $filtered_waiting;
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-.bg-gradient-primary { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); color: white; }
+    .bg-gradient-primary { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); color: white; }
     .bg-gradient-success { background: linear-gradient(135deg, #10b981 0%, #22c55e 100%); color: white; }
     .bg-gradient-warning { background: linear-gradient(135deg, #f59e0b 0%, #eab308 100%); color: white; }
     .bg-gradient-danger { background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%); color: white; }
     .bg-gradient-info { background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%); color: white; }
     .bg-gradient-purple { background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); color: white; }
-/* Timeline Styles */
+
     .timeline { position: relative; padding-left: 30px; margin-bottom: 0; list-style: none; }
     .timeline::before { content: ''; position: absolute; top: 0; bottom: 0; left: 14px; width: 2px; background: #e2e8f0; }
     .timeline-item { position: relative; margin-bottom: 1.5rem; }
-    .timeline-item::before { content: ''; position: absolute; left: -20px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; box-shadow: 0 0 0 2px #3b82f6; }
+    .timeline-item::before { content: ''; position: absolute; left: -20px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #2563eb; border: 2px solid #fff; box-shadow: 0 0 0 2px #2563eb; }
     .timeline-item:last-child { margin-bottom: 0; }
 
-    /* แอนิเมชันสำหรับ Alert Center */
     @keyframes ring {
-      0% { transform: rotate(0); }
-      10% { transform: rotate(15deg); }
-      20% { transform: rotate(-10deg); }
-      30% { transform: rotate(10deg); }
-      40% { transform: rotate(-10deg); }
-      50% { transform: rotate(0); }
-      100% { transform: rotate(0); }
+      0%, 50%, 100% { transform: rotate(0); }
+      10% { transform: rotate(12deg); }
+      20% { transform: rotate(-8deg); }
+      30% { transform: rotate(8deg); }
+      40% { transform: rotate(-6deg); }
     }
-    .bell-shake { animation: ring 2s infinite; display: inline-block; }
-    .cursor-pointer { cursor: pointer; transition: all 0.2s; }
-    .cursor-pointer:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(220, 38, 38, 0.15) !important; }
+    .bell-shake { animation: ring 2.4s ease-in-out infinite; display: inline-block; }
 
-    /* Custom Scrollbar */
     .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+
+    .rp-exec-hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.25rem;
+        padding: 1.35rem 1.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid #dbe7ee;
+        border-radius: 1rem;
+        background:
+            radial-gradient(circle at 92% 10%, rgba(14,165,233,.10), transparent 12rem),
+            linear-gradient(135deg, #ffffff 0%, #f7fbfd 100%);
+        box-shadow: 0 .35rem 1.15rem rgba(15, 23, 42, .045);
+    }
+    .rp-exec-title {
+        margin: 0 0 .3rem;
+        color: #0f172a;
+        font-size: clamp(1.25rem, 2vw, 1.65rem);
+        font-weight: 800;
+        letter-spacing: -.025em;
+    }
+    .rp-exec-subtitle {
+        margin: 0;
+        color: #64748b;
+        font-size: .875rem;
+    }
+    .rp-exec-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: .6rem;
+    }
+    .rp-exec-chip {
+        min-height: 2.65rem;
+        display: inline-flex;
+        align-items: center;
+        gap: .55rem;
+        padding: .6rem .85rem;
+        border: 1px solid #d7e3ea;
+        border-radius: .75rem;
+        background: #fff;
+        color: #334155;
+        font-size: .85rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .rp-exec-chip i { color: #2563eb; font-size: 1rem; }
+
+    .rp-dashboard-section-label {
+        margin: 0 0 .65rem;
+        color: #64748b;
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .rp-action-card {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        min-height: 4.55rem;
+        height: 100%;
+        padding: .8rem .85rem;
+        border: 1px solid #dbe5eb;
+        border-radius: .9rem;
+        background: #fff;
+        color: #1e293b;
+        text-decoration: none;
+        box-shadow: 0 .2rem .65rem rgba(15,23,42,.025);
+        transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease, background .18s ease;
+    }
+    .rp-action-card:hover {
+        color: #0f172a;
+        border-color: #b8cfdd;
+        background: #fbfdff;
+        box-shadow: 0 .45rem 1rem rgba(15,23,42,.055);
+        transform: translateY(-1px);
+    }
+    .rp-action-card:focus-visible {
+        outline: .18rem solid rgba(37,99,235,.35);
+        outline-offset: .15rem;
+    }
+    .rp-action-icon {
+        display: grid;
+        place-items: center;
+        width: 2.45rem;
+        height: 2.45rem;
+        flex: 0 0 2.45rem;
+        border-radius: .72rem;
+        font-size: 1.08rem;
+    }
+    .rp-tone-blue { color: #1d4ed8; background: #eff6ff; }
+    .rp-tone-cyan { color: #0369a1; background: #ecfeff; }
+    .rp-tone-green { color: #15803d; background: #f0fdf4; }
+    .rp-tone-amber { color: #b45309; background: #fffbeb; }
+    .rp-tone-red { color: #b91c1c; background: #fef2f2; }
+    .rp-tone-violet { color: #6d28d9; background: #f5f3ff; }
+    .rp-tone-slate { color: #475569; background: #f1f5f9; }
+
+    .rp-action-copy { min-width: 0; display: grid; gap: .12rem; }
+    .rp-action-title {
+        color: #1e293b;
+        font-size: .86rem;
+        font-weight: 800;
+        line-height: 1.25;
+    }
+    .rp-action-meta {
+        color: #94a3b8;
+        font-size: .7rem;
+        line-height: 1.25;
+    }
+    .rp-action-badge {
+        position: absolute;
+        top: .45rem;
+        right: .45rem;
+        min-width: 1.35rem;
+        height: 1.35rem;
+        display: inline-grid;
+        place-items: center;
+        padding: 0 .35rem;
+        border-radius: 999px;
+        background: #dc2626;
+        color: #fff;
+        border: 2px solid #fff;
+        font-size: .65rem;
+        font-weight: 800;
+    }
+    .rp-action-badge.warning { background: #d97706; }
+
+    .rp-alert-center {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        width: 100%;
+        margin: 0 0 1rem;
+        padding: .9rem 1rem;
+        border: 1px solid #fecaca;
+        border-left: 4px solid #dc2626;
+        border-radius: .95rem;
+        background: #fff7f7;
+        color: #1e293b;
+        cursor: pointer;
+        text-align: left;
+    }
+    .rp-alert-center:hover { background: #fff1f2; border-color: #fca5a5; }
+    .rp-alert-left { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+    .rp-alert-icon {
+        display: grid;
+        place-items: center;
+        width: 2.55rem;
+        height: 2.55rem;
+        flex: 0 0 2.55rem;
+        border-radius: .75rem;
+        background: #dc2626;
+        color: #fff;
+        font-size: 1.05rem;
+    }
+    .rp-alert-title { margin: 0 0 .1rem; color: #b91c1c; font-size: .87rem; font-weight: 800; }
+    .rp-alert-text { margin: 0; color: #64748b; font-size: .78rem; }
+    .rp-alert-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        color: #b91c1c;
+        font-size: .78rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .rp-kpi-card {
+        position: relative;
+        height: 100%;
+        min-height: 5.7rem;
+        overflow: hidden;
+        border: 1px solid #dbe5eb;
+        border-radius: .95rem;
+        background: #fff;
+        box-shadow: 0 .2rem .65rem rgba(15,23,42,.025);
+    }
+    .rp-kpi-card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: .2rem;
+        background: var(--kpi-accent, #2563eb);
+    }
+    .rp-kpi-card .card-body {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .7rem;
+        min-height: 5.7rem;
+        padding: .9rem 1rem !important;
+    }
+    .rp-kpi-label {
+        margin: 0 0 .25rem;
+        color: #64748b;
+        font-size: .68rem;
+        font-weight: 800;
+        letter-spacing: .035em;
+        text-transform: uppercase;
+    }
+    .rp-kpi-value {
+        margin: 0;
+        color: #0f172a;
+        font-size: clamp(1.35rem, 1.9vw, 1.7rem);
+        font-weight: 800;
+        letter-spacing: -.025em;
+        line-height: 1.05;
+    }
+    .rp-kpi-icon {
+        display: grid;
+        place-items: center;
+        width: 2.55rem;
+        height: 2.55rem;
+        flex: 0 0 2.55rem;
+        border-radius: .75rem;
+        font-size: 1.05rem;
+    }
+
+    @media (max-width: 991.98px) {
+        .rp-exec-hero { align-items: flex-start; flex-direction: column; }
+        .rp-exec-actions { width: 100%; justify-content: flex-start; }
+        .rp-alert-center { align-items: flex-start; }
+    }
+    @media (max-width: 575.98px) {
+        .rp-dashboard-page { padding-inline: .1rem !important; }
+        .rp-exec-hero { padding: 1rem; }
+        .rp-exec-actions { display: grid; grid-template-columns: 1fr; }
+        .rp-exec-chip { width: 100%; justify-content: center; }
+        .rp-action-card { min-height: 4.25rem; padding: .7rem; }
+        .rp-action-meta { display: none; }
+        .rp-alert-center { flex-direction: column; }
+        .rp-alert-cta { padding-left: 3.35rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .bell-shake { animation: none; }
+        .rp-action-card { transition: none; }
+    }
 </style>
 
 <div class="container-fluid px-3 px-md-4 py-4 min-vh-100 rp-dashboard-page">
     
-    <div class="rp-dashboard-hero d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <section class="rp-exec-hero" aria-labelledby="execDashboardTitle">
         <div>
-            <h3 class="fw-black text-dark mb-1">ภาพรวมระบบ (Executive Dashboard)</h3>
-            <p class="text-muted mb-0" style="font-size: 14px;">ยินดีต้อนรับ, <span class="fw-bold text-primary"><?= htmlspecialchars($_SESSION['user']['name'] ?? 'ผู้ดูแลระบบ') ?></span></p>
+            <h2 class="rp-exec-title" id="execDashboardTitle">ภาพรวมระบบ</h2>
+            <p class="rp-exec-subtitle">
+                Executive Dashboard · ยินดีต้อนรับ
+                <span class="fw-bold text-primary"><?= htmlspecialchars($_SESSION['user']['name'] ?? 'ผู้ดูแลระบบ', ENT_QUOTES, 'UTF-8') ?></span>
+            </p>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <a href="index.php?c=dashboard&a=map_view" class="btn btn-primary rounded-pill shadow-sm fw-bold px-4 py-2 d-flex align-items-center gap-2" style="transition: all 0.2s;">
-                <i class="bi bi-geo-alt-fill fs-5"></i> แสดงแผนที่ รพ.สต.
+        <div class="rp-exec-actions">
+            <a href="index.php?c=dashboard&a=map_view" class="btn btn-primary d-inline-flex align-items-center gap-2 px-3">
+                <i class="bi bi-geo-alt" aria-hidden="true"></i>
+                <span>แสดงแผนที่ รพ.สต.</span>
             </a>
-            
-            <div class="text-md-end text-muted font-monospace bg-white px-4 py-2 rounded-pill shadow-sm border border-primary border-opacity-25 text-primary fw-bold">
-                <i class="bi bi-calendar3 me-2"></i> วันนี้: <?= date('d') ?> <?= $thai_months[(int)date('m')] ?> <?= date('Y')+543 ?>
+            <div class="rp-exec-chip" aria-label="วันที่ปัจจุบัน">
+                <i class="bi bi-calendar3" aria-hidden="true"></i>
+                <span>วันนี้ <?= date('d') ?> <?= $thai_months[(int)date('m')] ?> <?= date('Y') + 543 ?></span>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- Quick Actions -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=roster" class="quick-action-btn">
-                <i class="bi bi-calendar-check text-success"></i>จัดการตารางเวร
-            </a>
+    <section class="mb-3" aria-labelledby="quickActionsTitle">
+        <h3 class="rp-dashboard-section-label" id="quickActionsTitle">เมนูลัด</h3>
+        <div class="row g-2 g-md-3">
+            <div class="col-6 col-lg-4 col-xl-2">
+                <a href="index.php?c=roster" class="rp-action-card">
+                    <span class="rp-action-icon rp-tone-green"><i class="bi bi-calendar2-week" aria-hidden="true"></i></span>
+                    <span class="rp-action-copy">
+                        <span class="rp-action-title">จัดการตารางเวร</span>
+                        <span class="rp-action-meta">สร้างและจัดเวร</span>
+                    </span>
+                </a>
+            </div>
+            <div class="col-6 col-lg-4 col-xl-2">
+                <a href="index.php?c=leave&a=approvals" class="rp-action-card">
+                    <span class="rp-action-icon rp-tone-red"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
+                    <span class="rp-action-copy">
+                        <span class="rp-action-title">พิจารณาใบลา</span>
+                        <span class="rp-action-meta">ตรวจคำขออนุมัติ</span>
+                    </span>
+                    <?php if ($pending_leaves > 0): ?>
+                        <span class="rp-action-badge" aria-label="<?= (int)$pending_leaves ?> ใบลารออนุมัติ"><?= (int)$pending_leaves ?></span>
+                    <?php endif; ?>
+                </a>
+            </div>
+            <div class="col-6 col-lg-4 col-xl-2">
+                <a href="index.php?c=swap" class="rp-action-card">
+                    <span class="rp-action-icon rp-tone-amber"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>
+                    <span class="rp-action-copy">
+                        <span class="rp-action-title">คำขอแลกเวร</span>
+                        <span class="rp-action-meta">ตรวจและอนุมัติคำขอ</span>
+                    </span>
+                    <?php if ($pending_swaps > 0): ?>
+                        <span class="rp-action-badge warning" aria-label="<?= (int)$pending_swaps ?> คำขอแลกเวร"><?= (int)$pending_swaps ?></span>
+                    <?php endif; ?>
+                </a>
+            </div>
+            <div class="col-6 col-lg-4 col-xl-2">
+                <a href="index.php?c=staff" class="rp-action-card">
+                    <span class="rp-action-icon rp-tone-blue"><i class="bi bi-people" aria-hidden="true"></i></span>
+                    <span class="rp-action-copy">
+                        <span class="rp-action-title">ฐานข้อมูลบุคลากร</span>
+                        <span class="rp-action-meta">ข้อมูลและสิทธิ์ผู้ใช้</span>
+                    </span>
+                </a>
+            </div>
+            <div class="col-6 col-lg-4 col-xl-2">
+                <a href="index.php?c=report" class="rp-action-card">
+                    <span class="rp-action-icon rp-tone-cyan"><i class="bi bi-bar-chart" aria-hidden="true"></i></span>
+                    <span class="rp-action-copy">
+                        <span class="rp-action-title">รายงานสถิติ</span>
+                        <span class="rp-action-meta">สรุปและวิเคราะห์ข้อมูล</span>
+                    </span>
+                </a>
+            </div>
+            <div class="col-6 col-lg-4 col-xl-2">
+                <a href="index.php?c=settings" class="rp-action-card">
+                    <span class="rp-action-icon rp-tone-slate"><i class="bi bi-sliders" aria-hidden="true"></i></span>
+                    <span class="rp-action-copy">
+                        <span class="rp-action-title">ตั้งค่าระบบ</span>
+                        <span class="rp-action-meta">กำหนดค่าการใช้งาน</span>
+                    </span>
+                </a>
+            </div>
         </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=leave&a=approvals" class="quick-action-btn position-relative">
-                <i class="bi bi-envelope-paper text-danger"></i>พิจารณาใบลา
-                <?php if($pending_leaves > 0): ?>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow"><?= $pending_leaves ?></span>
-                <?php endif; ?>
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=swap" class="quick-action-btn position-relative">
-                <i class="bi bi-arrow-left-right text-warning"></i>คำขอแลกเวร
-                <?php if($pending_swaps > 0): ?>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark shadow"><?= $pending_swaps ?></span>
-                <?php endif; ?>
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=staff" class="quick-action-btn">
-                <i class="bi bi-people text-primary"></i>ฐานข้อมูลบุคลากร
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=report" class="quick-action-btn">
-                <i class="bi bi-file-earmark-bar-graph text-info"></i>รายงานสถิติ
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=settings" class="quick-action-btn">
-                <i class="bi bi-gear text-secondary"></i>ตั้งค่าระบบ
-            </a>
-        </div>
-    </div>
+    </section>
 
     <!-- Alert Center -->
-    <?php 
+    <?php
     $total_alerts = count($risk_hospitals) + count($fatigue_staff) + count($waiting_hospitals);
-    if($total_alerts > 0): 
+    if ($total_alerts > 0):
     ?>
-    <div class="alert bg-danger bg-opacity-10 border-0 border-start border-danger border-4 shadow-sm mb-4 rounded-4 p-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between cursor-pointer" onclick="showAlertPopup()">
-        <div class="d-flex align-items-center mb-3 mb-md-0">
-            <div class="bg-danger text-white rounded-circle d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width:45px;height:45px;">
-                <i class="bi bi-bell-fill fs-5 bell-shake"></i>
-            </div>
-            <div>
-                <h6 class="text-danger fw-bold mb-1">ศูนย์แจ้งเตือนความเสี่ยง (Alert Center)</h6>
-                <p class="text-dark mb-0 small">พบข้อความแจ้งเตือนที่ต้องให้ความสนใจจำนวน <b class="text-danger fs-6"><?= $total_alerts ?></b> รายการ</p>
-            </div>
-        </div>
-        <button class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold"><i class="bi bi-search me-1"></i> คลิกเพื่อดูสรุปการแจ้งเตือน</button>
-    </div>
+    <button type="button" class="rp-alert-center" onclick="showAlertPopup()" aria-label="เปิดศูนย์แจ้งเตือนความเสี่ยง <?= (int)$total_alerts ?> รายการ">
+        <span class="rp-alert-left">
+            <span class="rp-alert-icon"><i class="bi bi-bell-fill bell-shake" aria-hidden="true"></i></span>
+            <span>
+                <span class="rp-alert-title d-block">ศูนย์แจ้งเตือนความเสี่ยง</span>
+                <span class="rp-alert-text d-block">มีรายการที่ควรตรวจสอบ <?= number_format($total_alerts) ?> รายการ</span>
+            </span>
+        </span>
+        <span class="rp-alert-cta">
+            ดูรายละเอียด
+            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+        </span>
+    </button>
     <?php endif; ?>
 
     <!-- KPI Stats -->
-    <div class="row g-3 mb-4">
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">หน่วยบริการ</p>
-                        <h3 class="fw-black text-dark mb-0"><?= number_format($total_hospitals) ?></h3>
+    <section class="mb-4" aria-labelledby="kpiTitle">
+        <h3 class="rp-dashboard-section-label" id="kpiTitle">ตัวชี้วัดสำคัญ</h3>
+        <div class="row g-2 g-md-3">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="rp-kpi-card" style="--kpi-accent:#0891b2;">
+                    <div class="card-body">
+                        <div>
+                            <p class="rp-kpi-label">หน่วยบริการ</p>
+                            <p class="rp-kpi-value"><?= number_format($total_hospitals) ?></p>
+                        </div>
+                        <span class="rp-kpi-icon rp-tone-cyan"><i class="bi bi-hospital" aria-hidden="true"></i></span>
                     </div>
-                    <div class="icon-circle bg-gradient-info shadow-sm"><i class="bi bi-hospital"></i></div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="rp-kpi-card" style="--kpi-accent:#2563eb;">
+                    <div class="card-body">
+                        <div>
+                            <p class="rp-kpi-label">บุคลากร</p>
+                            <p class="rp-kpi-value"><?= number_format($total_staff) ?></p>
+                        </div>
+                        <span class="rp-kpi-icon rp-tone-blue"><i class="bi bi-people" aria-hidden="true"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="rp-kpi-card" style="--kpi-accent:#16a34a;">
+                    <div class="card-body">
+                        <div>
+                            <p class="rp-kpi-label">ขึ้นเวรวันนี้</p>
+                            <p class="rp-kpi-value"><?= number_format($on_duty_today) ?></p>
+                        </div>
+                        <span class="rp-kpi-icon rp-tone-green"><i class="bi bi-person-check" aria-hidden="true"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="rp-kpi-card" style="--kpi-accent:#dc2626;">
+                    <div class="card-body">
+                        <div>
+                            <p class="rp-kpi-label">ใบลารออนุมัติ</p>
+                            <p class="rp-kpi-value <?= $pending_leaves > 0 ? 'text-danger' : '' ?>"><?= number_format($pending_leaves) ?></p>
+                        </div>
+                        <span class="rp-kpi-icon rp-tone-red"><i class="bi bi-file-earmark-check" aria-hidden="true"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="rp-kpi-card" style="--kpi-accent:#d97706;">
+                    <div class="card-body">
+                        <div>
+                            <p class="rp-kpi-label">ขอแลกเวร</p>
+                            <p class="rp-kpi-value <?= $pending_swaps > 0 ? 'text-warning' : '' ?>"><?= number_format($pending_swaps) ?></p>
+                        </div>
+                        <span class="rp-kpi-icon rp-tone-amber"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="rp-kpi-card" style="--kpi-accent:#7c3aed;">
+                    <div class="card-body">
+                        <div>
+                            <p class="rp-kpi-label">งบประมาณ (บาท)</p>
+                            <p class="rp-kpi-value" style="font-size:clamp(1.15rem,1.6vw,1.45rem);"><?= number_format($estimated_budget) ?></p>
+                        </div>
+                        <span class="rp-kpi-icon rp-tone-violet"><i class="bi bi-cash-stack" aria-hidden="true"></i></span>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">บุคลากร</p>
-                        <h3 class="fw-black text-dark mb-0"><?= number_format($total_staff) ?></h3>
-                    </div>
-                    <div class="icon-circle bg-gradient-primary shadow-sm"><i class="bi bi-people-fill"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">ขึ้นเวรวันนี้</p>
-                        <h3 class="fw-black text-dark mb-0"><?= number_format($on_duty_today) ?></h3>
-                    </div>
-                    <div class="icon-circle bg-gradient-success shadow-sm"><i class="bi bi-person-workspace"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100 border <?= $pending_leaves > 0 ? 'border-danger border-opacity-50' : '' ?>">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-danger fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">ใบลารออนุมัติ</p>
-                        <h3 class="fw-black text-danger mb-0"><?= number_format($pending_leaves) ?></h3>
-                    </div>
-                    <div class="icon-circle bg-gradient-danger shadow-sm"><i class="bi bi-envelope-paper-fill"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100 border <?= $pending_swaps > 0 ? 'border-warning border-opacity-50' : '' ?>">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-warning fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">ขอแลกเวร</p>
-                        <h3 class="fw-black text-warning mb-0"><?= number_format($pending_swaps) ?></h3>
-                    </div>
-                    <div class="icon-circle bg-gradient-warning shadow-sm"><i class="bi bi-arrow-left-right"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">งบประมาณ (บ.)</p>
-                        <h4 class="fw-black text-dark mb-0"><?= number_format($estimated_budget) ?></h4>
-                    </div>
-                    <div class="icon-circle bg-gradient-purple shadow-sm"><i class="bi bi-cash-coin"></i></div>
-                </div>
-            </div>
-        </div>
-    </div>
+    </section>
 
     <!-- Charts -->
     <div class="row g-4 mb-4">
