@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 final class ElectronicSignature {
+    public const PRIVACY_NOTICE_VERSION = 'PDPA-SIGN-2026-10-V1';
     private const MAX_BYTES = 1048576; // 1 MiB decoded image
     private const MAX_WIDTH = 2400;
     private const MAX_HEIGHT = 1200;
