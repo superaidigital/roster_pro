@@ -116,6 +116,14 @@ class AuthController {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
+
+        // Logout changes session state, so accept POST only. CSRF is validated
+        // centrally by index.php before this action runs.
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            exit('Method Not Allowed');
+        }
         
         // 📝 บันทึก Log: ออกจากระบบด้วยตนเอง
         if (isset($_SESSION['user'])) {
