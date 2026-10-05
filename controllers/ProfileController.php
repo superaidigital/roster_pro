@@ -5,7 +5,8 @@ require_once 'config/database.php';
 require_once 'config/security.php';
 require_once 'models/UserModel.php';
 require_once 'models/ProfileModel.php';
-require_once 'controllers/LogsController.php'; 
+require_once 'controllers/LogsController.php';
+require_once 'lib/ElectronicSignature.php'; 
 
 class ProfileController {
     
@@ -282,6 +283,88 @@ class ProfileController {
             header("Location: index.php?c=profile&id=" . $target_user_id);
             exit;
         }
+    }
+
+    // ====================================================
+    // ✍️ 2.5 ลายเซ็นอิเล็กทรอนิกส์
+    // ====================================================
+    public function save_signature() {
+        $this->checkAuth();
+        $this->requirePostAndCsrf();
+
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $this->requireProfileManagePermission($targetUserId);
+
+        $dataUrl = trim((string)($_POST['signature_data'] ?? ''));
+        $method = strtoupper(trim((string)($_POST['signature_method'] ?? 'DRAW')));
+
+        try {
+            $signature = ElectronicSignature::normalize($dataUrl, $method);
+
+            $db = (new Database())->getConnection();
+            $userModel = new UserModel($db);
+
+            if (!$userModel->updateSignature($targetUserId, $signature['data_url'], $signature['method'])) {
+                throw new RuntimeException('Unable to save signature.');
+            }
+
+            if ((int)($_SESSION['user']['id'] ?? 0) === $targetUserId) {
+                $_SESSION['user']['signature_path'] = $signature['data_url'];
+                $_SESSION['user']['signature_sha256'] = $signature['sha256'];
+                $_SESSION['user']['signature_method'] = $signature['method'];
+                $_SESSION['user']['signature_updated_at'] = date('Y-m-d H:i:s');
+            }
+
+            LogsController::addLog(
+                $db,
+                (int)$_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                'บันทึกลายเซ็นอิเล็กทรอนิกส์ user_id=' . $targetUserId
+                    . ' method=' . $signature['method']
+                    . ' sha256=' . substr($signature['sha256'], 0, 16)
+            );
+
+            $_SESSION['success_msg'] = 'บันทึกลายเซ็นอิเล็กทรอนิกส์เรียบร้อยแล้ว';
+        } catch (Throwable $e) {
+            error_log('Electronic signature save rejected: ' . $e->getMessage());
+            $_SESSION['error_msg'] = 'ไม่สามารถบันทึกลายเซ็นได้ กรุณาวาดใหม่หรือใช้ไฟล์ PNG/JPG ที่ถูกต้อง';
+        }
+
+        header('Location: index.php?c=profile&id=' . $targetUserId . '#nav-signature');
+        exit;
+    }
+
+    public function delete_signature() {
+        $this->checkAuth();
+        $this->requirePostAndCsrf();
+
+        $targetUserId = (int)($_POST['user_id'] ?? 0);
+        $this->requireProfileManagePermission($targetUserId);
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+
+        if ($userModel->clearSignature($targetUserId)) {
+            if ((int)($_SESSION['user']['id'] ?? 0) === $targetUserId) {
+                $_SESSION['user']['signature_path'] = null;
+                $_SESSION['user']['signature_sha256'] = null;
+                $_SESSION['user']['signature_method'] = null;
+                $_SESSION['user']['signature_updated_at'] = date('Y-m-d H:i:s');
+            }
+
+            LogsController::addLog(
+                $db,
+                (int)$_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                'ลบลายเซ็นอิเล็กทรอนิกส์ user_id=' . $targetUserId
+            );
+            $_SESSION['success_msg'] = 'ลบลายเซ็นอิเล็กทรอนิกส์แล้ว';
+        } else {
+            $_SESSION['error_msg'] = 'ไม่สามารถลบลายเซ็นได้';
+        }
+
+        header('Location: index.php?c=profile&id=' . $targetUserId . '#nav-signature');
+        exit;
     }
 
     // ====================================================
