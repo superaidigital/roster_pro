@@ -1,0 +1,29 @@
+# Roster Pro - Apache hardening
+# Public entry point: /index.php
+# Internal PHP implementation files must never be executed directly over HTTP.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block direct access to internal application code.
+    RewriteRule ^(?:config|controllers|models|views|database)/ - [F,L,NC]
+
+    # Block every PHP file except the front controller.
+    RewriteRule ^(?!index\.php$).*\.php$ - [F,L,NC]
+
+    # Block dotfiles except the ACME well-known path used by TLS automation.
+    RewriteRule "(^|/)\.(?!well-known/)" - [F,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+<FilesMatch "(?i)\.(?:sql|env|ini|log|bak|backup|dist|md)$">
+    Require all denied
+</FilesMatch>
