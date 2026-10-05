@@ -35,7 +35,41 @@ public function addNotification($user_id, $type, $title, $message, $link = null)
         }
     }
 
-    /**
+        /**
+     * Reliable notification path backed by the durable background job queue.
+     */
+    public function queueNotification(
+        int $user_id,
+        string $type,
+        string $title,
+        string $message,
+        ?string $link = null,
+        ?string $dedupeKey = null
+    ): ?int {
+        require_once __DIR__ . '/BackgroundJobModel.php';
+
+        if ($user_id <= 0 || trim($title) === '' || trim($message) === '') {
+            throw new InvalidArgumentException('Invalid queued notification payload.');
+        }
+
+        $jobs = new BackgroundJobModel($this->conn);
+        return $jobs->enqueue(
+            'IN_APP_NOTIFICATION',
+            [
+                'user_id' => $user_id,
+                'type' => strtoupper(trim($type)) ?: 'INFO',
+                'title' => mb_substr(trim($title), 0, 255, 'UTF-8'),
+                'message' => mb_substr(trim($message), 0, 4000, 'UTF-8'),
+                'link' => $link,
+            ],
+            5,
+            40,
+            null,
+            $dedupeKey
+        );
+    }
+
+/**
      * 🌟 2. ดึงการแจ้งเตือนทั้งหมดของ User (เรียงจากใหม่ไปเก่า)
      */
     public function getUserNotifications($user_id, $limit = 50) {
@@ -137,11 +171,14 @@ public function addNotification($user_id, $type, $title, $message, $link = null)
      * ตัวอย่างการใช้งาน: รันอัตโนมัติเมื่อครบเดือน เพื่อไม่ให้ตารางหนักเกินไป
      */
     public function deleteOldNotifications($days = 30) {
-        $query = "DELETE FROM " . $this->table_name . " WHERE created_at < DATE_SUB(NOW(), INTERVAL :days DAY)";
+        $days = max(7, min(3650, (int)$days));
+        $threshold = date('Y-m-d H:i:s', time() - ($days * 86400));
+        $query = "DELETE FROM " . $this->table_name . " WHERE created_at < :threshold";
         $stmt = $this->conn->prepare($query);
         try {
-            return $stmt->execute([':days' => $days]);
+            return $stmt->execute([':threshold' => $threshold]);
         } catch (PDOException $e) {
+            error_log("Delete Old Notifications Error: " . $e->getMessage());
             return false;
         }
     }

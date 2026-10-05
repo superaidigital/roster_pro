@@ -188,6 +188,15 @@ $settings = $settings ?? []; // รับค่าจาก Controller
             </a>
         </div>
 
+        <!-- 6. System Health & Reliability -->
+        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.6s;">
+            <a href="index.php?c=observability" class="setting-card p-4">
+                <div class="icon-box grad-purple"><i class="bi bi-activity"></i></div>
+                <div class="card-title-modern">System Health & Reliability</div>
+                <p class="card-text-modern">ติดตาม Error, Queue, Failed Jobs, Migration และ Health Snapshot สำหรับ Production</p>
+            </a>
+        </div>
+
         <!-- 6. ประวัติการใช้งาน -->
         <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.6s;">
             <a href="index.php?c=logs" class="setting-card p-4">

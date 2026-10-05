@@ -26,13 +26,14 @@ class HealthController {
             ];
         }
 
-        $healthy = ($result['status'] ?? '') === 'ok';
-        http_response_code($healthy ? 200 : 503);
+        $ready = ($result['status'] ?? '') !== 'unhealthy';
+        http_response_code($ready ? 200 : 503);
 
         echo json_encode([
             'status' => $result['status'],
             'checks' => $result['checks'],
             'migrations' => $result['migration_summary'],
+            'reliability' => $result['reliability'] ?? null,
             'timestamp' => date(DATE_ATOM),
         ], JSON_UNESCAPED_SLASHES);
         exit;
