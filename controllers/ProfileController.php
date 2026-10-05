@@ -96,6 +96,18 @@ class ProfileController {
             exit;
         }
     }
+    private function requireSignatureOwner(int $targetUserId): void {
+        security_start_session();
+
+        $currentUserId = (int)($_SESSION['user']['id'] ?? 0);
+        if ($targetUserId <= 0 || $targetUserId !== $currentUserId) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = 'ลายเซ็นอิเล็กทรอนิกส์ต้องบันทึกหรือลบโดยเจ้าของบัญชีเท่านั้น';
+            header('Location: index.php?c=profile&id=' . $currentUserId . '#nav-signature');
+            exit;
+        }
+    }
+
 
     // ====================================================
     // 🌟 1. โหลดหน้า Dashboard แฟ้มประวัติ (Profile View)
@@ -293,7 +305,7 @@ class ProfileController {
         $this->requirePostAndCsrf();
 
         $targetUserId = (int)($_POST['user_id'] ?? 0);
-        $this->requireProfileManagePermission($targetUserId);
+        $this->requireSignatureOwner($targetUserId);
 
         $dataUrl = trim((string)($_POST['signature_data'] ?? ''));
         $method = strtoupper(trim((string)($_POST['signature_method'] ?? 'DRAW')));
@@ -339,7 +351,7 @@ class ProfileController {
         $this->requirePostAndCsrf();
 
         $targetUserId = (int)($_POST['user_id'] ?? 0);
-        $this->requireProfileManagePermission($targetUserId);
+        $this->requireSignatureOwner($targetUserId);
 
         $db = (new Database())->getConnection();
         $userModel = new UserModel($db);
