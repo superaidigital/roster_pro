@@ -309,6 +309,16 @@ class ProfileController {
 
         $dataUrl = trim((string)($_POST['signature_data'] ?? ''));
         $method = strtoupper(trim((string)($_POST['signature_method'] ?? 'DRAW')));
+        $pdpaAcknowledged = (string)($_POST['signature_pdpa_ack'] ?? '') === '1';
+        $noticeVersion = trim((string)($_POST['signature_pdpa_notice_version'] ?? ''));
+
+        if (!$pdpaAcknowledged
+            || $noticeVersion === ''
+            || !hash_equals(ElectronicSignature::PRIVACY_NOTICE_VERSION, $noticeVersion)) {
+            $_SESSION['error_msg'] = 'กรุณาอ่านและยืนยันการรับทราบประกาศการประมวลผลข้อมูลส่วนบุคคลก่อนบันทึกลายเซ็น';
+            header('Location: index.php?c=profile&id=' . $targetUserId . '#nav-signature');
+            exit;
+        }
 
         try {
             $signature = ElectronicSignature::normalize($dataUrl, $method);
@@ -316,7 +326,12 @@ class ProfileController {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
 
-            if (!$userModel->updateSignature($targetUserId, $signature['data_url'], $signature['method'])) {
+            if (!$userModel->updateSignature(
+                $targetUserId,
+                $signature['data_url'],
+                $signature['method'],
+                ElectronicSignature::PRIVACY_NOTICE_VERSION
+            )) {
                 throw new RuntimeException('Unable to save signature.');
             }
 
@@ -326,7 +341,9 @@ class ProfileController {
                 || !hash_equals(
                     (string)$signature['sha256'],
                     (string)($savedSignature['signature_sha256'] ?? '')
-                )) {
+                )
+                || (string)($savedSignature['signature_pdpa_notice_version'] ?? '') !== ElectronicSignature::PRIVACY_NOTICE_VERSION
+                || empty($savedSignature['signature_pdpa_ack_at'])) {
                 throw new RuntimeException('Signature database readback verification failed.');
             }
 
@@ -335,6 +352,8 @@ class ProfileController {
                 $_SESSION['user']['signature_sha256'] = $signature['sha256'];
                 $_SESSION['user']['signature_method'] = $signature['method'];
                 $_SESSION['user']['signature_updated_at'] = date('Y-m-d H:i:s');
+                $_SESSION['user']['signature_pdpa_notice_version'] = ElectronicSignature::PRIVACY_NOTICE_VERSION;
+                $_SESSION['user']['signature_pdpa_ack_at'] = date('Y-m-d H:i:s');
             }
 
             LogsController::addLog(
@@ -344,6 +363,8 @@ class ProfileController {
                 'บันทึกลายเซ็นอิเล็กทรอนิกส์ user_id=' . $targetUserId
                     . ' method=' . $signature['method']
                     . ' sha256=' . substr($signature['sha256'], 0, 16)
+                    . ' pdpa_notice=' . ElectronicSignature::PRIVACY_NOTICE_VERSION
+                    . ' pdpa_ack=1'
             );
 
             $_SESSION['success_msg'] = 'บันทึกลายเซ็นอิเล็กทรอนิกส์เรียบร้อยแล้ว';
