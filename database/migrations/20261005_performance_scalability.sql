@@ -20,5 +20,3 @@ CREATE INDEX IF NOT EXISTS idx_shift_swaps_status_hospital_created
 CREATE INDEX IF NOT EXISTS idx_users_active_scope
     ON users (is_deleted, deleted_at, hospital_id, role);
 
-CREATE INDEX IF NOT EXISTS idx_employee_licenses_status_expire_user
-    ON employee_licenses (status, expire_date, user_id);
