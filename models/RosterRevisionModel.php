@@ -55,6 +55,10 @@ class RosterRevisionModel {
         return hash('sha256', $this->encode($payload));
     }
 
+    private function verificationCodeForHash(string $contentHash): string {
+        return strtoupper(substr(hash('sha256', 'roster-verify|' . $contentHash), 0, 32));
+    }
+
     private function getNextRevisionNo(int $hospitalId, string $monthYear): int {
         $stmt = $this->conn->prepare(
             "SELECT revision_no
@@ -214,6 +218,7 @@ class RosterRevisionModel {
             'pay_summary' => $paySummary,
         ];
         $contentHash = $this->calculateHash($hashPayload);
+        $verificationCode = $this->verificationCodeForHash($contentHash);
 
         $stmt = $this->conn->prepare(
             "INSERT INTO roster_revisions
@@ -221,12 +226,12 @@ class RosterRevisionModel {
                  prepared_by, prepared_name, prepared_position, prepared_signature, prepared_at,
                  reviewed_by, reviewed_name, reviewed_position, reviewed_signature, reviewed_at,
                  approved_by, approved_name, approved_position, approved_signature, approved_at,
-                 staff_json, holidays_json, shifts_json, pay_summary_json, content_hash)
+                 staff_json, holidays_json, shifts_json, pay_summary_json, content_hash, verification_code)
              VALUES (?, ?, ?, ?, ?, ?,
                      ?, ?, ?, ?, ?,
                      ?, ?, ?, ?, ?,
                      ?, ?, ?, ?, ?,
-                     ?, ?, ?, ?, ?)"
+                     ?, ?, ?, ?, ?, ?)"
         );
         $stmt->execute([
             $hospitalId,
@@ -255,6 +260,7 @@ class RosterRevisionModel {
             $shiftsJson,
             $paySummaryJson,
             $contentHash,
+            $verificationCode,
         ]);
 
         $id = (int)$this->conn->lastInsertId();
@@ -276,7 +282,7 @@ class RosterRevisionModel {
                     snapshot_id, prepared_by, prepared_name, prepared_position, prepared_at,
                     reviewed_by, reviewed_name, reviewed_position, reviewed_at,
                     approved_by, approved_name, approved_position, approved_at,
-                    content_hash, created_at
+                    content_hash, verification_code, created_at
              FROM roster_revisions
              WHERE hospital_id = ? AND month_year = ?
              ORDER BY revision_no DESC
@@ -363,4 +369,46 @@ class RosterRevisionModel {
 
         return hash_equals((string)$revision['content_hash'], $this->calculateHash($payload));
     }
+
+    public function getPublicVerification(string $verificationCode): ?array {
+        $verificationCode = strtoupper(trim($verificationCode));
+        if (!preg_match('/^[A-F0-9]{32}$/', $verificationCode)) {
+            return null;
+        }
+
+        $stmt = $this->conn->prepare(
+            "SELECT id, hospital_id, hospital_name, month_year, revision_no, revision_code,
+                    snapshot_id, approved_by, approved_name, approved_position, approved_at,
+                    content_hash, verification_code, created_at
+             FROM roster_revisions
+             WHERE verification_code = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$verificationCode]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+
+        $latestStmt = $this->conn->prepare(
+            "SELECT id, revision_no, revision_code, verification_code, approved_at
+             FROM roster_revisions
+             WHERE hospital_id = ? AND month_year = ?
+             ORDER BY revision_no DESC
+             LIMIT 1"
+        );
+        $latestStmt->execute([(int)$row['hospital_id'], (string)$row['month_year']]);
+        $latest = $latestStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        $row['integrity_valid'] = $this->verifyRevision((int)$row['id'], (int)$row['hospital_id']);
+        $row['is_latest'] = $latest
+            ? (int)$latest['id'] === (int)$row['id']
+            : true;
+        $row['latest_revision_code'] = $latest ? (string)$latest['revision_code'] : (string)$row['revision_code'];
+        $row['latest_verification_code'] = $latest ? (string)$latest['verification_code'] : $verificationCode;
+        $row['latest_approved_at'] = $latest ? (string)$latest['approved_at'] : (string)$row['approved_at'];
+
+        return $row;
+    }
+
 }
