@@ -675,7 +675,9 @@ CREATE TABLE `users` (
   `signature_path` longtext DEFAULT NULL COMMENT 'เก็บลายมือชื่ออิเล็กทรอนิกส์ (Base64)',
   `signature_sha256` char(64) DEFAULT NULL COMMENT 'SHA-256 ของ binary ลายเซ็น',
   `signature_method` varchar(20) DEFAULT NULL COMMENT 'DRAW หรือ UPLOAD',
-  `signature_updated_at` datetime DEFAULT NULL COMMENT 'เวลาที่บันทึกลายเซ็นล่าสุด'
+  `signature_updated_at` datetime DEFAULT NULL COMMENT 'เวลาที่บันทึกลายเซ็นล่าสุด',
+  `signature_pdpa_notice_version` varchar(50) DEFAULT NULL COMMENT 'เวอร์ชันประกาศ PDPA ที่ผู้ใช้รับทราบก่อนบันทึกลายเซ็น',
+  `signature_pdpa_ack_at` datetime DEFAULT NULL COMMENT 'เวลาที่ผู้ใช้รับทราบประกาศ PDPA ก่อนบันทึกลายเซ็น'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
