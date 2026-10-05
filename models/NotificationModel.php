@@ -8,9 +8,11 @@ class NotificationModel {
     public function __construct($db) {
         $this->conn = $db;
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        
-        // 🌟 ตรวจสอบและสร้างตารางอัตโนมัติเมื่อเรียกใช้ Model ครั้งแรก
-        $this->checkAndCreateTable();
+
+        // Never mutate schema during normal web requests.
+        if (getenv('APP_AUTO_MIGRATE') === '1') {
+            $this->checkAndCreateTable();
+        }
     }
 
     /**
@@ -126,6 +128,30 @@ class NotificationModel {
         } catch (PDOException $e) {
             return false;
         }
+    }
+
+    public function getByIdForUser($id, $user_id) {
+        $stmt = $this->conn->prepare("
+            SELECT *
+            FROM {$this->table_name}
+            WHERE id = :id AND user_id = :user_id
+            LIMIT 1
+        ");
+        $stmt->execute([':id' => (int)$id, ':user_id' => (int)$user_id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function deleteForUser($id, $user_id) {
+        $stmt = $this->conn->prepare("
+            DELETE FROM {$this->table_name}
+            WHERE id = :id AND user_id = :user_id
+        ");
+        return $stmt->execute([':id' => (int)$id, ':user_id' => (int)$user_id]);
+    }
+
+    public function deleteAllForUser($user_id) {
+        $stmt = $this->conn->prepare("DELETE FROM {$this->table_name} WHERE user_id = :user_id");
+        return $stmt->execute([':user_id' => (int)$user_id]);
     }
 
     /**

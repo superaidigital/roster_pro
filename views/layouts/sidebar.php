@@ -1075,9 +1075,11 @@ if (!function_exists('renderSidebarMenu')) {
     
     <!-- ปุ่มออกจากระบบ (ล่างสุด) -->
     <div class="mt-auto p-3 border-top bg-white">
-        <a href="index.php?c=auth&a=logout" class="nav-link d-flex align-items-center text-decoration-none" onclick="return confirm('คุณต้องการออกจากระบบใช่หรือไม่?');" title="ออกจากระบบ">
-            <i class="bi bi-box-arrow-left"></i> <span class="sidebar-text">ออกจากระบบ</span>
-        </a>
+        <form action="index.php?c=auth&a=logout" method="POST" class="m-0" onsubmit="return confirm('คุณต้องการออกจากระบบใช่หรือไม่?');">
+            <button type="submit" class="nav-link d-flex align-items-center text-decoration-none border-0 w-100 bg-transparent" title="ออกจากระบบ">
+                <i class="bi bi-box-arrow-left"></i> <span class="sidebar-text">ออกจากระบบ</span>
+            </button>
+        </form>
     </div>
 </aside>
 

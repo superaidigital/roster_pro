@@ -8,9 +8,13 @@ class UserModel {
     public function __construct($db) {
         $this->conn = $db;
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        
-        // รันฟังก์ชันตรวจสอบและสร้างคอลัมน์อัตโนมัติเมื่อมีการเรียกใช้ Model
-        $this->checkAndCreateColumns();
+
+        // Performance/Security:
+        // DDL should not run on every web request. Enable this only temporarily
+        // during a controlled legacy migration, then turn it off again.
+        if (getenv('APP_AUTO_MIGRATE') === '1') {
+            $this->checkAndCreateColumns();
+        }
     }
 
     /**
@@ -50,7 +54,7 @@ class UserModel {
             if (!empty($columns_to_add)) {
                 $alter_query = "ALTER TABLE `" . $this->table_name . "` " . implode(', ', $columns_to_add);
                 $this->conn->exec($alter_query);
-                error_log("Auto-migrated columns in users table: " . implode(', ', array_keys($columns_to_add)));
+                error_log("Auto-migrated users table columns successfully.");
             }
         } catch (PDOException $e) {
             error_log("User Auto-migration failed: " . $e->getMessage());

@@ -15,7 +15,11 @@ class UsersController {
     private function checkAuth() {
         if (session_status() === PHP_SESSION_NONE) session_start();
         
-        if (!isset($_SESSION['user']) || !in_array(strtoupper($_SESSION['user']['role']), ['ADMIN', 'SUPERADMIN', 'HR'])) {
+        if (
+            $_SERVER['REQUEST_METHOD'] !== 'POST'
+            || !isset($_SESSION['user'])
+            || !in_array(strtoupper($_SESSION['user']['role']), ['ADMIN', 'SUPERADMIN', 'HR'], true)
+        ) {
             $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์เข้าถึงส่วนการจัดการผู้ใช้งานเครือข่าย";
             header("Location: index.php?c=dashboard");
             exit;
@@ -189,7 +193,8 @@ class UsersController {
                     }
                 }
             } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error: " . $e->getMessage();
+                error_log('Users edit failed: ' . $e->getMessage());
+                $_SESSION['error_msg'] = "ไม่สามารถบันทึกข้อมูลผู้ใช้งานได้";
             }
         }
         header("Location: index.php?c=users");
@@ -205,7 +210,12 @@ class UsersController {
         // เปลี่ยนการตรวจสอบมารับค่า $_POST
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id'])) {
             $db = (new Database())->getConnection();
-            $id = trim($_POST['id']);
+            $id = filter_var($_POST['id'], FILTER_VALIDATE_INT);
+            if (!$id) {
+                $_SESSION['error_msg'] = "เลขอ้างอิงผู้ใช้งานไม่ถูกต้อง";
+                header("Location: index.php?c=users");
+                exit;
+            }
 
             try {
                 // 🌟 แก้ไข: ใช้ Query ตรงเพื่อดึงข้อมูลข้ามข้อจำกัดของ UserModel
@@ -257,7 +267,8 @@ class UsersController {
                     }
                 }
             } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error deleting user: " . $e->getMessage();
+                error_log('Users delete failed: ' . $e->getMessage());
+                $_SESSION['error_msg'] = "ไม่สามารถลบข้อมูลผู้ใช้งานได้";
             }
         } else {
              // ดักจับกรณีผู้ใช้เผลอกดลิงก์มาแบบ GET หรือไม่มีค่า id ส่งมา
@@ -276,8 +287,14 @@ class UsersController {
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id']) && isset($_POST['status'])) {
             $db = (new Database())->getConnection();
-            $id = trim($_POST['id']);
-            $status = (int)$_POST['status'];
+            $id = filter_var($_POST['id'], FILTER_VALIDATE_INT);
+            $status = filter_var($_POST['status'], FILTER_VALIDATE_INT);
+
+            if (!$id || !in_array($status, [0, 1], true)) {
+                $_SESSION['error_msg'] = "ข้อมูลสถานะบัญชีไม่ถูกต้อง";
+                header("Location: index.php?c=users");
+                exit;
+            }
 
             // รับค่าจาก Popup
             $inactive_reason = !empty($_POST['inactive_reason']) ? $_POST['inactive_reason'] : null;
@@ -301,8 +318,9 @@ class UsersController {
                     $this->executeUpdateStatus($db, $id, $status, $inactive_reason, $inactive_date, $inactive_note, $target['name']);
                     
                 }
-            } catch (Exception $e) { 
-                $_SESSION['error_msg'] = "เกิดข้อผิดพลาดทางเทคนิค: " . $e->getMessage(); 
+            } catch (Exception $e) {
+                error_log('Users toggle failed: ' . $e->getMessage());
+                $_SESSION['error_msg'] = "ไม่สามารถอัปเดตสถานะบัญชีได้";
             }
         }
         header("Location: index.php?c=users");
@@ -328,41 +346,9 @@ class UsersController {
             $_SESSION['success_msg'] = "อัปเดตสถานะ {$target_name} สำเร็จ";
 
         } catch (PDOException $e) {
-            // 🌟 ระบบ Auto-Migration: สร้างคอลัมน์อัตโนมัติหากยังไม่มี
-            if (strpos($e->getMessage(), 'Unknown column') !== false) {
-                try {
-                    $stmt_cols = $db->query("SHOW COLUMNS FROM users");
-                    $columns = $stmt_cols->fetchAll(PDO::FETCH_COLUMN);
-
-                    if (!in_array('inactive_reason', $columns)) {
-                        $db->exec("ALTER TABLE users ADD COLUMN inactive_reason VARCHAR(100) NULL COMMENT 'สาเหตุการระงับ'");
-                    }
-                    if (!in_array('inactive_date', $columns)) {
-                        $db->exec("ALTER TABLE users ADD COLUMN inactive_date DATE NULL COMMENT 'วันที่ระงับ/ลาออก/เกษียณ'");
-                    }
-                    if (!in_array('inactive_note', $columns)) {
-                        $db->exec("ALTER TABLE users ADD COLUMN inactive_note TEXT NULL COMMENT 'หมายเหตุเพิ่มเติม'");
-                    }
-
-                    // ลองรันคำสั่งอีกครั้งหลังจากเพิ่มคอลัมน์แล้ว
-                    if ($status === 0) {
-                        $stmt = $db->prepare("UPDATE users SET is_active = 0, inactive_reason = ?, inactive_date = ?, inactive_note = ? WHERE id = ?");
-                        $stmt->execute([$reason, $date, $note, $id]);
-                        $logTxt = "ระงับบัญชี (เหตุผล: {$reason})";
-                    } else {
-                        $stmt = $db->prepare("UPDATE users SET is_active = 1, inactive_reason = NULL, inactive_date = NULL, inactive_note = NULL WHERE id = ?");
-                        $stmt->execute([$id]);
-                        $logTxt = "เปิดใช้งาน";
-                    }
-                    LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "{$logTxt} บัญชี ID: {$id}");
-                    $_SESSION['success_msg'] = "อัปเดตสถานะ {$target_name} สำเร็จ";
-
-                } catch (Exception $ex) {
-                    $_SESSION['error_msg'] = "Auto-Migration ล้มเหลว: " . $ex->getMessage();
-                }
-            } else {
-                $_SESSION['error_msg'] = "Database Error: " . $e->getMessage();
-            }
+            // Schema changes belong in explicit migrations, never normal requests.
+            error_log('Users status update failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถอัปเดตสถานะบัญชีได้ กรุณาตรวจสอบ migration ของฐานข้อมูล";
         }
     }
 
@@ -388,14 +374,22 @@ class UsersController {
                 $db->beginTransaction();
                 $stmt = $db->prepare("UPDATE users SET display_order = ? WHERE id = ?");
                 foreach ($data['order'] as $item) {
-                    $stmt->execute([$item['order'], $item['id']]);
+                    $id = filter_var($item['id'] ?? null, FILTER_VALIDATE_INT);
+                    $order = filter_var($item['order'] ?? null, FILTER_VALIDATE_INT);
+
+                    if (!$id || $order === false || $order < 0 || $order > 100000) {
+                        throw new InvalidArgumentException('Invalid ordering payload');
+                    }
+
+                    $stmt->execute([$order, $id]);
                 }
                 $db->commit();
                 echo json_encode(['success' => true]);
             } catch (Exception $e) {
                 if ($db->inTransaction()) $db->rollBack();
+                error_log('Users update_order failed: ' . $e->getMessage());
                 http_response_code(500);
-                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                echo json_encode(['success' => false, 'message' => 'Unable to save ordering']);
             }
         } else {
             echo json_encode(['success' => false, 'message' => 'Invalid data']);

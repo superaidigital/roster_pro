@@ -48,10 +48,27 @@ class HolidayModel {
     // ดึงวันหยุดตามเดือน-ปี (เอาไว้ใช้ตรวจสอบรวดเดียวตอนจัดตารางเวร)
     public function getHolidaysByMonth($year, $month) {
         try {
-            $stmt = $this->conn->prepare("SELECT * FROM holidays WHERE YEAR(holiday_date) = ? AND MONTH(holiday_date) = ? AND is_active = 1");
-            $stmt->execute([$year, $month]);
+            $year = (int) $year;
+            $month = (int) $month;
+            if ($year < 2000 || $year > 2100 || $month < 1 || $month > 12) {
+                return [];
+            }
+
+            $start = sprintf('%04d-%02d-01', $year, $month);
+            $end = date('Y-m-t', strtotime($start));
+
+            // Range predicates can use an index on holiday_date.
+            $stmt = $this->conn->prepare("
+                SELECT *
+                FROM holidays
+                WHERE holiday_date BETWEEN ? AND ?
+                  AND is_active = 1
+                ORDER BY holiday_date ASC
+            ");
+            $stmt->execute([$start, $end]);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
+            error_log('getHolidaysByMonth failed: ' . $e->getMessage());
             return [];
         }
     }
@@ -87,7 +104,9 @@ class HolidayModel {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);

@@ -435,21 +435,21 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
         <div class="leave-hero-icon bg-<?= $page_theme ?> bg-opacity-10 text-<?= $page_theme ?>">
             <i class="bi <?= $page_icon ?>"></i>
         </div>
-        <h2 id="leavePageTitle" class="leave-hero-title"><?= $page_title ?></h2>
+        <h2 id="leavePageTitle" class="leave-hero-title"><?= htmlspecialchars((string)$page_title, ENT_QUOTES, 'UTF-8') ?></h2>
         <p class="leave-hero-subtitle">ส่งแบบฟอร์มขออนุญาตลาออนไลน์ และตรวจสอบประวัติการลา</p>
     </section>
 
     <!-- แจ้งเตือนสถานะต่างๆ -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert alert-modern alert-success alert-dismissible fade show mb-4" role="alert">
-            <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); endif; ?>
         
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert alert-modern alert-danger alert-dismissible fade show mb-4" role="alert">
-            <i class="bi bi-exclamation-triangle-fill me-2 fs-5 align-middle"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5 align-middle"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['error_msg']); endif; ?>
@@ -798,7 +798,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const leaveTypeSelect = document.getElementById('leave_type'); const medCertSection = document.getElementById('med_cert_section');
     const medCertInput = document.getElementById('med_cert_file'); const leaveForm = document.getElementById('leaveForm');
-    const employeeType = "<?= $employee_type ?? '' ?>"; const holidaysList = <?= isset($json_holidays) ? $json_holidays : '[]' ?>;
+    const employeeType = <?= json_encode((string)($employee_type ?? ''), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>; const holidaysList = <?= isset($json_holidays) ? $json_holidays : '[]' ?>;
 
     function calculateWorkingDays(startDateStr, endDateStr) {
         if (!startDateStr || !endDateStr) return 0;

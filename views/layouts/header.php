@@ -145,6 +145,66 @@ $header_page_icon = $page_context[2];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="csrf-token" content="<?= htmlspecialchars((string)($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+
+    <script>
+    // Central CSRF client helper:
+    // - POST forms receive a hidden _csrf field at submit time.
+    // - same-origin fetch/XHR-style requests receive X-CSRF-Token automatically.
+    (() => {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        const token = meta ? meta.content : '';
+        if (!token) return;
+
+        const ensureFormToken = (form) => {
+            if (!(form instanceof HTMLFormElement)) return;
+            if ((form.method || 'get').toLowerCase() !== 'post') return;
+
+            let input = form.querySelector('input[name="_csrf"]');
+            if (!input) {
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = '_csrf';
+                form.appendChild(input);
+            }
+            input.value = token;
+        };
+
+        // Cover normal user submits and forms created after page load.
+        document.addEventListener('submit', (event) => {
+            ensureFormToken(event.target);
+        }, true);
+
+        // Cover legacy code that calls form.submit() directly (which normally
+        // bypasses the submit event).
+        const nativeFormSubmit = HTMLFormElement.prototype.submit;
+        HTMLFormElement.prototype.submit = function() {
+            ensureFormToken(this);
+            return nativeFormSubmit.call(this);
+        };
+
+        // Pre-populate existing forms so browser-native and library submits work.
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('form[method="post"], form[method="POST"]').forEach(ensureFormToken);
+        });
+
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = (input, init = {}) => {
+            const requestUrl = input instanceof Request ? input.url : String(input);
+            const url = new URL(requestUrl, window.location.href);
+            const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
+
+            if (url.origin === window.location.origin && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+                const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+                headers.set('X-CSRF-Token', token);
+                init = { ...init, headers };
+            }
+
+            return nativeFetch(input, init);
+        };
+    })();
+    </script>
+
     <!-- 🌟 ดึงชื่อแอปมาแสดงที่ชื่อแท็บเบราว์เซอร์ -->
     <title><?= htmlspecialchars($app_name) ?> - <?= htmlspecialchars($app_subtitle) ?></title>
     
@@ -703,7 +763,6 @@ $header_page_icon = $page_context[2];
                         <!-- 🌟 วนลูปแสดงการแจ้งเตือนล่าสุด 5 รายการ -->
                         <?php foreach ($latest_notifications as $notif): 
                             $is_read = $notif['is_read'] == 1;
-                            $link = !empty($notif['link']) ? "index.php?c=notification&a=read&id={$notif['id']}&url=" . urlencode($notif['link']) : "index.php?c=notification&a=read&id={$notif['id']}";
                             
                             // ตกแต่งสีไอคอนตามประเภท
                             $type = strtoupper($notif['type'] ?? 'INFO');
@@ -714,24 +773,27 @@ $header_page_icon = $page_context[2];
                             elseif ($type == 'SWAP') { $icon = 'bi-arrow-left-right'; $color = 'info text-dark'; }
                             elseif ($type == 'LEAVE') { $icon = 'bi-person-dash-fill'; $color = 'warning text-dark'; }
                         ?>
-                            <a href="<?= $link ?>" class="text-decoration-none text-dark d-block">
-                                <div class="p-3 d-flex align-items-start <?= !$is_read ? 'bg-primary bg-opacity-10' : 'bg-white' ?> notif-item" style="transition: all 0.2s;">
-                                    <div class="bg-<?= $color ?> bg-opacity-10 text-<?= str_replace(' text-dark', '', $color) ?> rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
-                                        <i class="bi <?= $icon ?>"></i>
-                                    </div>
-                                    <div class="ms-3 flex-grow-1">
-                                        <div class="d-flex justify-content-between align-items-start mb-1">
-                                            <div class="fw-bolder <?= !$is_read ? 'text-dark' : 'text-secondary' ?>" style="font-size: 13.5px; line-height: 1.3;">
-                                                <?= htmlspecialchars($notif['title']) ?>
-                                            </div>
-                                            <small class="text-muted ms-2 text-nowrap" style="font-size: 10px;"><i class="bi bi-clock me-1"></i><?= date('d/m H:i', strtotime($notif['created_at'])) ?></small>
+                            <form action="index.php?c=notification&a=read" method="POST" class="m-0">
+                                <input type="hidden" name="id" value="<?= (int)$notif['id'] ?>">
+                                <button type="submit" class="text-decoration-none text-dark d-block w-100 border-0 p-0 bg-transparent text-start">
+                                    <div class="p-3 d-flex align-items-start <?= !$is_read ? 'bg-primary bg-opacity-10' : 'bg-white' ?> notif-item" style="transition: all 0.2s;">
+                                        <div class="bg-<?= $color ?> bg-opacity-10 text-<?= str_replace(' text-dark', '', $color) ?> rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                                            <i class="bi <?= $icon ?>"></i>
                                         </div>
-                                        <p class="mb-0 text-muted" style="font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                            <?= htmlspecialchars($notif['message']) ?>
-                                        </p>
+                                        <div class="ms-3 flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                                <div class="fw-bolder <?= !$is_read ? 'text-dark' : 'text-secondary' ?>" style="font-size: 13.5px; line-height: 1.3;">
+                                                    <?= htmlspecialchars((string)$notif['title'], ENT_QUOTES, 'UTF-8') ?>
+                                                </div>
+                                                <small class="text-muted ms-2 text-nowrap" style="font-size: 10px;"><i class="bi bi-clock me-1"></i><?= date('d/m H:i', strtotime($notif['created_at'])) ?></small>
+                                            </div>
+                                            <p class="mb-0 text-muted" style="font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                                <?= htmlspecialchars((string)$notif['message'], ENT_QUOTES, 'UTF-8') ?>
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                            </a>
+                                </button>
+                            </form>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
@@ -739,9 +801,11 @@ $header_page_icon = $page_context[2];
                 <?php if (!empty($latest_notifications)): ?>
                     <!-- ปุ่ม Footer ทำเครื่องหมายอ่านแล้ว -->
                     <div class="p-2 border-top bg-light text-center" style="border-radius: 0 0 1rem 1rem;">
-                        <a href="index.php?c=notification&a=read_all" class="text-decoration-none text-muted fw-bold small d-block py-2" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')" onclick="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
-                            <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
-                        </a>
+                        <form action="index.php?c=notification&a=read_all" method="POST" class="m-0" onsubmit="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
+                            <button type="submit" class="btn btn-link text-decoration-none text-muted fw-bold small py-2 w-100">
+                                <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
+                            </button>
+                        </form>
                     </div>
                 <?php endif; ?>
             </div>
@@ -771,7 +835,13 @@ $header_page_icon = $page_context[2];
                 <li><a class="dropdown-item py-2" href="index.php?c=settings&a=system"><i class="bi bi-gear text-secondary me-2"></i> ตั้งค่าระบบ</a></li>
                 <?php endif; ?>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger fw-bold py-2" href="index.php?c=auth&a=logout"><i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ</a></li>
+                <li>
+                    <form action="index.php?c=auth&a=logout" method="POST" class="m-0">
+                        <button type="submit" class="dropdown-item text-danger fw-bold py-2">
+                            <i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ
+                        </button>
+                    </form>
+                </li>
             </ul>
         </div>
         <?php endif; ?>

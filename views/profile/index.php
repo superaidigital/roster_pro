@@ -13,11 +13,11 @@
     </div>
 
     <?php if (isset($_SESSION['success_msg'])): ?>
-        <div class="alert alert-success border-0 shadow-sm rounded-3 d-flex align-items-center mb-4"><i class="bi bi-check-circle-fill fs-5 text-success me-3"></i> <div class="fw-bold text-dark"><?= $_SESSION['success_msg'] ?></div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button></div>
+        <div class="alert alert-success border-0 shadow-sm rounded-3 d-flex align-items-center mb-4"><i class="bi bi-check-circle-fill fs-5 text-success me-3"></i> <div class="fw-bold text-dark"><?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button></div>
         <?php unset($_SESSION['success_msg']); endif; ?>
         
     <?php if (isset($_SESSION['error_msg'])): ?>
-        <div class="alert alert-danger border-0 shadow-sm rounded-3 d-flex align-items-center mb-4"><i class="bi bi-exclamation-triangle-fill fs-5 text-danger me-3"></i> <div class="fw-bold text-dark"><?= $_SESSION['error_msg'] ?></div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button></div>
+        <div class="alert alert-danger border-0 shadow-sm rounded-3 d-flex align-items-center mb-4"><i class="bi bi-exclamation-triangle-fill fs-5 text-danger me-3"></i> <div class="fw-bold text-dark"><?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?></div><button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button></div>
         <?php unset($_SESSION['error_msg']); endif; ?>
 
     <div class="row g-4">

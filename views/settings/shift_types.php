@@ -24,14 +24,14 @@
 
         <?php if(isset($_SESSION['success_msg'])): ?>
             <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 mb-4">
-                <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+                <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php unset($_SESSION['success_msg']); ?>
         <?php endif; ?>
         <?php if(isset($_SESSION['error_msg'])): ?>
             <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0 mb-4">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php unset($_SESSION['error_msg']); ?>

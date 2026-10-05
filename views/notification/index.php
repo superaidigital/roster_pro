@@ -171,7 +171,10 @@ $unread_count = $notifModel->getUnreadCount($user_id);
                         $date_time = date('d/m/Y H:i', strtotime($notif['created_at']));
                     ?>
                     
-                    <div class="list-group-item notif-item <?= !$is_read ? 'unread' : '' ?>" id="notif-row-<?= $notif['id'] ?>" onclick="handleNotifClick(event, <?= $notif['id'] ?>, '<?= htmlspecialchars($notif['link'] ?? '') ?>')">
+                    <div class="list-group-item notif-item <?= !$is_read ? 'unread' : '' ?>"
+                         id="notif-row-<?= (int)$notif['id'] ?>"
+                         data-link="<?= htmlspecialchars((string)($notif['link'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                         onclick="handleNotifClick(event, <?= (int)$notif['id'] ?>, this.dataset.link)">
                         <div class="d-flex align-items-start gap-3">
                             
                             <!-- Icon -->
@@ -197,7 +200,7 @@ $unread_count = $notifModel->getUnreadCount($user_id);
                             
                             <!-- Action Buttons -->
                             <div class="d-flex align-items-center align-self-center ps-2">
-                                <button class="notif-action-btn text-muted" onclick="deleteNotif(event, <?= $notif['id'] ?>)" title="ลบการแจ้งเตือนนี้">
+                                <button class="notif-action-btn text-muted" onclick="deleteNotif(event, <?= (int)$notif['id'] ?>)" title="ลบการแจ้งเตือนนี้">
                                     <i class="bi bi-trash3-fill"></i>
                                 </button>
                             </div>
@@ -225,9 +228,14 @@ function handleNotifClick(event, id, link) {
     // ถ้าผู้ใช้กดปุ่มลบ ให้ข้ามฟังก์ชันนี้ไป (ป้องกันการเปลี่ยนหน้า)
     if (event.target.closest('button')) return;
 
-    // ทำเครื่องหมายว่าอ่านแล้วเงียบๆ
-    fetch(`${BASE_URL}&a=read_notif&id=${id}`).then(() => {
-        // อัปเดต UI 
+    const body = new URLSearchParams({ noti_id: String(id) });
+
+    // ทำเครื่องหมายว่าอ่านแล้วผ่าน POST + CSRF
+    fetch(`${BASE_URL}&a=markNotificationAsRead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body
+    }).then(() => {
         const row = document.getElementById(`notif-row-${id}`);
         const dot = document.getElementById(`dot-${id}`);
         if(row) {
@@ -237,9 +245,14 @@ function handleNotifClick(event, id, link) {
         }
         if(dot) dot.remove();
 
-        // ไปที่ลิงก์ถ้ามี
-        if (link && link !== '') {
-            window.location.href = link;
+        // Only follow same-origin notification links.
+        if (link) {
+            try {
+                const url = new URL(link, window.location.href);
+                if (url.origin === window.location.origin) {
+                    window.location.href = url.href;
+                }
+            } catch (_) {}
         }
     });
 }
@@ -260,7 +273,11 @@ function deleteNotif(event, id) {
         reverseButtons: true
     }).then((result) => {
         if (result.isConfirmed) {
-            fetch(`${BASE_URL}&a=delete_notif&id=${id}`)
+            fetch(`${BASE_URL}&a=deleteNotification`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: new URLSearchParams({ noti_id: String(id) })
+            })
             .then(res => res.json())
             .then(data => {
                 if(data.status === 'success') {
@@ -280,7 +297,7 @@ function deleteNotif(event, id) {
 
 // 3. อ่านทั้งหมด
 function markAllAsRead() {
-    fetch(`${BASE_URL}&a=read_all_notif`)
+    fetch(`${BASE_URL}&a=markAllNotificationsAsRead`, { method: 'POST' })
     .then(res => res.json())
     .then(data => {
         if(data.status === 'success') {
@@ -317,7 +334,7 @@ function deleteAllNotifs() {
         reverseButtons: true
     }).then((result) => {
         if (result.isConfirmed) {
-            fetch(`${BASE_URL}&a=delete_all_notif`)
+            fetch(`${BASE_URL}&a=deleteAllNotifications`, { method: 'POST' })
             .then(res => res.json())
             .then(data => {
                 if(data.status === 'success') {

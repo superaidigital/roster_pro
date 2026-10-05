@@ -47,13 +47,13 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
     <!-- Alert Messages -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
@@ -112,11 +112,11 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
                         $theme = $user['color_theme'] ?? 'primary';
                         $initial = mb_substr($user['name'], 0, 1, 'UTF-8');
                     ?>
-                        <tr class="staff-row" data-id="<?= $user['id'] ?>" data-role="<?= strtoupper($user['role']) ?>">
+                        <tr class="staff-row" data-id="<?= (int)$user['id'] ?>" data-role="<?= htmlspecialchars(strtoupper((string)$user['role']), ENT_QUOTES, 'UTF-8') ?>">
                             <td class="text-center"><i class="bi bi-grip-vertical drag-handle"></i></td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar-circle bg-<?= $theme ?> me-3"><?= $initial ?></div>
+                                    <div class="avatar-circle bg-<?= htmlspecialchars((string)$theme, ENT_QUOTES, 'UTF-8') ?> me-3"><?= htmlspecialchars((string)$initial, ENT_QUOTES, 'UTF-8') ?></div>
                                     <div>
                                         <div class="fw-bold text-dark staff-name"><?= htmlspecialchars($user['name']) ?></div>
                                         <div class="small text-muted font-monospace staff-username"><i class="bi bi-person me-1"></i><?= htmlspecialchars($user['username'] ?? '-') ?></div>
@@ -152,7 +152,12 @@ $current_user_role = trim(strtoupper($_SESSION['user']['role'] ?? 'STAFF'));
                                 
                                 <!-- Delete Button -->
                                 <?php if($user['id'] != $_SESSION['user']['id']): ?>
-                                    <a href="index.php?c=staff&a=delete&id=<?= $user['id'] ?>" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm" onclick="return confirm('ยืนยันการลบข้อมูลบุคลากร?');"><i class="bi bi-trash-fill"></i></a>
+                                    <form action="index.php?c=staff&a=delete" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบข้อมูลบุคลากร?');">
+                                        <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                        <button type="submit" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
                             </td>
                         </tr>

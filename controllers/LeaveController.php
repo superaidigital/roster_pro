@@ -14,12 +14,41 @@ class LeaveController {
     // 🌟 ฟังก์ชันช่วยเหลือ (Helper Functions)
     // ==========================================
     
-    // 🛠️ ฟังก์ชันพิเศษ: ซ่อมแซมโครงสร้างฐานข้อมูลอัตโนมัติ
+    // Centralized authentication guard for every action that reads session user data.
+    private function ensureAuthenticated() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        if (!isset($_SESSION['user']) || empty($_SESSION['user']['id'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+    }
+
+    // Legacy schema patch: disabled during normal requests because ALTER TABLE
+    // can lock tables and was previously executed on every visit/submission.
+    // Enable temporarily with APP_AUTO_PATCH_DB=1 only during a controlled migration.
     private function autoPatchDatabase($db) {
+        if (getenv('APP_AUTO_PATCH_DB') !== '1') {
+            return;
+        }
+
         try {
             $db->exec("ALTER TABLE leave_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'PENDING'");
             $db->exec("UPDATE leave_requests SET status = 'CANCEL_REQUESTED' WHERE status = ''");
-        } catch (Exception $e) { }
+        } catch (Exception $e) {
+            error_log('Leave schema patch failed: ' . $e->getMessage());
+        }
+    }
+
+    private function isValidDate($value) {
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return false;
+        }
+
+        $date = DateTime::createFromFormat('!Y-m-d', $value);
+        return $date && $date->format('Y-m-d') === $value;
     }
 
     private function getCurrentBudgetYear() {
@@ -56,10 +85,21 @@ class LeaveController {
                 "Authorization: Bearer " . $line_token
             ]);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            // Never disable TLS certificate validation in production.
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
             $result = curl_exec($ch);
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+            if ($result === false || $http_code < 200 || $http_code >= 300) {
+                error_log('LINE notification request failed with HTTP code ' . $http_code);
+                curl_close($ch);
+                return false;
+            }
+
             curl_close($ch);
             return $result;
         } catch (Exception $e) { return false; }
@@ -69,7 +109,7 @@ class LeaveController {
     // 🌟 หน้าจอหลัก (ยื่นใบลา และ ประวัติการลาของฉัน)
     // ==========================================
     public function index() {
-        if (!isset($_SESSION['user'])) { header("Location: index.php?c=auth&a=index"); exit; }
+        $this->ensureAuthenticated();
 
         $db = (new Database())->getConnection();
         $this->autoPatchDatabase($db); 
@@ -81,7 +121,10 @@ class LeaveController {
         $role = $_SESSION['user']['role'];
         $budget_year = $this->getCurrentBudgetYear();
         
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+        $selected_month = $_GET['month'] ?? date('Y-m');
+        if (!is_string($selected_month) || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $selected_month)) {
+            $selected_month = date('Y-m');
+        }
 
         $stmt_emp = $db->prepare("SELECT employee_type FROM users WHERE id = ?");
         $stmt_emp->execute([$user_id]);
@@ -116,36 +159,59 @@ class LeaveController {
     // 🌟 ส่งคำขอลา (Submit Leave Request)
     // ==========================================
     public function request() {
-        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-            $db = (new Database())->getConnection();
-            $this->autoPatchDatabase($db); 
-            
-            $leaveModel = new LeaveModel($db);
-            $notifModel = new NotificationModel($db);
-            
-            $user_id = $_SESSION['user']['id'];
-            $hospital_id = $_SESSION['user']['hospital_id'];
-            $user_name = $_SESSION['user']['name'];
-            $role = $_SESSION['user']['role'];
-            $budget_year = $this->getCurrentBudgetYear();
-            
-            $leave_type_id = $_POST['leave_type_id'];
-            $start_date = $_POST['start_date'];
-            $end_date = $_POST['end_date'];
-            $reason = $_POST['reason'];
+        $this->ensureAuthenticated();
 
-            if (strtotime($start_date) > strtotime($end_date)) {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("Location: index.php?c=leave&a=index");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $this->autoPatchDatabase($db);
+
+        $leaveModel = new LeaveModel($db);
+        $notifModel = new NotificationModel($db);
+
+        $user_id = (int) $_SESSION['user']['id'];
+        $hospital_id = (int) ($_SESSION['user']['hospital_id'] ?? 0);
+        $user_name = (string) ($_SESSION['user']['name'] ?? '');
+        $role = (string) ($_SESSION['user']['role'] ?? 'STAFF');
+        $budget_year = $this->getCurrentBudgetYear();
+
+        $leave_type_id = filter_var($_POST['leave_type_id'] ?? null, FILTER_VALIDATE_INT);
+        $start_date = is_string($_POST['start_date'] ?? null) ? $_POST['start_date'] : '';
+        $end_date = is_string($_POST['end_date'] ?? null) ? $_POST['end_date'] : '';
+        $reason = is_string($_POST['reason'] ?? null) ? trim($_POST['reason']) : '';
+
+        if (
+            !$leave_type_id
+            || !$this->isValidDate($start_date)
+            || !$this->isValidDate($end_date)
+            || $reason === ''
+            || mb_strlen($reason, 'UTF-8') > 2000
+        ) {
+            $_SESSION['error_msg'] = "ข้อมูลคำขอลาไม่ครบถ้วนหรือรูปแบบไม่ถูกต้อง";
+            header("Location: index.php?c=leave&a=index");
+            exit;
+        }
+
+        if ($start_date > $end_date) {
                 $_SESSION['error_msg'] = "วันที่สิ้นสุดการลา ต้องไม่น้อยกว่าวันที่เริ่มต้น";
                 header("Location: index.php?c=leave&a=index"); exit;
             }
 
-            $stmt_overlap = $db->prepare("
-                SELECT id FROM leave_requests 
-                WHERE user_id = ? AND status IN ('PENDING', 'APPROVED', 'CANCEL_REQUESTED') 
-                AND start_date <= ? AND end_date >= ?
-            ");
-            $stmt_overlap->execute([$user_id, $end_date, $start_date]);
-            if ($stmt_overlap->rowCount() > 0) {
+        $stmt_overlap = $db->prepare("
+            SELECT EXISTS(
+                SELECT 1
+                FROM leave_requests
+                WHERE user_id = ?
+                  AND status IN ('PENDING', 'APPROVED', 'CANCEL_REQUESTED')
+                  AND start_date <= ?
+                  AND end_date >= ?
+            )
+        ");
+        $stmt_overlap->execute([$user_id, $end_date, $start_date]);
+        if ((int) $stmt_overlap->fetchColumn() === 1) {
                 $_SESSION['error_msg'] = "คุณมียื่นใบลาในช่วงเวลาดังกล่าวไว้แล้ว (รอพิจารณา หรือ อนุมัติแล้ว)";
                 header("Location: index.php?c=leave&a=index"); exit;
             }
@@ -243,38 +309,72 @@ class LeaveController {
                 header("Location: index.php?c=leave&a=index"); exit;
             }
 
-            $has_med_cert = 0; $med_cert_path = null;
-            if ($leave_name === 'ลาป่วย') {
-                if ($actual_working_days >= 3 && empty($_FILES['med_cert_file']['name'])) {
-                    $_SESSION['error_msg'] = "การลาป่วยติดต่อกัน 3 วันทำการขึ้นไป ต้องอัปโหลดไฟล์ใบรับรองแพทย์ด้วย";
-                    header("Location: index.php?c=leave&a=index"); exit;
-                }
+        $has_med_cert = 0;
+        $med_cert_path = null;
 
-                if (!empty($_FILES['med_cert_file']['name']) && $_FILES['med_cert_file']['error'] == 0) {
-                    $allowed_ext = ['jpg', 'jpeg', 'png', 'pdf'];
-                    $file_name = $_FILES['med_cert_file']['name'];
-                    $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+        if ($leave_name === 'ลาป่วย') {
+            $file = $_FILES['med_cert_file'] ?? null;
 
-                    if (in_array($file_ext, $allowed_ext)) {
-                        $upload_dir = 'uploads/med_certs/';
-                        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-                        
-                        $new_name = uniqid('cert_' . $user_id . '_') . '.' . $file_ext;
-                        $target_file = $upload_dir . $new_name;
-
-                        if (move_uploaded_file($_FILES['med_cert_file']['tmp_name'], $target_file)) {
-                            $has_med_cert = 1;
-                            $med_cert_path = $target_file;
-                        } else {
-                            $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการอัปโหลดไฟล์ใบรับรองแพทย์";
-                            header("Location: index.php?c=leave&a=index"); exit;
-                        }
-                    } else {
-                        $_SESSION['error_msg'] = "ไฟล์ใบรับรองแพทย์ต้องเป็นนามสกุล JPG, PNG หรือ PDF เท่านั้น";
-                        header("Location: index.php?c=leave&a=index"); exit;
-                    }
-                }
+            if ($actual_working_days >= 3 && (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE)) {
+                $_SESSION['error_msg'] = "การลาป่วยติดต่อกัน 3 วันทำการขึ้นไป ต้องอัปโหลดไฟล์ใบรับรองแพทย์ด้วย";
+                header("Location: index.php?c=leave&a=index");
+                exit;
             }
+
+            if ($file && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+                    $_SESSION['error_msg'] = "อัปโหลดใบรับรองแพทย์ไม่สำเร็จ (รหัสข้อผิดพลาดไฟล์)";
+                    header("Location: index.php?c=leave&a=index");
+                    exit;
+                }
+
+                $maxBytes = 5 * 1024 * 1024;
+                if (($file['size'] ?? 0) <= 0 || ($file['size'] ?? 0) > $maxBytes || !is_uploaded_file($file['tmp_name'])) {
+                    $_SESSION['error_msg'] = "ไฟล์ใบรับรองแพทย์ต้องมีขนาดไม่เกิน 5 MB";
+                    header("Location: index.php?c=leave&a=index");
+                    exit;
+                }
+
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime = $finfo->file($file['tmp_name']);
+                $allowedMime = [
+                    'image/jpeg' => 'jpg',
+                    'image/png' => 'png',
+                    'application/pdf' => 'pdf',
+                ];
+
+                if (!isset($allowedMime[$mime])) {
+                    $_SESSION['error_msg'] = "ชนิดไฟล์ใบรับรองแพทย์ไม่ถูกต้อง อนุญาตเฉพาะ JPG, PNG หรือ PDF";
+                    header("Location: index.php?c=leave&a=index");
+                    exit;
+                }
+
+                $upload_dir = 'uploads/med_certs/';
+                if (!is_dir($upload_dir) && !mkdir($upload_dir, 0750, true) && !is_dir($upload_dir)) {
+                    $_SESSION['error_msg'] = "ระบบไม่สามารถเตรียมพื้นที่จัดเก็บไฟล์ได้";
+                    header("Location: index.php?c=leave&a=index");
+                    exit;
+                }
+
+                // Never trust the original filename. Generate a cryptographically random name.
+                $new_name = sprintf(
+                    'cert_%d_%s.%s',
+                    $user_id,
+                    bin2hex(random_bytes(16)),
+                    $allowedMime[$mime]
+                );
+                $target_file = $upload_dir . $new_name;
+
+                if (!move_uploaded_file($file['tmp_name'], $target_file)) {
+                    $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการอัปโหลดไฟล์ใบรับรองแพทย์";
+                    header("Location: index.php?c=leave&a=index");
+                    exit;
+                }
+
+                $has_med_cert = 1;
+                $med_cert_path = $target_file;
+            }
+        }
 
             if ($leaveModel->addLeaveRequest([
                 'user_id' => $user_id, 'leave_type_id' => $leave_type_id, 
@@ -297,22 +397,31 @@ class LeaveController {
             } else {
                 $_SESSION['error_msg'] = "เกิดข้อผิดพลาดในการบันทึกข้อมูลลงระบบ";
             }
-        }
-        header("Location: index.php?c=leave&a=index"); exit;
+
+        header("Location: index.php?c=leave&a=index");
+        exit;
     }
 
     // ==========================================
     // 🌟 ยกเลิกใบลา (ปรับปรุง: ลบทิ้งเพื่อล้างประวัติ)
     // ==========================================
     public function cancel() {
-        if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['request_id'])) {
+        $this->ensureAuthenticated();
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {
+            $request_id = filter_var($_POST['request_id'], FILTER_VALIDATE_INT);
+            if (!$request_id) {
+                $_SESSION['error_msg'] = "เลขอ้างอิงใบลาไม่ถูกต้อง";
+                header("Location: index.php?c=leave&a=index");
+                exit;
+            }
+
             $db = (new Database())->getConnection();
             $this->autoPatchDatabase($db);
             
             $notifModel = new NotificationModel($db);
             
-            $request_id = $_POST['request_id'];
-            $user_id = $_SESSION['user']['id'];
+            $user_id = (int) $_SESSION['user']['id'];
             $user_name = $_SESSION['user']['name'];
             $hospital_id = $_SESSION['user']['hospital_id'];
 

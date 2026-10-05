@@ -38,14 +38,14 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
     <!-- Alerts -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
 
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
@@ -81,7 +81,7 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                     </div>
                     <h5 class="fw-bolder text-dark mb-2">สำรองข้อมูลเก็บไว้ในเซิร์ฟเวอร์</h5>
                     <p class="text-muted mb-4" style="font-size: 13.5px; line-height: 1.6;">
-                        บันทึกไฟล์ .sql เก็บไว้ในโฟลเดอร์ <code class="bg-light px-2 py-1 rounded">public/uploads/Backup</code> อย่างปลอดภัย
+                        บันทึกไฟล์ .sql ในพื้นที่สำรองข้อมูลส่วนตัวที่ไม่เปิดให้เข้าถึงจากเว็บโดยตรง
                     </p>
 
                     <form action="index.php?c=settings&a=do_server_backup" method="POST" class="w-100" onsubmit="return confirm('ต้องการสร้างไฟล์สำรองข้อมูลเก็บบนเซิร์ฟเวอร์ใช่หรือไม่?');">
@@ -128,14 +128,17 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                                         <td><span class="badge bg-secondary bg-opacity-10 text-secondary border font-monospace"><?= $file['size'] ?> KB</span></td>
                                         <td class="text-muted"><?= $file['date'] ?></td>
                                         <td>
-                                            <a href="<?= htmlspecialchars($file['path']) ?>" download class="btn btn-sm btn-outline-primary rounded-circle" title="ดาวน์โหลด">
+                                            <a href="index.php?c=settings&a=download_server_backup&file=<?= urlencode((string)$file['filename']) ?>"
+                                               class="btn btn-sm btn-outline-primary rounded-circle" title="ดาวน์โหลด">
                                                 <i class="bi bi-download"></i>
                                             </a>
-                                            <a href="index.php?c=settings&a=delete_server_backup&file=<?= urlencode($file['filename']) ?>" 
-                                               class="btn btn-sm btn-outline-danger rounded-circle ms-1" 
-                                               onclick="return confirm('ยืนยันการลบไฟล์ <?= htmlspecialchars($file['filename']) ?> ?');" title="ลบไฟล์">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
+                                            <form action="index.php?c=settings&a=delete_server_backup" method="POST" class="d-inline"
+                                                  onsubmit="return confirm('ยืนยันการลบไฟล์สำรองข้อมูลนี้?');">
+                                                <input type="hidden" name="file" value="<?= htmlspecialchars((string)$file['filename'], ENT_QUOTES, 'UTF-8') ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle ms-1" title="ลบไฟล์">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -146,9 +149,9 @@ $server_backups = $server_backups ?? []; // นำเข้าตัวแปร
                     <!-- วิธีตั้งค่า Cron Job -->
                     <div class="card-footer bg-light p-3">
                         <h6 class="fw-bold" style="font-size: 13px;"><i class="bi bi-robot text-primary me-1"></i> การตั้งค่าสำรองข้อมูลอัตโนมัติ (Cron Job)</h6>
-                        <p class="text-muted mb-1" style="font-size: 12px;">หากต้องการให้ระบบสำรองข้อมูลอัตโนมัติทุกเดือน ให้นำ URL ด้านล่างไปตั้งค่าใน Cron Job ของโฮสติ้ง (เช่น ตั้งค่าให้ทำงานทุกวันที่ 1 ของเดือน)</p>
+                        <p class="text-muted mb-1" style="font-size: 12px;">กำหนด <code>CRON_BACKUP_KEY</code> ใน Environment และตั้ง Cron Job ให้ส่งค่าเดียวกันผ่าน Header <code>X-Cron-Key</code> โดยไม่ใส่ Secret ใน URL หรือ Git</p>
                         <code class="d-block bg-dark text-white p-2 rounded mt-2" style="font-size: 11px; word-break: break-all;">
-                            curl -s "http://<?= $_SERVER['HTTP_HOST'] ?>/index.php?c=settings&a=cron_monthly_backup&key=ROSTER_PRO_CRON_2026"
+                            curl -fsS -H "X-Cron-Key: $ROSTER_CRON_KEY" "https://<?= htmlspecialchars((string)($_SERVER['HTTP_HOST'] ?? 'your-domain.example'), ENT_QUOTES, 'UTF-8') ?>/index.php?c=settings&amp;a=cron_monthly_backup"
                         </code>
                     </div>
                 </div>

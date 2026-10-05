@@ -71,13 +71,13 @@ list($n_start, $n_end) = getShiftTimes($hospital['night_shift'] ?? '', '00:00', 
     <!-- Alert Messages -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
@@ -105,7 +105,7 @@ list($n_start, $n_end) = getShiftTimes($hospital['night_shift'] ?? '', '00:00', 
                     <div class="card-body p-4">
                         <!-- ส่วนอัปโหลดโลโก้ -->
                         <div class="text-center mb-4 pb-3 border-bottom">
-                            <img src="<?= $logo_url ?>" alt="Hospital Logo" class="logo-preview mb-3" id="logoPreview">
+                            <img src="<?= htmlspecialchars((string)$logo_url, ENT_QUOTES, 'UTF-8') ?>" alt="Hospital Logo" class="logo-preview mb-3" id="logoPreview">
                             <div>
                                 <label for="logoInput" class="btn btn-sm btn-outline-primary rounded-pill px-4 fw-bold shadow-sm cursor-pointer">
                                     <i class="bi bi-camera-fill me-1"></i> เปลี่ยนรูปตราสัญลักษณ์
@@ -237,12 +237,12 @@ list($n_start, $n_end) = getShiftTimes($hospital['night_shift'] ?? '', '00:00', 
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="flex-grow-1">
                                             <label class="form-label small text-muted mb-1 fw-bold">เข้างาน</label>
-                                            <input type="time" id="m_s" class="form-control text-center fw-bold fs-6" value="<?= $m_start ?>" required>
+                                            <input type="time" id="m_s" class="form-control text-center fw-bold fs-6" value="<?= htmlspecialchars((string)$m_start, ENT_QUOTES, 'UTF-8') ?>" required>
                                         </div>
                                         <div class="pt-3 fw-bold text-muted opacity-50"><i class="bi bi-arrow-right"></i></div>
                                         <div class="flex-grow-1">
                                             <label class="form-label small text-muted mb-1 fw-bold">ออกงาน</label>
-                                            <input type="time" id="m_e" class="form-control text-center fw-bold fs-6" value="<?= $m_end ?>" required>
+                                            <input type="time" id="m_e" class="form-control text-center fw-bold fs-6" value="<?= htmlspecialchars((string)$m_end, ENT_QUOTES, 'UTF-8') ?>" required>
                                         </div>
                                     </div>
                                 </div>
@@ -263,12 +263,12 @@ list($n_start, $n_end) = getShiftTimes($hospital['night_shift'] ?? '', '00:00', 
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="flex-grow-1">
                                             <label class="form-label small text-muted mb-1 fw-bold">เข้างาน</label>
-                                            <input type="time" id="a_s" class="form-control text-center fw-bold fs-6" value="<?= $a_start ?>" required>
+                                            <input type="time" id="a_s" class="form-control text-center fw-bold fs-6" value="<?= htmlspecialchars((string)$a_start, ENT_QUOTES, 'UTF-8') ?>" required>
                                         </div>
                                         <div class="pt-3 fw-bold text-muted opacity-50"><i class="bi bi-arrow-right"></i></div>
                                         <div class="flex-grow-1">
                                             <label class="form-label small text-muted mb-1 fw-bold">ออกงาน</label>
-                                            <input type="time" id="a_e" class="form-control text-center fw-bold fs-6" value="<?= $a_end ?>" required>
+                                            <input type="time" id="a_e" class="form-control text-center fw-bold fs-6" value="<?= htmlspecialchars((string)$a_end, ENT_QUOTES, 'UTF-8') ?>" required>
                                         </div>
                                     </div>
                                 </div>
@@ -289,12 +289,12 @@ list($n_start, $n_end) = getShiftTimes($hospital['night_shift'] ?? '', '00:00', 
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="flex-grow-1">
                                             <label class="form-label small text-muted mb-1 fw-bold">เข้างาน</label>
-                                            <input type="time" id="n_s" class="form-control text-center fw-bold fs-6" value="<?= $n_start ?>" required>
+                                            <input type="time" id="n_s" class="form-control text-center fw-bold fs-6" value="<?= htmlspecialchars((string)$n_start, ENT_QUOTES, 'UTF-8') ?>" required>
                                         </div>
                                         <div class="pt-3 fw-bold text-muted opacity-50"><i class="bi bi-arrow-right"></i></div>
                                         <div class="flex-grow-1">
                                             <label class="form-label small text-muted mb-1 fw-bold">ออกงาน</label>
-                                            <input type="time" id="n_e" class="form-control text-center fw-bold fs-6" value="<?= $n_end ?>" required>
+                                            <input type="time" id="n_e" class="form-control text-center fw-bold fs-6" value="<?= htmlspecialchars((string)$n_end, ENT_QUOTES, 'UTF-8') ?>" required>
                                         </div>
                                     </div>
                                 </div>

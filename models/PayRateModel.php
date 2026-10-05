@@ -7,7 +7,11 @@ class PayRateModel {
 
     public function __construct($db) {
         $this->conn = $db;
-        $this->checkAndCreateTable();
+
+        // Schema creation/mutation must be an explicit deployment step.
+        if (getenv('APP_AUTO_MIGRATE') === '1') {
+            $this->checkAndCreateTable();
+        }
     }
 
     private function checkAndCreateTable() {
@@ -45,6 +49,72 @@ class PayRateModel {
         $stmt = $this->conn->prepare("SELECT * FROM " . $this->table_name . " ORDER BY display_order ASC, id ASC");
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function updateRate($id, array $data) {
+        $id = (int) $id;
+        if ($id <= 0) return false;
+
+        $stmt = $this->conn->prepare("
+            UPDATE {$this->table_name}
+            SET keywords = ?, rate_r = ?, rate_y = ?, rate_b = ?
+            WHERE id = ?
+        ");
+
+        return $stmt->execute([
+            trim((string)($data['keywords'] ?? '')),
+            max(0, (int)($data['rate_r'] ?? 0)),
+            max(0, (int)($data['rate_y'] ?? 0)),
+            max(0, (int)($data['rate_b'] ?? 0)),
+            $id
+        ]);
+    }
+
+    public function addRate(array $data) {
+        $keywords = trim((string)($data['keywords'] ?? ''));
+        if ($keywords === '') return false;
+
+        $name = trim((string)($data['name'] ?? $keywords));
+
+        $stmt = $this->conn->prepare("
+            INSERT INTO {$this->table_name}
+                (name, keywords, rate_r, rate_y, rate_b, display_order)
+            VALUES (?, ?, ?, ?, ?, COALESCE((SELECT MAX(p.display_order) + 1 FROM {$this->table_name} p), 1))
+        ");
+
+        return $stmt->execute([
+            $name,
+            $keywords,
+            max(0, (int)($data['rate_r'] ?? 0)),
+            max(0, (int)($data['rate_y'] ?? 0)),
+            max(0, (int)($data['rate_b'] ?? 0))
+        ]);
+    }
+
+    public function deleteRate($id) {
+        $id = (int) $id;
+        if ($id <= 0) return false;
+
+        $stmt = $this->conn->prepare("DELETE FROM {$this->table_name} WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+
+    public function updateAmounts($id, $rateY, $rateB, $rateR) {
+        $id = (int) $id;
+        if ($id <= 0) return false;
+
+        $stmt = $this->conn->prepare("
+            UPDATE {$this->table_name}
+            SET rate_y = ?, rate_b = ?, rate_r = ?
+            WHERE id = ?
+        ");
+
+        return $stmt->execute([
+            max(0, (int)$rateY),
+            max(0, (int)$rateB),
+            max(0, (int)$rateR),
+            $id
+        ]);
     }
 
     // 🌟 ระบบบันทึกแบบฉลาด (อัปเดตอันเก่า เพิ่มอันใหม่ ลบอันที่ถูกกากบาททิ้ง)

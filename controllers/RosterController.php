@@ -33,7 +33,14 @@ class RosterController {
             $hospital_id = $_GET['hospital_id'];
         }
         
-        $selected_month = isset($_GET['month']) ? $_GET['month'] : date('Y-m');
+        $selected_month = $_GET['month'] ?? date('Y-m');
+        if (!is_string($selected_month) || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $selected_month)) {
+            $selected_month = date('Y-m');
+        }
+
+        // Use an index-friendly date range instead of LIKE/DATE_FORMAT on date columns.
+        $month_start = $selected_month . '-01';
+        $month_end = date('Y-m-t', strtotime($month_start));
 
         // 🏥 1. ดึงรายชื่อหน่วยบริการทั้งหมด
         $stmt_hosp = $db->query("SELECT id, name FROM hospitals WHERE is_active = 1 AND name NOT LIKE '%ส่วนกลาง%' ORDER BY id ASC");
@@ -68,20 +75,26 @@ class RosterController {
         $all_staff_for_sidebar = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
 
         // 📅 3. ดึงข้อมูลกะปฏิบัติงาน (Shifts) ของเดือนนี้
-        $stmt_shifts = $db->prepare("SELECT * FROM shifts WHERE hospital_id = ? AND shift_date LIKE ?");
-        $stmt_shifts->execute([$hospital_id, $selected_month . '-%']);
+        $stmt_shifts = $db->prepare("
+            SELECT *
+            FROM shifts
+            WHERE hospital_id = ?
+              AND shift_date BETWEEN ? AND ?
+        ");
+        $stmt_shifts->execute([$hospital_id, $month_start, $month_end]);
         $shifts = $stmt_shifts->fetchAll(PDO::FETCH_ASSOC);
 
         // 📝 4. ดึงข้อมูลวันลา (Leaves)
         $stmt_leaves = $db->prepare("
-            SELECT lr.*, lq.leave_type 
+            SELECT lr.*, lq.leave_type
             FROM leave_requests lr
             JOIN leave_quotas lq ON lr.leave_type_id = lq.id
             JOIN users u ON lr.user_id = u.id
             WHERE lr.status IN ('APPROVED', 'PENDING', 'CANCEL_REQUESTED')
-            AND (DATE_FORMAT(lr.start_date, '%Y-%m') = ? OR DATE_FORMAT(lr.end_date, '%Y-%m') = ?)
+              AND lr.start_date <= ?
+              AND lr.end_date >= ?
         ");
-        $stmt_leaves->execute([$selected_month, $selected_month]);
+        $stmt_leaves->execute([$month_end, $month_start]);
         $leaves = $stmt_leaves->fetchAll(PDO::FETCH_ASSOC);
 
         // 🚦 5. ดึงสถานะตารางเวร
