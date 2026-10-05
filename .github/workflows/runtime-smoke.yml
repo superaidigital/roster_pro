@@ -49,5 +49,8 @@ jobs:
       - name: Load schema-only database
         run: mariadb -h 127.0.0.1 -P 3306 -uroot -proot roster_pro_test < database/schema.sql
 
+      - name: Run performance contract
+        run: php scripts/performance_check.php
+
       - name: Run runtime smoke test
         run: php tests/runtime_smoke.php
