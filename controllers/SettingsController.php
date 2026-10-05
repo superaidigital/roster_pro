@@ -508,6 +508,57 @@ class SettingsController {
         $this->shift_types();
     }
 
+    // Bulk action used by views/settings/shift_types.php.
+    public function save_pay_rates() {
+        $this->requirePost();
+        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+
+        $db = (new Database())->getConnection();
+        require_once 'models/PayRateModel.php';
+        $payRateModel = new PayRateModel($db);
+        $rates = $payRateModel->getAllRates();
+
+        try {
+            $db->beginTransaction();
+
+            foreach ($rates as $rate) {
+                $id = (int)($rate['id'] ?? 0);
+                if ($id <= 0) continue;
+
+                $rateY = filter_var($_POST["rate_y_{$id}"] ?? null, FILTER_VALIDATE_INT);
+                $rateB = filter_var($_POST["rate_b_{$id}"] ?? null, FILTER_VALIDATE_INT);
+                $rateR = filter_var($_POST["rate_r_{$id}"] ?? null, FILTER_VALIDATE_INT);
+
+                if ($rateY === false || $rateB === false || $rateR === false) {
+                    throw new InvalidArgumentException("Invalid pay-rate value");
+                }
+
+                foreach ([$rateY, $rateB, $rateR] as $amount) {
+                    if ($amount < 0 || $amount > 100000) {
+                        throw new InvalidArgumentException("Pay-rate value out of range");
+                    }
+                }
+
+                if (!$payRateModel->updateAmounts($id, $rateY, $rateB, $rateR)) {
+                    throw new RuntimeException("Unable to update pay rate");
+                }
+            }
+
+            $db->commit();
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "ปรับปรุงอัตราค่าตอบแทน");
+            $_SESSION['success_msg'] = "บันทึกอัตราค่าตอบแทนเรียบร้อยแล้ว";
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            error_log('save_pay_rates failed: ' . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถบันทึกอัตราค่าตอบแทนได้";
+        }
+
+        header("Location: index.php?c=settings&a=shift_types");
+        exit;
+    }
+
     public function save_payrate() {
         $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
@@ -542,18 +593,27 @@ class SettingsController {
     }
 
     public function delete_payrate() {
+        $this->requirePost();
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+
+        $id = filter_var($_POST['id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$id) {
+            $_SESSION['error_msg'] = "เลขอ้างอิงอัตราค่าตอบแทนไม่ถูกต้อง";
+            header("Location: index.php?c=settings&a=shift_types");
+            exit;
+        }
+
         $db = (new Database())->getConnection();
         require_once 'models/PayRateModel.php';
         $payRateModel = new PayRateModel($db);
-        
-        if (isset($_GET['id'])) {
-            $payRateModel->deleteRate($_GET['id']);
-            
-            // 🌟 บันทึก Log: ลบเรทค่าตอบแทน
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบหมวดเรทค่าตอบแทน ID: " . $_GET['id']);
+
+        if ($payRateModel->deleteRate($id)) {
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบหมวดเรทค่าตอบแทน ID: {$id}");
             $_SESSION['success_msg'] = "ลบเรทค่าตอบแทนเรียบร้อยแล้ว";
+        } else {
+            $_SESSION['error_msg'] = "ไม่สามารถลบอัตราค่าตอบแทนได้";
         }
+
         header("Location: index.php?c=settings&a=shift_types");
         exit;
     }
