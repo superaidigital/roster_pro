@@ -23,3 +23,9 @@ CREATE TABLE IF NOT EXISTS disaster_recovery_drills (
   KEY idx_dr_drills_status_completed (status, completed_at),
   KEY idx_dr_drills_backup_created (backup_created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE system_health_snapshots
+  ADD COLUMN IF NOT EXISTS dr_status VARCHAR(20) NULL AFTER disk_free_mb,
+  ADD COLUMN IF NOT EXISTS dr_age_hours INT UNSIGNED NULL AFTER dr_status,
+  ADD COLUMN IF NOT EXISTS dr_rpo_seconds INT UNSIGNED NULL AFTER dr_age_hours,
+  ADD COLUMN IF NOT EXISTS dr_rto_ms INT UNSIGNED NULL AFTER dr_rpo_seconds;
