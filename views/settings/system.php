@@ -298,9 +298,12 @@ require_once __DIR__ . '/../components/ui.php';
                 </form>
             </div>
             <div class="modal-footer border-top-0 bg-light p-3 d-flex justify-content-between align-items-center">
-                <a href="index.php?c=settings&a=test_line" class="btn btn-outline-success fw-bold rounded-pill px-4" onclick="return confirm('ระบบจะทำการส่งข้อความทดสอบไปยังกลุ่ม LINE ของคุณ ยืนยันหรือไม่?');">
-                    <i class="bi bi-send-check-fill me-1"></i> ทดสอบส่งข้อความ
-                </a>
+                <form action="index.php?c=settings&a=test_line" method="POST" class="m-0" onsubmit="return confirm('ระบบจะทำการส่งข้อความทดสอบไปยังกลุ่ม LINE ของคุณ ยืนยันหรือไม่?');">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                    <button type="submit" class="btn btn-outline-success fw-bold rounded-pill px-4">
+                        <i class="bi bi-send-check-fill me-1"></i> ทดสอบส่งข้อความ
+                    </button>
+                </form>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-light border fw-bold rounded-pill px-4" data-bs-dismiss="modal">ปิด</button>
                     <button type="submit" form="lineNotifyForm" class="btn btn-success fw-bold rounded-pill px-4 shadow-sm"><i class="bi bi-save me-1"></i> บันทึกตั้งค่า</button>
