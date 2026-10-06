@@ -94,6 +94,11 @@ if (!empty($leaves) && is_array($leaves)) {
 }
 
 require_once __DIR__ . '/../components/ui.php';
+
+if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$roster_csrf_token = $_SESSION['csrf_token'];
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -258,6 +263,7 @@ require_once __DIR__ . '/../components/ui.php';
             <div class="rp-roster-status__actions">
                 <?php if (($roster_status === 'APPROVED' || $roster_status === 'REQUEST_EDIT') && $isAdmin): ?>
                     <form action="index.php?c=ajax&a=change_status" method="POST" class="d-flex gap-2 flex-wrap m-0">
+                        <input type="hidden" name="csrf_token" value="<?= rp_e($roster_csrf_token) ?>">
                         <input type="hidden" name="month_year" value="<?= rp_e($selected_month) ?>">
                         <input type="hidden" name="hospital_id" value="<?= rp_e($hospital_id ?? '') ?>">
                         <?php if ($roster_status === 'REQUEST_EDIT'): ?>
@@ -278,6 +284,7 @@ require_once __DIR__ . '/../components/ui.php';
 
                 <?php if ($roster_status === 'SUBMITTED' && ($_SESSION['user']['role'] ?? '') === 'DIRECTOR'): ?>
                     <form action="index.php?c=ajax&a=change_status" method="POST" class="d-flex gap-2 flex-wrap m-0">
+                        <input type="hidden" name="csrf_token" value="<?= rp_e($roster_csrf_token) ?>">
                         <input type="hidden" name="month_year" value="<?= rp_e($selected_month) ?>">
                         <button type="submit" name="status" value="DRAFT" class="rp-btn rp-btn--danger rp-btn--sm" onclick="return confirm('ยืนยันการตีกลับ?');">
                             <i class="bi bi-arrow-return-left"></i> ตีกลับ
@@ -290,6 +297,7 @@ require_once __DIR__ . '/../components/ui.php';
 
                 <?php if ($roster_status === 'APPROVED' && in_array($_SESSION['user']['role'] ?? '', ['SCHEDULER', 'DIRECTOR'], true)): ?>
                     <form action="index.php?c=ajax&a=request_edit" method="POST" class="m-0" onsubmit="return confirm('ส่งคำขอปลดล็อกตารางเวร?');">
+                        <input type="hidden" name="csrf_token" value="<?= rp_e($roster_csrf_token) ?>">
                         <input type="hidden" name="month_year" value="<?= rp_e($selected_month) ?>">
                         <button type="submit" class="rp-btn rp-btn--warning rp-btn--sm">
                             <i class="bi bi-unlock-fill"></i> ขอแก้ไขตาราง
@@ -314,6 +322,7 @@ require_once __DIR__ . '/../components/ui.php';
                         <i class="bi bi-eraser-fill"></i> ล้างข้อมูล
                     </a>
                     <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0" onsubmit="submitForApproval(event, this);">
+                        <input type="hidden" name="csrf_token" value="<?= rp_e($roster_csrf_token) ?>">
                         <input type="hidden" name="month_year" value="<?= rp_e($selected_month) ?>">
                         <input type="hidden" name="status" value="SUBMITTED">
                         <button type="submit" class="rp-btn rp-btn--primary rp-btn--sm">
@@ -950,6 +959,7 @@ require_once __DIR__ . '/../components/ui.php';
 
 <!-- ================= Scripts การทำงานหลัก ================= -->
 <script>
+const ROSTER_CSRF = <?= json_encode($roster_csrf_token, JSON_UNESCAPED_SLASHES) ?>;
 // 🌟 นำเข้าฐานข้อมูลเรทเงินจาก PHP ลง JavaScript
 const payRatesDB = <?php echo json_encode($pay_rates_db ?? []); ?>;
 const isApprovedSnapshot = <?= ($roster_status == 'APPROVED' && isset($pay_snapshot)) ? 'true' : 'false' ?>;
@@ -1038,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch('index.php?c=ajax&a=update_order', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF },
                     body: JSON.stringify({ order: orderData })
                 })
                 .then(res => res.json())
@@ -1163,7 +1173,7 @@ function saveShift(shiftValue, colorClass) {
     if (indicator) indicator.classList.remove('d-none');
     
     fetch('index.php?c=ajax&a=save_shift', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF},
         body: JSON.stringify({ user_id: staffId, date: dateStr, shift_type: shiftValue, hosp_id: targetHospId })
     })
     .then(res => res.json())
@@ -1187,7 +1197,7 @@ function removeStaffFromRoster(staffId, staffName) {
     cells.forEach(cell => {
         if (cell.innerText.trim() !== '') {
             promises.push(fetch('index.php?c=ajax&a=save_shift', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF},
                 body: JSON.stringify({ user_id: staffId, date: cell.getAttribute('data-date'), shift_type: '', hosp_id: targetHospId })
             }).then(res => res.json()));
         }
@@ -1309,7 +1319,7 @@ function showToast(type, message) {
 
 function copyPreviousMonth(currentMonth) {
     if(confirm('ระบบจะดึงแพทเทิร์นตารางเวรจาก "เดือนก่อนหน้า" มาทับข้อมูลเดือนปัจจุบันทั้งหมด\n\nยืนยันการดำเนินการหรือไม่?')) {
-        fetch('index.php?c=ajax&a=copy_roster_previous', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ target_month: currentMonth, hosp_id: targetHospId }) })
+        fetch('index.php?c=ajax&a=copy_roster_previous', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF}, body: JSON.stringify({ target_month: currentMonth, hosp_id: targetHospId }) })
         .then(res => res.json()).then(data => {
             if(data.status === 'success') { alert('คัดลอกตารางสำเร็จ!'); window.location.reload(); } else alert('Error: ' + data.message);
         });
@@ -1343,7 +1353,7 @@ function openHolidayInfoModal(dateStr, isHoliday, holidayName) {
 function submitHolidayRequest() {
     const hName = document.getElementById('hiRequestName').value.trim();
     if (!hName) return alert('กรุณาระบุชื่อวันหยุด');
-    fetch('index.php?c=ajax&a=request_holiday', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: selectedHolidayDate, name: hName, hosp_id: targetHospId }) })
+    fetch('index.php?c=ajax&a=request_holiday', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF}, body: JSON.stringify({ date: selectedHolidayDate, name: hName, hosp_id: targetHospId }) })
     .then(r => r.json()).then(d => {
         if (d.status === 'success') { alert('ส่งคำขอสำเร็จ!'); holidayInfoModal.hide(); } else alert('Error: ' + d.message);
     });
