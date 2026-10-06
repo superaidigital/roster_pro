@@ -1,0 +1,324 @@
+/* Roster Pro — Shift Swap workflow (Design System v2) */
+
+.rp-swap-overview {
+    display: grid;
+    grid-template-columns: repeat(4,minmax(0,1fr));
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+
+.rp-swap-kpi {
+    min-width: 0;
+    padding: .9rem;
+    border: 1px solid var(--rp-border);
+    border-radius: var(--rp-radius-lg);
+    background: var(--rp-surface);
+    box-shadow: var(--rp-shadow-xs);
+}
+
+.rp-swap-kpi__label {
+    color: var(--rp-text-muted);
+    font-size: .68rem;
+    font-weight: 700;
+}
+
+.rp-swap-kpi__value {
+    margin-top: .2rem;
+    color: var(--rp-text);
+    font-family: var(--rp-font-heading);
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.rp-swap-status {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .38rem .62rem;
+    border-radius: var(--rp-radius-pill);
+    font-size: .7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.rp-swap-status--target {
+    background: var(--rp-warning-50);
+    color: var(--rp-warning-700);
+}
+
+.rp-swap-status--director {
+    background: var(--rp-info-50);
+    color: var(--rp-info-700);
+}
+
+.rp-swap-status--approved {
+    background: var(--rp-success-50);
+    color: var(--rp-success-700);
+}
+
+.rp-swap-status--rejected {
+    background: var(--rp-danger-50);
+    color: var(--rp-danger-700);
+}
+
+.rp-swap-shift {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    min-height: 36px;
+    padding: .35rem .5rem;
+    border-radius: .65rem;
+    font-weight: 800;
+}
+
+.rp-swap-shift--m {
+    background: var(--rp-info-50);
+    color: var(--rp-info-700);
+}
+
+.rp-swap-shift--a {
+    background: var(--rp-warning-50);
+    color: var(--rp-warning-700);
+}
+
+.rp-swap-shift--n {
+    background: var(--rp-slate-800);
+    color: #fff;
+}
+
+.rp-swap-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.rp-swap-card {
+    overflow: hidden;
+}
+
+.rp-swap-card__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.rp-swap-card__title {
+    margin: 0;
+    color: var(--rp-text);
+    font-size: .88rem;
+    font-weight: 700;
+}
+
+.rp-swap-card__meta {
+    margin-top: .18rem;
+    color: var(--rp-text-muted);
+    font-size: .7rem;
+}
+
+.rp-swap-card__route {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+    align-items: center;
+    gap: .55rem;
+    margin-top: .85rem;
+}
+
+.rp-swap-card__side {
+    padding: .65rem;
+    border: 1px solid var(--rp-border);
+    border-radius: .7rem;
+    background: var(--rp-slate-50);
+}
+
+.rp-swap-card__side-label {
+    color: var(--rp-text-muted);
+    font-size: .62rem;
+}
+
+.rp-swap-card__side-name {
+    margin-top: .15rem;
+    color: var(--rp-text);
+    font-size: .76rem;
+    font-weight: 700;
+}
+
+.rp-swap-card__side-date {
+    margin-top: .35rem;
+    color: var(--rp-text-secondary);
+    font-size: .7rem;
+}
+
+.rp-swap-card__arrow {
+    color: var(--rp-teal-600);
+    font-size: 1.1rem;
+}
+
+.rp-swap-card__reason {
+    margin-top: .7rem;
+    padding: .6rem .7rem;
+    border-radius: .65rem;
+    background: var(--rp-slate-50);
+    color: var(--rp-text-secondary);
+    font-size: .72rem;
+    line-height: 1.45;
+}
+
+.rp-swap-card__actions {
+    display: flex;
+    gap: .5rem;
+    margin-top: .75rem;
+}
+
+.rp-swap-card__actions > *,
+.rp-swap-card__actions form,
+.rp-swap-card__actions .rp-btn {
+    flex: 1 1 0;
+}
+
+.rp-swap-flow {
+    display: grid;
+    grid-template-columns: repeat(4,minmax(0,1fr));
+    gap: .4rem;
+    margin-bottom: 1rem;
+}
+
+.rp-swap-flow__step {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    min-width: 0;
+    padding: .52rem .6rem;
+    border: 1px solid var(--rp-border);
+    border-radius: .7rem;
+    background: var(--rp-slate-50);
+    color: var(--rp-text-muted);
+    font-size: .66rem;
+    font-weight: 700;
+}
+
+.rp-swap-flow__number {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--rp-slate-200);
+    color: var(--rp-slate-700);
+    font-size: .64rem;
+}
+
+.rp-swap-flow__step--active {
+    border-color: #bfdbfe;
+    background: var(--rp-primary-50);
+    color: var(--rp-primary-700);
+}
+
+.rp-swap-flow__step--active .rp-swap-flow__number {
+    background: var(--rp-primary-600);
+    color: #fff;
+}
+
+.rp-swap-preview {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+    align-items: stretch;
+    gap: .65rem;
+    margin-top: 1rem;
+    padding: .75rem;
+    border: 1px solid #99f6e4;
+    border-radius: .8rem;
+    background: var(--rp-teal-50);
+}
+
+.rp-swap-preview[hidden] {
+    display: none !important;
+}
+
+.rp-swap-preview__side {
+    padding: .65rem;
+    border-radius: .7rem;
+    background: rgba(255,255,255,.85);
+}
+
+.rp-swap-preview__label {
+    color: var(--rp-text-muted);
+    font-size: .62rem;
+}
+
+.rp-swap-preview__name {
+    margin-top: .2rem;
+    color: var(--rp-text);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.rp-swap-preview__shift {
+    margin-top: .35rem;
+    color: var(--rp-text-secondary);
+    font-size: .72rem;
+}
+
+.rp-swap-preview__arrow {
+    display: grid;
+    place-items: center;
+    color: var(--rp-teal-600);
+    font-size: 1.35rem;
+}
+
+.rp-swap-modal .modal-content {
+    border: 1px solid var(--rp-border) !important;
+    border-radius: var(--rp-radius-xl) !important;
+    box-shadow: var(--rp-shadow-lg) !important;
+}
+
+.rp-swap-modal .modal-header,
+.rp-swap-modal .modal-footer {
+    background: var(--rp-slate-50);
+    border-color: var(--rp-border);
+}
+
+@media (max-width: 991.98px) {
+    .rp-swap-overview {
+        grid-template-columns: repeat(2,minmax(0,1fr));
+    }
+}
+
+@media (max-width: 767.98px) {
+    .rp-swap-flow {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .rp-swap-preview {
+        grid-template-columns: 1fr;
+    }
+
+    .rp-swap-preview__arrow {
+        transform: rotate(90deg);
+    }
+}
+
+@media (max-width: 575.98px) {
+    .rp-swap-overview {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .rp-swap-card__route {
+        grid-template-columns: 1fr;
+    }
+
+    .rp-swap-card__arrow {
+        transform: rotate(90deg);
+        justify-self: center;
+    }
+
+    .rp-swap-card__actions {
+        flex-direction: column;
+    }
+
+    .rp-swap-flow {
+        grid-template-columns: 1fr;
+    }
+}
