@@ -10,16 +10,50 @@ require_once 'controllers/LogsController.php'; // 🌟 ระบบ Log
 
 class LeaveController {
 
+    const LEAVE_MANAGER_ROLES = ['SUPERADMIN', 'ADMIN', 'DIRECTOR', 'SCHEDULER'];
+    const LEAVE_ADMIN_ROLES = ['SUPERADMIN', 'ADMIN'];
+    const MED_CERT_MAX_BYTES = 5242880; // 5 MB
+
     // ==========================================
     // 🌟 ฟังก์ชันช่วยเหลือ (Helper Functions)
     // ==========================================
-    
-    // 🛠️ ฟังก์ชันพิเศษ: ซ่อมแซมโครงสร้างฐานข้อมูลอัตโนมัติ
+
+    private function currentRole() {
+        $role = $_SESSION['user']['role'] ?? '';
+        return is_string($role) ? strtoupper(trim($role)) : '';
+    }
+
+    private function getCsrfToken() {
+        if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    private function verifyCsrf($redirect = 'index.php?c=leave&a=index') {
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $postedToken = $_POST['csrf_token'] ?? '';
+
+        if (!is_string($sessionToken) || !is_string($postedToken) ||
+            $sessionToken === '' || $postedToken === '' ||
+            !hash_equals($sessionToken, $postedToken)) {
+            $_SESSION['error_msg'] = 'คำขอหมดอายุหรือไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง';
+            header('Location: ' . $redirect);
+            exit;
+        }
+    }
+
+    private function requireLeaveManager() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_MANAGER_ROLES, true)) {
+            $_SESSION['error_msg'] = 'คุณไม่มีสิทธิ์ดำเนินการรายการนี้';
+            header('Location: index.php?c=leave&a=index');
+            exit;
+        }
+    }
+
+    // Database schema changes must be handled by migrations, not on every request.
     private function autoPatchDatabase($db) {
-        try {
-            $db->exec("ALTER TABLE leave_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'PENDING'");
-            $db->exec("UPDATE leave_requests SET status = 'CANCEL_REQUESTED' WHERE status = ''");
-        } catch (Exception $e) { }
+        return true;
     }
 
     private function getCurrentBudgetYear() {
@@ -56,8 +90,10 @@ class LeaveController {
                 "Authorization: Bearer " . $line_token
             ]);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             $result = curl_exec($ch);
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
