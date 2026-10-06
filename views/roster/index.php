@@ -65,6 +65,8 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     $d_str = "$year-$month-" . str_pad($i, 2, '0', STR_PAD_LEFT);
     $holiday_cache[$i] = isset($holidayModel) ? $holidayModel->isHoliday($d_str) : false;
 }
+
+require_once 'views/components/ui.php';
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -112,131 +114,66 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
 </style>
 
-<div class="w-100 bg-light p-3 p-md-4 min-vh-100 d-flex flex-column">
-    <div class="container-fluid max-w-7xl mx-auto flex-grow-1 d-flex flex-column">
+<div class="w-100 min-vh-100 d-flex flex-column">
+    <div class="rp-page flex-grow-1 d-flex flex-column">
         
-        <!-- 🌟 Header & Controls -->
-        <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center mb-4 gap-3 bg-white p-3 p-md-4 rounded-4 shadow-sm border-0">
-            <div style="min-width: 0;" class="flex-shrink-0">
-                <h4 class="fw-bold text-dark mb-1 text-truncate">
-                    <i class="bi bi-calendar3 text-primary me-2"></i> ตารางปฏิบัติงาน (Roster)
-                </h4>
-                <p class="text-muted mb-0 text-truncate" style="font-size: 14px;">หน่วยบริการ: <span class="fw-bold text-primary"><?= htmlspecialchars($hospital_name ?? '') ?></span></p>
-            </div>
-            
-            <div class="d-flex flex-wrap align-items-center justify-content-xl-end gap-2 flex-grow-1">
-                
-                <!-- 🌟 ปุ่มขอแลกเวร -->
-                <a href="index.php?c=swap" class="btn btn-warning rounded-pill shadow-sm fw-bold px-3 text-dark hover-shadow d-flex align-items-center" title="ระบบขอแลกเวร/เปลี่ยนเวร" style="height: 40px;">
-                    <i class="bi bi-arrow-left-right me-1"></i> <span class="d-none d-sm-inline">ขอแลกเวร</span>
-                </a>
+        <?php
+        ob_start();
+        ?>
+            <a href="index.php?c=swap" class="rp-btn rp-btn--secondary" title="ระบบขอแลกเวร/เปลี่ยนเวร">
+                <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                <span>ขอแลกเวร</span>
+            </a>
 
-                <form method="GET" action="index.php" id="filterFormRoster" class="d-flex flex-wrap gap-2 mb-0 align-items-center">
-                    <input type="hidden" name="c" value="roster">
-                    <input type="hidden" name="a" value="index">
-                    
-                    <?php if ($isAdmin): ?>
-                    <div class="dropdown shadow-sm" style="width: 220px;">
-                        <button class="btn d-flex justify-content-between align-items-center bg-white border border-secondary border-opacity-25 w-100 rounded-pill px-3" type="button" id="hospDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="true" style="height: 40px;">
-                            <div class="d-flex align-items-center gap-2 text-truncate" style="min-width: 0;">
-                                <i class="bi bi-hospital text-danger flex-shrink-0"></i>
-                                <span class="fw-bold text-dark text-truncate" style="font-size: 13.5px;"><?= htmlspecialchars($hospital_name ?? '') ?></span>
-                            </div>
-                            <i class="bi bi-chevron-down text-muted ms-2 flex-shrink-0" style="font-size: 12px;"></i>
-                        </button>
-                        <div class="dropdown-menu shadow w-100 p-0 border-0 rounded-3 overflow-hidden" aria-labelledby="hospDropdown">
-                            <div class="p-2 bg-light border-bottom sticky-top" style="z-index: 10;">
-                                <div class="input-group input-group-sm input-group-modern">
-                                    <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
-                                    <input type="text" class="form-control" id="hospSearchInput" placeholder="ค้นหา รพ.สต. ...">
-                                </div>
-                            </div>
-                            <ul class="list-unstyled mb-0 overflow-auto custom-scrollbar" style="max-height: 280px;" id="hospOptionList">
-                                <?php foreach ($hospitals_list as $h): ?>
-                                    <li>
-                                        <a class="dropdown-item hosp-option py-2 text-wrap lh-sm <?= $h['id'] == ($hospital_id??0) ? 'active bg-primary text-white fw-bold' : 'text-dark' ?>" href="#" data-val="<?= $h['id'] ?>" style="font-size: 13.5px;">
-                                            <?= htmlspecialchars($h['name']) ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <input type="hidden" name="hospital_id" id="selectedHospInput" value="<?= htmlspecialchars($hospital_id??'') ?>">
-                    </div>
-                    <?php else: ?>
-                        <input type="hidden" name="hospital_id" value="<?= $hospital_id ?? '' ?>">
-                    <?php endif; ?>
+            <form method="GET" action="index.php" id="filterFormRoster" class="rp-toolbar__group mb-0">
+                <input type="hidden" name="c" value="roster">
+                <input type="hidden" name="a" value="index">
 
-                    <?php
-                    $current_y = (int)date('Y');
-                    $sel_y = (int)substr($selected_month, 0, 4);
-                    $start_y = min($current_y - 1, $sel_y - 1);
-                    $end_y = max($current_y + 2, $sel_y + 2);
-                    $months_options = [];
-                    for ($y = $start_y; $y <= $end_y; $y++) {
-                        for ($m = 1; $m <= 12; $m++) {
-                            $val = sprintf("%04d-%02d", $y, $m);
-                            $label = $thai_months[$m] . " " . ($y + 543);
-                            $months_options[$val] = $label;
-                        }
-                    }
-                    ?>
-                    <div class="dropdown shadow-sm" style="width: 170px;">
-                        <button class="btn d-flex justify-content-between align-items-center bg-white border border-secondary border-opacity-25 w-100 rounded-pill px-3" type="button" id="monthDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="true" style="height: 40px;">
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-calendar-month text-primary"></i>
-                                <span class="fw-bold text-dark" style="font-size: 13.5px;"><?= $display_month_text ?></span>
-                            </div>
-                            <i class="bi bi-chevron-down text-muted ms-1" style="font-size: 12px;"></i>
-                        </button>
-                        <div class="dropdown-menu shadow w-100 p-0 border-0 rounded-3 overflow-hidden" aria-labelledby="monthDropdown">
-                            <div class="p-2 bg-light border-bottom sticky-top" style="z-index: 10;">
-                                <div class="input-group input-group-sm input-group-modern">
-                                    <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
-                                    <input type="text" class="form-control" id="monthSearchInput" placeholder="ค้นหาเดือน, ปี...">
-                                </div>
-                            </div>
-                            <ul class="list-unstyled mb-0 overflow-auto custom-scrollbar" style="max-height: 280px;" id="monthOptionList">
-                                <?php foreach ($months_options as $val => $label): ?>
-                                    <li>
-                                        <a class="dropdown-item month-option py-2 <?= $val == $selected_month ? 'active bg-primary text-white fw-bold' : 'text-dark' ?>" href="#" data-val="<?= $val ?>" style="font-size: 13.5px;">
-                                            <?= $label ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <input type="hidden" name="month" id="selectedMonthInput" value="<?= htmlspecialchars($selected_month) ?>">
-                    </div>
-                </form>
+                <?php if ($isAdmin): ?>
+                    <select name="hospital_id" class="rp-control" style="width:auto;min-width:220px;" onchange="this.form.submit()" aria-label="เลือกหน่วยบริการ">
+                        <?php foreach ($hospitals_list as $h): ?>
+                            <option value="<?= (int)$h['id'] ?>" <?= $h['id'] == ($hospital_id ?? 0) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($h['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php else: ?>
+                    <input type="hidden" name="hospital_id" value="<?= (int)($hospital_id ?? 0) ?>">
+                <?php endif; ?>
 
-                <div class="vr mx-1 d-none d-md-block opacity-25"></div>
+                <input type="month" name="month" class="rp-control" style="width:auto;" value="<?= htmlspecialchars($selected_month) ?>" onchange="this.form.submit()" aria-label="เลือกเดือน">
+            </form>
 
-                <!-- 🌟 กลุ่มปุ่มส่งออก -->
-                <div class="btn-group shadow-sm rounded-pill overflow-hidden" style="height: 40px;">
-                    <a href="index.php?c=roster&a=export_word&month=<?= $selected_month ?>&hospital_id=<?= urlencode($hospital_id??'') ?>" 
-                       class="btn btn-primary fw-bold d-flex align-items-center gap-2 px-3 border-0">
-                        <i class="bi bi-printer-fill fs-6"></i> <span class="d-none d-sm-inline">พิมพ์</span>
-                    </a>
-                    <div class="vr bg-white opacity-25"></div>
-                    <button onclick="exportTableToExcelClean('rosterTable', 'ตารางเวร_<?= $selected_month ?>')" class="btn btn-success fw-bold d-flex align-items-center gap-2 px-3 border-0">
-                        <i class="bi bi-file-earmark-excel-fill fs-6"></i> <span class="d-none d-sm-inline">Excel</span>
-                    </button>
-                </div>
-            </div>
-        </div>
+            <a href="index.php?c=roster&a=export_word&month=<?= urlencode($selected_month) ?>&hospital_id=<?= urlencode($hospital_id ?? '') ?>" class="rp-btn rp-btn--primary">
+                <i class="bi bi-printer-fill" aria-hidden="true"></i>
+                พิมพ์
+            </a>
+
+            <button type="button" onclick="exportTableToExcelClean('rosterTable', 'ตารางเวร_<?= htmlspecialchars($selected_month, ENT_QUOTES, 'UTF-8') ?>')" class="rp-btn rp-btn--success">
+                <i class="bi bi-file-earmark-excel-fill" aria-hidden="true"></i>
+                Excel
+            </button>
+        <?php
+        $roster_actions = ob_get_clean();
+        rp_page_header(
+            'ตารางปฏิบัติงาน',
+            'หน่วยบริการ: ' . ($hospital_name ?? '') . ' · ' . $display_month_text,
+            $roster_actions,
+            'Roster'
+        );
+        ?>
 
         <!-- 🌟 แจ้งเตือนข้อผิดพลาด/ความสำเร็จ -->
         <?php if (isset($_SESSION['success_msg'])): ?>
             <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 rounded-3" role="alert">
-                <i class="bi bi-check-circle-fill me-2"></i> <strong>สำเร็จ!</strong> <?= $_SESSION['success_msg'] ?>
+                <i class="bi bi-check-circle-fill me-2"></i> <strong>สำเร็จ!</strong> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php unset($_SESSION['success_msg']); ?>
         <?php endif; ?>
         <?php if (isset($_SESSION['error_msg'])): ?>
             <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0 rounded-3" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i> <strong>ข้อผิดพลาด!</strong> <?= $_SESSION['error_msg'] ?>
+                <i class="bi bi-exclamation-triangle-fill me-2"></i> <strong>ข้อผิดพลาด!</strong> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
             <?php unset($_SESSION['error_msg']); ?>
