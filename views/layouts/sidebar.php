@@ -1226,6 +1226,30 @@ document.addEventListener('DOMContentLoaded', function () {
         container.addEventListener('mouseenter', openFlyout);
         container.addEventListener('mouseleave', scheduleClose);
 
+        // Keyboard users: focus should expose the same flyout as hover.
+        container.addEventListener('focusin', function () {
+            if (sidebar.classList.contains('collapsed')) {
+                openFlyout();
+            }
+        });
+
+        container.addEventListener('focusout', function (event) {
+            if (!sidebar.classList.contains('collapsed')) return;
+            if (!container.contains(event.relatedTarget)) {
+                scheduleClose();
+            }
+        });
+
+        container.addEventListener('keydown', function (event) {
+            if (!sidebar.classList.contains('collapsed')) return;
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                container.classList.remove('flyout-open');
+                if (trigger) trigger.focus();
+            }
+        });
+
         if (flyout) {
             flyout.addEventListener('mouseenter', function () {
                 if (closeTimer) {
