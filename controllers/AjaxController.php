@@ -66,34 +66,6 @@ class AjaxController {
     }
 
     // ==========================================
-    // 💬 Helper: ฟังก์ชันส่งแจ้งเตือนผ่าน LINE Notify
-    // ==========================================
-    private function sendLineNotify($db, $message) {
-        $line_token = $this->getSystemSetting($db, 'line_notify_token');
-        if (empty($line_token)) return false;
-
-        $url = "https://notify-api.line.me/api/notify";
-        $data = ['message' => $message];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/x-www-form-urlencoded",
-            "Authorization: Bearer " . $line_token
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        
-        $result = curl_exec($ch);
-        curl_close($ch);
-        
-        return $result;
-    }
-
-    // ==========================================
     // 🛡️ Helper: ตรวจสอบสิทธิ์การจัดการตารางเวร
     // ==========================================
     private function canEditRoster($hospital_id, $month_year) {
@@ -131,44 +103,29 @@ class AjaxController {
     }
 
     // ==========================================
-    // 🌟 API: ทดสอบ LINE Notify
+    // 🌟 API: ทดสอบ LINE Messaging API
     // ==========================================
-    public function test_line_notify() {
+    public function test_line_messaging() {
         $this->ensureSession();
         $this->verifyCsrfJsonOrForm();
-        error_reporting(0); // 🌟 ปิด Warning ไม่ให้แทรก JSON
-        header('Content-Type: application/json');
-        
-        if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) {
-            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit;
+        header('Content-Type: application/json; charset=utf-8');
+
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        if (!in_array($role, ['SUPERADMIN', 'ADMIN'], true)) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized'], JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
-        $data = json_decode(file_get_contents("php://input"));
-        $token = $data->token ?? '';
+        $db = (new Database())->getConnection();
+        $result = (new NotificationService($db))->testLine(
+            "🟢 ทดสอบ LINE Messaging API จาก Roster Pro\nเวลา: " . date('d/m/Y H:i:s') . " น."
+        );
 
-        if(empty($token)) { echo json_encode(['status' => 'error', 'message' => 'Token is empty']); exit; }
-
-        $url = "https://notify-api.line.me/api/notify";
-        $message = "🟢 ทดสอบการเชื่อมต่อระบบ Roster Pro\nเวลา: " . date('Y-m-d H:i:s') . "\nหากคุณเห็นข้อความนี้ แสดงว่าระบบพร้อมส่งแจ้งเตือนแล้ว!";
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['message' => $message]));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/x-www-form-urlencoded", "Authorization: Bearer " . $token]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        
-        $result = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($http_code == 200) {
-            echo json_encode(['status' => 'success']);
-        } else {
-            echo json_encode(['status' => 'error', 'message' => 'LINE API Returned Code: ' . $http_code]);
-        }
+        echo json_encode([
+            'status' => !empty($result['success']) ? 'success' : 'error',
+            'message' => $result['message'] ?? ''
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
