@@ -66,7 +66,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     $holiday_cache[$i] = isset($holidayModel) ? $holidayModel->isHoliday($d_str) : false;
 }
 
-require_once 'views/components/ui.php';
+require_once __DIR__ . '/../components/ui.php';
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
