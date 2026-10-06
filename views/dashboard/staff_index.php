@@ -11,6 +11,8 @@ $my_pending_leaves = $my_pending_leaves ?? 0;
 $my_pending_swaps = $my_pending_swaps ?? 0;
 $roster_status = $roster_status ?? 'NOT_STARTED';
 
+require_once 'views/components/ui.php';
+
 // จัดการสีของตารางเวร
 $status_color = 'secondary';
 $status_text = 'ยังไม่เริ่มจัด';
@@ -42,77 +44,45 @@ if ($roster_status == 'APPROVED') {
     .shift-box:hover { background-color: #eff6ff; border-left-color: #2563eb; }
 </style>
 
-<div class="container-fluid px-3 px-md-4 py-4 min-vh-100">
-    
-    <!-- 🌟 ส่วนหัว (Welcome) -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 60px; height: 60px;">
-                <i class="bi bi-person-heart fs-3"></i>
-            </div>
-            <div>
-                <h3 class="fw-black text-dark mb-1">สวัสดี, <span class="text-primary"><?= htmlspecialchars($_SESSION['user']['name']) ?></span></h3>
-                <p class="text-muted mb-0" style="font-size: 14px;"><i class="bi bi-building me-1"></i>สังกัด: <?= htmlspecialchars($hospital_name) ?></p>
-            </div>
-        </div>
-        <div class="text-md-end text-muted font-monospace bg-white px-4 py-2 rounded-pill shadow-sm border border-secondary border-opacity-25 fw-bold">
-            <i class="bi bi-calendar3 me-2 text-primary"></i> วันนี้: <?= $today_th ?>
-        </div>
-    </div>
+<div class="rp-page">
 
-    <!-- 🌟 สถานะย่อย (Mini KPIs) -->
-    <div class="row g-3 mb-4">
-        <!-- เวรที่กำลังจะถึง -->
-        <div class="col-md-3 col-sm-6">
-            <div class="staff-card card h-100 border-start border-primary border-4">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1 small text-uppercase">เวรของคุณเดือนนี้</p>
-                        <h3 class="fw-black text-dark mb-0"><?= count($upcoming_shifts) ?> <span class="fs-6 text-muted fw-normal">กะ</span></h3>
-                    </div>
-                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex justify-content-center align-items-center" style="width: 45px; height: 45px;"><i class="bi bi-calendar-check fs-5"></i></div>
-                </div>
-            </div>
-        </div>
+    <?php
+    ob_start();
+    ?>
+        <span class="rp-badge rp-badge--info">
+            <i class="bi bi-calendar3" aria-hidden="true"></i>
+            <?= rp_e($today_th) ?>
+        </span>
+    <?php
+    $staff_header_actions = ob_get_clean();
 
-        <!-- คำขอลา -->
-        <div class="col-md-3 col-sm-6">
-            <div class="staff-card card h-100 border-start border-danger border-4">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1 small text-uppercase">ใบลารอพิจารณา</p>
-                        <h3 class="fw-black <?= $my_pending_leaves > 0 ? 'text-danger' : 'text-dark' ?> mb-0"><?= $my_pending_leaves ?> <span class="fs-6 text-muted fw-normal">รายการ</span></h3>
-                    </div>
-                    <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex justify-content-center align-items-center" style="width: 45px; height: 45px;"><i class="bi bi-envelope-paper fs-5"></i></div>
-                </div>
-            </div>
-        </div>
+    rp_page_header(
+        'หน้าหลักของฉัน',
+        'สังกัด ' . $hospital_name . ' · ดูเวร คำขอ และงานที่เกี่ยวข้องได้จากจุดเดียว',
+        $staff_header_actions,
+        'Roster Pro'
+    );
+    ?>
 
-        <!-- ขอแลกเวร -->
-        <div class="col-md-3 col-sm-6">
-            <div class="staff-card card h-100 border-start border-warning border-4">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1 small text-uppercase">แลกเวรรอพิจารณา</p>
-                        <h3 class="fw-black <?= $my_pending_swaps > 0 ? 'text-warning text-dark' : 'text-dark' ?> mb-0"><?= $my_pending_swaps ?> <span class="fs-6 text-muted fw-normal">รายการ</span></h3>
-                    </div>
-                    <div class="bg-warning bg-opacity-25 text-warning text-dark rounded-circle d-flex justify-content-center align-items-center" style="width: 45px; height: 45px;"><i class="bi bi-arrow-left-right fs-5"></i></div>
-                </div>
-            </div>
+    <section class="rp-section" aria-labelledby="myStatusTitle">
+        <?php rp_section_header('สถานะของฉัน', 'สรุปข้อมูลสำคัญที่ควรรู้วันนี้'); ?>
+        <div class="rp-grid rp-grid--4" id="myStatusTitle">
+            <?php rp_stat_card('เวรที่กำลังจะถึง', count($upcoming_shifts) . ' กะ', 'bi-calendar-check', 'primary', 'index.php?c=roster'); ?>
+            <?php rp_stat_card('ใบลารอพิจารณา', (int)$my_pending_leaves . ' รายการ', 'bi-envelope-paper', $my_pending_leaves > 0 ? 'danger' : 'primary', 'index.php?c=leave'); ?>
+            <?php rp_stat_card('แลกเวรรอพิจารณา', (int)$my_pending_swaps . ' รายการ', 'bi-arrow-left-right', $my_pending_swaps > 0 ? 'warning' : 'primary', 'index.php?c=swap'); ?>
+            <?php rp_stat_card('สถานะตารางเวร', $status_text, $status_icon, $roster_status === 'APPROVED' ? 'success' : ($roster_status === 'SUBMITTED' ? 'info' : 'warning'), 'index.php?c=roster'); ?>
         </div>
+    </section>
 
-        <!-- สถานะตารางรวม -->
-        <div class="col-md-3 col-sm-6">
-            <div class="staff-card card h-100 border-start border-<?= str_replace(' text-dark', '', $status_color) ?> border-4">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1 small text-uppercase">ตารางเวร รพ.สต.</p>
-                        <span class="badge bg-<?= $status_color ?> rounded-pill px-3 py-2 mt-1"><i class="bi <?= $status_icon ?> me-1"></i> <?= $status_text ?></span>
-                    </div>
-                </div>
-            </div>
+    <section class="rp-section" aria-labelledby="staffQuickTitle">
+        <?php rp_section_header('ทำรายการด่วน', 'งานที่ใช้บ่อยในแต่ละวัน'); ?>
+        <div class="rp-grid rp-grid--4 rp-action-grid-mobile" id="staffQuickTitle">
+            <?php rp_action_card('ดูตารางเวร', 'ตรวจเวรทั้งหมด', 'bi-calendar-range', 'index.php?c=roster', 'primary'); ?>
+            <?php rp_action_card('ยื่นใบลา', 'ตรวจสิทธิ์และส่งคำขอ', 'bi-calendar-minus', 'index.php?c=leave', 'danger', (int)$my_pending_leaves); ?>
+            <?php rp_action_card('ขอแลกเวร', 'ส่งและติดตามคำขอ', 'bi-arrow-repeat', 'index.php?c=swap', 'warning', (int)$my_pending_swaps); ?>
+            <?php rp_action_card('ข้อมูลส่วนตัว', 'โปรไฟล์และการตั้งค่า', 'bi-person-badge', 'index.php?c=profile', 'info'); ?>
         </div>
-    </div>
+    </section>
 
     <div class="row g-4">
         <!-- 🌟 เมนูลัด (Quick Actions) -->
