@@ -40,7 +40,7 @@ function getShortThaiDateApprovals($date_str) {
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-success border-4">
             <i class="bi bi-check-circle-fill fs-5 me-3"></i> 
-            <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['success_msg'] ?></div>
+            <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
@@ -49,7 +49,7 @@ function getShortThaiDateApprovals($date_str) {
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-danger border-4">
             <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
-            <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['error_msg'] ?></div>
+            <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?></div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
@@ -161,14 +161,16 @@ function getShortThaiDateApprovals($date_str) {
                                             <?php if($is_cancel_req): ?>
                                                 <!-- 🌟 กลุ่มปุ่มสำหรับ "พิจารณาคำขอยกเลิกใบลา" (สถานะ: CANCEL_REQUESTED) -->
                                                 <form action="index.php?c=leave&a=process_approval" method="POST" class="m-0 flex-fill">
-                                                    <input type="hidden" name="request_id" value="<?= $leave['id'] ?>">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
                                                     <input type="hidden" name="action" value="APPROVE_CANCEL">
                                                     <button type="submit" class="btn btn-sm btn-warning w-100 rounded-3 fw-bold text-dark shadow-sm px-0" style="font-size: 11px;" onclick="return confirm('ยืนยัน [อนุมัติให้ยกเลิกใบลา] นี้ใช่หรือไม่?\n\nระบบจะทำการคืนโควตาวันลาจำนวน <?= floatval($leave['num_days']) ?> วัน ให้กับพนักงานท่านนี้โดยอัตโนมัติ');">
                                                         <i class="bi bi-check2-all"></i> ให้ยกเลิก
                                                     </button>
                                                 </form>
                                                 <form action="index.php?c=leave&a=process_approval" method="POST" class="m-0 flex-fill">
-                                                    <input type="hidden" name="request_id" value="<?= $leave['id'] ?>">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
                                                     <input type="hidden" name="action" value="REJECT_CANCEL">
                                                     <button type="submit" class="btn btn-sm btn-soft-secondary w-100 rounded-3 fw-bold shadow-sm px-0" style="font-size: 11px;" onclick="return confirm('ยืนยัน [ไม่อนุมัติให้ยกเลิก] ใช่หรือไม่?\n\nใบลาฉบับนี้จะยังคงสถานะอนุมัติตามเดิม (ไม่คืนโควตา)');">
                                                         <i class="bi bi-x-lg"></i> ปฏิเสธ
@@ -178,14 +180,16 @@ function getShortThaiDateApprovals($date_str) {
                                             <?php else: ?>
                                                 <!-- 🌟 กลุ่มปุ่มสำหรับ "พิจารณาอนุมัติใบลาใหม่" (สถานะ: PENDING) -->
                                                 <form action="index.php?c=leave&a=process_approval" method="POST" class="m-0 flex-fill">
-                                                    <input type="hidden" name="request_id" value="<?= $leave['id'] ?>">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
                                                     <input type="hidden" name="action" value="APPROVED">
                                                     <button type="submit" class="btn btn-sm btn-success w-100 rounded-3 fw-bold shadow-sm px-0" style="font-size: 11px;" onclick="return confirm('ยืนยันการ [อนุมัติ] ใบลาใช่หรือไม่?\n\nระบบจะทำการหักโควตาวันลาของพนักงานจำนวน <?= floatval($leave['num_days']) ?> วัน');">
                                                         <i class="bi bi-check-lg"></i> อนุมัติ
                                                     </button>
                                                 </form>
                                                 <form action="index.php?c=leave&a=process_approval" method="POST" class="m-0 flex-fill">
-                                                    <input type="hidden" name="request_id" value="<?= $leave['id'] ?>">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
                                                     <input type="hidden" name="action" value="REJECTED">
                                                     <button type="submit" class="btn btn-sm btn-danger w-100 rounded-3 fw-bold shadow-sm px-0" style="font-size: 11px;" onclick="return confirm('ยืนยัน [ไม่อนุมัติ] ใบลาใช่หรือไม่?');">
                                                         <i class="bi bi-x-lg"></i> ไม่อนุมัติ
