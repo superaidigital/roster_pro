@@ -43,7 +43,13 @@ $users_balances = $users_balances ?? [];
         
         <div class="d-flex gap-2">
             <!-- ปุ่มประมวลผลยอดปีใหม่ -->
-            <form action="index.php?c=leave&a=process_new_year" method="POST" class="m-0" onsubmit="return confirm('ยืนยันการประมวลผลตัดยอดปีใหม่?\n\nระบบจะทำการคำนวณวันลายกมาของทุกคนโดยอัตโนมัติ โดยอ้างอิงจากอายุราชการและระเบียบวันลาพักผ่อน (พนักงานจ้างจะไม่ถูกยกยอดมา)');">
+            <form action="index.php?c=leave&a=process_new_year" method="POST" class="m-0">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                <div class="d-none"></div>
+                <!-- keep button behavior below -->
+                <?php /* form content continues */ ?>
+                <span class="d-none"></span>
+                 onsubmit="return confirm('ยืนยันการประมวลผลตัดยอดปีใหม่?\n\nระบบจะทำการคำนวณวันลายกมาของทุกคนโดยอัตโนมัติ โดยอ้างอิงจากอายุราชการและระเบียบวันลาพักผ่อน (พนักงานจ้างจะไม่ถูกยกยอดมา)');">
                 <button type="submit" class="btn btn-primary rounded-pill fw-bold shadow-sm px-4">
                     <i class="bi bi-arrow-repeat me-1"></i> ประมวลผลตัดยอดปีใหม่
                 </button>
