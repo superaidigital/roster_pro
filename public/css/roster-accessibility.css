@@ -1,0 +1,243 @@
+/* Roster Pro — Accessibility & QA layer (WCAG 2.2-oriented) */
+
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scroll-padding-top: calc(var(--rp-shell-topbar, 68px) + 12px);
+}
+
+body {
+    overflow-wrap: break-word;
+}
+
+/* One consistent visible focus treatment across legacy + Design System controls. */
+:where(
+    a[href],
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [role="button"],
+    [tabindex]:not([tabindex="-1"])
+):focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .42) !important;
+    outline-offset: 2px !important;
+    box-shadow: none;
+}
+
+.rp-btn:focus-visible,
+.rp-control:focus-visible,
+.rp-action-card:focus-visible,
+.rp-card-link:focus-visible,
+.nav-icon-btn:focus-visible,
+.profile-pill:focus-visible,
+#desktopSidebar .nav-link:focus-visible,
+#mobileSidebar .nav-link:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .42) !important;
+    outline-offset: 2px !important;
+}
+
+/* Keyboard users should always be able to see where content begins. */
+#rpMainContent:focus {
+    outline: none;
+}
+
+#rpMainContent:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .28);
+    outline-offset: -3px;
+}
+
+/* Disabled / busy states are visually and semantically consistent. */
+:where(button, .rp-btn)[disabled],
+:where(button, .rp-btn)[aria-disabled="true"],
+[aria-busy="true"] .rp-submit-lock {
+    cursor: not-allowed !important;
+    opacity: .62 !important;
+    transform: none !important;
+}
+
+.rp-is-busy {
+    pointer-events: none;
+    opacity: .72;
+}
+
+.rp-inline-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: rp-a11y-spin .7s linear infinite;
+}
+
+@keyframes rp-a11y-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Invalid fields: do not rely only on native browser color. */
+:where(input, select, textarea).rp-invalid,
+:where(input, select, textarea)[aria-invalid="true"] {
+    border-color: var(--rp-danger-600) !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, .12) !important;
+}
+
+.rp-field-error[role="alert"] {
+    font-weight: 600;
+}
+
+/* Horizontally scrollable data areas become discoverable keyboard regions. */
+.rp-scroll-region {
+    position: relative;
+}
+
+.rp-scroll-region:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .32);
+    outline-offset: -3px;
+}
+
+/* Avoid content being hidden behind sticky bars after anchor navigation. */
+:where([id]) {
+    scroll-margin-top: calc(var(--rp-shell-topbar, 68px) + 14px);
+}
+
+/* More reliable tap targets on touch devices while preserving dense desktop tables. */
+@media (pointer: coarse) {
+    :where(
+        .rp-btn,
+        .nav-icon-btn,
+        .rp-icon-btn,
+        .rp-roster-day-tab,
+        .rp-mobile-shift-btn,
+        .btn:not(.btn-close)
+    ) {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .dropdown-item,
+    #mobileSidebar .nav-link {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+    }
+
+    input,
+    select,
+    textarea {
+        font-size: 16px !important; /* prevents unwanted iOS input zoom */
+    }
+}
+
+/* Small screens: prevent fixed-width legacy elements from forcing page overflow. */
+@media (max-width: 767.98px) {
+    img,
+    svg,
+    canvas {
+        max-width: 100%;
+    }
+
+    .modal-dialog {
+        margin: .75rem;
+    }
+
+    .modal-content {
+        max-height: calc(100dvh - 1.5rem);
+    }
+
+    .modal-body {
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .rp-page-header__actions {
+        gap: .5rem;
+    }
+
+    .rp-page-header__actions > form {
+        flex: 1 1 auto;
+    }
+
+    .rp-page-header__actions > form .rp-btn {
+        width: 100%;
+    }
+}
+
+/* Respect user motion preference globally, including legacy animations. */
+@media (prefers-reduced-motion: reduce) {
+    html:focus-within {
+        scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .rp-inline-spinner {
+        animation: none !important;
+        border-right-color: currentColor;
+    }
+}
+
+/* Windows High Contrast / forced-colors support. */
+@media (forced-colors: active) {
+    .rp-card,
+    .rp-action-card,
+    .rp-control,
+    .rp-btn,
+    .rp-badge,
+    .rp-status-panel,
+    .rp-alert {
+        border: 1px solid CanvasText !important;
+    }
+
+    .rp-action-card__icon,
+    .rp-stat-card__icon,
+    .rp-empty-state__icon {
+        forced-color-adjust: auto;
+    }
+
+    :where(a, button, input, select, textarea):focus-visible {
+        outline: 2px solid Highlight !important;
+    }
+}
+
+/* Print should exclude interactive navigation and preserve report readability. */
+@media print {
+    .top-navbar,
+    #desktopSidebar,
+    #mobileSidebar,
+    .rp-skip-link,
+    .rp-page-header__actions,
+    .rp-report-filterbar,
+    .pwa-toast {
+        display: none !important;
+    }
+
+    body,
+    .rp-app-frame,
+    main.rp-main-content {
+        height: auto !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+
+    main.rp-main-content {
+        padding: 0 !important;
+    }
+
+    .rp-page {
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+    .rp-card {
+        break-inside: avoid;
+        box-shadow: none !important;
+    }
+}
