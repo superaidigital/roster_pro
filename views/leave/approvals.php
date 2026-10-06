@@ -9,7 +9,7 @@ function getShortThaiDateApprovals($date_str) {
     return date('j', $ts) . ' ' . $thai_months[(int)date('n', $ts)] . ' ' . (date('Y', $ts) + 543);
 }
 
-require_once 'views/components/ui.php';
+require_once __DIR__ . '/../components/ui.php';
 ?>
 <style>
     /* ปรับแต่งดีไซน์เพิ่มเติม */
