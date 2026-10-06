@@ -7,6 +7,7 @@ require_once 'models/NotificationModel.php';
 require_once 'models/UserModel.php';
 require_once 'models/LeaveModel.php';
 require_once 'controllers/LogsController.php'; // 🌟 นำเข้า Logs Controller
+require_once 'services/NotificationService.php';
 
 class AjaxController {
 
@@ -503,8 +504,8 @@ class AjaxController {
                 $this->notifyRole($hospital_id, 'DIRECTOR', 'INFO', 'มีตารางเวรรออนุมัติ', $msg, $target_link);
                 $_SESSION['success_msg'] = "ส่งตารางเวรขอพิจารณาอนุมัติสำเร็จ";
                 
-                if ($this->getSystemSetting($db, 'line_notify_on_submit') === '1') {
-                    $this->sendLineNotify($db, "\n📝 มีตารางเวรส่งมาใหม่\nหน่วยบริการ: {$hospital_name}\nเดือน: {$month_name}\nโปรดเข้าสู่ระบบเพื่อตรวจสอบครับ");
+                if ($this->getSystemSetting($db, 'line_messaging_on_roster') === '1') {
+                    (new NotificationService($db))->sendLineEvent('roster', "\n📝 มีตารางเวรส่งมาใหม่\nหน่วยบริการ: {$hospital_name}\nเดือน: {$month_name}\nโปรดเข้าสู่ระบบเพื่อตรวจสอบครับ");
                 }
                 
             } elseif ($new_status === 'DRAFT') {
@@ -569,8 +570,8 @@ class AjaxController {
             }
             $_SESSION['success_msg'] = "ส่งคำขอแก้ไขตารางเวรไปยังส่วนกลางแล้ว กรุณารอการปลดล็อค";
 
-            if ($this->getSystemSetting($db, 'line_notify_on_request') === '1') {
-                $this->sendLineNotify($db, "\n🔓 มีคำขอปลดล็อคตารางเวร\nหน่วยบริการ: {$hospital_name}\nเดือน: {$month_text}\nโปรดเข้าสู่ระบบเพื่อพิจารณาอนุมัติครับ");
+            if ($this->getSystemSetting($db, 'line_messaging_on_roster') === '1') {
+                (new NotificationService($db))->sendLineEvent('roster', "\n🔓 มีคำขอปลดล็อคตารางเวร\nหน่วยบริการ: {$hospital_name}\nเดือน: {$month_text}\nโปรดเข้าสู่ระบบเพื่อพิจารณาอนุมัติครับ");
             }
 
         } catch (Exception $e) {}
@@ -613,11 +614,11 @@ class AjaxController {
                         $notifModel->addNotification($admin['id'], 'WARNING', "คำขอเพิ่มวันหยุด", "มีเสนอเพิ่มวันหยุด '{$data->name}' ในวันที่ {$thai_date}", "index.php?c=settings&a=holidays");
                     }
                     
-                    if ($this->getSystemSetting($db, 'line_notify_on_holiday') === '1') {
+                    if ($this->getSystemSetting($db, 'line_messaging_on_holiday') === '1') {
                         $stmt_hosp = $db->prepare("SELECT name FROM hospitals WHERE id = ?");
                         $stmt_hosp->execute([$hospital_id]);
                         $hosp_name = $stmt_hosp->fetch(PDO::FETCH_ASSOC)['name'] ?? '';
-                        $this->sendLineNotify($db, "\n🗓️ เสนอวันหยุดใหม่\nหน่วยบริการ: {$hosp_name}\nวันหยุด: {$data->name}\nวันที่: {$thai_date}");
+                        (new NotificationService($db))->sendLineEvent('holiday', "\n🗓️ เสนอวันหยุดใหม่\nหน่วยบริการ: {$hosp_name}\nวันหยุด: {$data->name}\nวันที่: {$thai_date}");
                     }
 
                     echo json_encode(['status' => 'success']);
