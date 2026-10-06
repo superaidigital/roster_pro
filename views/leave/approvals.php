@@ -8,6 +8,8 @@ function getShortThaiDateApprovals($date_str) {
     $ts = strtotime($date_str);
     return date('j', $ts) . ' ' . $thai_months[(int)date('n', $ts)] . ' ' . (date('Y', $ts) + 543);
 }
+
+require_once 'views/components/ui.php';
 ?>
 <style>
     /* ปรับแต่งดีไซน์เพิ่มเติม */
@@ -24,17 +26,15 @@ function getShortThaiDateApprovals($date_str) {
     .badge-soft-warning { background-color: #fffbeb; color: #d97706; border: 1px solid #fcd34d; }
 </style>
 
-<div class="container-fluid px-4 py-4">
-    <!-- Header -->
-    <div class="d-flex align-items-center mb-4">
-        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 48px; height: 48px;">
-            <i class="bi bi-ui-checks fs-4"></i>
-        </div>
-        <div>
-            <h2 class="h4 text-dark fw-bold mb-0">พิจารณาอนุมัติใบลา</h2>
-            <p class="text-muted small mb-0">ตรวจสอบและอนุมัติแบบฟอร์มการขอลา หรือการขอยกเลิกใบลาของบุคลากร</p>
-        </div>
-    </div>
+<div class="rp-page">
+    <?php
+    rp_page_header(
+        'พิจารณาอนุมัติใบลา',
+        'ตรวจสอบใบลาและคำขอยกเลิก พร้อมดำเนินการจากรายการเดียว',
+        '<span class="rp-badge rp-badge--info"><i class="bi bi-inbox" aria-hidden="true"></i> ' . count($pending_leaves ?? []) . ' รายการ</span>',
+        'Approval Queue'
+    );
+    ?>
 
     <!-- Alert ข้อความแจ้งเตือน -->
     <?php if (isset($_SESSION['success_msg'])): ?>
@@ -55,14 +55,16 @@ function getShortThaiDateApprovals($date_str) {
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
-    <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
-        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-            <h6 class="m-0 fw-bold text-dark"><i class="bi bi-inbox-fill text-primary me-2"></i> รายการใบลาที่รอการพิจารณาทั้งหมด</h6>
-            <span class="badge bg-primary rounded-pill"><?= count($pending_leaves ?? []) ?> รายการ</span>
+    <section class="rp-section">
+        <?php rp_section_header('รายการรอพิจารณา', 'จัดลำดับคำขอที่ต้องดำเนินการก่อน'); ?>
+        <div class="rp-card overflow-hidden">
+        <div class="rp-card__header">
+            <h2 class="rp-card__title"><i class="bi bi-inbox-fill text-primary me-2" aria-hidden="true"></i>คิวใบลา</h2>
+            <span class="rp-badge rp-badge--info"><?= count($pending_leaves ?? []) ?> รายการ</span>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive custom-scrollbar" style="max-height: 65vh;">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table rp-table table-hover align-middle mb-0">
                     <thead class="table-light text-secondary sticky-top" style="font-size: 13px; z-index: 10;">
                         <tr>
                             <th class="ps-4 py-3">ผู้ยื่นเรื่อง</th>
