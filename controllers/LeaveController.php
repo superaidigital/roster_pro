@@ -204,6 +204,10 @@ class LeaveController {
             exit;
         }
 
+        $leave_month = (int)$start_dt->format('m');
+        $leave_year = (int)$start_dt->format('Y');
+        $budget_year = ($leave_month >= 10) ? $leave_year + 1 : $leave_year;
+
         if ($reason === '' || mb_strlen($reason, 'UTF-8') > 1000) {
             $_SESSION['error_msg'] = "กรุณาระบุเหตุผลการลา และต้องไม่เกิน 1,000 ตัวอักษร";
             header("Location: index.php?c=leave&a=index");
@@ -699,13 +703,15 @@ class LeaveController {
         $userModel = new UserModel($db);
         
         $hospital_id = $_SESSION['user']['hospital_id']; 
-        $role = $_SESSION['user']['role'];
-        $budget_year = isset($_GET['year']) ? $_GET['year'] : $this->getCurrentBudgetYear();
+        $role = $this->currentRole();
+        $csrf_token = $this->getCsrfToken();
+        $budget_year = isset($_GET['year']) ? (int)$_GET['year'] : $this->getCurrentBudgetYear();
         
         $staffs = in_array($role, ['SUPERADMIN', 'ADMIN']) ? $userModel->getAllStaff() : $userModel->getUsersByHospital($hospital_id);
         
         // 🌟 แก้ไข: ดึงข้อมูลพนักงานที่แก้ไขจากฐานข้อมูล (ป้องกันบัคเปลี่ยนคนตอนบันทึก)
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'update_balance') {
+            $this->verifyCsrf("index.php?c=leave&a=manage");
             $stmt_bal = $db->prepare("SELECT user_id, budget_year FROM leave_balances WHERE id = ?");
             $stmt_bal->execute([$_POST['balance_id']]);
             $bal = $stmt_bal->fetch(PDO::FETCH_ASSOC);
@@ -754,8 +760,9 @@ class LeaveController {
         $leaveModel = new LeaveModel($db);
 
         $hospital_id = $_SESSION['user']['hospital_id'];
-        $role = $_SESSION['user']['role'];
+        $role = $this->currentRole();
         $budget_year = $this->getCurrentBudgetYear();
+        $csrf_token = $this->getCsrfToken();
 
         $staffs = in_array($role, ['SUPERADMIN', 'ADMIN']) ? $userModel->getAllStaff() : $userModel->getUsersByHospital($hospital_id);
 
@@ -782,7 +789,10 @@ class LeaveController {
     }
 
     public function save_balance() {
-        if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_SESSION['user'])) {
+        $this->requireLeaveManager();
+
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $this->verifyCsrf("index.php?c=leave&a=balances");
             $db = (new Database())->getConnection(); 
             $leaveModel = new LeaveModel($db);
             
@@ -822,7 +832,10 @@ class LeaveController {
     // 🌟 3. ประมวลผลตัดยอดวันลาพักผ่อนปีงบประมาณใหม่
     // ==========================================
     public function process_new_year() {
-        if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_SESSION['user'])) {
+        $this->requireLeaveManager();
+
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $this->verifyCsrf("index.php?c=leave&a=balances");
             $db = (new Database())->getConnection();
             $leaveModel = new LeaveModel($db);
             $userModel = new UserModel($db);
@@ -884,10 +897,13 @@ class LeaveController {
     // 🌟 หน้าอื่นๆ (ตั้งค่าและรายงาน)
     // ==========================================
     public function settings() {
-        if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) { header("Location: index.php?c=leave"); exit; }
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_ADMIN_ROLES, true)) { header("Location: index.php?c=leave"); exit; }
         
-        $db = (new Database())->getConnection(); $leaveModel = new LeaveModel($db);
+        $db = (new Database())->getConnection();
+        $leaveModel = new LeaveModel($db);
+        $csrf_token = $this->getCsrfToken();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['quotas'])) {
+            $this->verifyCsrf("index.php?c=leave&a=settings");
             foreach ($_POST['quotas'] as $id => $q) {
                 $calc_type = isset($q['calculation_type']) ? $q['calculation_type'] : 'WORKING_DAYS';
                 $leaveModel->updateLeaveQuota($id, $q['max_days'], $q['description'], $calc_type);
