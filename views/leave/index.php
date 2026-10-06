@@ -117,8 +117,14 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
        ========================================================= */
     .leave-page-container {
         width: 100%;
-        max-width: 1320px;
+        max-width: 1200px;
         margin: 0 auto;
+    }
+
+    .leave-main-grid {
+        max-width: 1120px;
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .leave-hero-card {
@@ -176,11 +182,12 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
 
     /* Compact leave wallet */
     .leave-wallet {
-        margin-bottom: 1.5rem;
-        padding: 1rem;
+        max-width: 1120px;
+        margin: 0 auto 1.5rem;
+        padding: .85rem;
         background: linear-gradient(145deg, #fbfdff 0%, #f8fafc 100%);
         border: 1px solid #e5edf5;
-        border-radius: 1.2rem;
+        border-radius: 1.15rem;
         box-shadow: 0 8px 22px rgba(15,23,42,.04);
     }
 
@@ -237,6 +244,51 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
 
     .leave-wallet-summary-copy {
         min-width: 0;
+    }
+
+    .leave-wallet-key-balances {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: .45rem;
+        flex-wrap: wrap;
+    }
+
+    .leave-wallet-key-chip {
+        min-width: 92px;
+        padding: .38rem .55rem;
+        border: 1px solid #e2e8f0;
+        border-radius: .75rem;
+        background: #ffffff;
+        text-align: center;
+        line-height: 1.1;
+        box-shadow: 0 2px 8px rgba(15,23,42,.035);
+    }
+
+    .leave-wallet-key-chip .key-label {
+        display: block;
+        max-width: 105px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #64748b;
+        font-size: .64rem;
+        font-weight: 700;
+    }
+
+    .leave-wallet-key-chip .key-value {
+        display: block;
+        margin-top: 3px;
+        color: #0f172a;
+        font-size: .9rem;
+        font-weight: 800;
+    }
+
+    .leave-wallet-key-chip .key-unit {
+        color: #94a3b8;
+        font-size: .62rem;
+        font-weight: 600;
     }
 
     .leave-wallet-summary-title {
@@ -411,8 +463,37 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
         }
 
         .leave-wallet-summary {
-            align-items: flex-start;
+            align-items: center;
+            flex-wrap: wrap;
             padding: .55rem;
+        }
+
+        .leave-wallet-summary-main {
+            flex: 1 1 calc(100% - 52px);
+        }
+
+        .leave-wallet-key-balances {
+            order: 3;
+            width: 100%;
+            margin-left: 0;
+            justify-content: flex-start;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-top: .45rem;
+            scrollbar-width: none;
+        }
+
+        .leave-wallet-key-balances::-webkit-scrollbar {
+            display: none;
+        }
+
+        .leave-wallet-key-chip {
+            min-width: 96px;
+            flex: 0 0 auto;
+        }
+
+        .leave-wallet-summary-subtitle {
+            display: none;
         }
 
         .leave-wallet-toggle {
@@ -454,7 +535,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
         </div>
         <?php unset($_SESSION['error_msg']); endif; ?>
 
-    <div class="row g-4 mb-5">
+    <div class="row g-4 mb-5 leave-main-grid">
         <!-- ========================================== -->
         <!-- 🌟 ส่วนที่ 1: ฟอร์มยื่นใบลา -->
         <!-- ========================================== -->
@@ -678,6 +759,64 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                     <div class="leave-wallet-summary-subtitle">ย่อไว้เพื่อประหยัดพื้นที่หน้าจอ • กดเพื่อดูรายละเอียดสิทธิ์วันลา</div>
                 </div>
             </div>
+
+            <?php
+                // แสดงเฉพาะยอดคงเหลือที่สำคัญในสถานะย่อ เพื่อไม่ให้กินพื้นที่หน้าจอ
+                $wallet_summary_items = [];
+                if (!empty($leave_balances)) {
+                    if (!empty($selected_leave_type_req)) {
+                        foreach ($leave_balances as $summary_balance) {
+                            if (($summary_balance['leave_type_name'] ?? '') === $selected_leave_type_req) {
+                                $wallet_summary_items[] = $summary_balance;
+                                break;
+                            }
+                        }
+                    } else {
+                        $wallet_priority_types = ['ลาป่วย', 'ลากิจส่วนตัว', 'ลาพักผ่อน'];
+
+                        foreach ($wallet_priority_types as $priority_type) {
+                            foreach ($leave_balances as $summary_balance) {
+                                if (($summary_balance['leave_type_name'] ?? '') === $priority_type) {
+                                    $wallet_summary_items[] = $summary_balance;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (count($wallet_summary_items) < 3) {
+                            foreach ($leave_balances as $summary_balance) {
+                                $already_added = false;
+                                foreach ($wallet_summary_items as $existing_summary) {
+                                    if (($existing_summary['leave_type_name'] ?? '') === ($summary_balance['leave_type_name'] ?? '')) {
+                                        $already_added = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!$already_added) {
+                                    $wallet_summary_items[] = $summary_balance;
+                                }
+
+                                if (count($wallet_summary_items) >= 3) break;
+                            }
+                        }
+                    }
+                }
+            ?>
+
+            <?php if (!empty($wallet_summary_items)): ?>
+                <div class="leave-wallet-key-balances" aria-label="สรุปวันลาคงเหลือ">
+                    <?php foreach ($wallet_summary_items as $summary_balance): ?>
+                        <div class="leave-wallet-key-chip" title="<?= htmlspecialchars($summary_balance['leave_type_name']) ?>">
+                            <span class="key-label"><?= htmlspecialchars($summary_balance['leave_type_name']) ?></span>
+                            <span class="key-value">
+                                <?= floatval($summary_balance['remaining']) ?>
+                                <span class="key-unit">วัน</span>
+                            </span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
 
             <button
                 class="leave-wallet-toggle"
