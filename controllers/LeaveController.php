@@ -496,112 +496,196 @@ class LeaveController {
     // 🌟 หน้าอนุมัติการลา (Approvals)
     // ==========================================
     public function approvals() {
-        if (!isset($_SESSION['user']) || !in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN', 'DIRECTOR', 'SCHEDULER'])) {
-            header("Location: index.php?c=leave"); exit;
-        }
+        $this->requireLeaveManager();
+
         $db = (new Database())->getConnection();
-        $this->autoPatchDatabase($db);
-        
-        $role = $_SESSION['user']['role'];
-        $hospital_id = $_SESSION['user']['hospital_id'];
+        $role = $this->currentRole();
+        $hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        $csrf_token = $this->getCsrfToken();
 
         $query = "SELECT lr.*, lq.leave_type, u.name as user_name, u.employee_type, h.name as hospital_name
                   FROM leave_requests lr
-                  JOIN users u ON lr.user_id = u.id 
+                  JOIN users u ON lr.user_id = u.id
                   JOIN leave_quotas lq ON lr.leave_type_id = lq.id
                   LEFT JOIN hospitals h ON u.hospital_id = h.id
                   WHERE lr.status IN ('PENDING', 'CANCEL_REQUESTED') ";
 
-        if (!in_array($role, ['SUPERADMIN', 'ADMIN'])) {
+        if (!in_array($role, self::LEAVE_ADMIN_ROLES, true)) {
             $query .= " AND u.hospital_id = :hosp_id ";
         }
         $query .= " ORDER BY lr.created_at ASC";
 
         $stmt = $db->prepare($query);
-        if (!in_array($role, ['SUPERADMIN', 'ADMIN'])) {
-            $stmt->bindValue(':hosp_id', $hospital_id);
+        if (!in_array($role, self::LEAVE_ADMIN_ROLES, true)) {
+            $stmt->bindValue(':hosp_id', $hospital_id, PDO::PARAM_INT);
         }
         $stmt->execute();
         $pending_leaves = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        require_once 'views/layouts/header.php'; 
-        require_once 'views/layouts/sidebar.php'; 
-        require_once 'views/leave/approvals.php'; 
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/leave/approvals.php';
         echo "</div></div></body></html>";
     }
 
     // 🌟 ประมวลผลการอนุมัติ (รวมถึงการอนุมัติให้ยกเลิก)
     public function process_approval() {
-        if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && isset($_POST['request_id'])) {
-            $db = (new Database())->getConnection(); 
-            $this->autoPatchDatabase($db);
-            
-            $notifModel = new NotificationModel($db);
+        $this->requireLeaveManager();
 
-            $request_id = $_POST['request_id']; 
-            $action = $_POST['action']; 
-            $approver_id = $_SESSION['user']['id'];
-            
-            // ดึงชื่อคนที่ยื่นเรื่องมาเพื่อเก็บ Log ให้อ่านง่าย
-            $stmt = $db->prepare("SELECT lr.*, u.name as request_user_name FROM leave_requests lr LEFT JOIN users u ON lr.user_id = u.id WHERE lr.id = ?");
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("Location: index.php?c=leave&a=approvals");
+            exit;
+        }
+        $this->verifyCsrf("index.php?c=leave&a=approvals");
+
+        $request_id = filter_input(INPUT_POST, 'request_id', FILTER_VALIDATE_INT);
+        $action = strtoupper(trim((string)($_POST['action'] ?? '')));
+        $allowed_actions = ['APPROVED', 'REJECTED', 'APPROVE_CANCEL', 'REJECT_CANCEL'];
+
+        if (!$request_id || !in_array($action, $allowed_actions, true)) {
+            $_SESSION['error_msg'] = "คำสั่งอนุมัติไม่ถูกต้อง";
+            header("Location: index.php?c=leave&a=approvals");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $notifModel = new NotificationModel($db);
+        $approver_id = (int)$_SESSION['user']['id'];
+        $approver_role = $this->currentRole();
+        $approver_hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+
+        try {
+            $db->beginTransaction();
+
+            $stmt = $db->prepare("
+                SELECT lr.*, u.name AS request_user_name, u.hospital_id AS request_hospital_id,
+                       lq.leave_type AS leave_type_name
+                FROM leave_requests lr
+                JOIN users u ON lr.user_id = u.id
+                JOIN leave_quotas lq ON lr.leave_type_id = lq.id
+                WHERE lr.id = ?
+                FOR UPDATE
+            ");
             $stmt->execute([$request_id]);
             $req = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($req) {
-                $stmt_type = $db->prepare("SELECT leave_type FROM leave_quotas WHERE id = ?");
-                $stmt_type->execute([$req['leave_type_id']]);
-                $leave_type_name = $stmt_type->fetchColumn() ?: 'การลา';
-                $request_user_name = $req['request_user_name'] ?? ('User ID: ' . $req['user_id']);
 
-                if ($req['status'] === 'PENDING') {
-                    if ($action === 'APPROVED') {
-                        $db->prepare("UPDATE leave_requests SET status = 'APPROVED', approved_by = ?, approved_at = NOW() WHERE id = ?")->execute([$approver_id, $request_id]);
-                        $db->prepare("UPDATE leave_balances SET used_days = used_days + ? WHERE user_id = ? AND budget_year = ? AND leave_type_id = ?")
-                           ->execute([$req['num_days'], $req['user_id'], $this->getCurrentBudgetYear(), $req['leave_type_id']]);
-                        
-                        // 🌟 บันทึก Log: อนุมัติใบลา
-                        LogsController::addLog($db, $approver_id, LogsController::ACTION_UPDATE, "อนุมัติใบ{$leave_type_name} ของคุณ {$request_user_name} (Ref ID: {$request_id})");
-                        
-                        $_SESSION['success_msg'] = "อนุมัติใบลาและตัดยอดคงเหลือเรียบร้อยแล้ว";
-                        $notifModel->addNotification($req['user_id'], 'SUCCESS', "ผลการพิจารณาใบลา", "ใบ{$leave_type_name} ของคุณได้รับคำสั่ง: อนุมัติแล้ว", "index.php?c=leave");
-                        
-                    } elseif ($action === 'REJECTED') {
-                        $db->prepare("UPDATE leave_requests SET status = 'REJECTED', approved_by = ?, approved_at = NOW() WHERE id = ?")->execute([$approver_id, $request_id]);
-                        
-                        // 🌟 บันทึก Log: ปฏิเสธใบลา
-                        LogsController::addLog($db, $approver_id, LogsController::ACTION_UPDATE, "ไม่อนุมัติใบ{$leave_type_name} ของคุณ {$request_user_name} (Ref ID: {$request_id})");
-                        
-                        $_SESSION['success_msg'] = "ปฏิเสธใบลาเรียบร้อยแล้ว"; 
-                        $notifModel->addNotification($req['user_id'], 'DANGER', "ผลการพิจารณาใบลา", "ใบ{$leave_type_name} ของคุณได้รับคำสั่ง: ไม่อนุมัติ", "index.php?c=leave");
+            if (!$req) {
+                throw new RuntimeException("ไม่พบข้อมูลใบลา");
+            }
+
+            if (!in_array($approver_role, self::LEAVE_ADMIN_ROLES, true) &&
+                (int)$req['request_hospital_id'] !== $approver_hospital_id) {
+                throw new RuntimeException("คุณไม่มีสิทธิ์อนุมัติใบลาของหน่วยงานอื่น");
+            }
+
+            $leave_type_name = $req['leave_type_name'] ?: 'การลา';
+            $request_user_name = $req['request_user_name'] ?: ('User ID: ' . $req['user_id']);
+
+            $start_ts = strtotime((string)$req['start_date']);
+            $start_month = (int)date('m', $start_ts);
+            $start_year = (int)date('Y', $start_ts);
+            $budget_year = ($start_month >= 10) ? $start_year + 1 : $start_year;
+
+            if ($req['status'] === 'PENDING') {
+                if ($action === 'APPROVED') {
+                    $stmt_up = $db->prepare("
+                        UPDATE leave_requests
+                        SET status = 'APPROVED', approved_by = ?, approved_at = NOW()
+                        WHERE id = ? AND status = 'PENDING'
+                    ");
+                    $stmt_up->execute([$approver_id, $request_id]);
+                    if ($stmt_up->rowCount() !== 1) {
+                        throw new RuntimeException("สถานะใบลาเปลี่ยนแปลงแล้ว กรุณารีเฟรช");
                     }
-                } 
-                elseif ($req['status'] === 'CANCEL_REQUESTED') {
-                    if ($action === 'APPROVE_CANCEL') {
-                        // 🌟 อนุมัติให้ยกเลิก -> ลบประวัติใบลาออกจากฐานข้อมูล และคืนโควตา
-                        $db->prepare("DELETE FROM leave_requests WHERE id = ?")->execute([$request_id]);
-                        $db->prepare("UPDATE leave_balances SET used_days = used_days - ? WHERE user_id = ? AND budget_year = ? AND leave_type_id = ?")
-                           ->execute([$req['num_days'], $req['user_id'], $this->getCurrentBudgetYear(), $req['leave_type_id']]);
-                        
-                        // 🌟 บันทึก Log: อนุมัติให้ยกเลิกและคืนโควตา
-                        LogsController::addLog($db, $approver_id, LogsController::ACTION_DELETE, "อนุมัติให้ยกเลิกและลบประวัติใบ{$leave_type_name} ของคุณ {$request_user_name} พร้อมคืนโควตาวันลา (Ref ID: {$request_id})");
-                        
-                        $_SESSION['success_msg'] = "อนุมัติการยกเลิก คืนโควตา และล้างประวัติวันลาเรียบร้อยแล้ว";
-                        $notifModel->addNotification($req['user_id'], 'INFO', "แจ้งผลการยกเลิกใบลา", "หัวหน้าอนุมัติการยกเลิกใบ{$leave_type_name} คืนสิทธิ์ให้คุณและล้างประวัติแล้ว", "index.php?c=leave");
-                        
-                    } elseif ($action === 'REJECT_CANCEL') {
-                        $db->prepare("UPDATE leave_requests SET status = 'APPROVED' WHERE id = ?")->execute([$request_id]);
-                        
-                        // 🌟 บันทึก Log: ไม่อนุมัติให้ยกเลิก
-                        LogsController::addLog($db, $approver_id, LogsController::ACTION_UPDATE, "ไม่อนุมัติคำขอยกเลิกใบ{$leave_type_name} ของคุณ {$request_user_name} (Ref ID: {$request_id})");
-                        
-                        $_SESSION['success_msg'] = "ปฏิเสธการยกเลิกใบลา (ใบลาคงสถานะอนุมัติตามเดิม)";
-                        $notifModel->addNotification($req['user_id'], 'WARNING', "แจ้งผลการยกเลิกใบลา", "หัวหน้า ไม่อนุมัติ การยกเลิกใบ{$leave_type_name} ของคุณ", "index.php?c=leave");
+
+                    $leaveModel = new LeaveModel($db);
+                    $leaveModel->getUserLeaveBalances((int)$req['user_id'], $budget_year);
+
+                    $stmt_bal = $db->prepare("
+                        UPDATE leave_balances
+                        SET used_days = used_days + ?
+                        WHERE user_id = ? AND budget_year = ? AND leave_type_id = ?
+                    ");
+                    $stmt_bal->execute([$req['num_days'], $req['user_id'], $budget_year, $req['leave_type_id']]);
+                    if ($stmt_bal->rowCount() !== 1) {
+                        throw new RuntimeException("ไม่พบบัญชีวันลาสำหรับตัดยอด");
                     }
+
+                    LogsController::addLog($db, $approver_id, LogsController::ACTION_UPDATE, "อนุมัติใบ{$leave_type_name} ของ {$request_user_name} (Ref ID: {$request_id})");
+                    $notifModel->addNotification($req['user_id'], 'SUCCESS', "ผลการพิจารณาใบลา", "ใบ{$leave_type_name} ของคุณได้รับคำสั่ง: อนุมัติแล้ว", "index.php?c=leave");
+                    $_SESSION['success_msg'] = "อนุมัติใบลาและตัดยอดคงเหลือเรียบร้อยแล้ว";
+                } elseif ($action === 'REJECTED') {
+                    $stmt_up = $db->prepare("
+                        UPDATE leave_requests
+                        SET status = 'REJECTED', approved_by = ?, approved_at = NOW()
+                        WHERE id = ? AND status = 'PENDING'
+                    ");
+                    $stmt_up->execute([$approver_id, $request_id]);
+                    if ($stmt_up->rowCount() !== 1) {
+                        throw new RuntimeException("สถานะใบลาเปลี่ยนแปลงแล้ว กรุณารีเฟรช");
+                    }
+
+                    LogsController::addLog($db, $approver_id, LogsController::ACTION_UPDATE, "ไม่อนุมัติใบ{$leave_type_name} ของ {$request_user_name} (Ref ID: {$request_id})");
+                    $notifModel->addNotification($req['user_id'], 'DANGER', "ผลการพิจารณาใบลา", "ใบ{$leave_type_name} ของคุณได้รับคำสั่ง: ไม่อนุมัติ", "index.php?c=leave");
+                    $_SESSION['success_msg'] = "ปฏิเสธใบลาเรียบร้อยแล้ว";
+                } else {
+                    throw new RuntimeException("คำสั่งไม่ตรงกับสถานะใบลา");
                 }
-            } else { $_SESSION['error_msg'] = "ไม่พบข้อมูลใบลา"; }
+            } elseif ($req['status'] === 'CANCEL_REQUESTED') {
+                if ($action === 'APPROVE_CANCEL') {
+                    $stmt_up = $db->prepare("
+                        UPDATE leave_requests
+                        SET status = 'CANCELLED', approved_by = ?, approved_at = NOW()
+                        WHERE id = ? AND status = 'CANCEL_REQUESTED'
+                    ");
+                    $stmt_up->execute([$approver_id, $request_id]);
+                    if ($stmt_up->rowCount() !== 1) {
+                        throw new RuntimeException("สถานะใบลาเปลี่ยนแปลงแล้ว กรุณารีเฟรช");
+                    }
+
+                    $stmt_bal = $db->prepare("
+                        UPDATE leave_balances
+                        SET used_days = GREATEST(0, used_days - ?)
+                        WHERE user_id = ? AND budget_year = ? AND leave_type_id = ?
+                    ");
+                    $stmt_bal->execute([$req['num_days'], $req['user_id'], $budget_year, $req['leave_type_id']]);
+
+                    LogsController::addLog($db, $approver_id, LogsController::ACTION_UPDATE, "อนุมัติยกเลิกใบ{$leave_type_name} ของ {$request_user_name} และคืนโควตา (Ref ID: {$request_id})");
+                    $notifModel->addNotification($req['user_id'], 'INFO', "แจ้งผลการยกเลิกใบลา", "หัวหน้าอนุมัติการยกเลิกใบ{$leave_type_name} และคืนสิทธิ์ให้คุณแล้ว", "index.php?c=leave");
+                    $_SESSION['success_msg'] = "อนุมัติการยกเลิกและคืนโควตาเรียบร้อยแล้ว";
+                } elseif ($action === 'REJECT_CANCEL') {
+                    $stmt_up = $db->prepare("
+                        UPDATE leave_requests
+                        SET status = 'APPROVED', approved_by = ?, approved_at = NOW()
+                        WHERE id = ? AND status = 'CANCEL_REQUESTED'
+                    ");
+                    $stmt_up->execute([$approver_id, $request_id]);
+                    if ($stmt_up->rowCount() !== 1) {
+                        throw new RuntimeException("สถานะใบลาเปลี่ยนแปลงแล้ว กรุณารีเฟรช");
+                    }
+
+                    LogsController::addLog($db, $approver_id, LogsController::ACTION_UPDATE, "ไม่อนุมัติคำขอยกเลิกใบ{$leave_type_name} ของ {$request_user_name} (Ref ID: {$request_id})");
+                    $notifModel->addNotification($req['user_id'], 'WARNING', "แจ้งผลการยกเลิกใบลา", "หัวหน้าไม่อนุมัติการยกเลิกใบ{$leave_type_name} ของคุณ", "index.php?c=leave");
+                    $_SESSION['success_msg'] = "ปฏิเสธการยกเลิกใบลา ใบลายังคงสถานะอนุมัติ";
+                } else {
+                    throw new RuntimeException("คำสั่งไม่ตรงกับสถานะคำขอยกเลิก");
+                }
+            } else {
+                throw new RuntimeException("รายการนี้ถูกดำเนินการไปแล้ว");
+            }
+
+            $db->commit();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            $_SESSION['error_msg'] = $e->getMessage();
         }
-        header("Location: index.php?c=leave&a=approvals"); exit;
+
+        header("Location: index.php?c=leave&a=approvals");
+        exit;
     }
+
 
 
     // ==========================================
