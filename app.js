@@ -47,11 +47,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 item.className = "dropdown-item noti-item";
                 item.dataset.id = noti.id;
                 
-                // โครงสร้าง HTML สำหรับแต่ละการแจ้งเตือน
-                item.innerHTML = `
-                    <i class="fas fa-envelope mr-2"></i> ${noti.title || 'การแจ้งเตือนใหม่'}
-                    <span class="float-right text-muted text-sm">${timeSince(new Date(noti.created_at))}</span>
-                `;
+                // สร้าง DOM ด้วย textContent เพื่อลดความเสี่ยง DOM XSS
+                const icon = document.createElement('i');
+                icon.className = 'bi bi-envelope me-2';
+
+                const title = document.createElement('span');
+                title.textContent = noti.title || 'การแจ้งเตือนใหม่';
+
+                const time = document.createElement('span');
+                time.className = 'float-end text-muted small';
+                time.textContent = timeSince(new Date(noti.created_at));
+
+                item.append(icon, title, time);
                 
                 // Event Click สำหรับคลิกอ่านข้อความ
                 item.addEventListener('click', function(e) {
