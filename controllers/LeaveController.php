@@ -712,9 +712,31 @@ class LeaveController {
         // 🌟 แก้ไข: ดึงข้อมูลพนักงานที่แก้ไขจากฐานข้อมูล (ป้องกันบัคเปลี่ยนคนตอนบันทึก)
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action']) && $_POST['action'] == 'update_balance') {
             $this->verifyCsrf("index.php?c=leave&a=manage");
-            $stmt_bal = $db->prepare("SELECT user_id, budget_year FROM leave_balances WHERE id = ?");
-            $stmt_bal->execute([$_POST['balance_id']]);
+            $balance_id = filter_input(INPUT_POST, 'balance_id', FILTER_VALIDATE_INT);
+            if (!$balance_id) {
+                $_SESSION['error_msg'] = "ข้อมูลบัญชีวันลาไม่ถูกต้อง";
+                header("Location: index.php?c=leave&a=manage");
+                exit;
+            }
+
+            $sql_bal = "SELECT lb.user_id, lb.budget_year
+                        FROM leave_balances lb
+                        JOIN users u ON lb.user_id = u.id
+                        WHERE lb.id = ?";
+            $params_bal = [$balance_id];
+            if (!in_array($role, self::LEAVE_ADMIN_ROLES, true)) {
+                $sql_bal .= " AND u.hospital_id = ?";
+                $params_bal[] = (int)$hospital_id;
+            }
+            $stmt_bal = $db->prepare($sql_bal);
+            $stmt_bal->execute($params_bal);
             $bal = $stmt_bal->fetch(PDO::FETCH_ASSOC);
+
+            if (!$bal) {
+                $_SESSION['error_msg'] = "ไม่พบบัญชีวันลา หรือคุณไม่มีสิทธิ์แก้ไขรายการนี้";
+                header("Location: index.php?c=leave&a=manage");
+                exit;
+            }
             
             $target_user_id = $bal ? $bal['user_id'] : (count($staffs) > 0 ? $staffs[0]['id'] : null);
             $target_budget_year = $bal ? $bal['budget_year'] : $budget_year;
@@ -722,10 +744,13 @@ class LeaveController {
             $target_user = $target_user_id ? $userModel->getUserById($target_user_id) : null;
             $user_name = $target_user ? $target_user['name'] : '';
 
-            $leaveModel->updateLeaveBalance($_POST['balance_id'], floatval($_POST['quota_days']), floatval($_POST['carried_over_days']), floatval($_POST['used_days']));
+            $quota_days = max(0, (float)($_POST['quota_days'] ?? 0));
+            $carried_over_days = max(0, (float)($_POST['carried_over_days'] ?? 0));
+            $used_days = max(0, (float)($_POST['used_days'] ?? 0));
+            $leaveModel->updateLeaveBalance($balance_id, $quota_days, $carried_over_days, $used_days);
             
             // 🌟 บันทึก Log: จัดการแก้โควตาด้วยตัวเอง
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "แก้ไขโควตาวันลาด้วยมือให้ {$user_name} (Balance ID: {$_POST['balance_id']})");
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "แก้ไขโควตาวันลาด้วยมือให้ {$user_name} (Balance ID: {$balance_id})");
             
             $_SESSION['success_msg'] = "อัปเดตข้อมูลวันลาของ {$user_name} เรียบร้อยแล้ว"; 
             
@@ -733,11 +758,18 @@ class LeaveController {
             exit;
         }
 
-        $target_user_id = isset($_GET['user_id']) ? $_GET['user_id'] : (count($staffs) > 0 ? $staffs[0]['id'] : null);
+        $target_user_id = isset($_GET['user_id']) ? (int)$_GET['user_id'] : (count($staffs) > 0 ? (int)$staffs[0]['id'] : null);
         $balances = []; $target_user = null;
 
         if ($target_user_id) {
-            $target_user = $userModel->getUserById($target_user_id);
+            if (!in_array($role, self::LEAVE_ADMIN_ROLES, true)) {
+                $allowed_ids = array_map('intval', array_column($staffs, 'id'));
+                if (!in_array((int)$target_user_id, $allowed_ids, true)) {
+                    $target_user_id = count($staffs) > 0 ? (int)$staffs[0]['id'] : null;
+                }
+            }
+
+            $target_user = $target_user_id ? $userModel->getUserById($target_user_id) : null;
             $leaveModel->getUserLeaveBalances($target_user_id, $budget_year);
             $stmt = $db->prepare("SELECT lb.*, lq.leave_type as leave_type_name FROM leave_balances lb JOIN leave_quotas lq ON lb.leave_type_id = lq.id WHERE lb.user_id = ? AND lb.budget_year = ?");
             $stmt->execute([$target_user_id, $budget_year]); $balances = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -796,9 +828,26 @@ class LeaveController {
             $db = (new Database())->getConnection(); 
             $leaveModel = new LeaveModel($db);
             
-            $user_id = $_POST['user_id'];
-            $brought_forward = floatval($_POST['brought_forward']);
+            $user_id = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT);
+            $brought_forward = max(0, (float)($_POST['brought_forward'] ?? 0));
             $budget_year = $this->getCurrentBudgetYear();
+
+            if (!$user_id) {
+                $_SESSION['error_msg'] = "ข้อมูลบุคลากรไม่ถูกต้อง";
+                header("Location: index.php?c=leave&a=balances");
+                exit;
+            }
+
+            $role = $this->currentRole();
+            if (!in_array($role, self::LEAVE_ADMIN_ROLES, true)) {
+                $stmt_scope = $db->prepare("SELECT 1 FROM users WHERE id = ? AND hospital_id = ? LIMIT 1");
+                $stmt_scope->execute([$user_id, (int)($_SESSION['user']['hospital_id'] ?? 0)]);
+                if (!$stmt_scope->fetchColumn()) {
+                    $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์แก้ไขวันลาของหน่วยงานอื่น";
+                    header("Location: index.php?c=leave&a=balances");
+                    exit;
+                }
+            }
             
             $balances = $leaveModel->getUserLeaveBalances($user_id, $budget_year);
             $balance_id = null; $quota_days = 10; $used_days = 0;
@@ -1032,23 +1081,40 @@ class LeaveController {
     }
 
     public function print() {
-        if (!isset($_SESSION['user']) || empty($_GET['id'])) { 
-            header("Location: index.php?c=leave"); exit; 
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
         }
+
+        $request_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$request_id) {
+            header("Location: index.php?c=leave");
+            exit;
+        }
+
         $db = (new Database())->getConnection();
-        $request_id = $_GET['id'];
-        $stmt = $db->prepare("SELECT lr.*, lq.leave_type as leave_type_name, u.name as user_name, u.employee_type, h.name as hospital_name 
+        $stmt = $db->prepare("SELECT lr.*, lq.leave_type as leave_type_name, u.name as user_name, u.employee_type, u.hospital_id as user_hospital_id, h.name as hospital_name 
                               FROM leave_requests lr JOIN leave_quotas lq ON lr.leave_type_id = lq.id JOIN users u ON lr.user_id = u.id JOIN hospitals h ON u.hospital_id = h.id WHERE lr.id = ?");
         $stmt->execute([$request_id]);
         $leave = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$leave) { die("ไม่พบข้อมูลใบลา"); }
-        if ($leave['user_id'] != $_SESSION['user']['id'] && !in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN', 'DIRECTOR', 'SCHEDULER'])) {
+
+        $role = $this->currentRole();
+        $is_owner = ((int)$leave['user_id'] === (int)$_SESSION['user']['id']);
+        $is_global_manager = in_array($role, self::LEAVE_ADMIN_ROLES, true);
+        $is_local_manager = in_array($role, ['DIRECTOR', 'SCHEDULER'], true)
+            && (int)$leave['user_hospital_id'] === (int)($_SESSION['user']['hospital_id'] ?? 0);
+
+        if (!$is_owner && !$is_global_manager && !$is_local_manager) {
             die("คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้");
         }
 
         $leaveModel = new LeaveModel($db);
-        $budget_year = $this->getCurrentBudgetYear();
+        $start_ts = strtotime((string)$leave['start_date']);
+        $start_month = (int)date('m', $start_ts);
+        $start_year = (int)date('Y', $start_ts);
+        $budget_year = ($start_month >= 10) ? $start_year + 1 : $start_year;
         $balances = $leaveModel->getUserLeaveBalances($leave['user_id'], $budget_year);
         
         $stat = ['quota' => 0, 'carried' => 0, 'used' => 0, 'remaining' => 0];
