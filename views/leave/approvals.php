@@ -121,7 +121,7 @@ require_once 'views/components/ui.php';
                                     <span class="fw-bold text-dark d-block" style="font-size: 14px;"><?= htmlspecialchars($leave['leave_type']) ?></span>
                                     
                                     <?php if(!empty($leave['med_cert_path'])): ?>
-                                        <a href="<?= htmlspecialchars($leave['med_cert_path']) ?>" target="_blank" class="badge bg-info bg-opacity-10 text-info text-decoration-none mt-1 border border-info border-opacity-25" style="font-size: 10px;">
+                                        <a href="index.php?c=leave&a=download_med_cert&id=<?= (int)$leave['id'] ?>" target="_blank" rel="noopener" class="rp-badge rp-badge--info text-decoration-none mt-1">
                                             <i class="bi bi-paperclip"></i> ดูใบรับรองแพทย์
                                         </a>
                                     <?php endif; ?>
@@ -214,4 +214,5 @@ require_once 'views/components/ui.php';
             <i class="bi bi-info-circle text-primary me-1"></i> <strong>คำแนะนำ:</strong> รายการที่มีแถบสีเหลือง หมายถึงบุคลากรขอยกเลิกใบลาที่เคยได้รับการอนุมัติไปแล้ว หากคุณกด "ให้ยกเลิก" ระบบจะทำการเปลี่ยนสถานะเป็น <span class="badge bg-secondary">ยกเลิกสำเร็จแล้ว</span> และคืนโควตาวันลาให้กับบุคลากรท่านนั้นโดยอัตโนมัติ
         </div>
     </div>
+    </section>
 </div>
