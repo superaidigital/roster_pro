@@ -248,67 +248,119 @@ require_once __DIR__ . '/../components/ui.php';
     </div>
 </div>
 
-<!-- ================= 🌟 Modal 2: ตั้งค่า LINE Notify ================= -->
-<div class="modal fade" id="lineNotifyModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+<!-- ================= LINE Messaging API ================= -->
+<div class="modal fade" id="lineNotifyModal" tabindex="-1" aria-labelledby="lineMessagingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-            <div class="modal-header border-bottom-0 bg-success bg-opacity-10 pb-3 p-4">
-                <h5 class="modal-title fw-bolder text-success"><i class="bi bi-line me-2"></i> ตั้งค่าการแจ้งเตือน LINE Notify</h5>
+            <div class="modal-header border-bottom-0 bg-success bg-opacity-10 p-4">
+                <div>
+                    <h5 class="modal-title fw-bolder text-success" id="lineMessagingModalLabel">
+                        <i class="bi bi-line me-2"></i> LINE Messaging API
+                    </h5>
+                    <div class="text-muted small mt-1">เชื่อมต่อ LINE Official Account เพื่อส่ง Push Message จาก Roster Pro</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
-            <div class="modal-body p-4 bg-white modern-input-group">
-                <form action="index.php?c=settings&a=update_system" method="POST" id="lineNotifyForm">
-                    <input type="hidden" name="section" value="line_notify">
-                    
-                    <div class="mb-4 pb-4 border-bottom">
-                        <label class="form-label fw-bold text-dark mb-2">LINE Notify Token (สำหรับกลุ่มส่วนกลาง)</label>
-                        <div class="input-group shadow-sm border border-success border-opacity-25 rounded-3 overflow-hidden focus-ring-success">
-                            <span class="input-group-text bg-success bg-opacity-10 border-0 text-success"><i class="bi bi-key-fill"></i></span>
-                            <input type="text" name="settings[line_notify_token]" class="form-control border-0 bg-white" value="<?= htmlspecialchars($settings['line_notify_token'] ?? '') ?>" placeholder="กรอก Token สตริงที่ได้จากเว็บ LINE Notify...">
+
+            <form action="index.php?c=settings&a=update_system" method="POST" id="lineMessagingForm">
+                <input type="hidden" name="section" value="line_messaging">
+
+                <div class="modal-body p-4 bg-white">
+                    <div class="rp-alert rp-alert--info mb-4">
+                        <span class="rp-alert__icon"><i class="bi bi-info-circle-fill"></i></span>
+                        <div class="rp-alert__content">
+                            ใช้ Channel access token จาก Messaging API ของ LINE Official Account และระบุ Target ID
+                            ของผู้ใช้ กลุ่ม หรือห้องที่ Bot เป็นสมาชิก
                         </div>
                     </div>
 
-                    <h6 class="fw-bolder text-dark mb-3"><i class="bi bi-toggle-on text-success me-2"></i> เลือกเหตุการณ์ที่ต้องการให้แจ้งเตือน</h6>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="p-3 border rounded-4 bg-light bg-opacity-50 h-100 transition-all hover-bg-white">
-                                <div class="form-check form-switch modern-switch mb-0">
-                                    <input class="form-check-input float-end ms-2" type="checkbox" id="notifySubmit" name="settings[line_notify_on_submit]" value="1" <?= ($settings['line_notify_on_submit'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                    <label class="form-check-label fw-bold text-dark d-block mb-1" for="notifySubmit">ส่งตารางเวรขออนุมัติ</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 border rounded-4 bg-light bg-opacity-50 h-100 transition-all hover-bg-white">
-                                <div class="form-check form-switch modern-switch mb-0">
-                                    <input class="form-check-input float-end ms-2" type="checkbox" id="notifyRequest" name="settings[line_notify_on_request]" value="1" <?= ($settings['line_notify_on_request'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                    <label class="form-check-label fw-bold text-dark d-block mb-1" for="notifyRequest">ขอปลดล็อคแก้ไขตาราง</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-12">
-                            <div class="p-3 border rounded-4 bg-light bg-opacity-50 transition-all hover-bg-white">
-                                <div class="form-check form-switch modern-switch mb-0">
-                                    <input class="form-check-input float-end ms-2" type="checkbox" id="notifyHoliday" name="settings[line_notify_on_holiday]" value="1" <?= ($settings['line_notify_on_holiday'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                    <label class="form-check-label fw-bold text-dark d-block mb-1" for="notifyHoliday">เสนอเพิ่มวันหยุดนักขัตฤกษ์</label>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="form-check form-switch mb-4 p-3 ps-5 border rounded-4 bg-light">
+                        <input class="form-check-input" type="checkbox"
+                               id="lineMessagingEnabled"
+                               name="settings[line_messaging_enabled]" value="1"
+                               <?= ($settings['line_messaging_enabled'] ?? '0') === '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label fw-bold" for="lineMessagingEnabled">
+                            เปิดใช้งาน LINE Messaging API
+                        </label>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer border-top-0 bg-light p-3 d-flex justify-content-between align-items-center">
-                <form action="index.php?c=settings&a=test_line" method="POST" class="m-0" onsubmit="return confirm('ระบบจะทำการส่งข้อความทดสอบไปยังกลุ่ม LINE ของคุณ ยืนยันหรือไม่?');">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
-                    <button type="submit" class="btn btn-outline-success fw-bold rounded-pill px-4">
-                        <i class="bi bi-send-check-fill me-1"></i> ทดสอบส่งข้อความ
-                    </button>
-                </form>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-light border fw-bold rounded-pill px-4" data-bs-dismiss="modal">ปิด</button>
-                    <button type="submit" form="lineNotifyForm" class="btn btn-success fw-bold rounded-pill px-4 shadow-sm"><i class="bi bi-save me-1"></i> บันทึกตั้งค่า</button>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Channel access token</label>
+                        <input type="password"
+                               name="settings[line_channel_access_token]"
+                               class="rp-control"
+                               value="<?= htmlspecialchars($settings['line_channel_access_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                               autocomplete="off"
+                               placeholder="Channel access token">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Channel secret</label>
+                        <input type="password"
+                               name="settings[line_channel_secret]"
+                               class="rp-control"
+                               value="<?= htmlspecialchars($settings['line_channel_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                               autocomplete="off"
+                               placeholder="Channel secret">
+                        <div class="form-text">เตรียมไว้สำหรับตรวจสอบ Webhook Signature ของ LINE</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Target ID สำหรับ Push Message</label>
+                        <input type="text"
+                               name="settings[line_target_id]"
+                               class="rp-control font-monospace"
+                               value="<?= htmlspecialchars($settings['line_target_id'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                               placeholder="U... / C... / R...">
+                        <div class="form-text">User ID ขึ้นต้น U, Group ID ขึ้นต้น C หรือ Room ID ขึ้นต้น R</div>
+                    </div>
+
+                    <h6 class="fw-bolder mb-3">เหตุการณ์ที่ส่งไป LINE</h6>
+                    <div class="row g-3">
+                        <?php
+                        $line_events = [
+                            'line_messaging_on_roster' => ['ตารางเวร', 'bi-calendar-check'],
+                            'line_messaging_on_leave' => ['การลา', 'bi-calendar-minus'],
+                            'line_messaging_on_swap' => ['แลกเวร', 'bi-arrow-left-right'],
+                            'line_messaging_on_holiday' => ['วันหยุด', 'bi-calendar-event'],
+                        ];
+                        foreach ($line_events as $setting_key => [$label, $icon]):
+                        ?>
+                            <div class="col-md-6">
+                                <div class="p-3 border rounded-4 bg-light h-100">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="<?= htmlspecialchars($setting_key, ENT_QUOTES, 'UTF-8') ?>"
+                                               name="settings[<?= htmlspecialchars($setting_key, ENT_QUOTES, 'UTF-8') ?>]"
+                                               value="1"
+                                               <?= ($settings[$setting_key] ?? '0') === '1' ? 'checked' : '' ?>>
+                                        <label class="form-check-label fw-bold"
+                                               for="<?= htmlspecialchars($setting_key, ENT_QUOTES, 'UTF-8') ?>">
+                                            <i class="bi <?= htmlspecialchars($icon, ENT_QUOTES, 'UTF-8') ?> me-1"></i>
+                                            <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
-            </div>
+
+                <div class="modal-footer bg-light border-top p-3 d-flex justify-content-between gap-2">
+                    <button type="submit"
+                            formaction="index.php?c=settings&a=test_line"
+                            class="rp-btn rp-btn--secondary"
+                            onclick="return confirm('ส่งข้อความทดสอบไปยัง Target ID ที่บันทึกไว้?');">
+                        <i class="bi bi-send-check-fill"></i> ทดสอบส่งข้อความ
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="rp-btn rp-btn--secondary" data-bs-dismiss="modal">ปิด</button>
+                        <button type="submit" class="rp-btn rp-btn--success">
+                            <i class="bi bi-save"></i> บันทึกการตั้งค่า
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
