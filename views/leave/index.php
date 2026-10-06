@@ -523,14 +523,14 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     <!-- แจ้งเตือนสถานะต่างๆ -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert alert-modern alert-success alert-dismissible fade show mb-4" role="alert">
-            <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); endif; ?>
         
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert alert-modern alert-danger alert-dismissible fade show mb-4" role="alert">
-            <i class="bi bi-exclamation-triangle-fill me-2 fs-5 align-middle"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill me-2 fs-5 align-middle"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['error_msg']); endif; ?>
@@ -551,6 +551,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                 </div>
                 <div class="card-body p-4">
                     <form action="index.php?c=leave&a=request" method="POST" id="leaveForm" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                         
                         <div class="mb-4">
                             <label class="form-label fw-bold text-secondary small text-uppercase">ประเภทการลา <span class="text-danger">*</span></label>
@@ -585,7 +586,8 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
 
                         <div class="mb-4">
                             <label class="form-label fw-bold text-secondary small text-uppercase">เหตุผลการลา <span class="text-danger">*</span></label>
-                            <textarea name="reason" class="form-control form-control-modern" rows="3" placeholder="ระบุเหตุผลที่ชัดเจน เช่น พักผ่อนประจำปี, ป่วยเป็นไข้..." required></textarea>
+                            <textarea name="reason" class="form-control form-control-modern" rows="3" maxlength="1000" aria-describedby="reasonHelp" placeholder="ระบุเหตุผลที่ชัดเจน เช่น พักผ่อนประจำปี, ป่วยเป็นไข้..." required></textarea>
+                            <div id="reasonHelp" class="form-text text-muted">สูงสุด 1,000 ตัวอักษร</div>
                         </div>
 
                         <!-- แจ้งเตือนอัปโหลดใบรับรองแพทย์ -->
@@ -596,7 +598,8 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                     <strong>ลาป่วยตั้งแต่ 3 วันทำการขึ้นไป</strong>
                                 </div>
                                 <label class="form-label small text-dark fw-bold mb-2">โปรดแนบไฟล์ใบรับรองแพทย์ (JPG, PNG, PDF)</label>
-                                <input class="form-control form-control-sm border-danger border-opacity-25 shadow-sm rounded-3 bg-white" type="file" name="med_cert_file" id="med_cert_file" accept=".jpg,.jpeg,.png,.pdf">
+                                <input class="form-control form-control-sm border-danger border-opacity-25 shadow-sm rounded-3 bg-white" type="file" name="med_cert_file" id="med_cert_file" accept=".jpg,.jpeg,.png,.pdf,application/pdf,image/jpeg,image/png" aria-describedby="medCertHelp">
+                                <div id="medCertHelp" class="form-text">รองรับ JPG, PNG, PDF ขนาดไม่เกิน 5 MB</div>
                             </div>
                         </div>
 
@@ -698,7 +701,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                                 <?php endif; ?>
                                             </div>
                                             <?php if(!empty($leave['med_cert_path'])): ?>
-                                                <a href="<?= htmlspecialchars($leave['med_cert_path']) ?>" target="_blank" class="badge bg-info bg-opacity-10 text-info text-decoration-none mt-1 border border-info border-opacity-25" style="font-size: 10px;"><i class="bi bi-paperclip"></i> ดูใบรับรอง</a>
+                                                <a href="index.php?c=leave&a=download_med_cert&id=<?= (int)$leave['id'] ?>" target="_blank" rel="noopener" class="badge bg-info bg-opacity-10 text-info text-decoration-none mt-1 border border-info border-opacity-25" style="font-size: 10px;"><i class="bi bi-paperclip"></i> ดูใบรับรอง</a>
                                             <?php endif; ?>
                                         </td>
                                         <td class="py-3">
@@ -728,7 +731,8 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                                 
                                                 <?php if (in_array($leave['status'], ['PENDING', 'APPROVED'])): ?>
                                                     <form action="index.php?c=leave&a=cancel" method="POST" class="flex-fill m-0" onsubmit="return confirm('<?= ($leave['status']=='APPROVED') ? 'ใบลาฉบับนี้ถูกอนุมัติไปแล้ว\n\nการยกเลิกจะต้องรอให้หัวหน้าอนุมัติการยกเลิกก่อน ระบบจึงจะคืนโควตาวันลาให้ ยืนยันการส่งคำขอยกเลิกใช่หรือไม่?' : 'คุณแน่ใจหรือไม่ที่จะยกเลิกคำขอใบลาฉบับนี้?' ?>');">
-                                                        <input type="hidden" name="request_id" value="<?= $leave['id'] ?>">
+                                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
                                                         <button type="submit" class="btn btn-soft-danger btn-sm w-100 rounded-3 fw-bold" style="font-size: 11px;" title="ยกเลิกคำขอนี้"><i class="bi bi-x-circle"></i> ยกเลิก</button>
                                                     </form>
                                                 <?php endif; ?>
