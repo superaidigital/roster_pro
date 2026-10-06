@@ -930,6 +930,91 @@ class LeaveController {
         require_once 'views/layouts/header.php'; require_once 'views/layouts/sidebar.php'; require_once 'views/leave/report.php'; echo "</div></div></body></html>";
     }
 
+    public function download_med_cert() {
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        $request_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$request_id) {
+            http_response_code(400);
+            exit("คำขอไม่ถูกต้อง");
+        }
+
+        $db = (new Database())->getConnection();
+        $stmt = $db->prepare("
+            SELECT lr.user_id, lr.med_cert_path, u.hospital_id
+            FROM leave_requests lr
+            JOIN users u ON lr.user_id = u.id
+            WHERE lr.id = ? AND lr.has_med_cert = 1
+            LIMIT 1
+        ");
+        $stmt->execute([$request_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row || empty($row['med_cert_path'])) {
+            http_response_code(404);
+            exit("ไม่พบไฟล์ใบรับรองแพทย์");
+        }
+
+        $role = $this->currentRole();
+        $current_user_id = (int)$_SESSION['user']['id'];
+        $current_hospital_id = (int)($_SESSION['user']['hospital_id'] ?? 0);
+
+        $allowed = ((int)$row['user_id'] === $current_user_id)
+            || in_array($role, self::LEAVE_ADMIN_ROLES, true)
+            || (in_array($role, ['DIRECTOR', 'SCHEDULER'], true)
+                && (int)$row['hospital_id'] === $current_hospital_id);
+
+        if (!$allowed) {
+            http_response_code(403);
+            exit("คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้");
+        }
+
+        $relative_path = str_replace('\\', '/', (string)$row['med_cert_path']);
+        $project_root = dirname(__DIR__);
+        $absolute_path = realpath($project_root . DIRECTORY_SEPARATOR . ltrim($relative_path, '/'));
+
+        $allowed_roots = [];
+        foreach (['storage/med_certs', 'uploads/med_certs'] as $allowed_dir) {
+            $resolved = realpath($project_root . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $allowed_dir));
+            if ($resolved) {
+                $allowed_roots[] = $resolved;
+            }
+        }
+
+        $inside_allowed_root = false;
+        if ($absolute_path && is_file($absolute_path)) {
+            foreach ($allowed_roots as $root) {
+                if (strpos($absolute_path, $root . DIRECTORY_SEPARATOR) === 0 || $absolute_path === $root) {
+                    $inside_allowed_root = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$inside_allowed_root) {
+            http_response_code(404);
+            exit("ไม่พบไฟล์เอกสาร");
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($absolute_path) ?: 'application/octet-stream';
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true)) {
+            http_response_code(415);
+            exit("ชนิดไฟล์ไม่รองรับ");
+        }
+
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . filesize($absolute_path));
+        header('Content-Disposition: inline; filename="medical-certificate-' . $request_id . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store, max-age=0');
+        readfile($absolute_path);
+        exit;
+    }
+
     public function print() {
         if (!isset($_SESSION['user']) || empty($_GET['id'])) { 
             header("Location: index.php?c=leave"); exit; 
