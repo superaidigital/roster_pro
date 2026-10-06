@@ -1,0 +1,115 @@
+/* Roster Pro Design System v2 — Foundation Tokens */
+:root {
+    --rp-font-body: "Sarabun", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --rp-font-heading: "Kanit", "Sarabun", system-ui, sans-serif;
+
+    --rp-navy-950: #081f2c;
+    --rp-navy-900: #0f2f44;
+    --rp-primary-700: #0f5fc4;
+    --rp-primary-600: #1677ff;
+    --rp-primary-500: #2f80ed;
+    --rp-primary-100: #dbeafe;
+    --rp-primary-50: #eff6ff;
+
+    --rp-teal-600: #0f9f91;
+    --rp-teal-500: #14b8a6;
+    --rp-teal-50: #f0fdfa;
+
+    --rp-success-700: #15803d;
+    --rp-success-600: #16a34a;
+    --rp-success-50: #f0fdf4;
+
+    --rp-warning-700: #b45309;
+    --rp-warning-600: #d97706;
+    --rp-warning-50: #fffbeb;
+
+    --rp-danger-700: #b91c1c;
+    --rp-danger-600: #dc2626;
+    --rp-danger-50: #fef2f2;
+
+    --rp-info-700: #0369a1;
+    --rp-info-600: #0284c7;
+    --rp-info-50: #f0f9ff;
+
+    --rp-violet-700: #6d28d9;
+    --rp-violet-600: #7c3aed;
+    --rp-violet-50: #f5f3ff;
+
+    --rp-slate-950: #020617;
+    --rp-slate-900: #0f172a;
+    --rp-slate-800: #1e293b;
+    --rp-slate-700: #334155;
+    --rp-slate-600: #475569;
+    --rp-slate-500: #64748b;
+    --rp-slate-400: #94a3b8;
+    --rp-slate-300: #cbd5e1;
+    --rp-slate-200: #e2e8f0;
+    --rp-slate-100: #f1f5f9;
+    --rp-slate-50: #f8fafc;
+
+    --rp-bg: #f7f9fc;
+    --rp-surface: #ffffff;
+    --rp-surface-subtle: #fbfdff;
+    --rp-border: #e2e8f0;
+    --rp-text: #0f172a;
+    --rp-text-secondary: #475569;
+    --rp-text-muted: #64748b;
+
+    --rp-space-1: 0.25rem;
+    --rp-space-2: 0.5rem;
+    --rp-space-3: 0.75rem;
+    --rp-space-4: 1rem;
+    --rp-space-5: 1.5rem;
+    --rp-space-6: 2rem;
+    --rp-space-7: 2.5rem;
+    --rp-space-8: 3rem;
+
+    --rp-radius-sm: 0.5rem;
+    --rp-radius-md: 0.75rem;
+    --rp-radius-lg: 1rem;
+    --rp-radius-xl: 1.25rem;
+    --rp-radius-pill: 999px;
+
+    --rp-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --rp-shadow-sm: 0 4px 14px rgba(15, 23, 42, 0.06);
+    --rp-shadow-md: 0 10px 30px rgba(15, 23, 42, 0.09);
+    --rp-shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.12);
+
+    --rp-control-height: 44px;
+    --rp-control-height-lg: 48px;
+
+    --rp-motion-fast: 140ms;
+    --rp-motion-normal: 220ms;
+    --rp-ease: cubic-bezier(.2,.8,.2,1);
+
+    --rp-content-max: 1280px;
+    --rp-reading-max: 1120px;
+
+    --rp-focus-ring: 0 0 0 3px rgba(22, 119, 255, 0.22);
+}
+
+html {
+    color-scheme: light;
+}
+
+body {
+    font-family: var(--rp-font-body);
+    color: var(--rp-text);
+    background: var(--rp-bg);
+}
+
+h1, h2, h3, h4, h5, h6,
+.rp-heading {
+    font-family: var(--rp-font-heading);
+    color: var(--rp-text);
+}
+
+:focus-visible {
+    outline: 2px solid var(--rp-primary-600);
+    outline-offset: 2px;
+}
+
+::selection {
+    background: var(--rp-primary-100);
+    color: var(--rp-navy-950);
+}

@@ -22,6 +22,27 @@ class UsersController {
         }
     }
 
+
+    private function getCsrfToken() {
+        if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    private function verifyCsrf($redirect = 'index.php?c=users') {
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $postedToken = $_POST['csrf_token'] ?? '';
+
+        if (!is_string($sessionToken) || !is_string($postedToken) ||
+            $sessionToken === '' || $postedToken === '' ||
+            !hash_equals($sessionToken, $postedToken)) {
+            $_SESSION['error_msg'] = "คำขอหมดอายุหรือไม่ถูกต้อง กรุณาลองใหม่";
+            header("Location: " . $redirect);
+            exit;
+        }
+    }
+
     // ==========================================
     // 🌟 ตรวจสอบสิทธิ์การจัดการรายบุคคล
     // ==========================================
@@ -81,6 +102,7 @@ class UsersController {
 
         // ดึงกลุ่มเรทค่าตอบแทน
         $pay_rates = $payRateModel->getAllRates();
+        $csrf_token = $this->getCsrfToken();
 
         // โหลด View
         require_once 'views/layouts/header.php';
@@ -94,6 +116,7 @@ class UsersController {
     // ====================================================
     public function add() {
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
@@ -142,6 +165,7 @@ class UsersController {
     // ====================================================
     public function edit() {
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
@@ -201,6 +225,7 @@ class UsersController {
     // ====================================================
     public function delete() {
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         
         // เปลี่ยนการตรวจสอบมารับค่า $_POST
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id'])) {
@@ -273,6 +298,7 @@ class UsersController {
     // ====================================================
     public function toggle() {
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id']) && isset($_POST['status'])) {
             $db = (new Database())->getConnection();
@@ -382,13 +408,23 @@ class UsersController {
         $json = file_get_contents('php://input');
         $data = json_decode($json, true);
 
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $postedToken = is_array($data) ? ($data['csrf_token'] ?? '') : '';
+        if (!is_string($sessionToken) || !is_string($postedToken) ||
+            $sessionToken === '' || $postedToken === '' ||
+            !hash_equals($sessionToken, $postedToken)) {
+            http_response_code(419);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            exit;
+        }
+
         if (isset($data['order']) && is_array($data['order'])) {
             $db = (new Database())->getConnection();
             try {
                 $db->beginTransaction();
                 $stmt = $db->prepare("UPDATE users SET display_order = ? WHERE id = ?");
                 foreach ($data['order'] as $item) {
-                    $stmt->execute([$item['order'], $item['id']]);
+                    $stmt->execute([(int)$item['order'], (int)$item['id']]);
                 }
                 $db->commit();
                 echo json_encode(['success' => true]);
@@ -408,6 +444,7 @@ class UsersController {
     // ====================================================
     public function bulk_delete() {
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ids'])) {
             $db = (new Database())->getConnection();
@@ -493,6 +530,7 @@ class UsersController {
 
     public function import() {
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['import_file'])) {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
@@ -538,6 +576,7 @@ class UsersController {
     // ====================================================
     public function restore() {
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id'])) {
             $db = (new Database())->getConnection();
             $id = $_POST['id'];

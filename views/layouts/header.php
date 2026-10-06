@@ -109,6 +109,11 @@ if (isset($_SESSION['user'])) {
     }
 }
 
+if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$header_csrf_token = $_SESSION['csrf_token'];
+
 // ========================================================
 // 🌟 Context ของหน้าปัจจุบันสำหรับ Topbar
 // ========================================================
@@ -144,9 +149,10 @@ $header_page_icon = $page_context[2];
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- 🌟 ดึงชื่อแอปมาแสดงที่ชื่อแท็บเบราว์เซอร์ -->
     <title><?= htmlspecialchars($app_name) ?> - <?= htmlspecialchars($app_subtitle) ?></title>
+    <meta name="csrf-token" content="<?= htmlspecialchars($header_csrf_token ?? ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0d6efd">
@@ -154,14 +160,22 @@ $header_page_icon = $page_context[2];
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
+    <!-- Roster Pro Design System v2 -->
+    <link rel="stylesheet" href="public/css/roster-tokens.css">
+    <link rel="stylesheet" href="public/css/roster-layout.css">
+    <link rel="stylesheet" href="public/css/roster-components.css">
+    <link rel="stylesheet" href="public/css/roster-responsive.css">
+    <link rel="stylesheet" href="public/css/roster-accessibility.css?v=2">
+
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="public/js/roster-qa.js?v=2" defer></script>
 
     <style>
         :root {
@@ -630,8 +644,12 @@ $header_page_icon = $page_context[2];
             .topbar-main { gap: 8px; }
         }
     </style>
+
+    <!-- Application Shell overrides legacy inline layout styles -->
+    <link rel="stylesheet" href="public/css/roster-shell.css?v=2">
 </head>
 <body>
+<a class="rp-skip-link" href="#rpMainContent">ข้ามไปยังเนื้อหาหลัก</a>
 <script>
     // ใช้สถานะ Sidebar ก่อนวาด Topbar เพื่อลดอาการกระพริบของ Layout
     if (localStorage.getItem('sidebarState') === 'collapsed') {
@@ -654,7 +672,7 @@ $header_page_icon = $page_context[2];
 
     <div class="topbar-main">
         <div class="topbar-left">
-            <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" title="เปิดเมนู">
+            <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูหลัก" title="เปิดเมนู">
                 <i class="bi bi-list fs-4"></i>
             </button>
 
@@ -676,12 +694,12 @@ $header_page_icon = $page_context[2];
         
         <!-- 🔔 Notification Dropdown -->
         <div class="dropdown">
-            <button class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <button class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="การแจ้งเตือน">
                 <i class="bi bi-bell-fill fs-5"></i>
                 <?php if($unread_count > 0): ?>
-                    <span class="notif-badge" id="notifBadge" style="display: block;"><?= $unread_count > 99 ? '99+' : $unread_count ?></span>
+                    <span class="notif-badge" id="notifBadge" style="display: block;" aria-live="polite" aria-label="<?= (int)$unread_count ?> รายการที่ยังไม่ได้อ่าน"><?= $unread_count > 99 ? '99+' : $unread_count ?></span>
                 <?php else: ?>
-                    <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
+                    <span class="notif-badge" id="notifBadge" style="display: none;" aria-live="polite" aria-label="ไม่มีรายการที่ยังไม่ได้อ่าน">0</span>
                 <?php endif; ?>
             </button>
             
@@ -703,7 +721,7 @@ $header_page_icon = $page_context[2];
                         <!-- 🌟 วนลูปแสดงการแจ้งเตือนล่าสุด 5 รายการ -->
                         <?php foreach ($latest_notifications as $notif): 
                             $is_read = $notif['is_read'] == 1;
-                            $link = !empty($notif['link']) ? "index.php?c=notification&a=read&id={$notif['id']}&url=" . urlencode($notif['link']) : "index.php?c=notification&a=read&id={$notif['id']}";
+                            $target_link = !empty($notif['link']) ? (string)$notif['link'] : 'index.php?c=notification';
                             
                             // ตกแต่งสีไอคอนตามประเภท
                             $type = strtoupper($notif['type'] ?? 'INFO');
@@ -714,7 +732,11 @@ $header_page_icon = $page_context[2];
                             elseif ($type == 'SWAP') { $icon = 'bi-arrow-left-right'; $color = 'info text-dark'; }
                             elseif ($type == 'LEAVE') { $icon = 'bi-person-dash-fill'; $color = 'warning text-dark'; }
                         ?>
-                            <a href="<?= $link ?>" class="text-decoration-none text-dark d-block">
+                            <form method="POST" action="index.php?c=notification&a=read" class="m-0">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($header_csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                <input type="hidden" name="id" value="<?= (int)$notif['id'] ?>">
+                                <input type="hidden" name="url" value="<?= htmlspecialchars($target_link, ENT_QUOTES, 'UTF-8') ?>">
+                                <button type="submit" class="w-100 border-0 p-0 text-start bg-transparent text-dark">
                                 <div class="p-3 d-flex align-items-start <?= !$is_read ? 'bg-primary bg-opacity-10' : 'bg-white' ?> notif-item" style="transition: all 0.2s;">
                                     <div class="bg-<?= $color ?> bg-opacity-10 text-<?= str_replace(' text-dark', '', $color) ?> rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
                                         <i class="bi <?= $icon ?>"></i>
@@ -731,7 +753,8 @@ $header_page_icon = $page_context[2];
                                         </p>
                                     </div>
                                 </div>
-                            </a>
+                                </button>
+                            </form>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
@@ -739,9 +762,13 @@ $header_page_icon = $page_context[2];
                 <?php if (!empty($latest_notifications)): ?>
                     <!-- ปุ่ม Footer ทำเครื่องหมายอ่านแล้ว -->
                     <div class="p-2 border-top bg-light text-center" style="border-radius: 0 0 1rem 1rem;">
-                        <a href="index.php?c=notification&a=read_all" class="text-decoration-none text-muted fw-bold small d-block py-2" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')" onclick="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
-                            <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
-                        </a>
+                        <form method="POST" action="index.php?c=notification&a=read_all" class="m-0" onsubmit="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($header_csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="return_to" value="index.php?c=notification">
+                            <button type="submit" class="btn btn-link text-decoration-none text-muted fw-bold small w-100 py-2">
+                                <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
+                            </button>
+                        </form>
                     </div>
                 <?php endif; ?>
             </div>
@@ -751,7 +778,7 @@ $header_page_icon = $page_context[2];
 
         <!-- 👤 Profile Dropdown -->
         <div class="dropdown">
-            <a href="#" class="profile-pill" data-bs-toggle="dropdown" aria-expanded="false">
+            <a href="#" class="profile-pill" data-bs-toggle="dropdown" aria-expanded="false" aria-label="เมนูผู้ใช้ <?= htmlspecialchars($_SESSION['user']['name'] ?? '') ?>">
                 <div class="user-avatar"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></div>
                 <div class="d-none d-md-block text-start lh-1 pe-2">
                     <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
@@ -787,8 +814,8 @@ $header_page_icon = $page_context[2];
         <div class="pwa-toast-subtitle">เพิ่มไว้บนหน้าจอเพื่อเปิดใช้งานได้สะดวกขึ้น</div>
     </div>
     <div class="pwa-toast-actions">
-        <button id="btnDismissPwa" class="btn btn-light border">ภายหลัง</button>
-        <button id="btnInstallPwa" class="btn btn-primary shadow-sm">ติดตั้ง</button>
+        <button id="btnDismissPwa" class="rp-btn rp-btn--secondary">ภายหลัง</button>
+        <button id="btnInstallPwa" class="rp-btn rp-btn--primary">ติดตั้ง</button>
     </div>
 </div>
 
@@ -858,10 +885,12 @@ $header_page_icon = $page_context[2];
                 const badge = document.getElementById('notifBadge');
                 if(badge) {
                     if(data.unread_count > 0) { 
-                        badge.innerText = data.unread_count > 99 ? '99+' : data.unread_count; 
+                        badge.innerText = data.unread_count > 99 ? '99+' : data.unread_count;
+                        badge.setAttribute('aria-label', data.unread_count + ' รายการที่ยังไม่ได้อ่าน');
                         badge.style.display = 'block'; 
                     } else { 
-                        badge.style.display = 'none'; 
+                        badge.style.display = 'none';
+                        badge.setAttribute('aria-label', 'ไม่มีรายการที่ยังไม่ได้อ่าน'); 
                     }
                 }
             }
@@ -874,5 +903,5 @@ $header_page_icon = $page_context[2];
 </script>
 
 <!-- 🌟 2. Layout Wrapper: ล็อกความสูงเพื่อป้องกันเลย์เอาท์แตก -->
-<div class="d-flex w-100 overflow-hidden" style="height: calc(100vh - 70px);">
+<div class="d-flex w-100 overflow-hidden rp-app-frame">
     <!-- 💡 ไฟล์ sidebar.php จะถูกแทรกต่อจากบรรทัดนี้ -->

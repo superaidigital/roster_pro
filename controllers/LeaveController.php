@@ -6,6 +6,7 @@ require_once 'models/LeaveModel.php';
 require_once 'models/UserModel.php';
 require_once 'models/HolidayModel.php';
 require_once 'models/NotificationModel.php';
+require_once 'services/NotificationService.php';
 require_once 'controllers/LogsController.php'; // 🌟 ระบบ Log
 
 class LeaveController {
@@ -67,38 +68,6 @@ class LeaveController {
         $start = new DateTime($start_date);
         $today = new DateTime();
         return $today->diff($start)->y;
-    }
-
-    private function sendLineNotify($db, $message) {
-        try {
-            $stmt = $db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'line_notify_token'");
-            $stmt->execute();
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            $line_token = $row ? $row['setting_value'] : null;
-
-            if (empty($line_token)) return false;
-
-            $url = "https://notify-api.line.me/api/notify";
-            $data = ['message' => $message];
-
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Content-Type: application/x-www-form-urlencoded",
-                "Authorization: Bearer " . $line_token
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-            $result = curl_exec($ch);
-            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            return $result;
-        } catch (Exception $e) { return false; }
     }
 
     // ==========================================
@@ -407,6 +376,10 @@ class LeaveController {
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $approver) {
                 $notifModel->addNotification($approver['id'], 'INFO', 'ใบลาใหม่รออนุมัติ', "{$user_name} ขอ{$leave_name} {$actual_working_days} วัน", "index.php?c=leave&a=approvals");
             }
+            (new NotificationService($db))->sendLineEvent(
+                'leave',
+                "มีใบลาใหม่รออนุมัติ: {$user_name} / {$leave_name} / {$actual_working_days} วัน"
+            );
         } else {
             if ($uploaded_absolute_path && is_file($uploaded_absolute_path)) {
                 @unlink($uploaded_absolute_path);

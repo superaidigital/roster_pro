@@ -1,0 +1,108 @@
+/* Roster Pro Design System v2 — Responsive + Accessibility */
+@media (max-width: 1199.98px) {
+    .rp-grid--6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .rp-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 991.98px) {
+    .rp-page {
+        width: min(calc(100% - 1.5rem), var(--rp-content-max));
+        padding-top: 1rem;
+    }
+
+    .rp-page-header {
+        align-items: flex-start;
+        padding: 1rem;
+    }
+
+    .rp-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 767.98px) {
+    .rp-page-header {
+        flex-direction: column;
+    }
+
+    .rp-page-header__actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .rp-grid--6,
+    .rp-grid--4,
+    .rp-grid--3,
+    .rp-grid--2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rp-stat-card {
+        min-height: 92px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .rp-page {
+        width: min(calc(100% - 1rem), var(--rp-content-max));
+        padding-bottom: 5rem;
+    }
+
+    .rp-grid--6,
+    .rp-grid--4,
+    .rp-grid--3,
+    .rp-grid--2 {
+        grid-template-columns: 1fr;
+        gap: .75rem;
+    }
+
+    .rp-action-grid-mobile {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rp-page-header__actions > * {
+        flex: 1 1 auto;
+    }
+
+    .rp-page-header__actions .rp-btn {
+        width: 100%;
+    }
+
+    .rp-action-card {
+        min-height: 82px;
+    }
+
+    .rp-stat-card__value {
+        font-size: 1.5rem;
+    }
+}
+
+@media (hover: none) {
+    .rp-card--interactive:hover,
+    .rp-action-card:hover,
+    .rp-btn:hover {
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}
+
+@media (prefers-contrast: more) {
+    .rp-card,
+    .rp-action-card,
+    .rp-control {
+        border-color: var(--rp-slate-500);
+    }
+
+    .rp-text-muted,
+    .rp-field-help {
+        color: var(--rp-slate-700);
+    }
+}

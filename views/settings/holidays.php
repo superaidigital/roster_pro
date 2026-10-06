@@ -36,9 +36,13 @@ function formatDateThai($dateString) {
             <a href="index.php?c=settings&a=system" class="btn btn-light border fw-bold rounded-pill shadow-sm px-4">
                 <i class="bi bi-arrow-left me-1"></i> กลับ
             </a>
-            <a href="index.php?c=settings&a=sync_api&year=<?= $year ?>" class="btn btn-primary fw-bold rounded-pill shadow-sm px-4" onclick="return confirm('ระบบจะทำการดึงข้อมูลจาก Server ส่วนกลาง (Data.go.th / Nager Date)\nต้องการดำเนินการต่อหรือไม่?');">
-                <i class="bi bi-cloud-arrow-down me-1"></i> ซิงค์ API ปี <?= $year ?>
-            </a>
+            <form action="index.php?c=settings&a=sync_api" method="POST" class="m-0" onsubmit="return confirm('ระบบจะทำการดึงข้อมูลจาก Server ส่วนกลาง (Data.go.th / Nager Date)\nต้องการดำเนินการต่อหรือไม่?');">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                <input type="hidden" name="year" value="<?= (int)$year ?>">
+                <button type="submit" class="btn btn-primary fw-bold rounded-pill shadow-sm px-4">
+                    <i class="bi bi-cloud-arrow-down me-1"></i> ซิงค์ API ปี <?= (int)$year ?>
+                </button>
+            </form>
         </div>
     </div>
 
@@ -158,11 +162,13 @@ function formatDateThai($dateString) {
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-center">
-                                            <a href="index.php?c=settings&a=delete_holiday&id=<?= $h['id'] ?>" 
-                                               class="btn btn-sm btn-outline-danger rounded-circle" 
-                                               onclick="return confirm('ยืนยันการลบวันหยุดนี้?');" title="ลบ">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
+                                            <form action="index.php?c=settings&a=delete_holiday" method="POST" class="d-inline" onsubmit="return confirm('ยืนยันการลบวันหยุดนี้?');">
+                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                                <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle" title="ลบ" aria-label="ลบวันหยุด">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>

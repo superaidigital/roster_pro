@@ -1084,15 +1084,15 @@ if (!function_exists('renderSidebarMenu')) {
 <!-- ========================================== -->
 <!-- 🌟 2. Mobile Sidebar (Offcanvas) -->
 <!-- ========================================== -->
-<div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" style="width: 280px;">
+<div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
     <div class="offcanvas-header border-bottom px-4 py-3">
-        <h5 class="offcanvas-title fw-bold d-flex align-items-center text-primary">
+        <h5 class="offcanvas-title fw-bold d-flex align-items-center text-primary" id="mobileSidebarLabel">
             <div class="bg-primary text-white rounded-3 d-flex align-items-center justify-content-center me-2 shadow-sm" style="width: 32px; height: 32px;">
                 <i class="bi bi-calendar2-check-fill fs-6"></i>
             </div>
             Roster<span class="text-dark">Pro</span>
         </h5>
-        <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas"></button>
+        <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="ปิดเมนู"></button>
     </div>
     <div class="offcanvas-body p-0 d-flex flex-column custom-scrollbar pb-4">
         <?php renderSidebarMenu($c, $a, $role, $allowed_controllers); ?>
@@ -1226,6 +1226,30 @@ document.addEventListener('DOMContentLoaded', function () {
         container.addEventListener('mouseenter', openFlyout);
         container.addEventListener('mouseleave', scheduleClose);
 
+        // Keyboard users: focus should expose the same flyout as hover.
+        container.addEventListener('focusin', function () {
+            if (sidebar.classList.contains('collapsed')) {
+                openFlyout();
+            }
+        });
+
+        container.addEventListener('focusout', function (event) {
+            if (!sidebar.classList.contains('collapsed')) return;
+            if (!container.contains(event.relatedTarget)) {
+                scheduleClose();
+            }
+        });
+
+        container.addEventListener('keydown', function (event) {
+            if (!sidebar.classList.contains('collapsed')) return;
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                container.classList.remove('flyout-open');
+                if (trigger) trigger.focus();
+            }
+        });
+
         if (flyout) {
             flyout.addEventListener('mouseenter', function () {
                 if (closeTimer) {
@@ -1271,4 +1295,4 @@ document.addEventListener('DOMContentLoaded', function () {
 <!-- ========================================== -->
 <!-- 🌟 4. เปิดพื้นที่ Main Content (ส่วนแสดงผลข้อมูล) -->
 <!-- ========================================== -->
-<main class="flex-grow-1 position-relative overflow-y-auto custom-scrollbar" style="background-color: #f4f6f9; padding: 1.5rem; height: 100%;">
+<main id="rpMainContent" class="flex-grow-1 position-relative custom-scrollbar rp-main-content" tabindex="-1">

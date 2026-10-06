@@ -4,6 +4,7 @@
 $role = strtoupper($_SESSION['user']['role'] ?? '');
 $is_superadmin = ($role === 'SUPERADMIN');
 $settings = $settings ?? []; // รับค่าจาก Controller
+require_once __DIR__ . '/../components/ui.php';
 ?>
 
 <style>
@@ -99,137 +100,112 @@ $settings = $settings ?? []; // รับค่าจาก Controller
     .modern-switch .form-check-input { width: 44px; height: 24px; cursor: pointer; }
     .modern-switch .form-check-input:checked { background-color: #10b981; border-color: #10b981; }
 </style>
+<link rel="stylesheet" href="public/css/admin-hub.css?v=2">
 
-<div class="container-fluid px-3 px-md-4 py-4 min-vh-100 d-flex flex-column">
+<div class="rp-page">
     
-    <!-- 🌟 Header -->
-    <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white animate-fade-in" style="animation-delay: 0.1s;">
-        <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="bg-primary bg-opacity-10 text-primary rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 64px; height: 64px;">
-                    <i class="bi bi-gear-wide-connected fs-1"></i>
-                </div>
-                <div>
-                    <h3 class="fw-bolder text-dark mb-1" style="letter-spacing: -0.5px;">ตั้งค่าระบบส่วนกลาง (System Settings)</h3>
-                    <p class="text-muted mb-0 fw-medium" style="font-size: 14.5px;">ศูนย์รวมการตั้งค่าโครงสร้างระบบ สิทธิการใช้งาน และการแจ้งเตือน</p>
-                </div>
-            </div>
-            <?php if ($is_superadmin): ?>
-                <div class="text-end d-none d-md-block">
-                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-3 py-2 rounded-pill fw-bold">
-                        <i class="bi bi-shield-lock-fill me-1"></i> SUPERADMIN MODE
-                    </span>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
+    <?php
+    ob_start();
+    if ($is_superadmin):
+    ?>
+        <span class="rp-badge rp-badge--danger"><i class="bi bi-shield-lock-fill" aria-hidden="true"></i> SUPERADMIN</span>
+    <?php
+    endif;
+    $settings_header_actions = ob_get_clean();
 
-    <!-- 🌟 Alerts -->
+    rp_page_header(
+        'ตั้งค่าระบบส่วนกลาง',
+        'จัดการค่าพื้นฐาน การแจ้งเตือน วันหยุด สิทธิ์ และการดูแลระบบจากศูนย์กลางเดียว',
+        $settings_header_actions,
+        'System Settings'
+    );
+    ?>
+
     <?php if (isset($_SESSION['success_msg'])): ?>
-        <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-success border-4 animate-fade-in">
-            <i class="bi bi-check-circle-fill fs-5 me-3"></i> <div class="fw-bold" style="font-size: 14.5px;"><?= $_SESSION['success_msg'] ?></div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--success" role="status" aria-live="polite">
+            <span class="rp-alert__icon"><i class="bi bi-check-circle-fill"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['success_msg']) ?></div>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
+
     <?php if (isset($_SESSION['error_msg'])): ?>
-        <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-danger border-4 animate-fade-in">
-            <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> <div class="fw-bold" style="font-size: 14.5px;"><?= $_SESSION['error_msg'] ?></div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--danger" role="alert">
+            <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['error_msg']) ?></div>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
-    <!-- 🌟 Grid Menu (แผงควบคุมระบบ) -->
-    <div class="row g-4">
-        
-        <!-- 1. ข้อมูลทั่วไป -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.1s;">
-            <a href="#" class="setting-card p-4" data-bs-toggle="modal" data-bs-target="#generalSettingsModal">
-                <div class="icon-box grad-blue"><i class="bi bi-sliders"></i></div>
-                <div class="card-title-modern">ข้อมูลทั่วไปของระบบ</div>
-                <p class="card-text-modern">ตั้งค่าชื่อระบบ เปิด-ปิดโหมดซ่อมบำรุง และการตั้งค่าทำงานพื้นฐาน</p>
+    <section class="rp-section" aria-labelledby="settingsToolsTitle">
+        <?php rp_section_header('เครื่องมือระบบ', 'เลือกหมวดที่ต้องการจัดการ ระบบจะแสดงเฉพาะรายการที่สิทธิ์ของคุณเข้าถึงได้'); ?>
+        <div class="rp-settings-grid" id="settingsToolsTitle">
+            <a href="#" class="rp-setting-card" data-bs-toggle="modal" data-bs-target="#generalSettingsModal">
+                <span class="rp-setting-card__icon"><i class="bi bi-sliders"></i></span>
+                <h2 class="rp-setting-card__title">ข้อมูลทั่วไปของระบบ</h2>
+                <p class="rp-setting-card__description">ชื่อระบบ โหมดซ่อมบำรุง และค่าพื้นฐานสำหรับการทำงาน</p>
+                <div class="rp-setting-card__footer">เปิดการตั้งค่า →</div>
             </a>
-        </div>
 
-        <!-- 2. LINE Notify -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.2s;">
-            <a href="#" class="setting-card p-4" data-bs-toggle="modal" data-bs-target="#lineNotifyModal">
-                <div class="icon-box grad-green"><i class="bi bi-line"></i></div>
-                <div class="card-title-modern">การแจ้งเตือน LINE</div>
-                <p class="card-text-modern">จัดการ Token เชื่อมต่อ LINE API สำหรับแจ้งเตือนวันลาและตารางเวร</p>
+            <a href="#" class="rp-setting-card rp-setting-card--success" data-bs-toggle="modal" data-bs-target="#lineNotifyModal">
+                <span class="rp-setting-card__icon"><i class="bi bi-bell"></i></span>
+                <h2 class="rp-setting-card__title">การแจ้งเตือน</h2>
+                <p class="rp-setting-card__description">กำหนดช่องทางและเหตุการณ์ที่ต้องส่งการแจ้งเตือนจากระบบ</p>
+                <div class="rp-setting-card__footer">ตั้งค่าการแจ้งเตือน →</div>
             </a>
-        </div>
 
-        <!-- 3. วันหยุดราชการ -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.3s;">
-            <a href="index.php?c=settings&a=holidays" class="setting-card p-4">
-                <div class="icon-box grad-red"><i class="bi bi-calendar2-heart"></i></div>
-                <div class="card-title-modern">วันหยุดราชการ / นักขัตฤกษ์</div>
-                <p class="card-text-modern">กำหนดวันหยุดประจำปี หรือดึงข้อมูลอัตโนมัติ เพื่อใช้ประมวลผลวันลา</p>
+            <a href="index.php?c=settings&a=holidays" class="rp-setting-card rp-setting-card--danger">
+                <span class="rp-setting-card__icon"><i class="bi bi-calendar2-heart"></i></span>
+                <h2 class="rp-setting-card__title">วันหยุดราชการ</h2>
+                <p class="rp-setting-card__description">กำหนดวันหยุดเพื่อใช้คำนวณวันลาและตารางปฏิบัติงาน</p>
+                <div class="rp-setting-card__footer">จัดการวันหยุด →</div>
             </a>
-        </div>
 
-        <!-- 4. กลุ่มสายงาน / เรทค่าตอบแทน -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.4s;">
-            <a href="index.php?c=settings&a=shift_types" class="setting-card p-4">
-                <div class="icon-box grad-orange"><i class="bi bi-cash-coin"></i></div>
-                <div class="card-title-modern">กลุ่มสายงาน / ค่าเวร</div>
-                <p class="card-text-modern">จัดการกลุ่มวิชาชีพ และกำหนดเรทค่าเวรนอกเวลาราชการ (ร, ย, บ)</p>
+            <a href="index.php?c=settings&a=shift_types" class="rp-setting-card rp-setting-card--warning">
+                <span class="rp-setting-card__icon"><i class="bi bi-cash-coin"></i></span>
+                <h2 class="rp-setting-card__title">กลุ่มสายงาน / ค่าเวร</h2>
+                <p class="rp-setting-card__description">กำหนดกลุ่มวิชาชีพและอัตราค่าตอบแทนของเวรแต่ละประเภท</p>
+                <div class="rp-setting-card__footer">จัดการอัตรา →</div>
             </a>
-        </div>
 
-        <!-- 5. สถานะระบบเซิร์ฟเวอร์ -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.5s;">
-            <a href="index.php?c=settings&a=system_status" class="setting-card p-4">
-                <div class="icon-box grad-cyan"><i class="bi bi-hdd-network"></i></div>
-                <div class="card-title-modern">สถานะเซิร์ฟเวอร์ (Server)</div>
-                <p class="card-text-modern">ตรวจสอบพื้นที่จัดเก็บข้อมูล เวอร์ชัน PHP และสถานะการเชื่อมต่อฐานข้อมูล</p>
+            <a href="index.php?c=settings&a=system_status" class="rp-setting-card rp-setting-card--info">
+                <span class="rp-setting-card__icon"><i class="bi bi-hdd-network"></i></span>
+                <h2 class="rp-setting-card__title">สถานะเซิร์ฟเวอร์</h2>
+                <p class="rp-setting-card__description">ตรวจฐานข้อมูล พื้นที่จัดเก็บ และข้อมูลสภาพแวดล้อมของเซิร์ฟเวอร์</p>
+                <div class="rp-setting-card__footer">ตรวจสอบสถานะ →</div>
             </a>
-        </div>
 
-        <!-- 6. ประวัติการใช้งาน -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.6s;">
-            <a href="index.php?c=logs" class="setting-card p-4">
-                <div class="icon-box grad-dark"><i class="bi bi-journal-code"></i></div>
-                <div class="card-title-modern">ประวัติการใช้งาน (Logs)</div>
-                <p class="card-text-modern">ติดตามความเคลื่อนไหว ตรวจสอบการเพิ่ม/ลบ/แก้ไขข้อมูลในระบบ</p>
+            <a href="index.php?c=logs" class="rp-setting-card">
+                <span class="rp-setting-card__icon"><i class="bi bi-journal-code"></i></span>
+                <h2 class="rp-setting-card__title">ประวัติการใช้งาน</h2>
+                <p class="rp-setting-card__description">ตรวจสอบการเพิ่ม แก้ไข ลบ และกิจกรรมสำคัญที่เกิดขึ้นในระบบ</p>
+                <div class="rp-setting-card__footer">เปิด Audit Log →</div>
             </a>
-        </div>
 
-        <?php if ($is_superadmin): ?>
-        <!-- 7. จัดการสิทธิ์เมนู (เฉพาะ SUPERADMIN) -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.7s;">
-            <a href="index.php?c=settings&a=menus" class="setting-card p-4">
-                <div class="icon-box grad-purple"><i class="bi bi-ui-checks-grid"></i></div>
-                <div class="card-title-modern">จัดการสิทธิ์เมนู (Permissions)</div>
-                <p class="card-text-modern">เปิด/ปิด เมนูต่างๆ ของระบบ และกำหนดสิทธิ์การเข้าถึงแบบละเอียด</p>
-                <div class="position-absolute top-0 end-0 mt-3 me-3"><i class="bi bi-shield-lock-fill text-danger fs-5 opacity-50"></i></div>
-            </a>
-        </div>
+            <?php if ($is_superadmin): ?>
+                <a href="index.php?c=settings&a=menus" class="rp-setting-card rp-setting-card--violet">
+                    <span class="rp-setting-card__icon"><i class="bi bi-ui-checks-grid"></i></span>
+                    <h2 class="rp-setting-card__title">สิทธิ์เมนู</h2>
+                    <p class="rp-setting-card__description">กำหนดเมนูที่แต่ละบทบาทสามารถเห็นและเข้าใช้งานได้</p>
+                    <div class="rp-setting-card__footer">จัดการสิทธิ์ →</div>
+                </a>
 
-        <!-- 8. สำรองฐานข้อมูล (เฉพาะ SUPERADMIN) -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.8s;">
-            <a href="index.php?c=settings&a=backup" class="setting-card p-4">
-                <div class="icon-box" style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); --icon-shadow: rgba(20, 184, 166, 0.3); --card-color: #14b8a6;"><i class="bi bi-database-down"></i></div>
-                <div class="card-title-modern">สำรองข้อมูล (Backup Data)</div>
-                <p class="card-text-modern">ดาวน์โหลดไฟล์สำรองฐานข้อมูล (.sql) เพื่อป้องกันข้อมูลสูญหาย</p>
-                <div class="position-absolute top-0 end-0 mt-3 me-3"><i class="bi bi-shield-lock-fill text-danger fs-5 opacity-50"></i></div>
-            </a>
-        </div>
+                <a href="index.php?c=settings&a=backup" class="rp-setting-card rp-setting-card--success">
+                    <span class="rp-setting-card__icon"><i class="bi bi-database-down"></i></span>
+                    <h2 class="rp-setting-card__title">สำรองข้อมูล</h2>
+                    <p class="rp-setting-card__description">สร้าง ดาวน์โหลด และตรวจสอบไฟล์สำรองฐานข้อมูลของระบบ</p>
+                    <div class="rp-setting-card__footer">จัดการ Backup →</div>
+                </a>
 
-        <!-- 🌟 9. ล้างข้อมูลระบบ (Factory Reset) 🌟 -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.9s;">
-            <a href="#" data-bs-toggle="modal" data-bs-target="#resetSystemModal" class="setting-card p-4" style="border: 1px solid #fca5a5; background-color: #fef2f2;">
-                <div class="icon-box" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); --icon-shadow: rgba(239, 68, 68, 0.4); --card-color: #ef4444;"><i class="bi bi-exclamation-octagon-fill"></i></div>
-                <div class="card-title-modern text-danger">รีเซ็ตระบบ (Factory Reset)</div>
-                <p class="card-text-modern text-danger opacity-75">ล้างข้อมูลตารางเวร วันลา และประวัติ เพื่อเริ่มต้นใช้งานรอบปีใหม่</p>
-                <div class="position-absolute top-0 end-0 mt-3 me-3"><i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i></div>
-            </a>
+                <a href="#" data-bs-toggle="modal" data-bs-target="#resetSystemModal" class="rp-setting-card rp-setting-card--critical">
+                    <span class="rp-setting-card__icon"><i class="bi bi-exclamation-octagon-fill"></i></span>
+                    <h2 class="rp-setting-card__title">Factory Reset</h2>
+                    <p class="rp-setting-card__description">ล้างข้อมูลตารางเวร วันลา และข้อมูลรอบปีเพื่อเริ่มต้นระบบใหม่</p>
+                    <div class="rp-setting-card__footer">การดำเนินการความเสี่ยงสูง →</div>
+                </a>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
-
-    </div>
+    </section>
 </div>
 
 <!-- ================= 🌟 Modal 1: ตั้งค่าข้อมูลทั่วไป ================= -->
@@ -238,7 +214,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header border-bottom-0 bg-primary bg-opacity-10 pb-3 p-4">
                 <h5 class="modal-title fw-bolder text-primary"><i class="bi bi-sliders me-2"></i> ข้อมูลทั่วไปของระบบ</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
             <form action="index.php?c=settings&a=update_system" method="POST">
                 <input type="hidden" name="section" value="general">
@@ -272,64 +248,143 @@ $settings = $settings ?? []; // รับค่าจาก Controller
     </div>
 </div>
 
-<!-- ================= 🌟 Modal 2: ตั้งค่า LINE Notify ================= -->
-<div class="modal fade" id="lineNotifyModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+<!-- ================= LINE Messaging API ================= -->
+<div class="modal fade" id="lineNotifyModal" tabindex="-1" aria-labelledby="lineMessagingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-            <div class="modal-header border-bottom-0 bg-success bg-opacity-10 pb-3 p-4">
-                <h5 class="modal-title fw-bolder text-success"><i class="bi bi-line me-2"></i> ตั้งค่าการแจ้งเตือน LINE Notify</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header border-bottom-0 bg-success bg-opacity-10 p-4">
+                <div>
+                    <h5 class="modal-title fw-bolder text-success" id="lineMessagingModalLabel">
+                        <i class="bi bi-line me-2"></i> LINE Messaging API
+                    </h5>
+                    <div class="text-muted small mt-1">เชื่อมต่อ LINE Official Account เพื่อส่ง Push Message จาก Roster Pro</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
-            <div class="modal-body p-4 bg-white modern-input-group">
-                <form action="index.php?c=settings&a=update_system" method="POST" id="lineNotifyForm">
-                    <input type="hidden" name="section" value="line_notify">
-                    
-                    <div class="mb-4 pb-4 border-bottom">
-                        <label class="form-label fw-bold text-dark mb-2">LINE Notify Token (สำหรับกลุ่มส่วนกลาง)</label>
-                        <div class="input-group shadow-sm border border-success border-opacity-25 rounded-3 overflow-hidden focus-ring-success">
-                            <span class="input-group-text bg-success bg-opacity-10 border-0 text-success"><i class="bi bi-key-fill"></i></span>
-                            <input type="text" name="settings[line_notify_token]" class="form-control border-0 bg-white" value="<?= htmlspecialchars($settings['line_notify_token'] ?? '') ?>" placeholder="กรอก Token สตริงที่ได้จากเว็บ LINE Notify...">
+
+            <form action="index.php?c=settings&a=update_system" method="POST" id="lineMessagingForm">
+                <input type="hidden" name="section" value="line_messaging">
+
+                <div class="modal-body p-4 bg-white">
+                    <div class="rp-alert rp-alert--info mb-4">
+                        <span class="rp-alert__icon"><i class="bi bi-info-circle-fill"></i></span>
+                        <div class="rp-alert__content">
+                            ใช้ Channel access token จาก Messaging API ของ LINE Official Account และระบุ Target ID
+                            ของผู้ใช้ กลุ่ม หรือห้องที่ Bot เป็นสมาชิก
                         </div>
                     </div>
 
-                    <h6 class="fw-bolder text-dark mb-3"><i class="bi bi-toggle-on text-success me-2"></i> เลือกเหตุการณ์ที่ต้องการให้แจ้งเตือน</h6>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="p-3 border rounded-4 bg-light bg-opacity-50 h-100 transition-all hover-bg-white">
-                                <div class="form-check form-switch modern-switch mb-0">
-                                    <input class="form-check-input float-end ms-2" type="checkbox" id="notifySubmit" name="settings[line_notify_on_submit]" value="1" <?= ($settings['line_notify_on_submit'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                    <label class="form-check-label fw-bold text-dark d-block mb-1" for="notifySubmit">ส่งตารางเวรขออนุมัติ</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 border rounded-4 bg-light bg-opacity-50 h-100 transition-all hover-bg-white">
-                                <div class="form-check form-switch modern-switch mb-0">
-                                    <input class="form-check-input float-end ms-2" type="checkbox" id="notifyRequest" name="settings[line_notify_on_request]" value="1" <?= ($settings['line_notify_on_request'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                    <label class="form-check-label fw-bold text-dark d-block mb-1" for="notifyRequest">ขอปลดล็อคแก้ไขตาราง</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-12">
-                            <div class="p-3 border rounded-4 bg-light bg-opacity-50 transition-all hover-bg-white">
-                                <div class="form-check form-switch modern-switch mb-0">
-                                    <input class="form-check-input float-end ms-2" type="checkbox" id="notifyHoliday" name="settings[line_notify_on_holiday]" value="1" <?= ($settings['line_notify_on_holiday'] ?? '0') === '1' ? 'checked' : '' ?>>
-                                    <label class="form-check-label fw-bold text-dark d-block mb-1" for="notifyHoliday">เสนอเพิ่มวันหยุดนักขัตฤกษ์</label>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="form-check form-switch mb-4 p-3 ps-5 border rounded-4 bg-light">
+                        <input class="form-check-input" type="checkbox"
+                               id="lineMessagingEnabled"
+                               name="settings[line_messaging_enabled]" value="1"
+                               <?= ($settings['line_messaging_enabled'] ?? '0') === '1' ? 'checked' : '' ?>>
+                        <label class="form-check-label fw-bold" for="lineMessagingEnabled">
+                            เปิดใช้งาน LINE Messaging API
+                        </label>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer border-top-0 bg-light p-3 d-flex justify-content-between align-items-center">
-                <a href="index.php?c=settings&a=test_line" class="btn btn-outline-success fw-bold rounded-pill px-4" onclick="return confirm('ระบบจะทำการส่งข้อความทดสอบไปยังกลุ่ม LINE ของคุณ ยืนยันหรือไม่?');">
-                    <i class="bi bi-send-check-fill me-1"></i> ทดสอบส่งข้อความ
-                </a>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-light border fw-bold rounded-pill px-4" data-bs-dismiss="modal">ปิด</button>
-                    <button type="submit" form="lineNotifyForm" class="btn btn-success fw-bold rounded-pill px-4 shadow-sm"><i class="bi bi-save me-1"></i> บันทึกตั้งค่า</button>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Channel access token</label>
+                        <input type="password"
+                               name="settings[line_channel_access_token]"
+                               class="rp-control"
+                               value="<?= htmlspecialchars($settings['line_channel_access_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                               autocomplete="off"
+                               placeholder="Channel access token">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Channel secret</label>
+                        <input type="password"
+                               name="settings[line_channel_secret]"
+                               class="rp-control"
+                               value="<?= htmlspecialchars($settings['line_channel_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                               autocomplete="off"
+                               placeholder="Channel secret">
+                        <div class="form-text">เตรียมไว้สำหรับตรวจสอบ Webhook Signature ของ LINE</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Target ID สำหรับ Push Message</label>
+                        <input type="text"
+                               name="settings[line_target_id]"
+                               class="rp-control font-monospace"
+                               value="<?= htmlspecialchars($settings['line_target_id'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                               placeholder="U... / C... / R...">
+                        <div class="form-text">User ID ขึ้นต้น U, Group ID ขึ้นต้น C หรือ Room ID ขึ้นต้น R</div>
+                    </div>
+
+                    <div class="p-3 border rounded-4 bg-light mb-4">
+                        <div class="fw-bold mb-2"><i class="bi bi-broadcast me-1"></i> Webhook</div>
+                        <div class="small text-muted mb-1">Webhook URL ที่ใช้ใน LINE Developers Console</div>
+                        <code class="d-block p-2 bg-dark text-white rounded text-break mb-3"><?= htmlspecialchars(
+                            ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http')
+                            . '://' . ($_SERVER['HTTP_HOST'] ?? 'your-domain')
+                            . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/\\')
+                            . '/index.php?c=linewebhook&a=index',
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?></code>
+
+                        <div class="small text-muted">Source ล่าสุดที่ Webhook รับได้</div>
+                        <?php if (!empty($settings['line_last_source_id'])): ?>
+                            <div class="mt-1">
+                                <span class="rp-badge rp-badge--success"><?= htmlspecialchars($settings['line_last_source_type'] ?? 'source', ENT_QUOTES, 'UTF-8') ?></span>
+                                <code class="ms-1"><?= htmlspecialchars($settings['line_last_source_id'], ENT_QUOTES, 'UTF-8') ?></code>
+                            </div>
+                            <div class="form-text">นำค่านี้ไปวางใน Target ID หากต้องการส่งไปยัง Source นี้</div>
+                        <?php else: ?>
+                            <div class="text-muted small mt-1">ยังไม่มีข้อมูล — เพิ่ม OA เป็นเพื่อนหรือเข้ากลุ่ม แล้วส่งข้อความหนึ่งครั้งเพื่อให้ Webhook รับ Source ID</div>
+                        <?php endif; ?>
+                    </div>
+
+                    <h6 class="fw-bolder mb-3">เหตุการณ์ที่ส่งไป LINE</h6>
+                    <div class="row g-3">
+                        <?php
+                        $line_events = [
+                            'line_messaging_on_roster' => ['ตารางเวร', 'bi-calendar-check'],
+                            'line_messaging_on_leave' => ['การลา', 'bi-calendar-minus'],
+                            'line_messaging_on_swap' => ['แลกเวร', 'bi-arrow-left-right'],
+                            'line_messaging_on_holiday' => ['วันหยุด', 'bi-calendar-event'],
+                        ];
+                        foreach ($line_events as $setting_key => [$label, $icon]):
+                        ?>
+                            <div class="col-md-6">
+                                <div class="p-3 border rounded-4 bg-light h-100">
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="<?= htmlspecialchars($setting_key, ENT_QUOTES, 'UTF-8') ?>"
+                                               name="settings[<?= htmlspecialchars($setting_key, ENT_QUOTES, 'UTF-8') ?>]"
+                                               value="1"
+                                               <?= ($settings[$setting_key] ?? '0') === '1' ? 'checked' : '' ?>>
+                                        <label class="form-check-label fw-bold"
+                                               for="<?= htmlspecialchars($setting_key, ENT_QUOTES, 'UTF-8') ?>">
+                                            <i class="bi <?= htmlspecialchars($icon, ENT_QUOTES, 'UTF-8') ?> me-1"></i>
+                                            <?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
-            </div>
+
+                <div class="modal-footer bg-light border-top p-3 d-flex justify-content-between gap-2">
+                    <button type="submit"
+                            formaction="index.php?c=settings&a=test_line"
+                            class="rp-btn rp-btn--secondary"
+                            onclick="return confirm('ส่งข้อความทดสอบไปยัง Target ID ที่บันทึกไว้?');">
+                        <i class="bi bi-send-check-fill"></i> ทดสอบส่งข้อความ
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="rp-btn rp-btn--secondary" data-bs-dismiss="modal">ปิด</button>
+                        <button type="submit" class="rp-btn rp-btn--success">
+                            <i class="bi bi-save"></i> บันทึกการตั้งค่า
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -340,7 +395,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header border-bottom-0 bg-danger bg-opacity-10 pb-3 p-4">
                 <h5 class="modal-title fw-bolder text-danger"><i class="bi bi-exclamation-octagon-fill me-2"></i> ยืนยันการรีเซ็ตระบบ (Factory Reset)</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
             
             <form action="index.php?c=settings&a=factory_reset" method="POST" id="resetForm">

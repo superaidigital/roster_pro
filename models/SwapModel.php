@@ -141,41 +141,145 @@ class SwapModel {
         return $stmt->fetchColumn() ?: 0;
     }
 
-    // 🌟 5. ฟังก์ชันสลับเวรในฐานข้อมูลตารางเวร (เมื่อ ผอ. อนุมัติ)
+    // 🌟 5. สลับเวรในตาราง shifts แบบ Transaction
     public function executeSwapInRoster($swap_id) {
         try {
-            $swap = $this->getSwapById($swap_id);
-            if (!$swap || $swap['status'] !== 'APPROVED') return false;
-
-            // เริ่มการทำ Transaction (ถ้าคำสั่งใดพัง จะดึงข้อมูลกลับคืนทั้งหมด ไม่ให้ตารางเละ)
             $this->conn->beginTransaction();
 
-            // 1. เปลี่ยนเวรของผู้ขอแลก -> ไปเป็นของผู้ถูกขอแลก
-            $stmt1 = $this->conn->prepare("UPDATE roster_details SET user_id = :target_id WHERE user_id = :req_id AND duty_date = :req_date AND shift_type = :req_shift");
-            $stmt1->execute([
-                ':target_id' => $swap['target_user_id'],
-                ':req_id' => $swap['requestor_id'],
-                ':req_date' => $swap['requestor_date'],
-                ':req_shift' => $swap['requestor_shift']
+            $stmt_swap = $this->conn->prepare("
+                SELECT *
+                FROM {$this->table_name}
+                WHERE id = ?
+                FOR UPDATE
+            ");
+            $stmt_swap->execute([(int)$swap_id]);
+            $swap = $stmt_swap->fetch(PDO::FETCH_ASSOC);
+
+            if (!$swap || $swap['status'] !== 'PENDING_DIRECTOR') {
+                throw new RuntimeException('คำขอไม่ได้อยู่ในสถานะที่พร้อมอนุมัติ');
+            }
+
+            $stmt_shift = $this->conn->prepare("
+                SELECT id, hospital_id, user_id, shift_date, shift_type
+                FROM shifts
+                WHERE hospital_id = ?
+                  AND user_id = ?
+                  AND shift_date = ?
+                LIMIT 1
+                FOR UPDATE
+            ");
+
+            $stmt_shift->execute([
+                $swap['hospital_id'],
+                $swap['requestor_id'],
+                $swap['requestor_date']
+            ]);
+            $requestor_shift = $stmt_shift->fetch(PDO::FETCH_ASSOC);
+
+            $stmt_shift->execute([
+                $swap['hospital_id'],
+                $swap['target_user_id'],
+                $swap['target_date']
+            ]);
+            $target_shift = $stmt_shift->fetch(PDO::FETCH_ASSOC);
+
+            if (!$requestor_shift || !$target_shift) {
+                throw new RuntimeException('ไม่พบเวรต้นทางหรือเวรปลายทางในตารางปัจจุบัน');
+            }
+
+            if ((string)$requestor_shift['shift_type'] !== (string)$swap['requestor_shift'] ||
+                (string)$target_shift['shift_type'] !== (string)$swap['target_shift']) {
+                throw new RuntimeException('ตารางเวรถูกแก้ไขหลังจากสร้างคำขอ กรุณาสร้างคำขอใหม่');
+            }
+
+            // ป้องกันการสลับแล้วชนกับเวรอื่นในวันปลายทาง
+            $stmt_conflict = $this->conn->prepare("
+                SELECT COUNT(*)
+                FROM shifts
+                WHERE hospital_id = ?
+                  AND user_id = ?
+                  AND shift_date = ?
+                  AND id <> ?
+            ");
+
+            $stmt_conflict->execute([
+                $swap['hospital_id'],
+                $swap['target_user_id'],
+                $swap['requestor_date'],
+                $target_shift['id']
+            ]);
+            if ((int)$stmt_conflict->fetchColumn() > 0) {
+                throw new RuntimeException('ผู้รับมีเวรอื่นในวันที่จะรับแทนแล้ว');
+            }
+
+            $stmt_conflict->execute([
+                $swap['hospital_id'],
+                $swap['requestor_id'],
+                $swap['target_date'],
+                $requestor_shift['id']
+            ]);
+            if ((int)$stmt_conflict->fetchColumn() > 0) {
+                throw new RuntimeException('ผู้ขอมีเวรอื่นในวันที่จะรับแทนแล้ว');
+            }
+
+            // ลบสองแถวเดิมก่อน แล้วสร้างใหม่โดยสลับเจ้าของเวร
+            $stmt_delete = $this->conn->prepare("DELETE FROM shifts WHERE id IN (?, ?)");
+            $stmt_delete->execute([
+                (int)$requestor_shift['id'],
+                (int)$target_shift['id']
             ]);
 
-            // 2. เปลี่ยนเวรของผู้ถูกขอแลก -> ไปเป็นของผู้ขอแลก
-            $stmt2 = $this->conn->prepare("UPDATE roster_details SET user_id = :req_id WHERE user_id = :target_id AND duty_date = :target_date AND shift_type = :target_shift");
-            $stmt2->execute([
-                ':req_id' => $swap['requestor_id'],
-                ':target_id' => $swap['target_user_id'],
-                ':target_date' => $swap['target_date'],
-                ':target_shift' => $swap['target_shift']
+            $stmt_insert = $this->conn->prepare("
+                INSERT INTO shifts (hospital_id, user_id, shift_date, shift_type)
+                VALUES (?, ?, ?, ?)
+            ");
+
+            $stmt_insert->execute([
+                $swap['hospital_id'],
+                $swap['target_user_id'],
+                $swap['requestor_date'],
+                $swap['requestor_shift']
             ]);
 
-            // บันทึกการเปลี่ยนแปลง
+            $stmt_insert->execute([
+                $swap['hospital_id'],
+                $swap['requestor_id'],
+                $swap['target_date'],
+                $swap['target_shift']
+            ]);
+
+            $stmt_status = $this->conn->prepare("
+                UPDATE {$this->table_name}
+                SET status = 'APPROVED', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'PENDING_DIRECTOR'
+            ");
+            $stmt_status->execute([(int)$swap_id]);
+
+            if ($stmt_status->rowCount() !== 1) {
+                throw new RuntimeException('สถานะคำขอเปลี่ยนแปลงแล้ว กรุณารีเฟรช');
+            }
+
             $this->conn->commit();
             return true;
-        } catch (Exception $e) {
-            $this->conn->rollBack();
+        } catch (Throwable $e) {
+            if ($this->conn->inTransaction()) {
+                $this->conn->rollBack();
+            }
             error_log("Execute Swap Error: " . $e->getMessage());
             return false;
         }
+    }
+
+    public function cancelRequest($swap_id, $requestor_id) {
+        $stmt = $this->conn->prepare("
+            UPDATE {$this->table_name}
+            SET status = 'REJECTED', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND requestor_id = ?
+              AND status IN ('PENDING_TARGET', 'PENDING_DIRECTOR')
+        ");
+        $stmt->execute([(int)$swap_id, (int)$requestor_id]);
+        return $stmt->rowCount() === 1;
     }
 }
 ?>

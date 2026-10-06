@@ -22,6 +22,8 @@ $today_usages = $today_usages ?? []; // 🌟 ตัวแปรเก็บข�
 $thai_months = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 $current_month_th = $thai_months[(int)date('m')] . ' ' . (date('Y') + 543);
 
+require_once __DIR__ . '/../components/ui.php';
+
 // ==============================================================
 // 🌟 กรองเอา "ส่วนกลาง" ออกจากการแจ้งเตือนความเสี่ยง (ให้ตรงกับหน้าวิเคราะห์)
 // ==============================================================
@@ -55,260 +57,177 @@ $waiting_hospitals = $filtered_waiting;
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<style>
-    body { background-color: #f4f6f9; font-family: 'Sarabun', sans-serif; }
-    
-    .dashboard-card {
-        border: none; border-radius: 1.25rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        transition: transform 0.2s ease, box-shadow 0.2s ease; background: #fff; overflow: hidden;
-    }
-    .dashboard-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
-    
-    .icon-circle { width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-    
-    .bg-gradient-primary { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); color: white; }
-    .bg-gradient-success { background: linear-gradient(135deg, #10b981 0%, #22c55e 100%); color: white; }
-    .bg-gradient-warning { background: linear-gradient(135deg, #f59e0b 0%, #eab308 100%); color: white; }
-    .bg-gradient-danger { background: linear-gradient(135deg, #ef4444 0%, #f43f5e 100%); color: white; }
-    .bg-gradient-info { background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%); color: white; }
-    .bg-gradient-purple { background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); color: white; }
+<div class="rp-page">
 
-    .table-modern th { font-weight: 600; color: #64748b; background: #f8fafc; border-bottom: 2px solid #e2e8f0; font-size: 13px; text-transform: uppercase; }
-    .table-modern td { vertical-align: middle; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
-    
-    .chart-container { position: relative; height: 250px; width: 100%; }
-    
-    .quick-action-btn { transition: all 0.2s; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 1rem; color: #475569; font-weight: 600; text-align: center; padding: 15px 10px; text-decoration: none; display: block; }
-    .quick-action-btn i { font-size: 26px; display: block; margin-bottom: 8px; }
-    .quick-action-btn:hover { background: #fff; border-color: #3b82f6; color: #3b82f6; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.1); transform: translateY(-2px); }
-
-    /* Timeline Styles */
-    .timeline { position: relative; padding-left: 30px; margin-bottom: 0; list-style: none; }
-    .timeline::before { content: ''; position: absolute; top: 0; bottom: 0; left: 14px; width: 2px; background: #e2e8f0; }
-    .timeline-item { position: relative; margin-bottom: 1.5rem; }
-    .timeline-item::before { content: ''; position: absolute; left: -20px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; box-shadow: 0 0 0 2px #3b82f6; }
-    .timeline-item:last-child { margin-bottom: 0; }
-
-    /* แอนิเมชันสำหรับ Alert Center */
-    @keyframes ring {
-      0% { transform: rotate(0); }
-      10% { transform: rotate(15deg); }
-      20% { transform: rotate(-10deg); }
-      30% { transform: rotate(10deg); }
-      40% { transform: rotate(-10deg); }
-      50% { transform: rotate(0); }
-      100% { transform: rotate(0); }
-    }
-    .bell-shake { animation: ring 2s infinite; display: inline-block; }
-    .cursor-pointer { cursor: pointer; transition: all 0.2s; }
-    .cursor-pointer:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(220, 38, 38, 0.15) !important; }
-
-    /* Custom Scrollbar */
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
-</style>
-
-<div class="container-fluid px-3 px-md-4 py-4 min-vh-100">
-    
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end mb-4 gap-3">
-        <div>
-            <h3 class="fw-black text-dark mb-1">ภาพรวมระบบ (Executive Dashboard)</h3>
-            <p class="text-muted mb-0" style="font-size: 14px;">ยินดีต้อนรับ, <span class="fw-bold text-primary"><?= htmlspecialchars($_SESSION['user']['name'] ?? 'ผู้ดูแลระบบ') ?></span></p>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <a href="index.php?c=dashboard&a=map_view" class="btn btn-primary rounded-pill shadow-sm fw-bold px-4 py-2 d-flex align-items-center gap-2" style="transition: all 0.2s;">
-                <i class="bi bi-geo-alt-fill fs-5"></i> แสดงแผนที่ รพ.สต.
-            </a>
-            
-            <div class="text-md-end text-muted font-monospace bg-white px-4 py-2 rounded-pill shadow-sm border border-primary border-opacity-25 text-primary fw-bold">
-                <i class="bi bi-calendar3 me-2"></i> วันนี้: <?= date('d') ?> <?= $thai_months[(int)date('m')] ?> <?= date('Y')+543 ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=roster" class="quick-action-btn">
-                <i class="bi bi-calendar-check text-success"></i>จัดการตารางเวร
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=leave&a=approve" class="quick-action-btn position-relative">
-                <i class="bi bi-envelope-paper text-danger"></i>พิจารณาใบลา
-                <?php if($pending_leaves > 0): ?>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow"><?= $pending_leaves ?></span>
-                <?php endif; ?>
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=swap" class="quick-action-btn position-relative">
-                <i class="bi bi-arrow-left-right text-warning"></i>คำขอแลกเวร
-                <?php if($pending_swaps > 0): ?>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark shadow"><?= $pending_swaps ?></span>
-                <?php endif; ?>
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=staff" class="quick-action-btn">
-                <i class="bi bi-people text-primary"></i>ฐานข้อมูลบุคลากร
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=report" class="quick-action-btn">
-                <i class="bi bi-file-earmark-bar-graph text-info"></i>รายงานสถิติ
-            </a>
-        </div>
-        <div class="col-6 col-md-3 col-xl-2">
-            <a href="index.php?c=settings" class="quick-action-btn">
-                <i class="bi bi-gear text-secondary"></i>ตั้งค่าระบบ
-            </a>
-        </div>
-    </div>
-
-    <!-- Alert Center -->
-    <?php 
-    $total_alerts = count($risk_hospitals) + count($fatigue_staff) + count($waiting_hospitals);
-    if($total_alerts > 0): 
+    <?php
+    ob_start();
     ?>
-    <div class="alert bg-danger bg-opacity-10 border-0 border-start border-danger border-4 shadow-sm mb-4 rounded-4 p-3 d-flex flex-column flex-md-row align-items-md-center justify-content-between cursor-pointer" onclick="showAlertPopup()">
-        <div class="d-flex align-items-center mb-3 mb-md-0">
-            <div class="bg-danger text-white rounded-circle d-flex justify-content-center align-items-center flex-shrink-0 me-3" style="width:45px;height:45px;">
-                <i class="bi bi-bell-fill fs-5 bell-shake"></i>
-            </div>
-            <div>
-                <h6 class="text-danger fw-bold mb-1">ศูนย์แจ้งเตือนความเสี่ยง (Alert Center)</h6>
-                <p class="text-dark mb-0 small">พบข้อความแจ้งเตือนที่ต้องให้ความสนใจจำนวน <b class="text-danger fs-6"><?= $total_alerts ?></b> รายการ</p>
-            </div>
-        </div>
-        <button class="btn btn-danger rounded-pill px-4 shadow-sm fw-bold"><i class="bi bi-search me-1"></i> คลิกเพื่อดูสรุปการแจ้งเตือน</button>
-    </div>
+        <?php if (in_array(strtoupper($_SESSION['user']['role'] ?? ''), ['ADMIN', 'SUPERADMIN'], true)): ?>
+            <a href="index.php?c=dashboard&a=map_view" class="rp-btn rp-btn--primary">
+                <i class="bi bi-geo-alt-fill" aria-hidden="true"></i>
+                <span>แสดงแผนที่ รพ.สต.</span>
+            </a>
+        <?php endif; ?>
+        <span class="rp-badge rp-badge--info">
+            <i class="bi bi-calendar3" aria-hidden="true"></i>
+            <?= date('d') ?> <?= rp_e($thai_months[(int)date('m')]) ?> <?= date('Y') + 543 ?>
+        </span>
+    <?php
+    $dashboard_header_actions = ob_get_clean();
+
+    rp_page_header(
+        'ภาพรวมระบบ',
+        'Executive Dashboard · ยินดีต้อนรับ ' . ($_SESSION['user']['name'] ?? 'ผู้ใช้งาน'),
+        $dashboard_header_actions,
+        'Roster Pro'
+    );
+    ?>
+
+    <?php
+    $total_alerts = count($risk_hospitals) + count($fatigue_staff) + count($waiting_hospitals);
+    ?>
+
+    <?php if ($total_alerts > 0): ?>
+        <section class="rp-section" aria-labelledby="attentionTitle">
+            <?php rp_section_header('สิ่งที่ต้องให้ความสนใจ', 'รายการที่ควรตรวจสอบก่อนเริ่มงานส่วนอื่น'); ?>
+            <button type="button" class="rp-card rp-card--interactive w-100 text-start p-0 border-danger-subtle" onclick="showAlertPopup()" aria-label="เปิดศูนย์แจ้งเตือนความเสี่ยง">
+                <div class="rp-card__body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="rp-stat-card__icon" style="--rp-stat-soft:var(--rp-danger-50);--rp-stat-accent:var(--rp-danger-600);" aria-hidden="true">
+                            <i class="bi bi-bell-fill"></i>
+                        </span>
+                        <div>
+                            <h2 id="attentionTitle" class="rp-card__title mb-1">ศูนย์แจ้งเตือนความเสี่ยง</h2>
+                            <p class="rp-section-description mb-0">
+                                พบรายการที่ต้องตรวจสอบ <strong class="text-danger"><?= (int)$total_alerts ?></strong> รายการ
+                            </p>
+                        </div>
+                    </div>
+                    <span class="rp-btn rp-btn--danger">
+                        <i class="bi bi-arrow-right-circle" aria-hidden="true"></i>
+                        ดูรายละเอียด
+                    </span>
+                </div>
+            </button>
+        </section>
     <?php endif; ?>
 
-    <!-- KPI Stats -->
-    <div class="row g-3 mb-4">
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
+    <section class="rp-section" aria-labelledby="todayTitle">
+        <?php rp_section_header('วันนี้', 'สถานะกำลังคนและงานสำคัญที่เกี่ยวข้องกับการปฏิบัติงานวันนี้'); ?>
+        <div class="rp-dashboard-grid" id="todayTitle">
+            <div class="rp-card rp-today-card rp-dashboard-span-4">
+                <div class="rp-today-card__top">
                     <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">หน่วยบริการ</p>
-                        <h3 class="fw-black text-dark mb-0"><?= number_format($total_hospitals) ?></h3>
+                        <p class="rp-today-card__label">กำลังปฏิบัติงานวันนี้</p>
+                        <h3 class="rp-today-card__title"><?= number_format($on_duty_today) ?> คน</h3>
+                        <p class="rp-today-card__description">จำนวนบุคลากรที่มีตารางเวรในวันนี้</p>
                     </div>
-                    <div class="icon-circle bg-gradient-info shadow-sm"><i class="bi bi-hospital"></i></div>
+                    <span class="rp-today-card__icon"><i class="bi bi-person-workspace" aria-hidden="true"></i></span>
+                </div>
+                <div class="rp-today-card__footer">
+                    <a href="index.php?c=roster" class="rp-btn rp-btn--secondary rp-btn--sm">ดูตารางเวร</a>
                 </div>
             </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">บุคลากร</p>
-                        <h3 class="fw-black text-dark mb-0"><?= number_format($total_staff) ?></h3>
-                    </div>
-                    <div class="icon-circle bg-gradient-primary shadow-sm"><i class="bi bi-people-fill"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">ขึ้นเวรวันนี้</p>
-                        <h3 class="fw-black text-dark mb-0"><?= number_format($on_duty_today) ?></h3>
-                    </div>
-                    <div class="icon-circle bg-gradient-success shadow-sm"><i class="bi bi-person-workspace"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100 border <?= $pending_leaves > 0 ? 'border-danger border-opacity-50' : '' ?>">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-danger fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">ใบลารออนุมัติ</p>
-                        <h3 class="fw-black text-danger mb-0"><?= number_format($pending_leaves) ?></h3>
-                    </div>
-                    <div class="icon-circle bg-gradient-danger shadow-sm"><i class="bi bi-envelope-paper-fill"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100 border <?= $pending_swaps > 0 ? 'border-warning border-opacity-50' : '' ?>">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-warning fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">ขอแลกเวร</p>
-                        <h3 class="fw-black text-warning mb-0"><?= number_format($pending_swaps) ?></h3>
-                    </div>
-                    <div class="icon-circle bg-gradient-warning shadow-sm"><i class="bi bi-arrow-left-right"></i></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-2 col-md-4 col-sm-6">
-            <div class="dashboard-card card h-100">
-                <div class="card-body p-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 11px; text-transform: uppercase;">งบประมาณ (บ.)</p>
-                        <h4 class="fw-black text-dark mb-0"><?= number_format($estimated_budget) ?></h4>
-                    </div>
-                    <div class="icon-circle bg-gradient-purple shadow-sm"><i class="bi bi-cash-coin"></i></div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Charts -->
-    <div class="row g-4 mb-4">
-        <div class="col-xl-4 col-lg-6">
-            <div class="card dashboard-card h-100">
-                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold text-dark mb-0"><i class="bi bi-pie-chart-fill text-primary me-2"></i> สถานะตารางเวร</h6>
+            <div class="rp-card rp-today-card rp-dashboard-span-4">
+                <div class="rp-today-card__top">
+                    <div>
+                        <p class="rp-today-card__label">ใบลารอพิจารณา</p>
+                        <h3 class="rp-today-card__title"><?= number_format($pending_leaves) ?> รายการ</h3>
+                        <p class="rp-today-card__description">คำขอที่ยังต้องดำเนินการอนุมัติ</p>
+                    </div>
+                    <span class="rp-today-card__icon" style="background:var(--rp-danger-50);color:var(--rp-danger-700);"><i class="bi bi-envelope-paper" aria-hidden="true"></i></span>
                 </div>
-                <div class="card-body">
-                    <div class="chart-container"><canvas id="rosterStatusChart"></canvas></div>
+                <div class="rp-today-card__footer">
+                    <a href="index.php?c=leave&a=approvals" class="rp-btn rp-btn--danger rp-btn--sm">พิจารณาใบลา</a>
+                </div>
+            </div>
+
+            <div class="rp-card rp-today-card rp-dashboard-span-4">
+                <div class="rp-today-card__top">
+                    <div>
+                        <p class="rp-today-card__label">คำขอแลกเวร</p>
+                        <h3 class="rp-today-card__title"><?= number_format($pending_swaps) ?> รายการ</h3>
+                        <p class="rp-today-card__description">คำขอสลับเวรที่กำลังรอการดำเนินการ</p>
+                    </div>
+                    <span class="rp-today-card__icon" style="background:var(--rp-warning-50);color:var(--rp-warning-700);"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>
+                </div>
+                <div class="rp-today-card__footer">
+                    <a href="index.php?c=swap" class="rp-btn rp-btn--warning rp-btn--sm">ดูคำขอแลกเวร</a>
                 </div>
             </div>
         </div>
+    </section>
 
-        <div class="col-xl-4 col-lg-6">
-            <div class="card dashboard-card h-100">
-                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold text-dark mb-0"><i class="bi bi-bar-chart-steps text-info me-2"></i> สถิติการลาหยุดเดือนนี้</h6>
+    <section class="rp-section" aria-labelledby="quickActionsTitle">
+        <?php rp_section_header('เมนูลัด', 'เข้าถึงงานที่ใช้บ่อยโดยไม่ต้องค้นหาในเมนูด้านข้าง'); ?>
+        <div class="rp-grid rp-grid--6 rp-action-grid-mobile" id="quickActionsTitle">
+            <?php rp_action_card('จัดการตารางเวร', 'สร้างและตรวจเวร', 'bi-calendar-check', 'index.php?c=roster', 'success'); ?>
+            <?php rp_action_card('พิจารณาใบลา', 'ตรวจคำขออนุมัติ', 'bi-envelope-paper', 'index.php?c=leave&a=approvals', 'danger', (int)$pending_leaves); ?>
+            <?php rp_action_card('คำขอแลกเวร', 'ตรวจและอนุมัติคำขอ', 'bi-arrow-left-right', 'index.php?c=swap', 'warning', (int)$pending_swaps); ?>
+            <?php rp_action_card('ฐานข้อมูลบุคลากร', 'ข้อมูลและสิทธิ์ผู้ใช้', 'bi-people', 'index.php?c=staff', 'violet'); ?>
+            <?php rp_action_card('รายงานสถิติ', 'สรุปและวิเคราะห์ข้อมูล', 'bi-bar-chart', 'index.php?c=report', 'info'); ?>
+            <?php rp_action_card('ตั้งค่าระบบ', 'กำหนดค่าการใช้งาน', 'bi-sliders', 'index.php?c=settings', 'primary'); ?>
+        </div>
+    </section>
+
+    <section class="rp-section" aria-labelledby="kpiTitle">
+        <?php rp_section_header('ตัวชี้วัดสำคัญ', 'ข้อมูลภาพรวมล่าสุดสำหรับการตัดสินใจ'); ?>
+        <div class="rp-grid rp-grid--6" id="kpiTitle">
+            <?php rp_stat_card('หน่วยบริการ', number_format($total_hospitals), 'bi-hospital', 'info'); ?>
+            <?php rp_stat_card('บุคลากร', number_format($total_staff), 'bi-people-fill', 'primary'); ?>
+            <?php rp_stat_card('ขึ้นเวรวันนี้', number_format($on_duty_today), 'bi-person-workspace', 'success'); ?>
+            <?php rp_stat_card('ใบลารออนุมัติ', number_format($pending_leaves), 'bi-envelope-paper-fill', $pending_leaves > 0 ? 'danger' : 'primary', 'index.php?c=leave&a=approvals'); ?>
+            <?php rp_stat_card('ขอแลกเวร', number_format($pending_swaps), 'bi-arrow-left-right', $pending_swaps > 0 ? 'warning' : 'primary', 'index.php?c=swap'); ?>
+            <?php rp_stat_card('งบประมาณ (บาท)', number_format($estimated_budget), 'bi-cash-coin', 'violet'); ?>
+        </div>
+    </section>
+
+    <section class="rp-section" aria-labelledby="insightsTitle">
+        <?php rp_section_header('Insight เดือนนี้', 'ดูแนวโน้มสำคัญก่อนลงรายละเอียดรายงาน'); ?>
+        <div class="rp-dashboard-grid" id="insightsTitle">
+            <div class="rp-card rp-dashboard-card rp-dashboard-span-4">
+                <div class="rp-card__header">
+                    <h3 class="rp-card__title"><i class="bi bi-pie-chart-fill text-primary me-2"></i>สถานะตารางเวร</h3>
                 </div>
-                <div class="card-body">
+                <div class="rp-card__body">
+                    <div class="rp-chart-frame"><canvas id="rosterStatusChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="rp-card rp-dashboard-card rp-dashboard-span-4">
+                <div class="rp-card__header">
+                    <h3 class="rp-card__title"><i class="bi bi-bar-chart-steps text-info me-2"></i>สถิติการลาหยุดเดือนนี้</h3>
+                </div>
+                <div class="rp-card__body">
                     <?php if(empty($leave_trends_data)): ?>
-                        <div class="h-100 d-flex flex-column align-items-center justify-content-center text-muted opacity-50">
-                            <i class="bi bi-calendar-x fs-1 mb-2"></i><p>ไม่มีข้อมูลการลาหยุดที่อนุมัติแล้ว</p>
-                        </div>
+                        <?php rp_empty_state('bi-calendar-x', 'ยังไม่มีข้อมูลการลา', 'เมื่อมีรายการลาที่อนุมัติแล้ว สถิติจะปรากฏที่นี่', 'ดูระบบวันลา', 'index.php?c=leave'); ?>
                     <?php else: ?>
-                        <div class="chart-container"><canvas id="leaveTrendChart"></canvas></div>
+                        <div class="rp-chart-frame"><canvas id="leaveTrendChart"></canvas></div>
                     <?php endif; ?>
                 </div>
             </div>
-        </div>
 
-        <div class="col-xl-4 col-lg-12">
-            <div class="card dashboard-card h-100">
-                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold text-dark mb-0"><i class="bi bi-bar-chart-line-fill text-warning me-2"></i> Top 5 ภาระงาน (กะ/เดือน)</h6>
+            <div class="rp-card rp-dashboard-card rp-dashboard-span-4">
+                <div class="rp-card__header">
+                    <h3 class="rp-card__title"><i class="bi bi-bar-chart-line-fill text-warning me-2"></i>Top 5 ภาระงาน</h3>
                 </div>
-                <div class="card-body">
+                <div class="rp-card__body">
                     <?php if(empty($workload_data)): ?>
-                        <div class="h-100 d-flex flex-column align-items-center justify-content-center text-muted opacity-50">
-                            <i class="bi bi-graph-down fs-1 mb-2"></i><p>ยังไม่มีข้อมูลการจัดเวร</p>
-                        </div>
+                        <?php rp_empty_state('bi-graph-down', 'ยังไม่มีข้อมูลการจัดเวร', 'ระบบจะแสดงภาระงานหลังมีการจัดเวรในเดือนนี้', 'ไปยังตารางเวร', 'index.php?c=roster'); ?>
                     <?php else: ?>
-                        <div class="chart-container"><canvas id="workloadChart"></canvas></div>
+                        <div class="rp-chart-frame"><canvas id="workloadChart"></canvas></div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
     <!-- 🌟 แถวใหม่: สรุปการใช้งานระบบประจำวัน (Daily Usage) -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card dashboard-card h-100">
-                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="rp-card rp-dashboard-card h-100">
+                <div class="rp-card__header flex-wrap">
                     <div>
                         <h6 class="fw-bold text-dark mb-1"><i class="bi bi-activity text-primary me-2"></i> รายงานการเข้าใช้งานระบบประจำวัน</h6>
                         <p class="text-muted small mb-0">ข้อมูลความเคลื่อนไหวแยกตามหน่วยบริการ (อัปเดตแบบเรียลไทม์)</p>
@@ -317,9 +236,9 @@ $waiting_hospitals = $filtered_waiting;
                         <i class="bi bi-calendar-check me-1"></i> ข้อมูล ณ วันนี้: <?= date('d/m/Y') ?>
                     </span>
                 </div>
-                <div class="card-body p-0">
+                <div class="rp-card__body p-0">
                     <div class="table-responsive custom-scrollbar" style="max-height: 400px;">
-                        <table class="table table-modern mb-0 table-hover align-middle">
+                        <table class="table rp-table mb-0 table-hover align-middle">
                             <thead class="sticky-top bg-light" style="z-index: 1;">
                                 <tr>
                                     <th class="text-center px-3" width="5%">ที่</th>
@@ -390,14 +309,14 @@ $waiting_hospitals = $filtered_waiting;
     <!-- Recent Logs & Recent Leaves -->
     <div class="row g-4">
         <div class="col-xl-7 col-lg-6">
-            <div class="card dashboard-card h-100">
-                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+            <div class="rp-card rp-dashboard-card h-100">
+                <div class="rp-card__header">
                     <h6 class="fw-bold text-dark mb-0"><i class="bi bi-envelope-exclamation-fill text-danger me-2"></i> คำขอลาล่าสุด (รออนุมัติ)</h6>
-                    <a href="index.php?c=leave&a=approve" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size:12px;">จัดการใบลารออนุมัติ (<?= $pending_leaves ?>)</a>
+                    <a href="index.php?c=leave&a=approvals" class="btn btn-sm btn-outline-primary rounded-pill px-3" style="font-size:12px;">จัดการใบลารออนุมัติ (<?= $pending_leaves ?>)</a>
                 </div>
-                <div class="card-body p-0">
+                <div class="rp-card__body p-0">
                     <div class="table-responsive">
-                        <table class="table table-modern mb-0 table-hover text-center align-middle">
+                        <table class="table rp-table mb-0 table-hover text-center align-middle">
                             <thead class="bg-light">
                                 <tr>
                                     <th class="text-start px-4">ผู้ขออนุมัติ</th>
@@ -423,7 +342,7 @@ $waiting_hospitals = $filtered_waiting;
                                         <td><span class="badge bg-secondary bg-opacity-10 text-dark border px-2 py-1"><?= htmlspecialchars($leave['leave_type']) ?></span></td>
                                         <td class="font-monospace text-primary fw-medium" style="font-size: 12px;"><?= $sd ?> - <?= $ed ?></td>
                                         <td class="text-muted small"><?= date('d/m/Y H:i', strtotime($leave['created_at'])) ?></td>
-                                        <td><a href="index.php?c=leave&a=approve" class="btn btn-sm btn-primary rounded-pill shadow-sm" style="font-size:11px;">พิจารณา</a></td>
+                                        <td><a href="index.php?c=leave&a=approvals" class="btn btn-sm btn-primary rounded-pill shadow-sm" style="font-size:11px;">พิจารณา</a></td>
                                     </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
@@ -435,12 +354,12 @@ $waiting_hospitals = $filtered_waiting;
         </div>
 
         <div class="col-xl-5 col-lg-6">
-            <div class="card dashboard-card h-100">
-                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+            <div class="rp-card rp-dashboard-card h-100">
+                <div class="rp-card__header">
                     <h6 class="fw-bold text-dark mb-0"><i class="bi bi-clock-history text-secondary me-2"></i> ประวัติการทำรายการล่าสุด</h6>
                     <a href="index.php?c=logs" class="btn btn-sm btn-light rounded-pill px-3" style="font-size:12px;">ดูทั้งหมด</a>
                 </div>
-                <div class="card-body">
+                <div class="rp-card__body">
                     <?php if(empty($recent_logs)): ?>
                         <div class="text-center text-muted py-4 opacity-50"><i class="bi bi-journal-x fs-2 d-block mb-2"></i> ไม่มีประวัติการใช้งาน</div>
                     <?php else: ?>

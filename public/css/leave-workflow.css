@@ -1,0 +1,295 @@
+/* Roster Pro — Leave workflow module (Design System v2) */
+
+.rp-leave-wallet {
+    margin-bottom: 1rem;
+}
+
+.rp-leave-wallet__summary {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    padding: .9rem 1rem;
+    border: 1px solid var(--rp-border);
+    border-radius: var(--rp-radius-lg);
+    background: var(--rp-surface);
+    box-shadow: var(--rp-shadow-xs);
+}
+
+.rp-leave-wallet__copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.rp-leave-wallet__title {
+    margin: 0;
+    color: var(--rp-text);
+    font-size: .92rem;
+    font-weight: 700;
+}
+
+.rp-leave-wallet__subtitle {
+    margin-top: .18rem;
+    color: var(--rp-text-muted);
+    font-size: .72rem;
+}
+
+.rp-leave-wallet__balances {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.rp-leave-balance-chip {
+    min-width: 96px;
+    padding: .48rem .6rem;
+    border: 1px solid var(--rp-border);
+    border-radius: .75rem;
+    background: var(--rp-slate-50);
+    text-align: center;
+}
+
+.rp-leave-balance-chip__label {
+    display: block;
+    color: var(--rp-text-muted);
+    font-size: .65rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rp-leave-balance-chip__value {
+    display: block;
+    margin-top: .15rem;
+    color: var(--rp-text);
+    font-size: .95rem;
+    font-weight: 800;
+}
+
+.rp-leave-form-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: .4rem;
+    margin-bottom: 1rem;
+}
+
+.rp-leave-form-step {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    min-width: 0;
+    padding: .5rem .55rem;
+    border: 1px solid var(--rp-border);
+    border-radius: .7rem;
+    background: var(--rp-slate-50);
+    color: var(--rp-text-muted);
+    font-size: .68rem;
+    font-weight: 700;
+}
+
+.rp-leave-form-step__number {
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--rp-slate-200);
+    color: var(--rp-slate-700);
+    font-size: .65rem;
+}
+
+.rp-leave-form-step--active {
+    border-color: #bfdbfe;
+    background: var(--rp-primary-50);
+    color: var(--rp-primary-700);
+}
+
+.rp-leave-form-step--active .rp-leave-form-step__number {
+    background: var(--rp-primary-600);
+    color: #fff;
+}
+
+.rp-leave-preview {
+    margin: .25rem 0 1rem;
+    padding: .8rem;
+    border: 1px solid #bfdbfe;
+    border-radius: .8rem;
+    background: var(--rp-primary-50);
+}
+
+.rp-leave-preview__title {
+    margin: 0 0 .55rem;
+    color: var(--rp-primary-700);
+    font-size: .76rem;
+    font-weight: 700;
+}
+
+.rp-leave-preview__grid {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: .5rem;
+}
+
+.rp-leave-preview__item {
+    min-width: 0;
+    padding: .5rem;
+    border-radius: .65rem;
+    background: rgba(255,255,255,.75);
+    text-align: center;
+}
+
+.rp-leave-preview__label {
+    display: block;
+    color: var(--rp-text-muted);
+    font-size: .62rem;
+}
+
+.rp-leave-preview__value {
+    display: block;
+    margin-top: .12rem;
+    color: var(--rp-text);
+    font-size: .82rem;
+    font-weight: 800;
+}
+
+.rp-leave-history-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.rp-leave-history-toolbar .rp-control {
+    min-width: 145px;
+    width: auto;
+}
+
+.rp-approval-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.rp-approval-card {
+    border-left: 4px solid var(--rp-primary-600);
+}
+
+.rp-approval-card--cancel {
+    border-left-color: var(--rp-warning-600);
+    background: linear-gradient(90deg,var(--rp-warning-50),#fff 42%);
+}
+
+.rp-approval-card__person {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.rp-approval-card__name {
+    margin: 0;
+    color: var(--rp-text);
+    font-size: .9rem;
+    font-weight: 700;
+}
+
+.rp-approval-card__meta {
+    margin-top: .2rem;
+    color: var(--rp-text-muted);
+    font-size: .72rem;
+}
+
+.rp-approval-card__facts {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: .5rem;
+    margin-top: .8rem;
+}
+
+.rp-approval-card__fact {
+    padding: .55rem;
+    border: 1px solid var(--rp-border);
+    border-radius: .65rem;
+    background: var(--rp-slate-50);
+}
+
+.rp-approval-card__fact-label {
+    display: block;
+    color: var(--rp-text-muted);
+    font-size: .62rem;
+}
+
+.rp-approval-card__fact-value {
+    display: block;
+    margin-top: .15rem;
+    color: var(--rp-text);
+    font-size: .76rem;
+    font-weight: 700;
+}
+
+.rp-approval-card__reason {
+    margin-top: .75rem;
+    padding: .65rem;
+    border-radius: .65rem;
+    background: var(--rp-slate-50);
+    color: var(--rp-text-secondary);
+    font-size: .74rem;
+    line-height: 1.5;
+}
+
+.rp-approval-card__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+    margin-top: .8rem;
+}
+
+.rp-approval-card__actions .rp-btn,
+.rp-approval-card__actions form {
+    width: 100%;
+}
+
+@media (max-width: 767.98px) {
+    .rp-leave-wallet__summary {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .rp-leave-wallet__balances {
+        order: 3;
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .rp-leave-wallet__balances::-webkit-scrollbar {
+        display: none;
+    }
+
+    .rp-leave-balance-chip {
+        flex: 0 0 auto;
+    }
+
+    .rp-leave-form-steps {
+        grid-template-columns: 1fr;
+    }
+
+    .rp-leave-preview__grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .rp-leave-preview__item:first-child {
+        grid-column: 1 / -1;
+    }
+
+    .rp-leave-history-toolbar,
+    .rp-leave-history-toolbar form,
+    .rp-leave-history-toolbar .rp-control {
+        width: 100%;
+    }
+}

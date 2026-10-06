@@ -65,6 +65,40 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     $d_str = "$year-$month-" . str_pad($i, 2, '0', STR_PAD_LEFT);
     $holiday_cache[$i] = isset($holidayModel) ? $holidayModel->isHoliday($d_str) : false;
 }
+
+// Mobile day view: keep one day in focus instead of squeezing 31 columns into a phone screen.
+$mobile_day = isset($_GET['day']) ? (int)$_GET['day'] : ((date('Y-m') === $selected_month) ? (int)date('d') : 1);
+$mobile_day = max(1, min($days_in_month, $mobile_day));
+$mobile_date = "$year-$month-" . str_pad($mobile_day, 2, '0', STR_PAD_LEFT);
+
+$mobile_shift_map = [];
+if (!empty($shifts) && is_array($shifts)) {
+    foreach ($shifts as $shift) {
+        if (($shift['shift_date'] ?? '') === $mobile_date) {
+            $mobile_shift_map[(int)$shift['user_id']] = (string)($shift['shift_type'] ?? '');
+        }
+    }
+}
+
+$mobile_leave_map = [];
+if (!empty($leaves) && is_array($leaves)) {
+    $mobile_ts = strtotime($mobile_date);
+    foreach ($leaves as $leave) {
+        $start_ts = strtotime((string)$leave['start_date']);
+        $end_ts = strtotime((string)$leave['end_date']);
+        if ($mobile_ts >= $start_ts && $mobile_ts <= $end_ts) {
+            $suffix = (($leave['status'] ?? '') === 'APPROVED') ? '' : ' (รอ)';
+            $mobile_leave_map[(int)$leave['user_id']] = trim((string)$leave['leave_type'] . $suffix);
+        }
+    }
+}
+
+require_once __DIR__ . '/../components/ui.php';
+
+if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$roster_csrf_token = $_SESSION['csrf_token'];
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -111,242 +145,282 @@ for ($i = 1; $i <= $days_in_month; $i++) {
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
 </style>
+<link rel="stylesheet" href="public/css/roster-board.css?v=2">
 
-<div class="w-100 bg-light p-3 p-md-4 min-vh-100 d-flex flex-column">
-    <div class="container-fluid max-w-7xl mx-auto flex-grow-1 d-flex flex-column">
+<div class="w-100 min-vh-100 d-flex flex-column">
+    <div class="rp-page flex-grow-1 d-flex flex-column">
         
-        <!-- 🌟 Header & Controls -->
-        <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center mb-4 gap-3 bg-white p-3 p-md-4 rounded-4 shadow-sm border-0">
-            <div style="min-width: 0;" class="flex-shrink-0">
-                <h4 class="fw-bold text-dark mb-1 text-truncate">
-                    <i class="bi bi-calendar3 text-primary me-2"></i> ตารางปฏิบัติงาน (Roster)
-                </h4>
-                <p class="text-muted mb-0 text-truncate" style="font-size: 14px;">หน่วยบริการ: <span class="fw-bold text-primary"><?= htmlspecialchars($hospital_name ?? '') ?></span></p>
-            </div>
-            
-            <div class="d-flex flex-wrap align-items-center justify-content-xl-end gap-2 flex-grow-1">
-                
-                <!-- 🌟 ปุ่มขอแลกเวร -->
-                <a href="index.php?c=swap" class="btn btn-warning rounded-pill shadow-sm fw-bold px-3 text-dark hover-shadow d-flex align-items-center" title="ระบบขอแลกเวร/เปลี่ยนเวร" style="height: 40px;">
-                    <i class="bi bi-arrow-left-right me-1"></i> <span class="d-none d-sm-inline">ขอแลกเวร</span>
-                </a>
+        <?php
+        ob_start();
+        ?>
+            <a href="index.php?c=swap" class="rp-btn rp-btn--secondary">
+                <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                ขอแลกเวร
+            </a>
+            <a href="index.php?c=roster&a=export_word&month=<?= urlencode($selected_month) ?>&hospital_id=<?= urlencode($hospital_id ?? '') ?>" class="rp-btn rp-btn--primary">
+                <i class="bi bi-printer-fill" aria-hidden="true"></i>
+                พิมพ์
+            </a>
+            <button type="button" onclick="exportTableToExcelClean('rosterTable', 'ตารางเวร_<?= htmlspecialchars($selected_month, ENT_QUOTES, 'UTF-8') ?>')" class="rp-btn rp-btn--success">
+                <i class="bi bi-file-earmark-excel-fill" aria-hidden="true"></i>
+                Excel
+            </button>
+        <?php
+        $roster_actions = ob_get_clean();
+        rp_page_header(
+            'ตารางปฏิบัติงาน',
+            'หน่วยบริการ: ' . ($hospital_name ?? '') . ' · ' . $display_month_text,
+            $roster_actions,
+            'Roster'
+        );
+        ?>
 
-                <form method="GET" action="index.php" id="filterFormRoster" class="d-flex flex-wrap gap-2 mb-0 align-items-center">
-                    <input type="hidden" name="c" value="roster">
-                    <input type="hidden" name="a" value="index">
-                    
-                    <?php if ($isAdmin): ?>
-                    <div class="dropdown shadow-sm" style="width: 220px;">
-                        <button class="btn d-flex justify-content-between align-items-center bg-white border border-secondary border-opacity-25 w-100 rounded-pill px-3" type="button" id="hospDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="true" style="height: 40px;">
-                            <div class="d-flex align-items-center gap-2 text-truncate" style="min-width: 0;">
-                                <i class="bi bi-hospital text-danger flex-shrink-0"></i>
-                                <span class="fw-bold text-dark text-truncate" style="font-size: 13.5px;"><?= htmlspecialchars($hospital_name ?? '') ?></span>
-                            </div>
-                            <i class="bi bi-chevron-down text-muted ms-2 flex-shrink-0" style="font-size: 12px;"></i>
-                        </button>
-                        <div class="dropdown-menu shadow w-100 p-0 border-0 rounded-3 overflow-hidden" aria-labelledby="hospDropdown">
-                            <div class="p-2 bg-light border-bottom sticky-top" style="z-index: 10;">
-                                <div class="input-group input-group-sm input-group-modern">
-                                    <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
-                                    <input type="text" class="form-control" id="hospSearchInput" placeholder="ค้นหา รพ.สต. ...">
-                                </div>
-                            </div>
-                            <ul class="list-unstyled mb-0 overflow-auto custom-scrollbar" style="max-height: 280px;" id="hospOptionList">
-                                <?php foreach ($hospitals_list as $h): ?>
-                                    <li>
-                                        <a class="dropdown-item hosp-option py-2 text-wrap lh-sm <?= $h['id'] == ($hospital_id??0) ? 'active bg-primary text-white fw-bold' : 'text-dark' ?>" href="#" data-val="<?= $h['id'] ?>" style="font-size: 13.5px;">
-                                            <?= htmlspecialchars($h['name']) ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <input type="hidden" name="hospital_id" id="selectedHospInput" value="<?= htmlspecialchars($hospital_id??'') ?>">
-                    </div>
-                    <?php else: ?>
-                        <input type="hidden" name="hospital_id" value="<?= $hospital_id ?? '' ?>">
-                    <?php endif; ?>
+        <div class="rp-roster-toolbar" aria-label="ตัวกรองตารางเวร">
+            <form method="GET" action="index.php" id="filterFormRoster" class="rp-roster-toolbar__filters mb-0">
+                <input type="hidden" name="c" value="roster">
+                <input type="hidden" name="a" value="index">
 
-                    <?php
-                    $current_y = (int)date('Y');
-                    $sel_y = (int)substr($selected_month, 0, 4);
-                    $start_y = min($current_y - 1, $sel_y - 1);
-                    $end_y = max($current_y + 2, $sel_y + 2);
-                    $months_options = [];
-                    for ($y = $start_y; $y <= $end_y; $y++) {
-                        for ($m = 1; $m <= 12; $m++) {
-                            $val = sprintf("%04d-%02d", $y, $m);
-                            $label = $thai_months[$m] . " " . ($y + 543);
-                            $months_options[$val] = $label;
-                        }
-                    }
-                    ?>
-                    <div class="dropdown shadow-sm" style="width: 170px;">
-                        <button class="btn d-flex justify-content-between align-items-center bg-white border border-secondary border-opacity-25 w-100 rounded-pill px-3" type="button" id="monthDropdown" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="true" style="height: 40px;">
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-calendar-month text-primary"></i>
-                                <span class="fw-bold text-dark" style="font-size: 13.5px;"><?= $display_month_text ?></span>
-                            </div>
-                            <i class="bi bi-chevron-down text-muted ms-1" style="font-size: 12px;"></i>
-                        </button>
-                        <div class="dropdown-menu shadow w-100 p-0 border-0 rounded-3 overflow-hidden" aria-labelledby="monthDropdown">
-                            <div class="p-2 bg-light border-bottom sticky-top" style="z-index: 10;">
-                                <div class="input-group input-group-sm input-group-modern">
-                                    <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
-                                    <input type="text" class="form-control" id="monthSearchInput" placeholder="ค้นหาเดือน, ปี...">
-                                </div>
-                            </div>
-                            <ul class="list-unstyled mb-0 overflow-auto custom-scrollbar" style="max-height: 280px;" id="monthOptionList">
-                                <?php foreach ($months_options as $val => $label): ?>
-                                    <li>
-                                        <a class="dropdown-item month-option py-2 <?= $val == $selected_month ? 'active bg-primary text-white fw-bold' : 'text-dark' ?>" href="#" data-val="<?= $val ?>" style="font-size: 13.5px;">
-                                            <?= $label ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                        <input type="hidden" name="month" id="selectedMonthInput" value="<?= htmlspecialchars($selected_month) ?>">
-                    </div>
-                </form>
+                <?php if ($isAdmin): ?>
+                    <select name="hospital_id" class="rp-control" onchange="this.form.submit()" aria-label="เลือกหน่วยบริการ">
+                        <?php foreach ($hospitals_list as $h): ?>
+                            <option value="<?= (int)$h['id'] ?>" <?= (int)$h['id'] === (int)($hospital_id ?? 0) ? 'selected' : '' ?>>
+                                <?= rp_e($h['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php else: ?>
+                    <input type="hidden" name="hospital_id" value="<?= (int)($hospital_id ?? 0) ?>">
+                <?php endif; ?>
 
-                <div class="vr mx-1 d-none d-md-block opacity-25"></div>
+                <input type="month" name="month" class="rp-control" value="<?= rp_e($selected_month) ?>" onchange="this.form.submit()" aria-label="เลือกเดือน">
 
-                <!-- 🌟 กลุ่มปุ่มส่งออก -->
-                <div class="btn-group shadow-sm rounded-pill overflow-hidden" style="height: 40px;">
-                    <a href="index.php?c=roster&a=export_word&month=<?= $selected_month ?>&hospital_id=<?= urlencode($hospital_id??'') ?>" 
-                       class="btn btn-primary fw-bold d-flex align-items-center gap-2 px-3 border-0">
-                        <i class="bi bi-printer-fill fs-6"></i> <span class="d-none d-sm-inline">พิมพ์</span>
+                <?php if ($selected_month !== date('Y-m')): ?>
+                    <a href="index.php?c=roster&a=index&month=<?= urlencode(date('Y-m')) ?>&hospital_id=<?= urlencode($hospital_id ?? '') ?>" class="rp-btn rp-btn--secondary rp-btn--sm">
+                        <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                        เดือนปัจจุบัน
                     </a>
-                    <div class="vr bg-white opacity-25"></div>
-                    <button onclick="exportTableToExcelClean('rosterTable', 'ตารางเวร_<?= $selected_month ?>')" class="btn btn-success fw-bold d-flex align-items-center gap-2 px-3 border-0">
-                        <i class="bi bi-file-earmark-excel-fill fs-6"></i> <span class="d-none d-sm-inline">Excel</span>
-                    </button>
-                </div>
+                <?php endif; ?>
+            </form>
+
+            <div class="rp-roster-toolbar__actions">
+                <button type="button" class="rp-btn rp-btn--secondary rp-btn--sm" data-bs-toggle="modal" data-bs-target="#summaryModal">
+                    <i class="bi bi-bar-chart-fill" aria-hidden="true"></i>
+                    สรุปยอดเดือนนี้
+                </button>
             </div>
         </div>
 
-        <!-- 🌟 แจ้งเตือนข้อผิดพลาด/ความสำเร็จ -->
+        <!-- Feedback -->
         <?php if (isset($_SESSION['success_msg'])): ?>
-            <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 rounded-3" role="alert">
-                <i class="bi bi-check-circle-fill me-2"></i> <strong>สำเร็จ!</strong> <?= $_SESSION['success_msg'] ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div class="rp-alert rp-alert--success" role="status" aria-live="polite">
+                <span class="rp-alert__icon"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span>
+                <div class="rp-alert__content"><?= rp_e($_SESSION['success_msg']) ?></div>
             </div>
             <?php unset($_SESSION['success_msg']); ?>
         <?php endif; ?>
+
         <?php if (isset($_SESSION['error_msg'])): ?>
-            <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0 rounded-3" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i> <strong>ข้อผิดพลาด!</strong> <?= $_SESSION['error_msg'] ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div class="rp-alert rp-alert--danger" role="alert">
+                <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+                <div class="rp-alert__content"><?= rp_e($_SESSION['error_msg']) ?></div>
             </div>
             <?php unset($_SESSION['error_msg']); ?>
         <?php endif; ?>
 
-        <!-- 🌟 แถบสถานะตารางเวร และ ปุ่มดำเนินการ Workflow -->
-        <div class="card border-0 shadow-sm rounded-4 mb-4 <?= $roster_status == 'APPROVED' ? 'bg-success bg-opacity-10 border-success' : ($roster_status == 'SUBMITTED' ? 'bg-info bg-opacity-10' : 'bg-warning bg-opacity-10') ?>" style="border-left: 4px solid !important;">
-            <div class="card-body p-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-                <div class="d-flex align-items-center gap-3 flex-wrap">
-                    <div>
-                        <?php if ($roster_status == 'APPROVED'): ?>
-                            <i class="bi bi-check-circle-fill fs-5 me-2 text-success"></i> <strong class="text-success">สถานะ: อนุมัติแล้ว</strong> <span class="text-dark opacity-75">ตารางเวรเดือนนี้ได้รับการยืนยันความถูกต้องแล้ว</span>
-                        <?php elseif ($roster_status == 'SUBMITTED'): ?>
-                            <i class="bi bi-send-fill fs-5 me-2 text-primary"></i> <strong class="text-primary">สถานะ: รอพิจารณา</strong> <span class="text-dark opacity-75">ส่งถึงผู้อำนวยการแล้ว เพื่อรอการตรวจสอบ</span>
-                        <?php elseif ($roster_status == 'REQUEST_EDIT'): ?>
-                            <i class="bi bi-unlock-fill fs-5 me-2 text-danger"></i> <strong class="text-danger">สถานะ: ขอปลดล็อค (แก้ไข)</strong> <span class="text-dark opacity-75">ส่งคำขอไปยังส่วนกลางแล้ว</span>
-                        <?php else: ?>
-                            <i class="bi bi-pencil-square fs-5 me-2 text-warning text-dark"></i> <strong class="text-dark">สถานะ: กำลังจัดทำ (Draft)</strong> <span class="text-dark opacity-75">คุณสามารถเพิ่ม/ลดเวร หรือดึงคนนอกมาช่วยได้</span>
-                        <?php endif; ?>
-                    </div>
+        <?php
+        $status_tone = 'warning';
+        $status_icon = 'bi-pencil-square';
+        $status_title = 'กำลังจัดทำ';
+        $status_description = 'สามารถเพิ่ม ลด หรือปรับเวรได้ก่อนส่งพิจารณา';
 
-                    <button class="btn btn-sm shadow-sm text-nowrap rounded-pill px-3" style="background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); color: white; font-weight: bold;" data-bs-toggle="modal" data-bs-target="#summaryModal">
-                        <i class="bi bi-bar-chart-fill me-1"></i> สรุปยอดเดือนนี้
-                    </button>
-                </div>
-                
-                <div class="d-flex flex-wrap gap-2">
-                    <!-- ควบคุม Workflow สำหรับ ADMIN -->
-                    <?php if (($roster_status == 'APPROVED' || $roster_status == 'REQUEST_EDIT') && $isAdmin): ?>
-                        <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0 d-flex gap-2">
-                            <input type="hidden" name="month_year" value="<?= $selected_month ?>">
-                            <input type="hidden" name="hospital_id" value="<?= $hospital_id??'' ?>">
-                            
-                            <?php if ($roster_status == 'REQUEST_EDIT'): ?>
-                                <button type="submit" name="status" value="APPROVED" class="btn btn-sm btn-outline-secondary fw-bold bg-white text-nowrap rounded-3" onclick="return confirm('ปฏิเสธคำขอ?');"><i class="bi bi-x-circle me-1"></i> ปฏิเสธคำขอ</button>
-                                <button type="submit" name="status" value="DRAFT" class="btn btn-sm btn-warning fw-bold text-dark shadow-sm text-nowrap rounded-3" onclick="return confirm('ปลดล็อคเป็น DRAFT?');"><i class="bi bi-unlock-fill me-1"></i> อนุมัติให้แก้ไข</button>
-                            <?php else: ?>
-                                <input type="hidden" name="status" value="DRAFT">
-                                <button type="submit" class="btn btn-sm btn-outline-danger fw-bold bg-white text-nowrap rounded-3" onclick="return confirm('ยืนยันตีกลับตารางเวรให้แก้ไข?');"><i class="bi bi-unlock-fill me-1"></i> ตีกลับให้แก้ไข</button>
-                            <?php endif; ?>
-                        </form>
-                    <?php endif; ?>
+        if ($roster_status === 'APPROVED') {
+            $status_tone = 'success';
+            $status_icon = 'bi-check-circle-fill';
+            $status_title = 'อนุมัติแล้ว';
+            $status_description = 'ตารางเวรเดือนนี้ได้รับการยืนยันและอยู่ในโหมดอ่านอย่างเดียว';
+        } elseif ($roster_status === 'SUBMITTED') {
+            $status_tone = 'info';
+            $status_icon = 'bi-send-fill';
+            $status_title = 'รอพิจารณา';
+            $status_description = 'ตารางถูกส่งให้ผู้อำนวยการตรวจสอบแล้ว';
+        } elseif ($roster_status === 'REQUEST_EDIT') {
+            $status_tone = 'danger';
+            $status_icon = 'bi-unlock-fill';
+            $status_title = 'รออนุมัติแก้ไข';
+            $status_description = 'ส่งคำขอปลดล็อกตารางที่อนุมัติแล้ว และกำลังรอการดำเนินการ';
+        }
+        ?>
 
-                    <!-- ผอ. (DIRECTOR) ตรวจสอบและอนุมัติ -->
-                    <?php if ($roster_status == 'SUBMITTED' && $_SESSION['user']['role'] == 'DIRECTOR'): ?>
-                        <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0 d-flex gap-2">
-                            <input type="hidden" name="month_year" value="<?= $selected_month ?>">
-                            <button type="submit" name="status" value="DRAFT" class="btn btn-sm btn-outline-danger fw-bold bg-white text-nowrap rounded-3" onclick="return confirm('ยืนยันการตีกลับ?');"><i class="bi bi-arrow-return-left me-1"></i> ตีกลับ</button>
-                            <button type="submit" name="status" value="APPROVED" class="btn btn-sm btn-success fw-bold shadow-sm text-nowrap rounded-3" onclick="return confirm('อนุมัติตารางเวร?');"><i class="bi bi-check-circle-fill me-1"></i> อนุมัติเวร</button>
-                        </form>
-                    <?php endif; ?>
-
-                    <!-- ผู้จัดเวร / ผอ. ขอแก้ไขตารางที่อนุมัติแล้ว -->
-                    <?php if ($roster_status == 'APPROVED' && ($_SESSION['user']['role'] == 'SCHEDULER' || $_SESSION['user']['role'] == 'DIRECTOR')): ?>
-                        <form action="index.php?c=ajax&a=request_edit" method="POST" class="m-0" onsubmit="return confirm('ส่งคำขอปลดล็อคตารางเวร?');">
-                            <input type="hidden" name="month_year" value="<?= $selected_month ?>">
-                            <button type="submit" class="btn btn-sm btn-warning text-dark fw-bold shadow-sm text-nowrap rounded-3"><i class="bi bi-unlock-fill me-1"></i> ขอแก้ไขตาราง</button>
-                        </form>
-                    <?php endif; ?>
-
-                    <!-- กำลังจัดทำ (Draft) -->
-                    <?php if ($roster_status == 'DRAFT' && ($_SESSION['user']['role'] == 'SCHEDULER' || $_SESSION['user']['role'] == 'DIRECTOR')): ?>
-                        
-                        <!-- 🌟 ปุ่มจัดเวรอัตโนมัติ -->
-                        <button onclick="autoScheduleRoster()" class="btn btn-sm btn-outline-info fw-bold shadow-sm bg-white text-nowrap rounded-3" title="สุ่มรายชื่อบุคลากรทุกคน ครอบคลุมทุกตำแหน่งลงในตารางเวร">
-                            <i class="bi bi-robot me-1"></i> จัดการเวรอัตโนมัติ
-                        </button>
-                        
-                        <!-- 🌟 ปุ่มตรวจสอบตารางเวร -->
-                        <button onclick="validateRoster()" class="btn btn-sm btn-outline-warning text-dark fw-bold shadow-sm bg-white text-nowrap rounded-3" title="ตรวจสอบวันว่าง / วันที่มีแต่ผู้ช่วย">
-                            <i class="bi bi-shield-exclamation me-1"></i> ตรวจสอบตาราง
-                        </button>
-
-                        <button onclick="checkFatigueRules()" class="btn btn-sm btn-outline-danger fw-bold shadow-sm bg-white text-nowrap rounded-3" title="ตรวจสอบเวรชน / พักผ่อนไม่พอ">
-                            <i class="bi bi-heart-pulse me-1"></i> เช็คความล้า
-                        </button>
-
-                        <button onclick="copyPreviousMonth('<?= $selected_month ?>')" class="btn btn-sm btn-outline-success fw-bold shadow-sm bg-white text-nowrap rounded-3">
-                            <i class="bi bi-copy me-1"></i> คัดลอกเดือนก่อน
-                        </button>
-                        
-                        <a href="javascript:void(0)" onclick="confirmAction('index.php?c=roster&a=clear_roster&month=<?= $selected_month ?>', 'ยืนยันการล้างตารางเวรทั้งหมดของเดือนนี้?', this)" class="btn btn-sm btn-outline-secondary fw-bold shadow-sm bg-white text-nowrap rounded-3">
-                            <i class="bi bi-eraser-fill me-1"></i> ล้างข้อมูล
-                        </a>
-
-                        <div class="vr mx-1"></div>
-
-                        <!-- 🌟 เปลี่ยนให้เรียกใช้ submitForApproval(event, this) แทน confirm ธรรมดา -->
-                        <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0" onsubmit="submitForApproval(event, this);">
-                            <input type="hidden" name="month_year" value="<?= $selected_month ?>">
-                            <input type="hidden" name="status" value="SUBMITTED">
-                            <button type="submit" class="btn btn-sm btn-dark fw-bold shadow-sm px-4 text-nowrap rounded-3"><i class="bi bi-send-fill me-1"></i> ส่งอนุมัติ</button>
-                        </form>
-                    <?php endif; ?>
-                </div>
+        <div class="rp-status-panel rp-status-panel--<?= rp_e($status_tone) ?> rp-roster-status">
+            <div class="rp-roster-status__main">
+                <h2 class="rp-roster-status__title">
+                    <i class="bi <?= rp_e($status_icon) ?>" aria-hidden="true"></i>
+                    สถานะ: <?= rp_e($status_title) ?>
+                </h2>
+                <p class="rp-roster-status__description"><?= rp_e($status_description) ?></p>
             </div>
-            <!-- 🌟 แสดงผลลัพธ์การตรวจสอบตารางเวรทั่วไป -->
-            <div id="rosterWarnings" class="px-3 pb-3" style="display: none;"></div>
+
+            <div class="rp-roster-status__actions">
+                <?php if (($roster_status === 'APPROVED' || $roster_status === 'REQUEST_EDIT') && $isAdmin): ?>
+                    <form action="index.php?c=ajax&a=change_status" method="POST" class="d-flex gap-2 flex-wrap m-0">
+                        <input type="hidden" name="csrf_token" value="<?= rp_e($roster_csrf_token) ?>">
+                        <input type="hidden" name="month_year" value="<?= rp_e($selected_month) ?>">
+                        <input type="hidden" name="hospital_id" value="<?= rp_e($hospital_id ?? '') ?>">
+                        <?php if ($roster_status === 'REQUEST_EDIT'): ?>
+                            <button type="submit" name="status" value="APPROVED" class="rp-btn rp-btn--secondary rp-btn--sm" onclick="return confirm('ปฏิเสธคำขอแก้ไข?');">
+                                <i class="bi bi-x-circle"></i> ปฏิเสธ
+                            </button>
+                            <button type="submit" name="status" value="DRAFT" class="rp-btn rp-btn--warning rp-btn--sm" onclick="return confirm('อนุมัติให้แก้ไขตาราง?');">
+                                <i class="bi bi-unlock-fill"></i> อนุมัติให้แก้ไข
+                            </button>
+                        <?php else: ?>
+                            <input type="hidden" name="status" value="DRAFT">
+                            <button type="submit" class="rp-btn rp-btn--danger rp-btn--sm" onclick="return confirm('ยืนยันตีกลับตารางเวรให้แก้ไข?');">
+                                <i class="bi bi-arrow-return-left"></i> ตีกลับให้แก้ไข
+                            </button>
+                        <?php endif; ?>
+                    </form>
+                <?php endif; ?>
+
+                <?php if ($roster_status === 'SUBMITTED' && ($_SESSION['user']['role'] ?? '') === 'DIRECTOR'): ?>
+                    <form action="index.php?c=ajax&a=change_status" method="POST" class="d-flex gap-2 flex-wrap m-0">
+                        <input type="hidden" name="csrf_token" value="<?= rp_e($roster_csrf_token) ?>">
+                        <input type="hidden" name="month_year" value="<?= rp_e($selected_month) ?>">
+                        <button type="submit" name="status" value="DRAFT" class="rp-btn rp-btn--danger rp-btn--sm" onclick="return confirm('ยืนยันการตีกลับ?');">
+                            <i class="bi bi-arrow-return-left"></i> ตีกลับ
+                        </button>
+                        <button type="submit" name="status" value="APPROVED" class="rp-btn rp-btn--success rp-btn--sm" onclick="return confirm('อนุมัติตารางเวร?');">
+                            <i class="bi bi-check-circle-fill"></i> อนุมัติเวร
+                        </button>
+                    </form>
+                <?php endif; ?>
+
+                <?php if ($roster_status === 'APPROVED' && in_array($_SESSION['user']['role'] ?? '', ['SCHEDULER', 'DIRECTOR'], true)): ?>
+                    <form action="index.php?c=ajax&a=request_edit" method="POST" class="m-0" onsubmit="return confirm('ส่งคำขอปลดล็อกตารางเวร?');">
+                        <input type="hidden" name="csrf_token" value="<?= rp_e($roster_csrf_token) ?>">
+                        <input type="hidden" name="month_year" value="<?= rp_e($selected_month) ?>">
+                        <button type="submit" class="rp-btn rp-btn--warning rp-btn--sm">
+                            <i class="bi bi-unlock-fill"></i> ขอแก้ไขตาราง
+                        </button>
+                    </form>
+                <?php endif; ?>
+
+                <?php if ($roster_status === 'DRAFT' && in_array($_SESSION['user']['role'] ?? '', ['SCHEDULER', 'DIRECTOR'], true)): ?>
+                    <button type="button" onclick="autoScheduleRoster()" class="rp-btn rp-btn--secondary rp-btn--sm" title="จัดเวรอัตโนมัติ">
+                        <i class="bi bi-robot"></i> จัดอัตโนมัติ
+                    </button>
+                    <button type="button" onclick="validateRoster()" class="rp-btn rp-btn--secondary rp-btn--sm">
+                        <i class="bi bi-shield-check"></i> ตรวจตาราง
+                    </button>
+                    <button type="button" onclick="checkFatigueRules()" class="rp-btn rp-btn--secondary rp-btn--sm">
+                        <i class="bi bi-heart-pulse"></i> เช็กความล้า
+                    </button>
+                    <button type="button" onclick="copyPreviousMonth('<?= rp_e($selected_month) ?>')" class="rp-btn rp-btn--secondary rp-btn--sm">
+                        <i class="bi bi-copy"></i> คัดลอกเดือนก่อน
+                    </button>
+                    <a href="javascript:void(0)" onclick="confirmAction('index.php?c=roster&a=clear_roster&month=<?= rp_e($selected_month) ?>', 'ยืนยันการล้างตารางเวรทั้งหมดของเดือนนี้?', this)" class="rp-btn rp-btn--secondary rp-btn--sm">
+                        <i class="bi bi-eraser-fill"></i> ล้างข้อมูล
+                    </a>
+                    <form action="index.php?c=ajax&a=change_status" method="POST" class="m-0" onsubmit="submitForApproval(event, this);">
+                        <input type="hidden" name="csrf_token" value="<?= rp_e($roster_csrf_token) ?>">
+                        <input type="hidden" name="month_year" value="<?= rp_e($selected_month) ?>">
+                        <input type="hidden" name="status" value="SUBMITTED">
+                        <button type="submit" class="rp-btn rp-btn--primary rp-btn--sm">
+                            <i class="bi bi-send-fill"></i> ส่งอนุมัติ
+                        </button>
+                    </form>
+                <?php endif; ?>
+            </div>
+
+            <div id="rosterWarnings" class="w-100" style="display:none;"></div>
         </div>
 
-        <div class="row g-3 flex-grow-1">
+        <!-- Mobile day view -->
+        <section class="d-lg-none mb-3" aria-labelledby="mobileRosterTitle">
+            <div class="rp-card">
+                <div class="rp-card__header">
+                    <div>
+                        <h2 id="mobileRosterTitle" class="rp-card__title">เวรประจำวันที่ <?= (int)$mobile_day ?> <?= rp_e($thai_months[(int)$month]) ?></h2>
+                        <p class="rp-section-description mb-0">เลือกวันที่ด้านล่างเพื่อดูเวรแบบอ่านง่ายบนมือถือ</p>
+                    </div>
+                    <?php if ($holiday_cache[$mobile_day]): ?>
+                        <span class="rp-badge rp-badge--danger">วันหยุด</span>
+                    <?php endif; ?>
+                </div>
+                <div class="rp-card__body">
+                    <nav class="rp-roster-day-tabs" aria-label="เลือกวันที่">
+                        <?php for ($d = 1; $d <= $days_in_month; $d++):
+                            $day_date = "$year-$month-" . str_pad($d, 2, '0', STR_PAD_LEFT);
+                            $dow = (int)date('N', strtotime($day_date));
+                            $day_holiday = $holiday_cache[$d] || $dow >= 6;
+                            $day_url = 'index.php?c=roster&a=index&month=' . urlencode($selected_month)
+                                . '&hospital_id=' . urlencode($hospital_id ?? '')
+                                . '&day=' . $d;
+                        ?>
+                            <a href="<?= rp_e($day_url) ?>" class="rp-roster-day-tab <?= $d === $mobile_day ? 'rp-roster-day-tab--active' : '' ?> <?= $day_holiday ? 'rp-roster-day-tab--holiday' : '' ?>" <?= $d === $mobile_day ? 'aria-current="date"' : '' ?>>
+                                <?= $d ?>
+                            </a>
+                        <?php endfor; ?>
+                    </nav>
+
+                    <div class="rp-mobile-roster-list">
+                        <?php
+                        $mobile_visible_count = 0;
+                        foreach ($all_staff_for_sidebar as $staff):
+                            $staff_id = (int)$staff['id'];
+                            $is_external = isset($staff['hospital_id']) && (int)$staff['hospital_id'] !== (int)($hospital_id ?? 0);
+                            $shift_value = $mobile_shift_map[$staff_id] ?? '';
+                            if ($is_external && $shift_value === '') continue;
+                            $mobile_visible_count++;
+                            $leave_value = $mobile_leave_map[$staff_id] ?? '';
+                        ?>
+                            <div class="rp-mobile-roster-item">
+                                <div>
+                                    <h3 class="rp-mobile-roster-item__name"><?= rp_e($staff['name']) ?></h3>
+                                    <div class="rp-mobile-roster-item__meta">
+                                        <?= rp_e($staff['type'] ?? '') ?>
+                                        <?php if ($leave_value !== ''): ?>
+                                            · <span class="text-danger"><?= rp_e($leave_value) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <?php if ($canEdit && $leave_value === ''): ?>
+                                    <button type="button"
+                                            class="rp-mobile-shift-btn <?= rp_e(getShiftColorClass($shift_value)) ?>"
+                                            data-staff-id="<?= $staff_id ?>"
+                                            data-staff-payrate="<?= rp_e($staff['pay_rate_id'] ?? '') ?>"
+                                            data-date="<?= rp_e($mobile_date) ?>"
+                                            onclick="openMobileShiftEditor(this)"
+                                            aria-label="แก้ไขเวรของ <?= rp_e($staff['name']) ?>">
+                                        <?= $shift_value !== '' ? rp_e($shift_value) : '—' ?>
+                                    </button>
+                                <?php else: ?>
+                                    <span class="rp-mobile-shift-value <?= rp_e(getShiftColorClass($shift_value)) ?>">
+                                        <?= $shift_value !== '' ? rp_e($shift_value) : '—' ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+
+                        <?php if ($mobile_visible_count === 0): ?>
+                            <?php rp_empty_state('bi-people', 'ยังไม่มีบุคลากรในวันนี้', 'ยังไม่มีรายการบุคลากรหรือเวรสำหรับวันที่เลือก'); ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="rp-roster-workspace d-none d-lg-grid">
             <!-- 🌟 ตารางเวรหลัก -->
-            <div class="col-xl-9 col-lg-8 d-flex flex-column" style="transition: all 0.3s ease;">
-                <div class="card card-modern overflow-hidden mb-4 flex-grow-1">
-                    <div class="card-body p-0 d-flex flex-column">
-                        <div class="table-responsive flex-grow-1 custom-scrollbar" style="max-height: 70vh;">
-                            <table class="table table-bordered table-hover table-roster mb-0 text-center" id="rosterTable" style="min-width: 1000px;">
+            <div class="rp-roster-board">
+                <div class="rp-card overflow-hidden">
+                    <div class="p-0 d-flex flex-column">
+                        <div class="rp-roster-table-wrap custom-scrollbar">
+                            <table class="table table-bordered table-hover table-roster rp-roster-table text-center" id="rosterTable" style="--rp-roster-days:<?= (int)$days_in_month ?>;">
                                 <thead class="sticky-top" style="z-index: 10;">
                                     <tr>
-                                        <th rowspan="2" class="align-middle shadow-sm bg-white" style="min-width: 220px; left: 0; position: sticky; z-index: 11; border-right: 2px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">รายชื่อเจ้าหน้าที่</th>
+                                        <th rowspan="2" class="align-middle rp-roster-person-head">รายชื่อเจ้าหน้าที่</th>
                                         <th colspan="<?= $days_in_month ?>" class="bg-light border-bottom text-dark">วันที่ปฏิบัติงาน เดือน <?= $display_month_text ?></th>
                                     </tr>
                                     <tr>
@@ -362,8 +436,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                             $is_holiday_flag = $holidayName ? 'true' : 'false';
                                             $h_name = $holidayName ? htmlspecialchars($holidayName, ENT_QUOTES) : '';
                                         ?>
-                                            <th class="<?= $is_current_day ? 'bg-primary text-white shadow-sm' : ($is_weekend || $holidayName ? 'text-danger bg-light' : 'bg-light') ?> date-header-cell border-bottom" 
-                                                style="min-width: 42px; cursor: pointer; position: relative;"
+                                            <th class="rp-roster-date <?= $is_current_day ? 'rp-roster-date--today' : (($is_weekend || $holidayName) ? 'rp-roster-date--holiday' : '') ?>" 
                                                 onclick="openHolidayInfoModal('<?= $current_date_str ?>', <?= $is_holiday_flag ?>, '<?= $h_name ?>')"
                                                 title="<?= $holidayName ? 'วันหยุด: '.$holidayName : 'คลิกเพื่อเสนอวันหยุด' ?>">
                                                 <?= $i ?>
@@ -479,7 +552,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                                     $td_bg_class = 'holiday-column';
                                                 }
                                             ?>
-                                                <td class="p-0 text-center border-start-0 border-end-0 border-bottom <?= $td_bg_class ?>" style="height: 52px; position: relative; border-left: 1px solid #f1f5f9 !important;">
+                                                <td class="rp-roster-cell text-center <?= $is_current_day ? 'rp-roster-cell--today' : ($is_weekend_or_holiday ? 'rp-roster-cell--holiday' : '') ?>">
                                                     
                                                     <?php if ($leave_txt): ?>
                                                         <div class="position-absolute w-100 d-flex justify-content-center" style="top: 3px; left: 0; z-index: 2;">
@@ -520,7 +593,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                                     
                                     <!-- 🌟 Drop Zone สำหรับลากคนนอกมาลงตาราง -->
                                     <?php if ($canEdit): ?>
-                                    <tr id="dropZoneRow" ondragover="allowDrop(event)" ondrop="dropStaff(event)" ondragleave="dragLeave(event)" class="bg-light bg-opacity-75">
+                                    <tr id="dropZoneRow" ondragover="allowDrop(event)" ondrop="dropStaff(event)" ondragleave="dragLeave(event)" class="rp-roster-dropzone">
                                         <td colspan="<?= $days_in_month + 1 ?>" class="py-4 text-center text-primary" style="border: 2px dashed #a5b4fc; transition: all 0.2s;">
                                             <i class="bi bi-person-down fs-3 d-block mb-1 opacity-75"></i>
                                             <span class="fw-bold fs-6">ลากรายชื่อเจ้าหน้าที่จากแถบด้านขวามาวางที่บริเวณนี้</span>
@@ -533,7 +606,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                         </div>
                     </div>
                     
-                    <div class="card-footer bg-white border-top p-3 text-muted d-flex flex-wrap justify-content-between align-items-center" style="font-size: 12px;">
+                    <div class="rp-roster-legend">
                         <div>
                             <i class="bi bi-info-circle text-primary me-1"></i> 
                             <strong>สัญลักษณ์:</strong> <span class="fw-bold text-warning text-dark mx-1">บ</span> = บ่าย, <span class="fw-bold text-success mx-1">ร</span> = ดึก, <span class="fw-bold text-danger mx-1">ย</span> = วันหยุด
@@ -546,8 +619,8 @@ for ($i = 1; $i <= $days_in_month; $i++) {
             </div>
 
             <!-- 🌟 แถบรายชื่อบุคลากร (Sidebar) -->
-            <div class="col-xl-3 col-lg-4 sticky-sidebar">
-                <div class="card card-modern p-0 d-flex flex-column position-relative h-100">
+            <aside class="rp-staff-panel">
+                <div class="rp-card overflow-hidden">
                     
                     <?php if (!$canEdit): ?>
                     <div class="bg-warning bg-opacity-25 text-dark p-2 text-center border-bottom d-flex align-items-center justify-content-center gap-2" style="font-size: 13px; font-weight: bold; border-radius: 1.25rem 1.25rem 0 0;">
@@ -561,7 +634,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     </div>
                     <?php endif; ?>
 
-                    <div class="p-3 border-bottom bg-light <?= $canEdit ? 'rounded-top-4' : '' ?>">
+                    <div class="rp-staff-panel__head">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h6 class="fw-bold <?= !$canEdit ? 'text-muted' : 'text-dark' ?> mb-0 d-flex align-items-center">
                                 <i class="bi bi-people-fill <?= !$canEdit ? 'text-muted' : 'text-primary' ?> me-2"></i> <?= $canEdit ? 'เลือกบุคลากรเข้าเวร' : 'รายชื่อ/สถิติบุคลากร' ?>
@@ -569,26 +642,26 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                         </div>
                         
                         <div class="mb-2">
-                            <select id="staffHospitalFilter" class="form-select form-select-sm shadow-sm border-primary border-opacity-25 font-monospace fw-bold text-primary rounded-3">
+                            <select id="staffHospitalFilter" class="rp-control">
                                 <option value="own" selected>🔹 บุคลากรในสังกัด รพ.สต.</option>
                                 <option value="external">🔸 บุคลากรช่วยราชการ</option>
                             </select>
                         </div>
 
-                        <div class="input-group input-group-sm input-group-modern mt-2">
+                        <div class="input-group mt-2">
                             <span class="input-group-text"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" id="staffSearch" class="form-control" placeholder="ค้นหาชื่อ หรือตำแหน่ง...">
+                            <input type="search" id="staffSearch" class="rp-control" placeholder="ค้นหาชื่อ หรือตำแหน่ง..." aria-label="ค้นหาบุคลากร">
                         </div>
                     </div>
                     
-                    <div class="flex-grow-1 overflow-auto p-3 bg-light custom-scrollbar rounded-bottom-4" id="staffListContainer">
+                    <div class="rp-staff-panel__list custom-scrollbar" id="staffListContainer">
                         <?php 
                         foreach ($all_staff_for_sidebar as $staff): 
                             $is_external = (isset($staff['hospital_id']) && $staff['hospital_id'] != ($hospital_id??0));
                             $bs_color = getBsColor($staff['color_theme']);
                         ?>
                         <!-- 🌟 แนบ pay_rate_id ไว้เผื่อดึงผ่าน JS -->
-                        <div class="card mb-2 shadow-sm border-0 rounded-3 staff-card draggable-staff" 
+                        <div class="rp-staff-pick staff-card draggable-staff" 
                              draggable="<?= $canEdit ? 'true' : 'false' ?>"
                              <?= $canEdit ? 'ondragstart="drag(event)"' : '' ?>
                              style="<?= $is_external ? 'display: none;' : '' ?>"
@@ -597,7 +670,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                              data-payrateid="<?= $staff['pay_rate_id'] ?? '' ?>"
                              data-is-external="<?= $is_external ? 'true' : 'false' ?>">
                             
-                            <div class="card-body p-2 d-flex align-items-center">
+                            <div class="d-flex align-items-center w-100">
                                 <div class="bg-<?= $bs_color ?> bg-opacity-10 text-<?= $bs_color ?> rounded-circle d-flex justify-content-center align-items-center fw-bold me-3 flex-shrink-0" style="width: 38px; height: 38px; font-size:15px;">
                                     <?= mb_substr($staff['name'], 0, 1, 'UTF-8') ?>
                                 </div>
@@ -622,8 +695,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
                     </div>
                 </div>
             </div>
-        </div>
-
+        </aside>
     </div>
 </div>
 
@@ -887,6 +959,7 @@ for ($i = 1; $i <= $days_in_month; $i++) {
 
 <!-- ================= Scripts การทำงานหลัก ================= -->
 <script>
+const ROSTER_CSRF = <?= json_encode($roster_csrf_token, JSON_UNESCAPED_SLASHES) ?>;
 // 🌟 นำเข้าฐานข้อมูลเรทเงินจาก PHP ลง JavaScript
 const payRatesDB = <?php echo json_encode($pay_rates_db ?? []); ?>;
 const isApprovedSnapshot = <?= ($roster_status == 'APPROVED' && isset($pay_snapshot)) ? 'true' : 'false' ?>;
@@ -898,6 +971,7 @@ const currentMonthYear = new URLSearchParams(window.location.search).get('month'
 const targetHospId = '<?= htmlspecialchars($hospital_id ?? $_SESSION['user']['hospital_id'] ?? '') ?>';
 
 let currentCellBtn = null;
+let currentMobileShiftBtn = null;
 let shiftModal = null; 
 let payCalcModal = null; 
 let holidayInfoModal = null;
@@ -974,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch('index.php?c=ajax&a=update_order', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF },
                     body: JSON.stringify({ order: orderData })
                 })
                 .then(res => res.json())
@@ -1043,7 +1117,27 @@ function showPayCalculation(el) {
     payCalcModal.show();
 }
 
+function openMobileShiftEditor(btn) {
+    currentMobileShiftBtn = btn;
+    const staffId = btn.getAttribute('data-staff-id');
+    const dateStr = btn.getAttribute('data-date');
+    const desktopCell = document.querySelector('.shift-cell[data-staff-id="' + staffId + '"][data-date="' + dateStr + '"]');
+
+    if (desktopCell) {
+        openShiftModal(desktopCell);
+        return;
+    }
+
+    currentCellBtn = btn;
+    if (!shiftModal) shiftModal = new bootstrap.Modal(document.getElementById('shiftSelectorModal'));
+    const parts = dateStr.split('-');
+    const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+    document.getElementById('shiftModalDate').innerText = `วันที่ ${parseInt(parts[2], 10)} ${thMonths[parseInt(parts[1], 10)-1]} ${parseInt(parts[0])+543}`;
+    shiftModal.show();
+}
+
 function openShiftModal(btn) {
+    currentMobileShiftBtn = null;
     if (!shiftModal) shiftModal = new bootstrap.Modal(document.getElementById('shiftSelectorModal'));
     currentCellBtn = btn;
     const dateStr = btn.getAttribute('data-date');
@@ -1060,7 +1154,17 @@ function saveShift(shiftValue, colorClass) {
     const dateStr = currentCellBtn.getAttribute('data-date');
     
     currentCellBtn.innerText = shiftValue;
-    currentCellBtn.className = `btn w-100 h-100 p-0 border-0 shadow-none hover-cell shift-cell ${colorClass}`;
+
+    if (currentCellBtn.classList.contains('rp-mobile-shift-btn')) {
+        currentCellBtn.className = `rp-mobile-shift-btn ${colorClass}`;
+    } else {
+        currentCellBtn.className = `btn w-100 h-100 p-0 border-0 shadow-none hover-cell shift-cell ${colorClass}`;
+    }
+
+    if (currentMobileShiftBtn) {
+        currentMobileShiftBtn.innerText = shiftValue || '—';
+        currentMobileShiftBtn.className = `rp-mobile-shift-btn ${colorClass}`;
+    }
     if (shiftModal) shiftModal.hide();
     
     recalculateRowSummary(staffId, payRateId);
@@ -1069,7 +1173,7 @@ function saveShift(shiftValue, colorClass) {
     if (indicator) indicator.classList.remove('d-none');
     
     fetch('index.php?c=ajax&a=save_shift', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF},
         body: JSON.stringify({ user_id: staffId, date: dateStr, shift_type: shiftValue, hosp_id: targetHospId })
     })
     .then(res => res.json())
@@ -1093,7 +1197,7 @@ function removeStaffFromRoster(staffId, staffName) {
     cells.forEach(cell => {
         if (cell.innerText.trim() !== '') {
             promises.push(fetch('index.php?c=ajax&a=save_shift', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF},
                 body: JSON.stringify({ user_id: staffId, date: cell.getAttribute('data-date'), shift_type: '', hosp_id: targetHospId })
             }).then(res => res.json()));
         }
@@ -1215,7 +1319,7 @@ function showToast(type, message) {
 
 function copyPreviousMonth(currentMonth) {
     if(confirm('ระบบจะดึงแพทเทิร์นตารางเวรจาก "เดือนก่อนหน้า" มาทับข้อมูลเดือนปัจจุบันทั้งหมด\n\nยืนยันการดำเนินการหรือไม่?')) {
-        fetch('index.php?c=ajax&a=copy_roster_previous', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ target_month: currentMonth, hosp_id: targetHospId }) })
+        fetch('index.php?c=ajax&a=copy_roster_previous', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF}, body: JSON.stringify({ target_month: currentMonth, hosp_id: targetHospId }) })
         .then(res => res.json()).then(data => {
             if(data.status === 'success') { alert('คัดลอกตารางสำเร็จ!'); window.location.reload(); } else alert('Error: ' + data.message);
         });
@@ -1249,7 +1353,7 @@ function openHolidayInfoModal(dateStr, isHoliday, holidayName) {
 function submitHolidayRequest() {
     const hName = document.getElementById('hiRequestName').value.trim();
     if (!hName) return alert('กรุณาระบุชื่อวันหยุด');
-    fetch('index.php?c=ajax&a=request_holiday', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ date: selectedHolidayDate, name: hName, hosp_id: targetHospId }) })
+    fetch('index.php?c=ajax&a=request_holiday', { method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF}, body: JSON.stringify({ date: selectedHolidayDate, name: hName, hosp_id: targetHospId }) })
     .then(r => r.json()).then(d => {
         if (d.status === 'success') { alert('ส่งคำขอสำเร็จ!'); holidayInfoModal.hide(); } else alert('Error: ' + d.message);
     });
@@ -1272,7 +1376,7 @@ function autoScheduleRoster() {
             fetch('index.php?c=ajax&a=auto_schedule', {
                 method: 'POST',
                 body: JSON.stringify({ month_year: currentMonthYear, hosp_id: targetHospId }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF }
             }).then(res => res.json()).then(data => {
                 if(data.status === 'success') {
                     Swal.fire('สำเร็จ', data.message, 'success').then(() => window.location.reload());
