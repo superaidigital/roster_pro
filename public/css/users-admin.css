@@ -1,0 +1,272 @@
+/* Roster Pro — Users / HR workspace (Design System v2) */
+
+.rp-users-overview {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+
+.rp-users-kpi {
+    padding: .9rem 1rem;
+    border: 1px solid var(--rp-border);
+    border-radius: var(--rp-radius-lg);
+    background: var(--rp-surface);
+    box-shadow: var(--rp-shadow-xs);
+}
+
+.rp-users-kpi__label {
+    color: var(--rp-text-muted);
+    font-size: .68rem;
+    font-weight: 700;
+}
+
+.rp-users-kpi__value {
+    margin-top: .18rem;
+    color: var(--rp-text);
+    font-family: var(--rp-font-heading);
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.rp-users-filterbar {
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) minmax(180px, 1.4fr) minmax(150px, 1fr) minmax(150px, 1fr) auto;
+    gap: .6rem;
+    align-items: center;
+    padding: .85rem;
+    border: 1px solid var(--rp-border);
+    border-radius: var(--rp-radius-lg);
+    background: var(--rp-surface);
+    box-shadow: var(--rp-shadow-xs);
+}
+
+.rp-users-filterbar .rp-control {
+    min-width: 0;
+}
+
+.rp-users-table-wrap {
+    max-height: calc(100dvh - 310px);
+    overflow: auto;
+    scrollbar-width: thin;
+}
+
+.rp-users-table {
+    min-width: 1080px;
+    margin: 0;
+}
+
+.rp-users-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--rp-slate-50);
+}
+
+.rp-user-avatar {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: .8rem;
+    background: var(--rp-primary-50);
+    color: var(--rp-primary-700);
+    font-weight: 800;
+}
+
+.rp-user-person {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    min-width: 0;
+}
+
+.rp-user-person__copy {
+    min-width: 0;
+}
+
+.rp-user-person__name {
+    color: var(--rp-text);
+    font-size: .82rem;
+    font-weight: 700;
+}
+
+.rp-user-person__login {
+    margin-top: .15rem;
+    color: var(--rp-text-muted);
+    font-size: .68rem;
+    overflow-wrap: anywhere;
+}
+
+.rp-user-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .35rem;
+}
+
+.rp-icon-btn {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--rp-border);
+    border-radius: .65rem;
+    background: var(--rp-surface);
+    color: var(--rp-slate-600);
+    cursor: pointer;
+    transition: background-color var(--rp-motion-fast), border-color var(--rp-motion-fast), color var(--rp-motion-fast);
+}
+
+.rp-icon-btn:hover {
+    background: var(--rp-slate-50);
+    border-color: var(--rp-slate-300);
+    color: var(--rp-text);
+}
+
+.rp-icon-btn--primary { color: var(--rp-primary-700); }
+.rp-icon-btn--success { color: var(--rp-success-700); }
+.rp-icon-btn--danger { color: var(--rp-danger-700); }
+
+.rp-users-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+}
+
+.rp-user-card {
+    padding: .9rem;
+}
+
+.rp-user-card__head {
+    display: flex;
+    align-items: flex-start;
+    gap: .65rem;
+}
+
+.rp-user-card__status {
+    margin-left: auto;
+}
+
+.rp-user-card__facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .45rem;
+    margin-top: .7rem;
+}
+
+.rp-user-card__fact {
+    min-width: 0;
+    padding: .55rem;
+    border: 1px solid var(--rp-border);
+    border-radius: .65rem;
+    background: var(--rp-slate-50);
+}
+
+.rp-user-card__fact-label {
+    display: block;
+    color: var(--rp-text-muted);
+    font-size: .62rem;
+}
+
+.rp-user-card__fact-value {
+    display: block;
+    margin-top: .12rem;
+    color: var(--rp-text);
+    font-size: .72rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rp-user-card__actions {
+    display: flex;
+    gap: .45rem;
+    margin-top: .75rem;
+    flex-wrap: wrap;
+}
+
+.rp-user-card__actions > *,
+.rp-user-card__actions form {
+    flex: 1 1 0;
+}
+
+.rp-user-card__actions .rp-btn {
+    width: 100%;
+}
+
+.rp-bulk-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .7rem .85rem;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--rp-radius-md);
+    background: var(--rp-primary-50);
+    margin-bottom: .75rem;
+}
+
+.rp-bulk-bar.is-visible {
+    display: flex;
+}
+
+.rp-modal-section {
+    padding: .85rem;
+    border: 1px solid var(--rp-border);
+    border-radius: .8rem;
+    background: var(--rp-slate-50);
+}
+
+.rp-modal-section__title {
+    margin: 0 0 .7rem;
+    font-size: .82rem;
+    font-weight: 700;
+    color: var(--rp-text);
+}
+
+@media (max-width: 1199.98px) {
+    .rp-users-overview {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rp-users-filterbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .rp-users-filterbar > :first-child {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .rp-users-filterbar {
+        grid-template-columns: 1fr;
+    }
+
+    .rp-users-filterbar > :first-child {
+        grid-column: auto;
+    }
+
+    .rp-users-overview {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 575.98px) {
+    .rp-users-overview {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .rp-user-card__facts {
+        grid-template-columns: 1fr;
+    }
+
+    .rp-user-card__actions {
+        flex-direction: column;
+    }
+}
