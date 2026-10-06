@@ -1,6 +1,4 @@
 <?php
-// ที่อยู่ไฟล์: controllers/NotificationController.php
-
 require_once 'config/database.php';
 require_once 'models/NotificationModel.php';
 
@@ -13,71 +11,152 @@ class NotificationController {
             session_start();
         }
 
-        // 🛡️ ตรวจสอบสิทธิ์การเข้าใช้งาน (ต้องล็อกอินก่อน)
         if (!isset($_SESSION['user'])) {
             $_SESSION['error_msg'] = "กรุณาเข้าสู่ระบบก่อนใช้งาน";
-            header("Location: index.php?c=auth&a=login");
+            header("Location: index.php?c=auth&a=index");
             exit;
         }
 
-        // เชื่อมต่อฐานข้อมูลและเรียกใช้ Model
         $this->db = (new Database())->getConnection();
         $this->notifModel = new NotificationModel($this->db);
     }
 
-    // ==========================================
-    // 🌟 1. โหลดหน้าจอหลักการแจ้งเตือน (index)
-    // ==========================================
+    private function getCsrfToken() {
+        if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    private function verifyCsrf() {
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $postedToken = $_POST['csrf_token'] ?? '';
+
+        if (!is_string($sessionToken) || !is_string($postedToken) ||
+            $sessionToken === '' || $postedToken === '' ||
+            !hash_equals($sessionToken, $postedToken)) {
+            $this->respondError('คำขอหมดอายุหรือไม่ถูกต้อง', 419);
+        }
+    }
+
+    private function requirePost() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->respondError('Method not allowed', 405);
+        }
+    }
+
+    private function isAjaxRequest() {
+        return ($_POST['ajax'] ?? '') === '1'
+            || strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
+    }
+
+    private function safeInternalUrl($url, $fallback = 'index.php?c=notification') {
+        if (!is_string($url)) return $fallback;
+
+        $url = trim($url);
+        if ($url === '' || preg_match('/[\r\n]/', $url)) return $fallback;
+
+        // Only allow application-internal index.php routes.
+        if (preg_match('/^index\.php(?:\?.*)?$/', $url)) {
+            return $url;
+        }
+
+        return $fallback;
+    }
+
+    private function respondJson($payload, $status = 200) {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    private function respondError($message, $status = 400) {
+        if ($this->isAjaxRequest()) {
+            $this->respondJson(['status' => 'error', 'message' => $message], $status);
+        }
+
+        http_response_code($status);
+        $_SESSION['error_msg'] = $message;
+        header("Location: index.php?c=notification");
+        exit;
+    }
+
     public function index() {
-        // ข้อมูลถูกดึงอยู่แล้วในไฟล์ View แต่เราโหลด Layout ให้ครบถ้วน
+        $csrf_token = $this->getCsrfToken();
+
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
         require_once 'views/notification/index.php';
-        
-        // ปิด Tag โครงสร้าง HTML (ปรับให้ตรงกับโครงสร้างเทมเพลตของคุณ)
         echo "</main></div></body></html>";
     }
 
-    // ==========================================
-    // 🌟 2. อ่านการแจ้งเตือน 1 รายการและเปลี่ยนหน้า (Redirect)
-    // ==========================================
     public function read() {
-        if (isset($_GET['id'])) {
-            $id = (int)$_GET['id'];
-            $user_id = $_SESSION['user']['id'];
-            
-            // อัปเดตสถานะในฐานข้อมูลว่า "อ่านแล้ว"
-            $this->notifModel->markAsRead($id, $user_id);
+        $this->requirePost();
+        $this->verifyCsrf();
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $user_id = (int)$_SESSION['user']['id'];
+        $target = $this->safeInternalUrl($_POST['url'] ?? '', 'index.php?c=notification');
+
+        if (!$id) {
+            $this->respondError('ไม่พบรหัสการแจ้งเตือน');
         }
 
-        // ตรวจสอบว่ามีลิงก์แนบมาด้วยหรือไม่ ถ้ามีให้วิ่งไปที่ลิงก์นั้น
-        if (!empty($_GET['url'])) {
-            $target_url = urldecode($_GET['url']);
-            header("Location: " . $target_url);
-        } else {
-            // ถ้าไม่มีลิงก์ ให้กลับไปที่หน้ารวมการแจ้งเตือน
-            header("Location: index.php?c=notification");
+        $ok = $this->notifModel->markAsRead($id, $user_id);
+
+        if ($this->isAjaxRequest()) {
+            $this->respondJson([
+                'status' => $ok ? 'success' : 'error',
+                'url' => $target
+            ], $ok ? 200 : 400);
         }
+
+        header("Location: " . $target);
         exit;
     }
 
-    // ==========================================
-    // 🌟 3. ทำเครื่องหมายว่าอ่านทั้งหมด (กรณีเรียกจาก Header Dropdown)
-    // ==========================================
     public function read_all() {
-        $user_id = $_SESSION['user']['id'];
-        
-        // สั่งเคลียร์ให้อ่านทั้งหมด
-        $this->notifModel->markAllAsRead($user_id);
-        
-        // พยายามพากลับไปหน้าเดิมที่ผู้ใช้กด (Referer) ถ้าไม่มีให้ไปหน้า Dashboard
-        $referer = $_SERVER['HTTP_REFERER'] ?? 'index.php?c=dashboard';
-        
-        // ใส่ Alert แจ้งเตือนความสำเร็จ (ถ้ามีระบบรองรับใน View)
-        $_SESSION['success_msg'] = "ทำเครื่องหมายว่าอ่านแล้วทั้งหมดเรียบร้อย";
-        
-        header("Location: " . $referer);
+        $this->requirePost();
+        $this->verifyCsrf();
+
+        $user_id = (int)$_SESSION['user']['id'];
+        $ok = $this->notifModel->markAllAsRead($user_id);
+
+        if ($this->isAjaxRequest()) {
+            $this->respondJson(['status' => $ok ? 'success' : 'error'], $ok ? 200 : 400);
+        }
+
+        $_SESSION['success_msg'] = $ok ? "ทำเครื่องหมายว่าอ่านแล้วทั้งหมดเรียบร้อย" : "ไม่สามารถอัปเดตการแจ้งเตือนได้";
+        $returnTo = $this->safeInternalUrl($_POST['return_to'] ?? '', 'index.php?c=notification');
+        header("Location: " . $returnTo);
         exit;
+    }
+
+    public function delete() {
+        $this->requirePost();
+        $this->verifyCsrf();
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        if (!$id) {
+            $this->respondError('ไม่พบรหัสการแจ้งเตือน');
+        }
+
+        $ok = $this->notifModel->deleteNotification($id, (int)$_SESSION['user']['id']);
+        $this->respondJson(['status' => $ok ? 'success' : 'error'], $ok ? 200 : 400);
+    }
+
+    public function delete_all() {
+        $this->requirePost();
+        $this->verifyCsrf();
+
+        $ok = $this->notifModel->deleteAllForUser((int)$_SESSION['user']['id']);
+        $this->respondJson(['status' => $ok ? 'success' : 'error'], $ok ? 200 : 400);
+    }
+
+    public function count() {
+        $count = $this->notifModel->getUnreadCount((int)$_SESSION['user']['id']);
+        $this->respondJson(['status' => 'success', 'unread_count' => (int)$count]);
     }
 }
 ?>
