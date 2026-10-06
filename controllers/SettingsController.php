@@ -75,8 +75,8 @@ class SettingsController {
         $hospitalModel = new HospitalModel($db);
 
         $hospital_id = $_SESSION['user']['hospital_id'];
-        if (isset($_POST['id']) && in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'])) {
-            $hospital_id = $_POST['id'];
+        if (isset($_GET['id']) && in_array($_SESSION['user']['role'], ['SUPERADMIN', 'ADMIN'], true)) {
+            $hospital_id = (int)$_GET['id'];
         }
         
         $hospital = $hospitalModel->getHospitalById($hospital_id);
