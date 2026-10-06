@@ -152,6 +152,7 @@ $header_page_icon = $page_context[2];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- 🌟 ดึงชื่อแอปมาแสดงที่ชื่อแท็บเบราว์เซอร์ -->
     <title><?= htmlspecialchars($app_name) ?> - <?= htmlspecialchars($app_subtitle) ?></title>
+    <meta name="csrf-token" content="<?= htmlspecialchars($header_csrf_token ?? ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0d6efd">
