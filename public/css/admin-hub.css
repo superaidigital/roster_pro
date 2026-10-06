@@ -1,0 +1,158 @@
+/* Roster Pro — Reports & Settings workspace (Design System v2) */
+
+.rp-report-filterbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    flex-wrap: wrap;
+    padding: .8rem .9rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--rp-border);
+    border-radius: var(--rp-radius-lg);
+    background: var(--rp-surface);
+    box-shadow: var(--rp-shadow-xs);
+}
+
+.rp-report-filterbar__group {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.rp-report-filterbar .rp-control {
+    width: auto;
+    min-width: 130px;
+}
+
+.rp-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 1rem;
+}
+
+.rp-setting-card {
+    --rp-setting-accent: var(--rp-primary-600);
+    --rp-setting-soft: var(--rp-primary-50);
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    border: 1px solid var(--rp-border);
+    border-radius: var(--rp-radius-xl);
+    background: var(--rp-surface);
+    color: inherit;
+    text-decoration: none;
+    box-shadow: var(--rp-shadow-xs);
+    transition: transform var(--rp-motion-normal), border-color var(--rp-motion-normal), box-shadow var(--rp-motion-normal);
+}
+
+.rp-setting-card:hover {
+    color: inherit;
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--rp-setting-accent) 28%, var(--rp-border));
+    box-shadow: var(--rp-shadow-md);
+}
+
+.rp-setting-card--success {
+    --rp-setting-accent: var(--rp-success-600);
+    --rp-setting-soft: var(--rp-success-50);
+}
+
+.rp-setting-card--warning {
+    --rp-setting-accent: var(--rp-warning-600);
+    --rp-setting-soft: var(--rp-warning-50);
+}
+
+.rp-setting-card--danger {
+    --rp-setting-accent: var(--rp-danger-600);
+    --rp-setting-soft: var(--rp-danger-50);
+}
+
+.rp-setting-card--info {
+    --rp-setting-accent: var(--rp-info-600);
+    --rp-setting-soft: var(--rp-info-50);
+}
+
+.rp-setting-card--violet {
+    --rp-setting-accent: var(--rp-violet-600);
+    --rp-setting-soft: var(--rp-violet-50);
+}
+
+.rp-setting-card__icon {
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    margin-bottom: .85rem;
+    border-radius: .85rem;
+    background: var(--rp-setting-soft);
+    color: var(--rp-setting-accent);
+    font-size: 1.2rem;
+}
+
+.rp-setting-card__title {
+    margin: 0;
+    color: var(--rp-text);
+    font-size: .95rem;
+    font-weight: 700;
+}
+
+.rp-setting-card__description {
+    margin: .35rem 0 0;
+    color: var(--rp-text-secondary);
+    font-size: .78rem;
+    line-height: 1.55;
+}
+
+.rp-setting-card__footer {
+    margin-top: auto;
+    padding-top: .9rem;
+    color: var(--rp-setting-accent);
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.rp-setting-card--critical {
+    border-color: #fecaca;
+    background: var(--rp-danger-50);
+}
+
+.rp-setting-card--critical .rp-setting-card__title,
+.rp-setting-card--critical .rp-setting-card__description,
+.rp-setting-card--critical .rp-setting-card__footer {
+    color: var(--rp-danger-700);
+}
+
+@media (max-width: 1199.98px) {
+    .rp-settings-grid {
+        grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+}
+
+@media (max-width: 767.98px) {
+    .rp-report-filterbar {
+        align-items: stretch;
+    }
+
+    .rp-report-filterbar__group,
+    .rp-report-filterbar .rp-control {
+        width: 100%;
+    }
+
+    .rp-report-filterbar__group {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .rp-settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .rp-report-filterbar__group {
+        grid-template-columns: 1fr;
+    }
+}
