@@ -25,6 +25,7 @@ require_once __DIR__ . '/../components/ui.php';
     
     .badge-soft-warning { background-color: #fffbeb; color: #d97706; border: 1px solid #fcd34d; }
 </style>
+<link rel="stylesheet" href="public/css/leave-workflow.css?v=2">
 
 <div class="rp-page">
     <?php
@@ -36,34 +37,127 @@ require_once __DIR__ . '/../components/ui.php';
     );
     ?>
 
-    <!-- Alert ข้อความแจ้งเตือน -->
     <?php if (isset($_SESSION['success_msg'])): ?>
-        <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-success border-4">
-            <i class="bi bi-check-circle-fill fs-5 me-3"></i> 
-            <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--success" role="status" aria-live="polite">
+            <span class="rp-alert__icon"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['success_msg']) ?></div>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
-    
+
     <?php if (isset($_SESSION['error_msg'])): ?>
-        <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-danger border-4">
-            <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
-            <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?></div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--danger" role="alert">
+            <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['error_msg']) ?></div>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
     <section class="rp-section">
         <?php rp_section_header('รายการรอพิจารณา', 'จัดลำดับคำขอที่ต้องดำเนินการก่อน'); ?>
-        <div class="rp-card overflow-hidden">
+        <div class="d-md-none rp-approval-mobile-list mb-3">
+            <?php if (empty($pending_leaves)): ?>
+                <div class="rp-card">
+                    <?php rp_empty_state('bi-check2-all', 'ไม่มีใบลาค้างพิจารณา', 'ขณะนี้ไม่มีรายการที่ต้องดำเนินการ'); ?>
+                </div>
+            <?php else: ?>
+                <?php foreach($pending_leaves as $leave):
+                    $is_cancel_req = (($leave['status'] ?? '') === 'CANCEL_REQUESTED');
+                ?>
+                    <article class="rp-card rp-card__body rp-approval-card <?= $is_cancel_req ? 'rp-approval-card--cancel' : '' ?>">
+                        <div class="rp-approval-card__person">
+                            <div>
+                                <h3 class="rp-approval-card__name"><?= rp_e($leave['user_name']) ?></h3>
+                                <div class="rp-approval-card__meta">
+                                    <?= rp_e($leave['employee_type']) ?> · <?= rp_e($leave['hospital_name'] ?? 'ส่วนกลาง') ?>
+                                </div>
+                            </div>
+                            <span class="rp-badge <?= $is_cancel_req ? 'rp-badge--warning' : 'rp-badge--info' ?>">
+                                <?= $is_cancel_req ? 'ขอยกเลิก' : 'รอพิจารณา' ?>
+                            </span>
+                        </div>
+
+                        <div class="rp-approval-card__facts">
+                            <div class="rp-approval-card__fact">
+                                <span class="rp-approval-card__fact-label">ประเภท</span>
+                                <span class="rp-approval-card__fact-value"><?= rp_e($leave['leave_type']) ?></span>
+                            </div>
+                            <div class="rp-approval-card__fact">
+                                <span class="rp-approval-card__fact-label">จำนวนวัน</span>
+                                <span class="rp-approval-card__fact-value"><?= rp_e((float)$leave['num_days']) ?> วัน</span>
+                            </div>
+                            <div class="rp-approval-card__fact">
+                                <span class="rp-approval-card__fact-label">ช่วงวันที่</span>
+                                <span class="rp-approval-card__fact-value">
+                                    <?php
+                                    $start_dt = getShortThaiDateApprovals($leave['start_date']);
+                                    $end_dt = getShortThaiDateApprovals($leave['end_date']);
+                                    echo rp_e($start_dt === $end_dt ? $start_dt : "{$start_dt} - {$end_dt}");
+                                    ?>
+                                </span>
+                            </div>
+                            <div class="rp-approval-card__fact">
+                                <span class="rp-approval-card__fact-label">ยื่นเมื่อ</span>
+                                <span class="rp-approval-card__fact-value"><?= rp_e(date('d/m/Y H:i', strtotime($leave['created_at']))) ?></span>
+                            </div>
+                        </div>
+
+                        <?php if (!empty($leave['reason'])): ?>
+                            <div class="rp-approval-card__reason"><?= nl2br(rp_e($leave['reason'])) ?></div>
+                        <?php endif; ?>
+
+                        <div class="d-flex gap-2 mt-3">
+                            <a href="index.php?c=leave&a=print&id=<?= (int)$leave['id'] ?>" target="_blank" rel="noopener" class="rp-btn rp-btn--secondary rp-btn--sm flex-fill">
+                                <i class="bi bi-file-earmark-text"></i> ดูต้นฉบับ
+                            </a>
+                            <?php if(!empty($leave['med_cert_path'])): ?>
+                                <a href="index.php?c=leave&a=download_med_cert&id=<?= (int)$leave['id'] ?>" target="_blank" rel="noopener" class="rp-btn rp-btn--secondary rp-btn--sm flex-fill">
+                                    <i class="bi bi-paperclip"></i> ใบรับรอง
+                                </a>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="rp-approval-card__actions">
+                            <?php if($is_cancel_req): ?>
+                                <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('อนุมัติให้ยกเลิกใบลานี้หรือไม่?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
+                                    <input type="hidden" name="action" value="APPROVE_CANCEL">
+                                    <button class="rp-btn rp-btn--warning w-100" type="submit"><i class="bi bi-check2-all"></i> ให้ยกเลิก</button>
+                                </form>
+                                <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('ปฏิเสธคำขอยกเลิกนี้หรือไม่?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
+                                    <input type="hidden" name="action" value="REJECT_CANCEL">
+                                    <button class="rp-btn rp-btn--secondary w-100" type="submit"><i class="bi bi-x-lg"></i> ปฏิเสธ</button>
+                                </form>
+                            <?php else: ?>
+                                <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('ยืนยันการอนุมัติใบลานี้หรือไม่?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
+                                    <input type="hidden" name="action" value="APPROVED">
+                                    <button class="rp-btn rp-btn--success w-100" type="submit"><i class="bi bi-check-lg"></i> อนุมัติ</button>
+                                </form>
+                                <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('ยืนยันไม่อนุมัติใบลานี้หรือไม่?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
+                                    <input type="hidden" name="action" value="REJECTED">
+                                    <button class="rp-btn rp-btn--danger w-100" type="submit"><i class="bi bi-x-lg"></i> ไม่อนุมัติ</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <div class="rp-card overflow-hidden d-none d-md-block">
         <div class="rp-card__header">
             <h2 class="rp-card__title"><i class="bi bi-inbox-fill text-primary me-2" aria-hidden="true"></i>คิวใบลา</h2>
             <span class="rp-badge rp-badge--info"><?= count($pending_leaves ?? []) ?> รายการ</span>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive custom-scrollbar" style="max-height: 65vh;">
+        <div class="rp-card__body p-0">
+            <div class="table-responsive custom-scrollbar rp-data-table-wrap">
                 <table class="table rp-table table-hover align-middle mb-0">
                     <thead class="table-light text-secondary sticky-top" style="font-size: 13px; z-index: 10;">
                         <tr>
@@ -79,12 +173,8 @@ require_once __DIR__ . '/../components/ui.php';
                     <tbody class="border-top-0">
                         <?php if (empty($pending_leaves)): ?>
                             <tr>
-                                <td colspan="7" class="text-center py-5">
-                                    <div class="d-inline-flex justify-content-center align-items-center rounded-circle bg-light mb-3" style="width: 80px; height: 80px;">
-                                        <i class="bi bi-check2-all text-success opacity-50" style="font-size: 2.5rem;"></i>
-                                    </div>
-                                    <h6 class="fw-bold text-success mb-1">ไม่มีใบลาค้างพิจารณา</h6>
-                                    <p class="text-muted small mb-0">เคลียร์งานเสร็จสิ้น ระบบเรียบร้อยดีในขณะนี้</p>
+                                <td colspan="7">
+                                    <?php rp_empty_state('bi-check2-all', 'ไม่มีใบลาค้างพิจารณา', 'ขณะนี้ไม่มีรายการที่ต้องดำเนินการ'); ?>
                                 </td>
                             </tr>
                         <?php else: ?>
@@ -210,8 +300,11 @@ require_once __DIR__ . '/../components/ui.php';
         </div>
         
         <!-- คำอธิบายเพิ่มเติมด้านล่างตาราง -->
-        <div class="card-footer bg-light border-top py-3 text-muted" style="font-size: 12px;">
-            <i class="bi bi-info-circle text-primary me-1"></i> <strong>คำแนะนำ:</strong> รายการที่มีแถบสีเหลือง หมายถึงบุคลากรขอยกเลิกใบลาที่เคยได้รับการอนุมัติไปแล้ว หากคุณกด "ให้ยกเลิก" ระบบจะทำการเปลี่ยนสถานะเป็น <span class="badge bg-secondary">ยกเลิกสำเร็จแล้ว</span> และคืนโควตาวันลาให้กับบุคลากรท่านนั้นโดยอัตโนมัติ
+        <div class="rp-alert rp-alert--info m-3">
+            <span class="rp-alert__icon"><i class="bi bi-info-circle" aria-hidden="true"></i></span>
+            <div class="rp-alert__content">
+                รายการขอยกเลิกใบลาจะแสดงโทนสีเหลือง เมื่ออนุมัติการยกเลิก ระบบจะคืนโควตาวันลาให้อัตโนมัติ
+            </div>
         </div>
     </div>
     </section>
