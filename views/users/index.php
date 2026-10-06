@@ -16,6 +16,22 @@ $hosp_map = [0 => 'ส่วนกลาง (สสจ./รพ.)'];
 foreach($hospitals_list as $h) {
     $hosp_map[$h['id']] = $h['name'];
 }
+
+$user_metrics = [
+    'total' => count($users_list),
+    'active' => 0,
+    'inactive' => 0,
+    'managers' => 0,
+];
+foreach ($users_list as $metric_user) {
+    if ((int)($metric_user['is_active'] ?? 1) === 1) $user_metrics['active']++;
+    else $user_metrics['inactive']++;
+    if (in_array(strtoupper((string)($metric_user['role'] ?? '')), ['SCHEDULER','DIRECTOR','HR','ADMIN','SUPERADMIN'], true)) {
+        $user_metrics['managers']++;
+    }
+}
+
+require_once __DIR__ . '/../components/ui.php';
 ?>
 
 <!-- Include Required Plugins -->
@@ -33,97 +49,182 @@ foreach($hospitals_list as $h) {
     .sortable-ghost td { background-color: #eff6ff !important; border-top: 2px dashed #3b82f6; }
     .avatar-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 </style>
+<link rel="stylesheet" href="public/css/users-admin.css?v=2">
 
-<div class="container-fluid px-3 px-md-4 py-4">
+<div class="rp-page">
 
-    <!-- Header Section -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width: 50px; height: 50px;">
-                <i class="bi bi-person-lines-fill fs-4"></i>
-            </div>
-            <div>
-                <h2 class="h4 text-dark mb-0 fw-bold">จัดการผู้ใช้งานและเครือข่าย</h2>
-                <p class="text-muted mb-0" style="font-size: 13px;">รายชื่อบุคลากรทั้งหมดภายใต้การกำกับดูแลของคุณ</p>
-            </div>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-            <button class="btn btn-outline-success fw-bold rounded-pill shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#importCsvModal">
-                <i class="bi bi-file-earmark-arrow-up me-1"></i> นำเข้า CSV
-            </button>
-            <button class="btn btn-primary fw-bold rounded-pill shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#addUserModal" onclick="resetForm()">
-                <i class="bi bi-person-plus-fill me-1"></i> เพิ่มผู้ใช้งาน
-            </button>
-        </div>
-    </div>
+    <?php
+    ob_start();
+    ?>
+        <button class="rp-btn rp-btn--secondary" data-bs-toggle="modal" data-bs-target="#importCsvModal">
+            <i class="bi bi-file-earmark-arrow-up" aria-hidden="true"></i>
+            นำเข้า CSV
+        </button>
+        <button class="rp-btn rp-btn--primary" data-bs-toggle="modal" data-bs-target="#addUserModal" onclick="resetForm()">
+            <i class="bi bi-person-plus-fill" aria-hidden="true"></i>
+            เพิ่มผู้ใช้งาน
+        </button>
+    <?php
+    $users_header_actions = ob_get_clean();
+    rp_page_header(
+        'บุคลากรและผู้ใช้งาน',
+        'ค้นหา กรอง จัดการสิทธิ์ และดูสถานะบัญชีจากพื้นที่ทำงานเดียว',
+        $users_header_actions,
+        'People & Access'
+    );
+    ?>
 
-    <!-- Alert Messages -->
     <?php if (isset($_SESSION['success_msg'])): ?>
-        <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
-            <i class="bi bi-check-circle-fill me-2"></i> <?= $_SESSION['success_msg'] ?>
+        <div class="rp-alert rp-alert--success" role="status" aria-live="polite">
+            <span class="rp-alert__icon"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['success_msg']) ?></div>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
+
     <?php if (isset($_SESSION['error_msg'])): ?>
-        <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 p-3 shadow-sm border-start border-danger border-4 mb-4">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?= $_SESSION['error_msg'] ?>
+        <div class="rp-alert rp-alert--danger" role="alert">
+            <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['error_msg']) ?></div>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
-    <!-- Real-time Filter & Search Section -->
-    <div class="card card-modern mb-4">
-        <div class="card-body p-3">
-            <div class="row g-2 align-items-center">
-                <div class="col-md-4">
-                    <div class="input-group shadow-sm rounded-3">
-                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="ค้นหาชื่อ, Username, เบอร์โทร...">
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <select id="filterHospital" class="form-select shadow-sm rounded-3">
-                        <option value="">-- ทุกหน่วยบริการ --</option>
-                        <option value="0">ส่วนกลาง (สสจ./รพ.)</option>
-                        <?php foreach($hospitals_list as $h): ?>
-                            <option value="<?= $h['id'] ?>">🏥 <?= htmlspecialchars($h['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select id="filterRole" class="form-select shadow-sm rounded-3">
-                        <option value="">-- ทุกสิทธิ์ --</option>
-                        <option value="STAFF">STAFF</option>
-                        <option value="SCHEDULER">SCHEDULER</option>
-                        <option value="HR">HR</option>
-                        <option value="ADMIN">ADMIN</option>
-                        <option value="SUPERADMIN">SUPERADMIN</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select id="filterStatus" class="form-select shadow-sm rounded-3">
-                        <option value="">-- ทุกสถานะ --</option>
-                        <option value="1">🟢 เปิดใช้งาน</option>
-                        <option value="0">🔴 ระงับบัญชี</option>
-                    </select>
-                </div>
-                <div class="col-md-1">
-                    <button class="btn btn-light border w-100 rounded-3 shadow-sm" onclick="clearFilters()" title="ล้างตัวกรอง">
-                        <i class="bi bi-arrow-counterclockwise"></i>
-                    </button>
-                </div>
-            </div>
+    <section class="rp-section" aria-labelledby="usersOverviewTitle">
+        <?php rp_section_header('ภาพรวมบัญชี', 'สถานะบุคลากรที่อยู่ภายใต้การดูแลของคุณ'); ?>
+        <div class="rp-users-overview" id="usersOverviewTitle">
+            <div class="rp-users-kpi"><div class="rp-users-kpi__label">ทั้งหมด</div><div class="rp-users-kpi__value"><?= number_format($user_metrics['total']) ?></div></div>
+            <div class="rp-users-kpi"><div class="rp-users-kpi__label">เปิดใช้งาน</div><div class="rp-users-kpi__value"><?= number_format($user_metrics['active']) ?></div></div>
+            <div class="rp-users-kpi"><div class="rp-users-kpi__label">ระงับบัญชี</div><div class="rp-users-kpi__value"><?= number_format($user_metrics['inactive']) ?></div></div>
+            <div class="rp-users-kpi"><div class="rp-users-kpi__label">ผู้จัดการ/ผู้ดูแล</div><div class="rp-users-kpi__value"><?= number_format($user_metrics['managers']) ?></div></div>
         </div>
-    </div>
+    </section>
 
-    <!-- Main Data Card -->
-    <div class="card card-modern overflow-hidden">
-        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+    <section class="rp-section" aria-labelledby="userFiltersTitle">
+        <?php rp_section_header('ค้นหาและกรอง', 'ลดรายการให้เหลือเฉพาะคนที่ต้องการจัดการ'); ?>
+        <div class="rp-users-filterbar" id="userFiltersTitle">
+            <input type="search" id="searchInput" class="rp-control" placeholder="ค้นหาชื่อ, Username, เบอร์โทร..." aria-label="ค้นหาผู้ใช้งาน">
+
+            <select id="filterHospital" class="rp-control" aria-label="กรองตามหน่วยบริการ">
+                <option value="">ทุกหน่วยบริการ</option>
+                <option value="0">ส่วนกลาง (สสจ./รพ.)</option>
+                <?php foreach($hospitals_list as $h): ?>
+                    <option value="<?= (int)$h['id'] ?>"><?= rp_e($h['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <select id="filterRole" class="rp-control" aria-label="กรองตามสิทธิ์">
+                <option value="">ทุกสิทธิ์</option>
+                <option value="STAFF">STAFF</option>
+                <option value="SCHEDULER">SCHEDULER</option>
+                <option value="HR">HR</option>
+                <option value="ADMIN">ADMIN</option>
+                <option value="SUPERADMIN">SUPERADMIN</option>
+            </select>
+
+            <select id="filterStatus" class="rp-control" aria-label="กรองตามสถานะ">
+                <option value="">ทุกสถานะ</option>
+                <option value="1">เปิดใช้งาน</option>
+                <option value="0">ระงับบัญชี</option>
+            </select>
+
+            <button type="button" class="rp-btn rp-btn--secondary" onclick="clearFilters()" title="ล้างตัวกรอง">
+                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+                <span class="d-none d-xl-inline">ล้าง</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Main Data -->
+    <section class="rp-section">
+        <?php rp_section_header('ทำเนียบบุคลากร', 'บนมือถือจะแสดงเป็นการ์ด และบน Desktop ใช้ตารางสำหรับจัดการหลายรายการ'); ?>
+
+        <div class="d-md-none rp-users-mobile-list mb-3" id="users-mobile-list">
+            <?php if (empty($users_list)): ?>
+                <div class="rp-card"><?php rp_empty_state('bi-people', 'ไม่พบข้อมูลผู้ใช้งาน', 'ลองเปลี่ยนตัวกรองหรือเพิ่มผู้ใช้งานใหม่'); ?></div>
+            <?php else: foreach($users_list as $user):
+                $initial = mb_substr($user['name'], 0, 1, 'UTF-8');
+                $is_active_user = (int)($user['is_active'] ?? 1) === 1;
+            ?>
+                <article class="rp-card rp-user-card user-card-mobile"
+                    data-id="<?= (int)$user['id'] ?>"
+                    data-hospital="<?= (int)($user['hospital_id'] ?? 0) ?>"
+                    data-role="<?= rp_e(strtoupper((string)$user['role'])) ?>"
+                    data-status="<?= $is_active_user ? '1' : '0' ?>">
+                    <div class="rp-user-card__head">
+                        <div class="rp-user-avatar"><?= rp_e($initial) ?></div>
+                        <div class="rp-user-person__copy">
+                            <div class="rp-user-person__name user-name"><?= rp_e($user['name']) ?></div>
+                            <div class="rp-user-person__login user-username"><?= rp_e($user['username'] ?? $user['phone'] ?? '-') ?></div>
+                            <span class="d-none user-phone"><?= rp_e($user['phone'] ?? '') ?></span>
+                        </div>
+                        <div class="rp-user-card__status">
+                            <span class="rp-badge <?= $is_active_user ? 'rp-badge--success' : 'rp-badge--danger' ?>">
+                                <?= $is_active_user ? 'ใช้งานอยู่' : 'ระงับ' ?>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="rp-user-card__facts">
+                        <div class="rp-user-card__fact">
+                            <span class="rp-user-card__fact-label">หน่วยบริการ</span>
+                            <span class="rp-user-card__fact-value"><?= rp_e($hosp_map[$user['hospital_id'] ?? 0] ?? '-') ?></span>
+                        </div>
+                        <div class="rp-user-card__fact">
+                            <span class="rp-user-card__fact-label">สิทธิ์</span>
+                            <span class="rp-user-card__fact-value"><?= rp_e($user['role']) ?></span>
+                        </div>
+                        <div class="rp-user-card__fact">
+                            <span class="rp-user-card__fact-label">ประเภทบุคลากร</span>
+                            <span class="rp-user-card__fact-value"><?= rp_e($user['employee_type'] ?? 'ทั่วไป') ?></span>
+                        </div>
+                        <div class="rp-user-card__fact">
+                            <span class="rp-user-card__fact-label">ตำแหน่ง/วิชาชีพ</span>
+                            <span class="rp-user-card__fact-value"><?= rp_e($user['type'] ?? '-') ?></span>
+                        </div>
+                    </div>
+
+                    <div class="rp-user-card__actions">
+                        <button class="rp-btn rp-btn--secondary rp-btn--sm"
+                            data-bs-toggle="modal" data-bs-target="#editUserModal"
+                            data-id="<?= (int)$user['id'] ?>"
+                            data-hospital="<?= rp_e($user['hospital_id'] ?? '0') ?>"
+                            data-name="<?= rp_e($user['name']) ?>"
+                            data-username="<?= rp_e($user['username'] ?? '') ?>"
+                            data-role="<?= rp_e($user['role']) ?>"
+                            data-type="<?= rp_e($user['type'] ?? '') ?>"
+                            data-emptype="<?= rp_e($user['employee_type'] ?? '') ?>"
+                            data-payrate="<?= rp_e($user['pay_rate_id'] ?? '') ?>"
+                            data-color="<?= rp_e($user['color_theme'] ?? 'primary') ?>"
+                            data-phone="<?= rp_e($user['phone'] ?? '') ?>"
+                            data-startdate="<?= rp_e($user['start_date'] ?? '') ?>"
+                            data-idcard="<?= rp_e($user['id_card'] ?? '') ?>"
+                            data-posnum="<?= rp_e($user['position_number'] ?? '') ?>">
+                            <i class="bi bi-pencil-fill"></i> แก้ไข
+                        </button>
+
+                        <?php if ((int)$user['id'] !== (int)$_SESSION['user']['id']): ?>
+                            <form method="POST" action="index.php?c=users&a=toggle" onsubmit="return confirm('ยืนยันการเปลี่ยนสถานะบัญชีนี้?');">
+                                <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                <input type="hidden" name="status" value="<?= $is_active_user ? 0 : 1 ?>">
+                                <button class="rp-btn rp-btn--secondary rp-btn--sm" type="submit">
+                                    <i class="bi bi-power"></i> <?= $is_active_user ? 'ระงับ' : 'เปิดใช้' ?>
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
+                </article>
+            <?php endforeach; endif; ?>
+        </div>
+
+        <div class="rp-card overflow-hidden d-none d-md-block">
+        <div class="rp-card__header">
             <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-list-stars text-primary me-2"></i>ทำเนียบบุคลากร</h6>
             <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill shadow-sm"><i class="bi bi-grip-vertical"></i> ลากที่ไอคอนเพื่อสลับตำแหน่ง</span>
         </div>
-        <div class="table-responsive">
-            <table class="table table-modern mb-0" style="min-width: 1100px;">
+        <div class="rp-users-table-wrap">
+            <table class="table rp-table rp-users-table mb-0">
                 <thead>
                     <tr>
                         <th class="text-center" width="5%"><i class="bi bi-arrow-down-up"></i></th>
@@ -137,7 +238,7 @@ foreach($hospitals_list as $h) {
                 </thead>
                 <tbody id="users-table-body">
                     <?php if(empty($users_list)): ?>
-                        <tr><td colspan="7" class="text-center py-5 text-muted">ไม่พบข้อมูลผู้ใช้งานในระบบ</td></tr>
+                        <tr><td colspan="7"><?php rp_empty_state('bi-people', 'ไม่พบข้อมูลผู้ใช้งาน', 'ลองเปลี่ยนตัวกรองหรือเพิ่มผู้ใช้งานใหม่'); ?></td></tr>
                     <?php else: foreach($users_list as $user): 
                         $theme = $user['color_theme'] ?? 'primary';
                         $initial = mb_substr($user['name'], 0, 1, 'UTF-8');
@@ -152,10 +253,10 @@ foreach($hospitals_list as $h) {
                             <td class="text-center"><i class="bi bi-grip-vertical drag-handle"></i></td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar-circle bg-<?= $theme ?> me-3"><?= $initial ?></div>
+                                    <div class="rp-user-avatar me-3"><?= $initial ?></div>
                                     <div>
-                                        <div class="fw-bold text-dark user-name"><?= htmlspecialchars($user['name']) ?></div>
-                                        <div class="small text-muted font-monospace user-username"><i class="bi bi-person-badge me-1"></i><?= htmlspecialchars($user['username'] ?? $user['phone']) ?></div>
+                                        <div class="rp-user-person__name user-name"><?= htmlspecialchars($user['name']) ?></div>
+                                        <div class="rp-user-person__login user-username"><i class="bi bi-person-badge me-1"></i><?= htmlspecialchars($user['username'] ?? $user['phone']) ?></div>
                                         <span class="d-none user-phone"><?= htmlspecialchars($user['phone'] ?? '') ?></span>
                                     </div>
                                 </div>
@@ -190,16 +291,19 @@ foreach($hospitals_list as $h) {
                             </td>
                             <td class="text-center">
                                 <!-- Status Toggle -->
-                                <?php if($user['id'] != $_SESSION['user']['id']): ?>
-                                    <a href="index.php?c=users&a=toggle&id=<?= $user['id'] ?>&status=<?= ($user['is_active'] ?? 1) == 1 ? 0 : 1 ?>" 
-                                       class="btn btn-sm btn-light border <?= ($user['is_active'] ?? 1) == 1 ? 'text-success' : 'text-danger' ?> rounded-circle shadow-sm" 
-                                       title="<?= ($user['is_active'] ?? 1) == 1 ? 'ระงับการใช้งาน' : 'เปิดใช้งาน' ?>">
-                                        <i class="bi bi-power"></i>
-                                    </a>
+                                <?php if((int)$user['id'] !== (int)$_SESSION['user']['id']): ?>
+                                    <form method="POST" action="index.php?c=users&a=toggle" class="d-inline" onsubmit="return confirm('ยืนยันการเปลี่ยนสถานะบัญชีนี้?');">
+                                        <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                        <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                        <input type="hidden" name="status" value="<?= ((int)($user['is_active'] ?? 1) === 1) ? 0 : 1 ?>">
+                                        <button type="submit" class="rp-icon-btn <?= ((int)($user['is_active'] ?? 1) === 1) ? 'rp-icon-btn--success' : 'rp-icon-btn--danger' ?>" title="<?= ((int)($user['is_active'] ?? 1) === 1) ? 'ระงับการใช้งาน' : 'เปิดใช้งาน' ?>">
+                                            <i class="bi bi-power"></i>
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
 
                                 <!-- Edit Button -->
-                                <button class="btn btn-sm btn-light border text-primary rounded-circle shadow-sm ms-1" 
+                                <button class="rp-icon-btn rp-icon-btn--primary" 
                                         data-bs-toggle="modal" data-bs-target="#editUserModal"
                                         data-id="<?= $user['id'] ?>"
                                         data-hospital="<?= htmlspecialchars($user['hospital_id'] ?? '0') ?>"
@@ -218,8 +322,14 @@ foreach($hospitals_list as $h) {
                                 </button>
                                 
                                 <!-- Delete Button -->
-                                <?php if($user['id'] != $_SESSION['user']['id']): ?>
-                                    <a href="index.php?c=users&a=delete&id=<?= $user['id'] ?>" class="btn btn-sm btn-light border text-danger rounded-circle ms-1 shadow-sm" onclick="return confirm('ยืนยันการลบผู้ใช้งานท่านนี้ออกจากระบบ? ข้อมูลเวรจะถูกลบไปด้วย');"><i class="bi bi-trash-fill"></i></a>
+                                <?php if((int)$user['id'] !== (int)$_SESSION['user']['id']): ?>
+                                    <form method="POST" action="index.php?c=users&a=delete" class="d-inline" onsubmit="return confirm('ยืนยันการลบ/ซ่อนผู้ใช้งานนี้? หากมีประวัติเวร ระบบจะเก็บข้อมูลย้อนหลังไว้');">
+                                        <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                        <input type="hidden" name="id" value="<?= (int)$user['id'] ?>">
+                                        <button type="submit" class="rp-icon-btn rp-icon-btn--danger" title="ลบหรือซ่อนบัญชี">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -230,14 +340,17 @@ foreach($hospitals_list as $h) {
     </div>
 </div>
 
+</section>
+
 <!-- Modal: Import CSV -->
 <div class="modal fade" id="importCsvModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
             <form action="index.php?c=users&a=import" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
                 <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
                     <h5 class="modal-title fw-bold text-dark"><i class="bi bi-file-earmark-excel text-success me-2"></i>นำเข้าบุคลากร (CSV)</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="alert alert-info border-0 bg-info bg-opacity-10 text-dark rounded-4 mb-4" style="font-size: 13px;">
@@ -267,9 +380,10 @@ foreach($hospitals_list as $h) {
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
             <form action="index.php?c=users&a=add" method="POST" id="addForm">
+                <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
                 <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
                     <h5 class="modal-title fw-bold text-dark"><i class="bi bi-person-plus-fill text-primary me-2"></i>เพิ่มผู้ใช้งานระบบ</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3">
@@ -367,10 +481,11 @@ foreach($hospitals_list as $h) {
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
             <form action="index.php?c=users&a=edit" method="POST" id="editForm">
+                <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
                 <input type="hidden" name="id" id="edit_id">
                 <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
                     <h5 class="modal-title fw-bold text-dark"><i class="bi bi-pencil-square text-warning me-2"></i>แก้ไขข้อมูลผู้ใช้งาน</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
                 </div>
                 <div class="modal-body p-4">
                     <div class="row g-3">
@@ -467,7 +582,7 @@ function applyFilters() {
     const filterRole = document.getElementById('filterRole').value;
     const filterStatus = document.getElementById('filterStatus').value;
 
-    const rows = document.querySelectorAll('.user-row');
+    const rows = document.querySelectorAll('.user-row, .user-card-mobile');
     let visibleCount = 0;
 
     rows.forEach(row => {
@@ -604,7 +719,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetch('index.php?c=users&a=update_order', {
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ order: orderData })
+                    body: JSON.stringify({ order: orderData, csrf_token: <?= json_encode($csrf_token, JSON_UNESCAPED_SLASHES) ?> })
                 })
                 .then(response => response.json())
                 .then(data => {
