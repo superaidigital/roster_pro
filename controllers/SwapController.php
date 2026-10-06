@@ -3,6 +3,7 @@
 
 require_once 'config/database.php';
 require_once 'models/SwapModel.php';
+require_once 'services/NotificationService.php';
 require_once 'models/UserModel.php';
 
 // นำเข้าระบบแจ้งเตือน
@@ -176,6 +177,10 @@ class SwapController {
                     'มีคำขอแลกเวรใหม่',
                     "คุณ {$req_name} ส่งคำขอแลกเวรกับคุณ ในวันที่ {$tar_date_th} โปรดตรวจสอบรายละเอียด",
                     'index.php?c=swap'
+                );
+                (new NotificationService($db))->sendLineEvent(
+                    'swap',
+                    "มีคำขอแลกเวรใหม่จาก {$req_name} วันที่ {$tar_date_th}"
                 );
             }
         } else {
