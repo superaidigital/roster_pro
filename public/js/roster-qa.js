@@ -62,7 +62,16 @@
     }
 
     function enhanceForms(root) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
         root.querySelectorAll('form').forEach(function (form) {
+            if ((form.getAttribute('method') || 'get').toLowerCase() === 'post' && csrfToken && !form.querySelector('input[name="csrf_token"]')) {
+                const csrf = document.createElement('input');
+                csrf.type = 'hidden';
+                csrf.name = 'csrf_token';
+                csrf.value = csrfToken;
+                form.prepend(csrf);
+            }
             if (form.dataset.rpQaBound === '1') return;
             form.dataset.rpQaBound = '1';
 
