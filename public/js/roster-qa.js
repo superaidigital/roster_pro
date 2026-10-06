@@ -117,6 +117,9 @@
 
     function enhanceModals(root) {
         root.querySelectorAll('.modal').forEach(function (modal) {
+            if (modal.dataset.rpQaModalBound === '1') return;
+            modal.dataset.rpQaModalBound = '1';
+
             if (!modal.hasAttribute('aria-modal')) modal.setAttribute('aria-modal', 'true');
 
             const title = modal.querySelector('.modal-title');
@@ -134,7 +137,14 @@
         });
     }
 
+    function enhanceCurrentNavigation(root) {
+        root.querySelectorAll('a.nav-link.active, .dropdown-item.active').forEach(function (link) {
+            if (!link.hasAttribute('aria-current')) link.setAttribute('aria-current', 'page');
+        });
+    }
+
     function runEnhancements(root) {
+        enhanceCurrentNavigation(root);
         enhanceIconButtons(root);
         enhanceScrollableRegions(root);
         enhanceTables(root);
