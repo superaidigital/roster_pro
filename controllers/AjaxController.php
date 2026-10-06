@@ -10,6 +10,46 @@ require_once 'controllers/LogsController.php'; // 🌟 นำเข้า Logs C
 
 class AjaxController {
 
+    private function ensureSession() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+    }
+
+    private function verifyCsrfJsonOrForm() {
+        $this->ensureSession();
+
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $requestToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? '');
+
+        if (!is_string($sessionToken) || !is_string($requestToken) ||
+            $sessionToken === '' || $requestToken === '' ||
+            !hash_equals($sessionToken, $requestToken)) {
+            http_response_code(419);
+
+            $accept = strtolower((string)($_SERVER['HTTP_ACCEPT'] ?? ''));
+            $contentType = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? ''));
+            if (str_contains($accept, 'application/json') || str_contains($contentType, 'application/json')) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['status' => 'error', 'message' => 'Invalid CSRF token'], JSON_UNESCAPED_UNICODE);
+            } else {
+                $_SESSION['error_msg'] = 'คำขอหมดอายุหรือไม่ถูกต้อง กรุณาลองใหม่';
+                header('Location: index.php?c=roster');
+            }
+            exit;
+        }
+    }
+
+    private function requireAuthenticatedJson() {
+        $this->ensureSession();
+        if (!isset($_SESSION['user'])) {
+            http_response_code(401);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+            exit;
+        }
+    }
+
     // ==========================================
     // ⚙️ Helper: ดึงค่า Config จากฐานข้อมูล
     // ==========================================
@@ -43,8 +83,8 @@ class AjaxController {
             "Authorization: Bearer " . $line_token
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         
         $result = curl_exec($ch);
         curl_close($ch);
@@ -93,6 +133,8 @@ class AjaxController {
     // 🌟 API: ทดสอบ LINE Notify
     // ==========================================
     public function test_line_notify() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         error_reporting(0); // 🌟 ปิด Warning ไม่ให้แทรก JSON
         header('Content-Type: application/json');
         
@@ -114,8 +156,8 @@ class AjaxController {
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['message' => $message]));
         curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/x-www-form-urlencoded", "Authorization: Bearer " . $token]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         
         $result = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -133,6 +175,8 @@ class AjaxController {
     // 🌟 API: บันทึกเวร (Save Shift)
     // ==========================================
     public function save_shift() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         error_reporting(0); // 🌟 ปิด Warning
         header('Content-Type: application/json');
         
@@ -206,7 +250,8 @@ class AjaxController {
                 }
                 exit;
             } catch (Exception $e) {
-                echo json_encode(['status' => 'error', 'message' => $e->getMessage()]); exit;
+                error_log("Ajax roster mutation error: " . $e->getMessage());
+                echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่']); exit;
             }
         }
         echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
@@ -216,6 +261,8 @@ class AjaxController {
     // 🌟 API: อัปเดตลำดับรายชื่อ (Drag & Drop)
     // ==========================================
     public function update_order() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         header('Content-Type: application/json');
         
         // อนุญาตเฉพาะ POST Request และต้องล็อกอิน
@@ -248,7 +295,8 @@ class AjaxController {
                 echo json_encode(['status' => 'success', 'message' => 'บันทึกลำดับเรียบร้อยแล้ว']);
             } catch (PDOException $e) {
                 $db->rollBack();
-                echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+                error_log("Ajax update order error: " . $e->getMessage());
+                echo json_encode(['status' => 'error', 'message' => 'ไม่สามารถบันทึกลำดับได้']);
             }
         } else {
             echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ถูกต้อง']);
@@ -260,6 +308,8 @@ class AjaxController {
     // 🌟 API: คัดลอกตารางจากเดือนก่อน (Copy Previous Month)
     // ==========================================
     public function copy_roster_previous() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         error_reporting(0);
         header('Content-Type: application/json');
         if (!isset($_SESSION['user'])) { echo json_encode(['status' => 'error', 'message' => 'Unauthorized']); exit; }
@@ -321,6 +371,8 @@ class AjaxController {
     // 🌟 API: ขอแลกเวร/เปลี่ยนเวร (Shift Swap Request)
     // ==========================================
     public function request_swap() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
             header("Location: index.php?c=roster"); exit;
         }
@@ -366,6 +418,8 @@ class AjaxController {
     // 🌟 เปลี่ยนสถานะตารางเวร (Workflow)
     // ==========================================
     public function change_status() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) {
             header("Location: index.php?c=roster"); exit;
         }
@@ -374,9 +428,16 @@ class AjaxController {
         $shiftModel = new ShiftModel($db);
         $notifModel = new NotificationModel($db);
 
-        $month_year = $_POST['month_year'];
-        $new_status = $_POST['status']; 
-        $hospital_id = $_POST['hospital_id'] ?? $_SESSION['user']['hospital_id'];
+        $month_year = trim((string)($_POST['month_year'] ?? ''));
+        $new_status = strtoupper(trim((string)($_POST['status'] ?? '')));
+        $hospital_id = (int)($_POST['hospital_id'] ?? ($_SESSION['user']['hospital_id'] ?? 0));
+
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month_year) ||
+            !in_array($new_status, ['DRAFT', 'SUBMITTED', 'APPROVED', 'REQUEST_EDIT'], true)) {
+            $_SESSION['error_msg'] = "ข้อมูลสถานะตารางเวรไม่ถูกต้อง";
+            header("Location: index.php?c=roster");
+            exit;
+        }
 
         $stmt_hosp = $db->prepare("SELECT name FROM hospitals WHERE id = ?");
         $stmt_hosp->execute([$hospital_id]);
@@ -463,7 +524,8 @@ class AjaxController {
                 $_SESSION['success_msg'] = "อนุมัติตารางเวรเดือน {$month_name} เรียบร้อยแล้ว";
             }
         } catch (Exception $e) {
-            $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $e->getMessage();
+            error_log("Ajax workflow error: " . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถดำเนินการได้ กรุณาลองใหม่";
         }
 
         $redirect = (in_array($_SESSION['user']['role'], ['ADMIN', 'SUPERADMIN'])) ? "index.php?c=report&a=overview&month=".$month_year : "index.php?c=roster&month=".$month_year;
@@ -474,6 +536,8 @@ class AjaxController {
     // 🌟 ขอแก้ไขตาราง (Request Edit)
     // ==========================================
     public function request_edit() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) { header("Location: index.php?c=roster"); exit; }
 
         $month_year = $_POST['month_year'];
@@ -518,6 +582,8 @@ class AjaxController {
     // 🌟 เสนอเพิ่มวันหยุดใหม่ (Request Holiday)
     // ==========================================
     public function request_holiday() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         header('Content-Type: application/json');
         $data = json_decode(file_get_contents("php://input"));
         
@@ -724,6 +790,8 @@ class AjaxController {
     // 🌟 สุ่มจัดเวรอัตโนมัติ (Auto-Schedule) 
     // ==========================================
     public function auto_schedule() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         error_reporting(0); // 🌟 ปิด Warning
         header('Content-Type: application/json');
         if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_SESSION['user'])) { 
@@ -876,6 +944,8 @@ class AjaxController {
     }
 
     public function markNotificationAsRead() {
+        $this->ensureSession();
+        $this->verifyCsrfJsonOrForm();
         error_reporting(0); header('Content-Type: application/json');
         if(!isset($_SESSION['user_id']) && !isset($_SESSION['user'])) { echo json_encode(['status' => 'error']); return; }
         if (!isset($_POST['noti_id'])) { echo json_encode(['status' => 'error', 'message' => 'Missing ID']); return; }
