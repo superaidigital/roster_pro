@@ -24,27 +24,31 @@ Branch: `ui/design-system-v2`
 - [x] Cron backup secret removed from source code
 - [x] TLS peer/host verification enabled for external HTTP calls
 
-## Production blocker
+## LINE Messaging API migration
 
-### LINE Notify is no longer available
+- [x] Production LINE Notify endpoint removed
+- [x] Central `NotificationService` added
+- [x] `LineMessagingService` uses Messaging API push endpoint
+- [x] Roster events routed through LINE Messaging API
+- [x] Leave request events routed through LINE Messaging API
+- [x] Swap request events routed through LINE Messaging API
+- [x] Settings UI migrated to Channel access token / Channel secret / Target ID
+- [x] Signed LINE webhook endpoint added
+- [x] Webhook captures the latest user/group/room Source ID
 
-The current codebase still contains LINE Notify integration using:
+Required setup before enabling LINE delivery:
 
-- `https://notify-api.line.me/api/notify`
-- `line_notify_token`
-- LINE Notify settings UI
+1. Create or select a LINE Official Account Messaging API channel.
+2. Save the Channel access token and Channel secret in Roster Pro Settings.
+3. Configure the webhook URL displayed in Roster Pro Settings in LINE Developers Console.
+4. Enable webhook delivery in the LINE channel.
+5. Send a message to the OA, or add the OA to the intended group and send a message.
+6. Confirm that Roster Pro shows a latest Source ID.
+7. Copy the intended Source ID into Target ID.
+8. Enable LINE Messaging API and the required event toggles.
+9. Use the Test Message action and confirm delivery.
 
-LINE Notify was terminated on 2025-03-31. Before production release, migrate notification delivery to LINE Official Account Messaging API.
-
-Recommended replacement configuration:
-
-- `line_channel_access_token`
-- `line_channel_secret`
-- Messaging API push/multicast/broadcast strategy
-- Mapping between Roster Pro users and LINE user IDs (or group/chat target strategy)
-- Delivery logging and retry handling
-
-Do not treat the existing LINE Notify test button as a valid production readiness test.
+Keep the existing in-app notification system enabled even when LINE delivery is disabled.
 
 ## Required environment configuration
 
@@ -119,4 +123,4 @@ git merge --no-ff ui/design-system-v2
 git status
 ```
 
-Do not push `main` until the LINE Messaging API blocker is resolved or notification delivery is intentionally disabled and documented.
+Do not push `main` until the local QA script and manual smoke tests pass, including a LINE Messaging API test when LINE delivery is enabled.
