@@ -636,8 +636,12 @@ $header_page_icon = $page_context[2];
             .topbar-main { gap: 8px; }
         }
     </style>
+
+    <!-- Application Shell overrides legacy inline layout styles -->
+    <link rel="stylesheet" href="public/css/roster-shell.css?v=2">
 </head>
 <body>
+<a class="rp-skip-link" href="#rpMainContent">ข้ามไปยังเนื้อหาหลัก</a>
 <script>
     // ใช้สถานะ Sidebar ก่อนวาด Topbar เพื่อลดอาการกระพริบของ Layout
     if (localStorage.getItem('sidebarState') === 'collapsed') {
@@ -880,5 +884,5 @@ $header_page_icon = $page_context[2];
 </script>
 
 <!-- 🌟 2. Layout Wrapper: ล็อกความสูงเพื่อป้องกันเลย์เอาท์แตก -->
-<div class="d-flex w-100 overflow-hidden" style="height: calc(100vh - 70px);">
+<div class="d-flex w-100 overflow-hidden rp-app-frame">
     <!-- 💡 ไฟล์ sidebar.php จะถูกแทรกต่อจากบรรทัดนี้ -->
