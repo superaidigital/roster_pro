@@ -115,8 +115,8 @@ class UsersController {
     // 🌟 2. เพิ่มผู้ใช้งานใหม่
     // ====================================================
     public function add() {
-            $this->verifyCsrf();
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
@@ -164,8 +164,8 @@ class UsersController {
     // 🌟 3. แก้ไขข้อมูลผู้ใช้งาน
     // ====================================================
     public function edit() {
-            $this->verifyCsrf();
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
@@ -224,8 +224,8 @@ class UsersController {
     // 🌟 4. ลบผู้ใช้งาน (ปรับเปลี่ยนเป็นรับ POST เพื่อความปลอดภัย)
     // ====================================================
     public function delete() {
-            $this->verifyCsrf();
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         
         // เปลี่ยนการตรวจสอบมารับค่า $_POST
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id'])) {
@@ -297,8 +297,8 @@ class UsersController {
     // 🌟 5. สลับสถานะ ระงับ/เปิดใช้งาน (อัปเดตเก็บสาเหตุการระงับ)
     // ====================================================
     public function toggle() {
-            $this->verifyCsrf();
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id']) && isset($_POST['status'])) {
             $db = (new Database())->getConnection();
@@ -443,8 +443,8 @@ class UsersController {
     // 🌟 7. ลบหลายรายการพร้อมกัน (Bulk Delete)
     // ====================================================
     public function bulk_delete() {
-            $this->verifyCsrf();
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ids'])) {
             $db = (new Database())->getConnection();
@@ -529,8 +529,8 @@ class UsersController {
     }
 
     public function import() {
-            $this->verifyCsrf();
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['import_file'])) {
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
@@ -575,8 +575,8 @@ class UsersController {
     // 🌟 9. ปลดล็อกบัญชีที่ถูกซ่อน (Restore / Undelete)
     // ====================================================
     public function restore() {
-            $this->verifyCsrf();
         $this->checkAuth();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { $this->verifyCsrf(); }
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id'])) {
             $db = (new Database())->getConnection();
             $id = $_POST['id'];
