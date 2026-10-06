@@ -376,6 +376,10 @@ class LeaveController {
             foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $approver) {
                 $notifModel->addNotification($approver['id'], 'INFO', 'ใบลาใหม่รออนุมัติ', "{$user_name} ขอ{$leave_name} {$actual_working_days} วัน", "index.php?c=leave&a=approvals");
             }
+            (new NotificationService($db))->sendLineEvent(
+                'leave',
+                "มีใบลาใหม่รออนุมัติ: {$user_name} / {$leave_name} / {$actual_working_days} วัน"
+            );
         } else {
             if ($uploaded_absolute_path && is_file($uploaded_absolute_path)) {
                 @unlink($uploaded_absolute_path);
