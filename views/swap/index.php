@@ -47,6 +47,8 @@ try {
         }
     }
 } catch (Exception $e) {}
+
+require_once 'views/components/ui.php';
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -70,50 +72,50 @@ try {
     .input-group-modern .form-control { border: none; box-shadow: none; }
 </style>
 
-<div class="container-fluid px-3 px-md-4 py-4">
+<div class="rp-page">
 
-    <!-- Header -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width: 56px; height: 56px;">
-                <i class="bi bi-arrow-left-right fs-4 text-dark"></i>
-            </div>
-            <div>
-                <h3 class="fw-bolder text-dark mb-0">ระบบขอแลกเวร/เปลี่ยนเวร</h3>
-                <p class="text-muted mb-0" style="font-size: 14px;">จัดการคำขอสลับตารางเวรปฏิบัติงานกับเพื่อนร่วมงาน</p>
-            </div>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="index.php?c=roster" class="btn btn-light shadow-sm rounded-pill fw-bold px-4 py-2 border">
-                <i class="bi bi-calendar3 me-2"></i> ดูตารางเวร
-            </a>
-            <button class="btn btn-primary rounded-pill shadow-sm fw-bold px-4 py-2" data-bs-toggle="modal" data-bs-target="#createSwapModal">
-                <i class="bi bi-plus-circle me-2"></i> ยื่นขอแลกเวร
-            </button>
-        </div>
-    </div>
+    <?php
+    ob_start();
+    ?>
+        <a href="index.php?c=roster" class="rp-btn rp-btn--secondary">
+            <i class="bi bi-calendar3" aria-hidden="true"></i>
+            ดูตารางเวร
+        </a>
+        <button class="rp-btn rp-btn--primary" data-bs-toggle="modal" data-bs-target="#createSwapModal">
+            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+            ยื่นขอแลกเวร
+        </button>
+    <?php
+    $swap_header_actions = ob_get_clean();
+    rp_page_header(
+        'คำขอแลกเวร',
+        'สร้าง ติดตาม และพิจารณาคำขอสลับตารางเวรจากจุดเดียว',
+        $swap_header_actions,
+        'Shift Swap'
+    );
+    ?>
 
     <!-- Alerts -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 border-start border-success border-4 fw-bold shadow-sm">
-            <i class="bi bi-check-circle-fill fs-5 me-3"></i> <?= $_SESSION['success_msg'] ?>
+            <i class="bi bi-check-circle-fill fs-5 me-3"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 border-start border-danger border-4 fw-bold shadow-sm">
-            <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> <?= $_SESSION['error_msg'] ?>
+            <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
     <!-- ตารางแสดงรายการแลกเวร -->
-    <div class="card card-modern overflow-hidden mb-4">
+    <section class="rp-section"><div class="rp-card overflow-hidden mb-4">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-modern mb-0 align-middle text-center">
+                <table class="table rp-table mb-0 align-middle text-center">
                     <thead>
                         <tr>
                             <th class="text-start ps-4">ผู้ขอแลกเวร</th>
