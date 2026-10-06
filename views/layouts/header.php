@@ -144,7 +144,7 @@ $header_page_icon = $page_context[2];
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- 🌟 ดึงชื่อแอปมาแสดงที่ชื่อแท็บเบราว์เซอร์ -->
     <title><?= htmlspecialchars($app_name) ?> - <?= htmlspecialchars($app_subtitle) ?></title>
     
@@ -164,10 +164,12 @@ $header_page_icon = $page_context[2];
     <link rel="stylesheet" href="public/css/roster-layout.css">
     <link rel="stylesheet" href="public/css/roster-components.css">
     <link rel="stylesheet" href="public/css/roster-responsive.css">
+    <link rel="stylesheet" href="public/css/roster-accessibility.css?v=2">
 
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="public/js/roster-qa.js?v=2" defer></script>
 
     <style>
         :root {
@@ -664,7 +666,7 @@ $header_page_icon = $page_context[2];
 
     <div class="topbar-main">
         <div class="topbar-left">
-            <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" title="เปิดเมนู">
+            <button class="nav-icon-btn d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูหลัก" title="เปิดเมนู">
                 <i class="bi bi-list fs-4"></i>
             </button>
 
@@ -686,12 +688,12 @@ $header_page_icon = $page_context[2];
         
         <!-- 🔔 Notification Dropdown -->
         <div class="dropdown">
-            <button class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <button class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="การแจ้งเตือน">
                 <i class="bi bi-bell-fill fs-5"></i>
                 <?php if($unread_count > 0): ?>
-                    <span class="notif-badge" id="notifBadge" style="display: block;"><?= $unread_count > 99 ? '99+' : $unread_count ?></span>
+                    <span class="notif-badge" id="notifBadge" style="display: block;" aria-live="polite" aria-label="<?= (int)$unread_count ?> รายการที่ยังไม่ได้อ่าน"><?= $unread_count > 99 ? '99+' : $unread_count ?></span>
                 <?php else: ?>
-                    <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
+                    <span class="notif-badge" id="notifBadge" style="display: none;" aria-live="polite" aria-label="ไม่มีรายการที่ยังไม่ได้อ่าน">0</span>
                 <?php endif; ?>
             </button>
             
@@ -761,7 +763,7 @@ $header_page_icon = $page_context[2];
 
         <!-- 👤 Profile Dropdown -->
         <div class="dropdown">
-            <a href="#" class="profile-pill" data-bs-toggle="dropdown" aria-expanded="false">
+            <a href="#" class="profile-pill" data-bs-toggle="dropdown" aria-expanded="false" aria-label="เมนูผู้ใช้ <?= htmlspecialchars($_SESSION['user']['name'] ?? '') ?>">
                 <div class="user-avatar"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></div>
                 <div class="d-none d-md-block text-start lh-1 pe-2">
                     <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
@@ -797,8 +799,8 @@ $header_page_icon = $page_context[2];
         <div class="pwa-toast-subtitle">เพิ่มไว้บนหน้าจอเพื่อเปิดใช้งานได้สะดวกขึ้น</div>
     </div>
     <div class="pwa-toast-actions">
-        <button id="btnDismissPwa" class="btn btn-light border">ภายหลัง</button>
-        <button id="btnInstallPwa" class="btn btn-primary shadow-sm">ติดตั้ง</button>
+        <button id="btnDismissPwa" class="rp-btn rp-btn--secondary">ภายหลัง</button>
+        <button id="btnInstallPwa" class="rp-btn rp-btn--primary">ติดตั้ง</button>
     </div>
 </div>
 
@@ -868,10 +870,12 @@ $header_page_icon = $page_context[2];
                 const badge = document.getElementById('notifBadge');
                 if(badge) {
                     if(data.unread_count > 0) { 
-                        badge.innerText = data.unread_count > 99 ? '99+' : data.unread_count; 
+                        badge.innerText = data.unread_count > 99 ? '99+' : data.unread_count;
+                        badge.setAttribute('aria-label', data.unread_count + ' รายการที่ยังไม่ได้อ่าน');
                         badge.style.display = 'block'; 
                     } else { 
-                        badge.style.display = 'none'; 
+                        badge.style.display = 'none';
+                        badge.setAttribute('aria-label', 'ไม่มีรายการที่ยังไม่ได้อ่าน'); 
                     }
                 }
             }
