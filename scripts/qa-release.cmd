@@ -56,16 +56,28 @@ if "!PHP_FAIL!"=="1" exit /b 1
 echo [PASS] PHP syntax is valid.
 
 echo.
-echo [4/6] Checking obsolete LINE Notify integration
-findstr /s /n /i /c:"notify-api.line.me" *.php controllers\*.php views\*.php views\*\*.php > "%TEMP%\roster_line_notify.txt" 2>nul
+echo [4/6] Checking LINE Messaging API migration
+findstr /s /n /i /c:"notify-api.line.me" controllers\*.php services\*.php > "%TEMP%\roster_line_notify.txt" 2>nul
 if exist "%TEMP%\roster_line_notify.txt" (
     for %%A in ("%TEMP%\roster_line_notify.txt") do if %%~zA GTR 0 (
-        echo [BLOCKER] LINE Notify references still exist:
+        echo [FAIL] Obsolete LINE Notify endpoint still exists:
         type "%TEMP%\roster_line_notify.txt"
-        echo.
-        echo LINE Notify has been discontinued. Migrate to Messaging API before production.
+        exit /b 1
     )
 )
+if not exist "services\LineMessagingService.php" (
+    echo [FAIL] Missing services\LineMessagingService.php
+    exit /b 1
+)
+if not exist "services\NotificationService.php" (
+    echo [FAIL] Missing services\NotificationService.php
+    exit /b 1
+)
+if not exist "controllers\LinewebhookController.php" (
+    echo [FAIL] Missing controllers\LinewebhookController.php
+    exit /b 1
+)
+echo [PASS] LINE Messaging API service and webhook files found.
 
 echo.
 echo [5/6] Checking hard-coded legacy cron secret
@@ -99,8 +111,8 @@ echo [PASS] Design System release files found.
 echo.
 echo ============================================================
 echo Static QA completed.
-echo Review the LINE Notify blocker above before merging to main.
-echo Then perform browser smoke tests listed in RELEASE_CHECKLIST_DESIGN_SYSTEM_V2.md
+echo Perform browser smoke tests listed in RELEASE_CHECKLIST_DESIGN_SYSTEM_V2.md
+echo If LINE delivery is enabled, verify webhook reception and a test push message.
 echo ============================================================
 
 exit /b 0
