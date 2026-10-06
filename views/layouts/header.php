@@ -109,6 +109,11 @@ if (isset($_SESSION['user'])) {
     }
 }
 
+if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$header_csrf_token = $_SESSION['csrf_token'];
+
 // ========================================================
 // 🌟 Context ของหน้าปัจจุบันสำหรับ Topbar
 // ========================================================
@@ -715,7 +720,7 @@ $header_page_icon = $page_context[2];
                         <!-- 🌟 วนลูปแสดงการแจ้งเตือนล่าสุด 5 รายการ -->
                         <?php foreach ($latest_notifications as $notif): 
                             $is_read = $notif['is_read'] == 1;
-                            $link = !empty($notif['link']) ? "index.php?c=notification&a=read&id={$notif['id']}&url=" . urlencode($notif['link']) : "index.php?c=notification&a=read&id={$notif['id']}";
+                            $target_link = !empty($notif['link']) ? (string)$notif['link'] : 'index.php?c=notification';
                             
                             // ตกแต่งสีไอคอนตามประเภท
                             $type = strtoupper($notif['type'] ?? 'INFO');
@@ -726,7 +731,11 @@ $header_page_icon = $page_context[2];
                             elseif ($type == 'SWAP') { $icon = 'bi-arrow-left-right'; $color = 'info text-dark'; }
                             elseif ($type == 'LEAVE') { $icon = 'bi-person-dash-fill'; $color = 'warning text-dark'; }
                         ?>
-                            <a href="<?= $link ?>" class="text-decoration-none text-dark d-block">
+                            <form method="POST" action="index.php?c=notification&a=read" class="m-0">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($header_csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                <input type="hidden" name="id" value="<?= (int)$notif['id'] ?>">
+                                <input type="hidden" name="url" value="<?= htmlspecialchars($target_link, ENT_QUOTES, 'UTF-8') ?>">
+                                <button type="submit" class="w-100 border-0 p-0 text-start bg-transparent text-dark">
                                 <div class="p-3 d-flex align-items-start <?= !$is_read ? 'bg-primary bg-opacity-10' : 'bg-white' ?> notif-item" style="transition: all 0.2s;">
                                     <div class="bg-<?= $color ?> bg-opacity-10 text-<?= str_replace(' text-dark', '', $color) ?> rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
                                         <i class="bi <?= $icon ?>"></i>
@@ -743,7 +752,8 @@ $header_page_icon = $page_context[2];
                                         </p>
                                     </div>
                                 </div>
-                            </a>
+                                </button>
+                            </form>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
@@ -751,9 +761,13 @@ $header_page_icon = $page_context[2];
                 <?php if (!empty($latest_notifications)): ?>
                     <!-- ปุ่ม Footer ทำเครื่องหมายอ่านแล้ว -->
                     <div class="p-2 border-top bg-light text-center" style="border-radius: 0 0 1rem 1rem;">
-                        <a href="index.php?c=notification&a=read_all" class="text-decoration-none text-muted fw-bold small d-block py-2" style="transition: color 0.2s;" onmouseover="this.classList.add('text-primary'); this.classList.remove('text-muted')" onmouseout="this.classList.add('text-muted'); this.classList.remove('text-primary')" onclick="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
-                            <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
-                        </a>
+                        <form method="POST" action="index.php?c=notification&a=read_all" class="m-0" onsubmit="return confirm('ยืนยันทำเครื่องหมายอ่านแล้วทั้งหมด?');">
+                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($header_csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                            <input type="hidden" name="return_to" value="index.php?c=notification">
+                            <button type="submit" class="btn btn-link text-decoration-none text-muted fw-bold small w-100 py-2">
+                                <i class="bi bi-check2-all me-1"></i> ทำเครื่องหมายว่าอ่านแล้ว
+                            </button>
+                        </form>
                     </div>
                 <?php endif; ?>
             </div>
