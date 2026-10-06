@@ -44,7 +44,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     $page_theme = 'secondary';
 }
 
-require_once 'views/components/ui.php';
+require_once __DIR__ . '/../components/ui.php';
 ?>
 <!-- นำเข้า CSS ของ Flatpickr สำหรับปฏิทิน -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
