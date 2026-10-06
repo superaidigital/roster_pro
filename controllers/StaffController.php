@@ -9,13 +9,74 @@ require_once 'controllers/LogsController.php';
 
 class StaffController {
     
-    // ตรวจสอบสิทธิ์ (SCHEDULER ขึ้นไปสามารถใช้งานส่วนนี้ได้)
+    // ตรวจสอบสิทธิ์การจัดการบุคลากร
     private function checkAuth() {
         if (session_status() === PHP_SESSION_NONE) session_start();
-        if (!isset($_SESSION['user'])) {
-            header("Location: index.php?c=auth&a=login");
+
+        $role = strtoupper((string)($_SESSION['user']['role'] ?? ''));
+        $allowed = ['SCHEDULER', 'DIRECTOR', 'HR', 'ADMIN', 'SUPERADMIN'];
+
+        if (!isset($_SESSION['user']) || !in_array($role, $allowed, true)) {
+            $_SESSION['error_msg'] = "คุณไม่มีสิทธิ์เข้าถึงส่วนจัดการบุคลากร";
+            header("Location: index.php?c=dashboard");
             exit;
         }
+    }
+
+    private function getCsrfToken() {
+        if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    private function verifyCsrf($redirect = 'index.php?c=staff') {
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $postedToken = $_POST['csrf_token'] ?? '';
+
+        if (!is_string($sessionToken) || !is_string($postedToken) ||
+            $sessionToken === '' || $postedToken === '' ||
+            !hash_equals($sessionToken, $postedToken)) {
+            $_SESSION['error_msg'] = "คำขอหมดอายุหรือไม่ถูกต้อง กรุณาลองใหม่";
+            header("Location: " . $redirect);
+            exit;
+        }
+    }
+
+    private function currentRole() {
+        return strtoupper((string)($_SESSION['user']['role'] ?? ''));
+    }
+
+    private function isGlobalAdmin() {
+        return in_array($this->currentRole(), ['ADMIN', 'SUPERADMIN', 'HR'], true);
+    }
+
+    private function canManageTarget(array $target) {
+        if ($this->isGlobalAdmin()) return true;
+
+        $myHospital = (int)($_SESSION['user']['hospital_id'] ?? 0);
+        if ((int)($target['hospital_id'] ?? 0) !== $myHospital) return false;
+
+        $targetRole = strtoupper((string)($target['role'] ?? ''));
+        $role = $this->currentRole();
+
+        if ($role === 'SCHEDULER' && in_array($targetRole, ['DIRECTOR', 'HR', 'ADMIN', 'SUPERADMIN'], true)) {
+            return false;
+        }
+
+        if ($role === 'DIRECTOR' && in_array($targetRole, ['HR', 'ADMIN', 'SUPERADMIN'], true)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function jsonCsrfValid(array $data) {
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $postedToken = $data['csrf_token'] ?? '';
+        return is_string($sessionToken) && is_string($postedToken)
+            && $sessionToken !== '' && $postedToken !== ''
+            && hash_equals($sessionToken, $postedToken);
     }
 
     // หน้าหลัก
@@ -42,6 +103,7 @@ class StaffController {
         }
 
         $pay_rates = $payRateModel->getAllRates();
+        $csrf_token = $this->getCsrfToken();
 
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
@@ -53,6 +115,7 @@ class StaffController {
     public function add() {
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $this->verifyCsrf();
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
             
@@ -111,6 +174,7 @@ class StaffController {
     public function edit() {
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $this->verifyCsrf();
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
             
@@ -152,7 +216,10 @@ class StaffController {
                     exit;
                 }
 
-                $can_edit = true;
+                $can_edit = $this->canManageTarget($existing_user);
+                if (!$can_edit) {
+                    $_SESSION['error_msg'] = "ปฏิเสธ: คุณไม่มีสิทธิ์แก้ไขบุคลากรรายนี้";
+                }
                 
                 // ตรวจสอบสิทธิ์เฉพาะผู้ที่ไม่ใช่แอดมินส่วนกลาง
                 if (!$is_global_admin) {
@@ -183,7 +250,8 @@ class StaffController {
                     }
                 }
             } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error: " . $e->getMessage();
+                error_log("Staff edit error: " . $e->getMessage());
+                $_SESSION['error_msg'] = "ไม่สามารถอัปเดตข้อมูลได้";
             }
         }
         header("Location: index.php?c=staff");
@@ -193,41 +261,44 @@ class StaffController {
     // ลบเดี่ยว
     public function delete() {
         $this->checkAuth();
-        if (isset($_GET['id'])) {
-            $db = (new Database())->getConnection();
-            $userModel = new UserModel($db);
-            $id = $_GET['id'];
-            $current_role = strtoupper($_SESSION['user']['role']);
-            $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR']);
 
-            try {
-                $target = $userModel->getUserById($id);
-                if (!$target) {
-                    header("Location: index.php?c=staff");
-                    exit;
-                }
-
-                $can_delete = true;
-                if (!$is_global_admin) {
-                    if ($current_role === 'SCHEDULER' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) $can_delete = false;
-                    if ($current_role === 'DIRECTOR' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) $can_delete = false;
-                }
-
-                if (!$can_delete) {
-                    $_SESSION['error_msg'] = "ปฏิเสธ: ไม่มีสิทธิ์ลบบุคลากรระดับสูง";
-                } elseif ($id == $_SESSION['user']['id']) {
-                    $_SESSION['error_msg'] = "ไม่สามารถลบบัญชีตัวเองได้";
-                } else {
-                    if ($userModel->deleteUser($id)) {
-                        // 🌟 บันทึก Log
-                        LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบข้อมูลบุคลากร: " . ($target['name'] ?? "ID: $id"));
-                        $_SESSION['success_msg'] = "ลบข้อมูลสำเร็จ";
-                    }
-                }
-            } catch (Exception $e) {
-                $_SESSION['error_msg'] = "Error deleting staff.";
-            }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("Location: index.php?c=staff");
+            exit;
         }
+
+        $this->verifyCsrf();
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        if (!$id || $id === (int)$_SESSION['user']['id']) {
+            $_SESSION['error_msg'] = "ไม่สามารถลบบัญชีนี้ได้";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+
+        try {
+            $target = $userModel->getUserById($id);
+            if (!$target || !$this->canManageTarget($target)) {
+                $_SESSION['error_msg'] = "ไม่พบข้อมูล หรือคุณไม่มีสิทธิ์ลบบุคลากรรายนี้";
+            } elseif ($userModel->deleteUser($id)) {
+                LogsController::addLog(
+                    $db,
+                    $_SESSION['user']['id'],
+                    LogsController::ACTION_DELETE,
+                    "ลบข้อมูลบุคลากร: " . ($target['name'] ?? "ID: $id")
+                );
+                $_SESSION['success_msg'] = "ลบข้อมูลสำเร็จ";
+            } else {
+                $_SESSION['error_msg'] = "ไม่สามารถลบข้อมูลได้";
+            }
+        } catch (Throwable $e) {
+            error_log("Staff delete error: " . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถลบข้อมูลได้";
+        }
+
         header("Location: index.php?c=staff");
         exit;
     }
@@ -236,6 +307,7 @@ class StaffController {
     public function bulk_delete() {
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $this->verifyCsrf();
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
             $ids = json_decode($_POST['ids'] ?? '[]');
@@ -248,7 +320,7 @@ class StaffController {
                 foreach ($ids as $id) {
                     if ($id != $_SESSION['user']['id']) { 
                         $target = $userModel->getUserById($id);
-                        $can_delete = true;
+                        $can_delete = $target && $this->canManageTarget($target);
                         
                         if (!$is_global_admin && $target) {
                             if ($current_role === 'SCHEDULER' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) $can_delete = false;
@@ -276,38 +348,42 @@ class StaffController {
     // เปิด/ปิด การใช้งาน (บัญชี)
     public function toggle() {
         $this->checkAuth();
-        if (isset($_GET['id']) && isset($_GET['status'])) {
-            $db = (new Database())->getConnection();
-            $userModel = new UserModel($db);
-            $id = $_GET['id'];
-            $status = (int)$_GET['status'];
-            
-            $current_role = strtoupper($_SESSION['user']['role']);
-            $is_global_admin = in_array($current_role, ['ADMIN', 'SUPERADMIN', 'HR']);
 
-            if ($id != $_SESSION['user']['id']) {
-                $target = $userModel->getUserById($id);
-                $can_toggle = true;
-                
-                if (!$is_global_admin && $target) {
-                    if ($current_role === 'SCHEDULER' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR', 'DIRECTOR'])) $can_toggle = false;
-                    if ($current_role === 'DIRECTOR' && in_array($target['role'], ['ADMIN', 'SUPERADMIN', 'HR'])) $can_toggle = false;
-                }
-
-                if ($can_toggle) {
-                    $userModel->updateStatus($id, $status);
-                    $actionTxt = $status === 1 ? "เปิด" : "ระงับ";
-                    
-                    // 🌟 บันทึก Log
-                    LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "{$actionTxt}การใช้งานบัญชีบุคลากร ID: {$id}");
-                    $_SESSION['success_msg'] = "เปลี่ยนสถานะสำเร็จ";
-                } else {
-                    $_SESSION['error_msg'] = "ปฏิเสธ: ไม่มีสิทธิ์ระงับบัญชีระดับสูง";
-                }
-            } else {
-                $_SESSION['error_msg'] = "ไม่สามารถระงับบัญชีตัวเองได้";
-            }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("Location: index.php?c=staff");
+            exit;
         }
+
+        $this->verifyCsrf();
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $status = filter_input(INPUT_POST, 'status', FILTER_VALIDATE_INT);
+
+        if (!$id || !in_array($status, [0, 1], true) || $id === (int)$_SESSION['user']['id']) {
+            $_SESSION['error_msg'] = "คำขอเปลี่ยนสถานะไม่ถูกต้อง";
+            header("Location: index.php?c=staff");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $userModel = new UserModel($db);
+        $target = $userModel->getUserById($id);
+
+        if (!$target || !$this->canManageTarget($target)) {
+            $_SESSION['error_msg'] = "ไม่พบข้อมูล หรือคุณไม่มีสิทธิ์เปลี่ยนสถานะบัญชีนี้";
+        } elseif ($userModel->updateStatus($id, $status)) {
+            $actionTxt = $status === 1 ? "เปิด" : "ระงับ";
+            LogsController::addLog(
+                $db,
+                $_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                "{$actionTxt}การใช้งานบัญชีบุคลากร ID: {$id}"
+            );
+            $_SESSION['success_msg'] = "เปลี่ยนสถานะสำเร็จ";
+        } else {
+            $_SESSION['error_msg'] = "ไม่สามารถเปลี่ยนสถานะได้";
+        }
+
         header("Location: index.php?c=staff");
         exit;
     }
@@ -318,9 +394,23 @@ class StaffController {
         header('Content-Type: application/json');
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $this->verifyCsrf();
             $db = (new Database())->getConnection();
-            $id = $_POST['id'] ?? 0;
-            $status = (int)($_POST['status'] ?? 1);
+            $userModel = new UserModel($db);
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+            $status = filter_input(INPUT_POST, 'status', FILTER_VALIDATE_INT);
+
+            if (!$id || !in_array($status, [0, 1], true)) {
+                echo json_encode(['success' => false, 'message' => 'Invalid request']);
+                exit;
+            }
+
+            $target = $userModel->getUserById($id);
+            if (!$target || !$this->canManageTarget($target)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Forbidden']);
+                exit;
+            }
 
             try {
                 // บันทึกลงฐานข้อมูล (คอลัมน์ show_in_roster)
@@ -338,7 +428,8 @@ class StaffController {
                 }
             } catch (Exception $e) {
                 // กรณีที่คอลัมน์ show_in_roster ยังไม่มีในฐานข้อมูล จะส่ง Error กลับไป
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                error_log("Staff roster status error: " . $e->getMessage());
+                echo json_encode(['success' => false, 'message' => 'ไม่สามารถอัปเดตข้อมูลได้']);
             }
             exit;
         }
@@ -355,13 +446,26 @@ class StaffController {
         $json = file_get_contents('php://input');
         $data = json_decode($json, true);
 
+        if (!is_array($data) || !$this->jsonCsrfValid($data)) {
+            http_response_code(419);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            exit;
+        }
+
         if (isset($data['order']) && is_array($data['order'])) {
             $db = (new Database())->getConnection();
             try {
                 $db->beginTransaction();
                 $stmt = $db->prepare("UPDATE users SET display_order = ? WHERE id = ?");
+                $userModel = new UserModel($db);
                 foreach ($data['order'] as $item) {
-                    $stmt->execute([$item['order'], $item['id']]);
+                    $id = (int)($item['id'] ?? 0);
+                    $order = (int)($item['order'] ?? 0);
+                    $target = $userModel->getUserById($id);
+                    if (!$id || !$target || !$this->canManageTarget($target)) {
+                        throw new RuntimeException('Forbidden roster order update');
+                    }
+                    $stmt->execute([$order, $id]);
                 }
                 
                 // 🌟 บันทึก Log
@@ -400,9 +504,28 @@ class StaffController {
     public function import() {
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['import_file'])) {
+            $this->verifyCsrf();
+
+            $upload = $_FILES['import_file'];
+            if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK ||
+                !is_uploaded_file($upload['tmp_name'] ?? '') ||
+                (int)($upload['size'] ?? 0) <= 0 ||
+                (int)($upload['size'] ?? 0) > 2 * 1024 * 1024) {
+                $_SESSION['error_msg'] = "ไฟล์ CSV ไม่ถูกต้อง หรือมีขนาดเกิน 2 MB";
+                header("Location: index.php?c=staff");
+                exit;
+            }
+
+            $extension = strtolower(pathinfo((string)($upload['name'] ?? ''), PATHINFO_EXTENSION));
+            if ($extension !== 'csv') {
+                $_SESSION['error_msg'] = "รองรับเฉพาะไฟล์ .csv";
+                header("Location: index.php?c=staff");
+                exit;
+            }
+
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
-            $handle = fopen($_FILES['import_file']['tmp_name'], "r");
+            $handle = fopen($upload['tmp_name'], "r");
             
             $bom = fread($handle, 3);
             if ($bom !== "\xEF\xBB\xBF") rewind($handle);
@@ -412,7 +535,8 @@ class StaffController {
             
             $ok = 0; $fail = 0;
             $fail_reasons = []; // เก็บเหตุผลที่ Error
-            $my_hosp = $_SESSION['user']['hospital_id'];
+            $my_hosp = (int)($_SESSION['user']['hospital_id'] ?? 0);
+            $is_global_admin = $this->isGlobalAdmin();
             
             while (($row = fgetcsv($handle)) !== FALSE) {
                 if (empty($row[1])) {
@@ -453,14 +577,14 @@ class StaffController {
                 }
 
                 $importData = [
-                    'hospital_id' => !empty($row[0]) ? (int)$row[0] : $my_hosp,
+                    'hospital_id' => ($is_global_admin && !empty($row[0])) ? (int)$row[0] : $my_hosp,
                     'name' => $name,
                     'username' => $username,
                     'id_card' => $id_card,
                     'position' => $position,
                     'employee_type' => $employee_type,
                     'phone' => $phone,
-                    'password' => '123456', // รหัสเริ่มต้น
+                    'password' => bin2hex(random_bytes(6)), // รหัสชั่วคราวแบบสุ่ม
                     'role' => 'STAFF',
                     'is_active' => 1,
                     'color_theme' => 'success'
@@ -496,14 +620,33 @@ class StaffController {
         header('Content-Type: application/json');
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $this->verifyCsrf();
             $db = (new Database())->getConnection();
             $userModel = new UserModel($db);
             
-            $user_id = $_POST['user_id'] ?? 0;
-            $signature_base64 = $_POST['signature_base64'] ?? '';
+            $user_id = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT);
+            $signature_base64 = trim((string)($_POST['signature_base64'] ?? ''));
 
             if(empty($user_id) || empty($signature_base64)) {
                 echo json_encode(['success' => false, 'message' => 'ข้อมูลไม่ครบถ้วน']);
+                exit;
+            }
+
+            $target = $userModel->getUserById($user_id);
+            if (!$target || !$this->canManageTarget($target)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'ไม่มีสิทธิ์จัดการลายเซ็นนี้']);
+                exit;
+            }
+
+            if (!preg_match('/^data:image\/(png|jpeg);base64,([A-Za-z0-9+\/=]+)$/', $signature_base64, $matches)) {
+                echo json_encode(['success' => false, 'message' => 'รูปแบบลายเซ็นไม่ถูกต้อง']);
+                exit;
+            }
+
+            $decoded = base64_decode($matches[2], true);
+            if ($decoded === false || strlen($decoded) > 1024 * 1024) {
+                echo json_encode(['success' => false, 'message' => 'ไฟล์ลายเซ็นต้องมีขนาดไม่เกิน 1 MB']);
                 exit;
             }
 
