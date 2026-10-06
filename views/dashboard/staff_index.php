@@ -11,7 +11,7 @@ $my_pending_leaves = $my_pending_leaves ?? 0;
 $my_pending_swaps = $my_pending_swaps ?? 0;
 $roster_status = $roster_status ?? 'NOT_STARTED';
 
-require_once 'views/components/ui.php';
+require_once __DIR__ . '/../components/ui.php';
 
 // จัดการสีของตารางเวร
 $status_color = 'secondary';
