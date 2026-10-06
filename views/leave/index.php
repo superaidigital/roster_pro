@@ -511,6 +511,7 @@ require_once __DIR__ . '/../components/ui.php';
         }
     }
 </style>
+<link rel="stylesheet" href="public/css/leave-workflow.css?v=2">
 
 <div class="rp-page leave-page-container">
     <?php
@@ -530,247 +531,30 @@ require_once __DIR__ . '/../components/ui.php';
     );
     ?>
 
-    <!-- แจ้งเตือนสถานะต่างๆ -->
+    <!-- Feedback -->
     <?php if (isset($_SESSION['success_msg'])): ?>
-        <div class="alert alert-modern alert-success alert-dismissible fade show mb-4" role="alert">
-            <i class="bi bi-check-circle-fill me-2 fs-5 align-middle"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--success" role="status" aria-live="polite">
+            <span class="rp-alert__icon"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['success_msg']) ?></div>
         </div>
         <?php unset($_SESSION['success_msg']); endif; ?>
-        
+
     <?php if (isset($_SESSION['error_msg'])): ?>
-        <div class="alert alert-modern alert-danger alert-dismissible fade show mb-4" role="alert">
-            <i class="bi bi-exclamation-triangle-fill me-2 fs-5 align-middle"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--danger" role="alert">
+            <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['error_msg']) ?></div>
         </div>
         <?php unset($_SESSION['error_msg']); endif; ?>
 
-    <div class="row g-4 mb-5 leave-main-grid">
-        <!-- ========================================== -->
-        <!-- 🌟 ส่วนที่ 1: ฟอร์มยื่นใบลา -->
-        <!-- ========================================== -->
-        <div class="col-lg-4">
-            <div class="rp-card h-100">
-                <div class="rp-card__header">
-                    <div class="icon-box-sm bg-<?= $page_theme ?> bg-opacity-10 text-<?= $page_theme ?> me-3">
-                        <i class="bi bi-pencil-square"></i>
-                    </div>
-                    <h5 class="mb-0 fw-bold text-dark">
-                        <?= $selected_leave_type_req ? 'แบบฟอร์ม' . htmlspecialchars($selected_leave_type_req) : 'ยื่นแบบฟอร์มขอลา' ?>
-                    </h5>
-                </div>
-                <div class="rp-card__body">
-                    <form action="index.php?c=leave&a=request" method="POST" id="leaveForm" enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                        
-                        <div class="mb-4">
-                            <label class="form-label fw-bold text-secondary small text-uppercase">ประเภทการลา <span class="text-danger">*</span></label>
-                            <select name="leave_type_id" id="leave_type" class="form-select rp-control" required>
-                                <option value="">-- กรุณาเลือกประเภทการลา --</option>
-                                <?php foreach($leave_types as $type): 
-                                    $is_selected = ($selected_leave_type_req === $type['leave_type']) ? 'selected' : '';
-                                ?>
-                                    <option value="<?= $type['id'] ?>" data-name="<?= htmlspecialchars($type['leave_type']) ?>" <?= $is_selected ?>>
-                                        <?= htmlspecialchars($type['leave_type']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="row g-3 mb-4">
-                            <div class="col-sm-6">
-                                <label class="form-label fw-bold text-secondary small text-uppercase">ตั้งแต่วันที่ <span class="text-danger">*</span></label>
-                                <div class="input-group-modern d-flex align-items-center bg-white">
-                                    <span class="ps-3 text-primary"><i class="bi bi-calendar-event"></i></span>
-                                    <input type="text" name="start_date" id="start_date" class="form-control rp-control border-0 px-2 fw-medium" required placeholder="คลิกเลือก" readonly style="background-color: transparent;">
-                                </div>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="form-label fw-bold text-secondary small text-uppercase">ถึงวันที่ <span class="text-danger">*</span></label>
-                                <div class="input-group-modern d-flex align-items-center bg-white">
-                                    <span class="ps-3 text-danger"><i class="bi bi-calendar-check"></i></span>
-                                    <input type="text" name="end_date" id="end_date" class="form-control rp-control border-0 px-2 fw-medium" required placeholder="คลิกเลือก" readonly style="background-color: transparent;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="form-label fw-bold text-secondary small text-uppercase">เหตุผลการลา <span class="text-danger">*</span></label>
-                            <textarea name="reason" class="form-control rp-control" rows="3" maxlength="1000" aria-describedby="reasonHelp" placeholder="ระบุเหตุผลที่ชัดเจน เช่น พักผ่อนประจำปี, ป่วยเป็นไข้..." required></textarea>
-                            <div id="reasonHelp" class="form-text text-muted">สูงสุด 1,000 ตัวอักษร</div>
-                        </div>
-
-                        <!-- แจ้งเตือนอัปโหลดใบรับรองแพทย์ -->
-                        <div class="mb-4" id="med_cert_section" style="display: none;">
-                            <div class="alert alert-modern alert-danger px-4 py-3 mb-0 border-0 bg-danger bg-opacity-10 text-danger rounded-4 shadow-sm">
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i> 
-                                    <strong>ลาป่วยตั้งแต่ 3 วันทำการขึ้นไป</strong>
-                                </div>
-                                <label class="form-label small text-dark fw-bold mb-2">โปรดแนบไฟล์ใบรับรองแพทย์ (JPG, PNG, PDF)</label>
-                                <input class="form-control form-control-sm border-danger border-opacity-25 shadow-sm rounded-3 bg-white" type="file" name="med_cert_file" id="med_cert_file" accept=".jpg,.jpeg,.png,.pdf,application/pdf,image/jpeg,image/png" aria-describedby="medCertHelp">
-                                <div id="medCertHelp" class="form-text">รองรับ JPG, PNG, PDF ขนาดไม่เกิน 5 MB</div>
-                            </div>
-                        </div>
-
-                        <button type="submit" id="btnSubmitLeave" class="rp-btn rp-btn--primary w-100 mt-2">
-                            <i class="bi bi-send-fill"></i> <span id="btnSubmitText">ยืนยันการส่งใบลา</span>
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- 🌟 ส่วนที่ 2: ประวัติการลา และ การจัดการคำขอ -->
-        <!-- ========================================== -->
-        <div class="col-lg-8">
-            <div class="rp-card h-100">
-                <div class="card-header bg-white py-3 border-bottom px-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
-                    <div class="d-flex align-items-center mt-1">
-                        <div class="icon-box-sm bg-secondary bg-opacity-10 text-secondary me-3">
-                            <i class="bi bi-clock-history"></i>
-                        </div>
-                        <h5 class="mb-0 fw-bold text-dark">ประวัติการลาของฉัน</h5>
-                    </div>
-                    
-                    <!-- ส่วนกรองเดือน และช่องค้นหา -->
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                        <form action="index.php" method="GET" class="m-0">
-                            <input type="hidden" name="c" value="leave">
-                            <input type="hidden" name="a" value="index">
-                            <?php if(!empty($selected_leave_type_req)): ?>
-                                <input type="hidden" name="type" value="<?= htmlspecialchars($selected_leave_type_req) ?>">
-                            <?php endif; ?>
-                            
-                            <div class="input-group input-group-sm shadow-sm rounded-pill overflow-hidden">
-                                <span class="input-group-text bg-white border-0 text-muted ps-3"><i class="bi bi-calendar-range"></i></span>
-                                <select name="month" class="form-select border-0 bg-white fw-bold text-primary shadow-none pe-4" style="font-size: 13px; cursor: pointer; min-width: 140px;" onchange="this.form.submit()">
-                                    <?php 
-                                        $current_y = (int)date('Y');
-                                        $sel_y = (int)substr($selected_month, 0, 4);
-                                        $start_y = min($current_y - 1, $sel_y - 1);
-                                        $end_y = max($current_y + 1, $sel_y + 1);
-                                        $thai_m_list = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-                                        
-                                        for ($y = $end_y; $y >= $start_y; $y--) {
-                                            for ($m = 12; $m >= 1; $m--) {
-                                                $val = sprintf("%04d-%02d", $y, $m);
-                                                $label = $thai_m_list[$m] . ' ' . ($y + 543);
-                                                $selected = ($val === $selected_month) ? 'selected' : '';
-                                                echo "<option value=\"{$val}\" {$selected}>{$label}</option>";
-                                            }
-                                        }
-                                    ?>
-                                </select>
-                            </div>
-                        </form>
-
-                        <div class="input-group input-group-sm shadow-sm rounded-pill overflow-hidden" style="max-width: 160px;">
-                            <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" id="leaveHistorySearch" class="form-control border-0" placeholder="ค้นหาประวัติ..." style="font-size: 13px;">
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive h-100 custom-scrollbar">
-                        <table class="table table-hover align-middle mb-0 border-0" id="leaveHistoryTable">
-                            <thead class="table-light text-secondary sticky-top" style="z-index: 5;">
-                                <tr>
-                                    <th class="ps-4 py-3 text-uppercase" style="font-size: 12px; font-weight: 700;">ประเภทการลา</th>
-                                    <th class="py-3 text-uppercase" style="font-size: 12px; font-weight: 700;">ช่วงวันที่</th>
-                                    <th class="text-center py-3 text-uppercase" style="font-size: 12px; font-weight: 700;">จำนวนวัน</th>
-                                    <th class="py-3 text-uppercase" style="font-size: 12px; font-weight: 700;">เหตุผล</th>
-                                    <th class="text-center pe-4 py-3 text-uppercase" style="width: 150px; font-size: 12px; font-weight: 700;">สถานะ/ดำเนินการ</th>
-                                </tr>
-                            </thead>
-                            <tbody class="border-top-0" id="leaveHistoryBody">
-                                <?php 
-                                // 🌟 กรองประวัติ: แสดงเดือนที่เลือก + (ใบลาที่ PENDING หรือ CANCEL_REQUESTED)
-                                $my_history = array_filter($my_leaves ?? [], function($l) use ($user_id, $selected_month) {
-                                    $leave_month = substr($l['start_date'], 0, 7);
-                                    // หากถูกยกเลิกแล้วและไม่ได้อยู่ในเดือนที่เลือก ให้ซ่อนไว้
-                                    return $l['user_id'] == $user_id && ($leave_month == $selected_month || in_array($l['status'], ['PENDING', 'CANCEL_REQUESTED']));
-                                });
-                                ?>
-                                <?php if (empty($my_history)): ?>
-                                    <tr id="emptyHistoryRow">
-                                        <td colspan="5" class="text-center py-5">
-                                            <div class="d-inline-flex justify-content-center align-items-center rounded-circle bg-light mb-3" style="width: 80px; height: 80px;"><i class="bi bi-folder-x text-muted opacity-50" style="font-size: 2.5rem;"></i></div>
-                                            <h6 class="fw-bold text-secondary">ไม่มีประวัติการลาในเดือนนี้</h6><p class="text-muted small mb-0">ลองเลือกเดือนอื่นจากตัวกรองด้านขวาบน เพื่อดูประวัติย้อนหลัง</p>
-                                        </td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach($my_history as $leave): ?>
-                                    <tr class="leave-row">
-                                        <td class="ps-4 py-3 leave-type-cell">
-                                            <div class="d-flex flex-wrap align-items-center mb-1">
-                                                <span class="fw-bold text-dark d-block" style="font-size: 14.5px;"><?= htmlspecialchars($leave['leave_type']) ?></span>
-                                                <?php if(substr($leave['start_date'], 0, 7) != $selected_month && in_array($leave['status'], ['PENDING', 'CANCEL_REQUESTED'])): ?>
-                                                    <span class="badge bg-warning text-dark border border-warning ms-2 rounded-pill shadow-sm" style="font-size: 10px; padding: 2px 6px;">ข้ามเดือน</span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <?php if(!empty($leave['med_cert_path'])): ?>
-                                                <a href="index.php?c=leave&a=download_med_cert&id=<?= (int)$leave['id'] ?>" target="_blank" rel="noopener" class="badge bg-info bg-opacity-10 text-info text-decoration-none mt-1 border border-info border-opacity-25" style="font-size: 10px;"><i class="bi bi-paperclip"></i> ดูใบรับรอง</a>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td class="py-3">
-                                            <span class="small bg-light px-2 py-1 rounded-2 border text-nowrap fw-medium text-secondary" style="font-size: 12px;">
-                                                <?php 
-                                                    $start_dt = getShortThaiDateLeave($leave['start_date']); $end_dt = getShortThaiDateLeave($leave['end_date']);
-                                                    echo ($start_dt === $end_dt) ? $start_dt : "{$start_dt} - {$end_dt}";
-                                                ?>
-                                            </span>
-                                        </td>
-                                        <td class="text-center py-3"><span class="fw-bold text-primary" style="font-size: 1.1rem;"><?= floatval($leave['num_days']) ?></span></td>
-                                        <td class="py-3 leave-reason-cell"><div class="text-truncate text-muted small" style="max-width: 180px;" title="<?= htmlspecialchars($leave['reason']) ?>"><?= htmlspecialchars($leave['reason']) ?></div></td>
-                                        <td class="text-center pe-4 py-3 leave-status-cell">
-                                            <!-- 🌟 ป้ายสถานะ -->
-                                            <?php 
-                                                if ($leave['status'] == 'APPROVED') { echo '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 d-block mb-2 py-1 px-2 rounded-pill w-100"><i class="bi bi-check-circle me-1"></i> อนุมัติแล้ว</span>'; } 
-                                                elseif ($leave['status'] == 'REJECTED') { echo '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 d-block mb-2 py-1 px-2 rounded-pill w-100"><i class="bi bi-x-circle me-1"></i> ไม่อนุมัติ</span>'; } 
-                                                elseif ($leave['status'] == 'CANCELLED') { echo '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 d-block mb-2 py-1 px-2 rounded-pill w-100"><i class="bi bi-slash-circle me-1"></i> ยกเลิกแล้ว</span>'; } 
-                                                elseif ($leave['status'] == 'PENDING') { echo '<span class="badge bg-warning bg-opacity-25 text-dark border border-warning border-opacity-50 d-block mb-2 py-1 px-2 rounded-pill w-100"><i class="bi bi-hourglass-split me-1"></i> รอพิจารณา</span>'; } 
-                                                elseif ($leave['status'] == 'CANCEL_REQUESTED') { echo '<span class="badge bg-warning text-dark border border-warning d-block mb-2 py-1 px-2 rounded-pill w-100 shadow-sm"><i class="bi bi-exclamation-triangle-fill me-1"></i> รออนุมัติยกเลิก</span>'; }
-                                                else { echo '<span class="badge bg-light text-dark border d-block mb-2 py-1 px-2 rounded-pill w-100">สถานะไม่ทราบ</span>'; }
-                                            ?>
-                                            
-                                            <!-- ปุ่มเครื่องมือ -->
-                                            <div class="d-flex gap-2 justify-content-center">
-                                                <a href="index.php?c=leave&a=print&id=<?= $leave['id'] ?>" target="_blank" class="btn btn-soft-primary btn-sm flex-fill rounded-3 fw-bold" style="font-size: 11px;" title="พิมพ์ฟอร์มใบลา"><i class="bi bi-printer"></i> พิมพ์</a>
-                                                
-                                                <?php if (in_array($leave['status'], ['PENDING', 'APPROVED'])): ?>
-                                                    <form action="index.php?c=leave&a=cancel" method="POST" class="flex-fill m-0" onsubmit="return confirm('<?= ($leave['status']=='APPROVED') ? 'ใบลาฉบับนี้ถูกอนุมัติไปแล้ว\n\nการยกเลิกจะต้องรอให้หัวหน้าอนุมัติการยกเลิกก่อน ระบบจึงจะคืนโควตาวันลาให้ ยืนยันการส่งคำขอยกเลิกใช่หรือไม่?' : 'คุณแน่ใจหรือไม่ที่จะยกเลิกคำขอใบลาฉบับนี้?' ?>');">
-                                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                                                        <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
-                                                        <button type="submit" class="btn btn-soft-danger btn-sm w-100 rounded-3 fw-bold" style="font-size: 11px;" title="ยกเลิกคำขอนี้"><i class="bi bi-x-circle"></i> ยกเลิก</button>
-                                                    </form>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- 🌟 ส่วนที่ 3: กระเป๋าวันลาคงเหลือ (Compact) -->
-    <!-- ========================================== -->
-    <section class="leave-wallet" aria-labelledby="leaveWalletTitle">
-        <div class="leave-wallet-summary">
-            <div class="leave-wallet-summary-main">
+    <section class="rp-leave-wallet" aria-labelledby="leaveWalletTitle">
+        <div class="rp-leave-wallet__summary">
+            <div class="d-flex align-items-center gap-2 flex-grow-1">
                 <div class="icon-box-sm bg-info bg-opacity-10 text-info">
                     <i class="bi bi-wallet2"></i>
                 </div>
-                <div class="leave-wallet-summary-copy">
-                    <h4 id="leaveWalletTitle" class="leave-wallet-summary-title">กระเป๋าสิทธิ์วันลาคงเหลือของคุณ</h4>
-                    <div class="leave-wallet-summary-subtitle">ย่อไว้เพื่อประหยัดพื้นที่หน้าจอ • กดเพื่อดูรายละเอียดสิทธิ์วันลา</div>
+                <div class="rp-leave-wallet__copy">
+                    <h4 id="leaveWalletTitle" class="rp-leave-wallet__title">กระเป๋าสิทธิ์วันลาคงเหลือของคุณ</h4>
+                    <div class="rp-leave-wallet__subtitle">ย่อไว้เพื่อประหยัดพื้นที่หน้าจอ • กดเพื่อดูรายละเอียดสิทธิ์วันลา</div>
                 </div>
             </div>
 
@@ -819,11 +603,11 @@ require_once __DIR__ . '/../components/ui.php';
             ?>
 
             <?php if (!empty($wallet_summary_items)): ?>
-                <div class="leave-wallet-key-balances" aria-label="สรุปวันลาคงเหลือ">
+                <div class="rp-leave-wallet__balances" aria-label="สรุปวันลาคงเหลือ">
                     <?php foreach ($wallet_summary_items as $summary_balance): ?>
-                        <div class="leave-wallet-key-chip" title="<?= htmlspecialchars($summary_balance['leave_type_name']) ?>">
-                            <span class="key-label"><?= htmlspecialchars($summary_balance['leave_type_name']) ?></span>
-                            <span class="key-value">
+                        <div class="rp-leave-balance-chip" title="<?= htmlspecialchars($summary_balance['leave_type_name']) ?>">
+                            <span class="rp-leave-balance-chip__label"><?= htmlspecialchars($summary_balance['leave_type_name']) ?></span>
+                            <span class="rp-leave-balance-chip__value">
                                 <?= floatval($summary_balance['remaining']) ?>
                                 <span class="key-unit">วัน</span>
                             </span>
@@ -930,6 +714,253 @@ require_once __DIR__ . '/../components/ui.php';
             </div>
         </div>
     </section>
+
+    <div class="row g-4 mb-5 leave-main-grid">
+        <!-- ========================================== -->
+        <!-- 🌟 ส่วนที่ 1: ฟอร์มยื่นใบลา -->
+        <!-- ========================================== -->
+        <div class="col-lg-4">
+            <div class="rp-card h-100">
+                <div class="rp-card__header">
+                    <div class="icon-box-sm bg-<?= $page_theme ?> bg-opacity-10 text-<?= $page_theme ?> me-3">
+                        <i class="bi bi-pencil-square"></i>
+                    </div>
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <?= $selected_leave_type_req ? 'แบบฟอร์ม' . htmlspecialchars($selected_leave_type_req) : 'ยื่นแบบฟอร์มขอลา' ?>
+                    </h5>
+                </div>
+                <div class="rp-card__body">
+                    <form action="index.php?c=leave&a=request" method="POST" id="leaveForm" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+
+                        <div class="rp-leave-form-steps" aria-label="ขั้นตอนการยื่นลา">
+                            <div class="rp-leave-form-step rp-leave-form-step--active" data-step="1">
+                                <span class="rp-leave-form-step__number">1</span>
+                                <span>ประเภทลา</span>
+                            </div>
+                            <div class="rp-leave-form-step" data-step="2">
+                                <span class="rp-leave-form-step__number">2</span>
+                                <span>ช่วงวัน</span>
+                            </div>
+                            <div class="rp-leave-form-step" data-step="3">
+                                <span class="rp-leave-form-step__number">3</span>
+                                <span>รายละเอียด</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">ประเภทการลา <span class="text-danger">*</span></label>
+                            <select name="leave_type_id" id="leave_type" class="form-select rp-control" required>
+                                <option value="">-- กรุณาเลือกประเภทการลา --</option>
+                                <?php foreach($leave_types as $type): 
+                                    $is_selected = ($selected_leave_type_req === $type['leave_type']) ? 'selected' : '';
+                                ?>
+                                    <option value="<?= $type['id'] ?>" data-name="<?= htmlspecialchars($type['leave_type']) ?>" <?= $is_selected ?>>
+                                        <?= htmlspecialchars($type['leave_type']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold text-secondary small text-uppercase">ตั้งแต่วันที่ <span class="text-danger">*</span></label>
+                                <div class="input-group-modern d-flex align-items-center bg-white">
+                                    <span class="ps-3 text-primary"><i class="bi bi-calendar-event"></i></span>
+                                    <input type="text" name="start_date" id="start_date" class="form-control rp-control border-0 px-2 fw-medium" required placeholder="คลิกเลือก" readonly style="background-color: transparent;">
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label fw-bold text-secondary small text-uppercase">ถึงวันที่ <span class="text-danger">*</span></label>
+                                <div class="input-group-modern d-flex align-items-center bg-white">
+                                    <span class="ps-3 text-danger"><i class="bi bi-calendar-check"></i></span>
+                                    <input type="text" name="end_date" id="end_date" class="form-control rp-control border-0 px-2 fw-medium" required placeholder="คลิกเลือก" readonly style="background-color: transparent;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-secondary small text-uppercase">เหตุผลการลา <span class="text-danger">*</span></label>
+                            <textarea name="reason" class="form-control rp-control" rows="3" maxlength="1000" aria-describedby="reasonHelp" placeholder="ระบุเหตุผลที่ชัดเจน เช่น พักผ่อนประจำปี, ป่วยเป็นไข้..." required></textarea>
+                            <div id="reasonHelp" class="form-text text-muted">สูงสุด 1,000 ตัวอักษร</div>
+                        </div>
+
+                        <div class="rp-leave-preview" id="leaveRequestPreview" hidden aria-live="polite">
+                            <p class="rp-leave-preview__title">สรุปคำขอก่อนส่ง</p>
+                            <div class="rp-leave-preview__grid">
+                                <div class="rp-leave-preview__item">
+                                    <span class="rp-leave-preview__label">ประเภท</span>
+                                    <span class="rp-leave-preview__value" id="previewLeaveType">-</span>
+                                </div>
+                                <div class="rp-leave-preview__item">
+                                    <span class="rp-leave-preview__label">จำนวนวันทำการ</span>
+                                    <span class="rp-leave-preview__value" id="previewLeaveDays">-</span>
+                                </div>
+                                <div class="rp-leave-preview__item">
+                                    <span class="rp-leave-preview__label">คงเหลือก่อนยื่น</span>
+                                    <span class="rp-leave-preview__value" id="previewLeaveBalance">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- แจ้งเตือนอัปโหลดใบรับรองแพทย์ -->
+                        <div class="mb-4" id="med_cert_section" style="display: none;">
+                            <div class="alert alert-modern alert-danger px-4 py-3 mb-0 border-0 bg-danger bg-opacity-10 text-danger rounded-4 shadow-sm">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i> 
+                                    <strong>ลาป่วยตั้งแต่ 3 วันทำการขึ้นไป</strong>
+                                </div>
+                                <label class="form-label small text-dark fw-bold mb-2">โปรดแนบไฟล์ใบรับรองแพทย์ (JPG, PNG, PDF)</label>
+                                <input class="form-control form-control-sm border-danger border-opacity-25 shadow-sm rounded-3 bg-white" type="file" name="med_cert_file" id="med_cert_file" accept=".jpg,.jpeg,.png,.pdf,application/pdf,image/jpeg,image/png" aria-describedby="medCertHelp">
+                                <div id="medCertHelp" class="form-text">รองรับ JPG, PNG, PDF ขนาดไม่เกิน 5 MB</div>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="btnSubmitLeave" class="rp-btn rp-btn--primary w-100 mt-2">
+                            <i class="bi bi-send-fill"></i> <span id="btnSubmitText">ยืนยันการส่งใบลา</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 🌟 ส่วนที่ 2: ประวัติการลา และ การจัดการคำขอ -->
+        <!-- ========================================== -->
+        <div class="col-lg-8">
+            <div class="rp-card h-100">
+                <div class="rp-card__header flex-wrap">
+                    <div class="d-flex align-items-center mt-1">
+                        <div class="icon-box-sm bg-secondary bg-opacity-10 text-secondary me-3">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                        <h5 class="mb-0 fw-bold text-dark">ประวัติการลาของฉัน</h5>
+                    </div>
+                    
+                    <!-- ส่วนกรองเดือน และช่องค้นหา -->
+                    <div class="rp-leave-history-toolbar">
+                        <form action="index.php" method="GET" class="m-0">
+                            <input type="hidden" name="c" value="leave">
+                            <input type="hidden" name="a" value="index">
+                            <?php if(!empty($selected_leave_type_req)): ?>
+                                <input type="hidden" name="type" value="<?= htmlspecialchars($selected_leave_type_req) ?>">
+                            <?php endif; ?>
+                            
+                            <div class="input-group input-group-sm shadow-sm rounded-pill overflow-hidden">
+                                <span class="input-group-text bg-white border-0 text-muted ps-3"><i class="bi bi-calendar-range"></i></span>
+                                <select name="month" class="rp-control" onchange="this.form.submit()" aria-label="เลือกเดือนประวัติการลา">
+                                    <?php 
+                                        $current_y = (int)date('Y');
+                                        $sel_y = (int)substr($selected_month, 0, 4);
+                                        $start_y = min($current_y - 1, $sel_y - 1);
+                                        $end_y = max($current_y + 1, $sel_y + 1);
+                                        $thai_m_list = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+                                        
+                                        for ($y = $end_y; $y >= $start_y; $y--) {
+                                            for ($m = 12; $m >= 1; $m--) {
+                                                $val = sprintf("%04d-%02d", $y, $m);
+                                                $label = $thai_m_list[$m] . ' ' . ($y + 543);
+                                                $selected = ($val === $selected_month) ? 'selected' : '';
+                                                echo "<option value=\"{$val}\" {$selected}>{$label}</option>";
+                                            }
+                                        }
+                                    ?>
+                                </select>
+                            </div>
+                        </form>
+
+                        <input type="search" id="leaveHistorySearch" class="rp-control" placeholder="ค้นหาประวัติ..." aria-label="ค้นหาประวัติการลา">
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive h-100 custom-scrollbar">
+                        <table class="table table-hover align-middle mb-0 border-0" id="leaveHistoryTable">
+                            <thead class="table-light text-secondary sticky-top" style="z-index: 5;">
+                                <tr>
+                                    <th class="ps-4 py-3 text-uppercase" style="font-size: 12px; font-weight: 700;">ประเภทการลา</th>
+                                    <th class="py-3 text-uppercase" style="font-size: 12px; font-weight: 700;">ช่วงวันที่</th>
+                                    <th class="text-center py-3 text-uppercase" style="font-size: 12px; font-weight: 700;">จำนวนวัน</th>
+                                    <th class="py-3 text-uppercase" style="font-size: 12px; font-weight: 700;">เหตุผล</th>
+                                    <th class="text-center pe-4 py-3 text-uppercase" style="width: 150px; font-size: 12px; font-weight: 700;">สถานะ/ดำเนินการ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="border-top-0" id="leaveHistoryBody">
+                                <?php 
+                                // 🌟 กรองประวัติ: แสดงเดือนที่เลือก + (ใบลาที่ PENDING หรือ CANCEL_REQUESTED)
+                                $my_history = array_filter($my_leaves ?? [], function($l) use ($user_id, $selected_month) {
+                                    $leave_month = substr($l['start_date'], 0, 7);
+                                    // หากถูกยกเลิกแล้วและไม่ได้อยู่ในเดือนที่เลือก ให้ซ่อนไว้
+                                    return $l['user_id'] == $user_id && ($leave_month == $selected_month || in_array($l['status'], ['PENDING', 'CANCEL_REQUESTED']));
+                                });
+                                ?>
+                                <?php if (empty($my_history)): ?>
+                                    <tr id="emptyHistoryRow">
+                                        <td colspan="5">
+                                            <?php rp_empty_state('bi-folder-x', 'ไม่มีประวัติการลาในเดือนนี้', 'ลองเลือกเดือนอื่นจากตัวกรองด้านบนเพื่อดูประวัติย้อนหลัง'); ?>
+                                        </td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach($my_history as $leave): ?>
+                                    <tr class="leave-row">
+                                        <td class="ps-4 py-3 leave-type-cell">
+                                            <div class="d-flex flex-wrap align-items-center mb-1">
+                                                <span class="fw-bold text-dark d-block" style="font-size: 14.5px;"><?= htmlspecialchars($leave['leave_type']) ?></span>
+                                                <?php if(substr($leave['start_date'], 0, 7) != $selected_month && in_array($leave['status'], ['PENDING', 'CANCEL_REQUESTED'])): ?>
+                                                    <span class="badge bg-warning text-dark border border-warning ms-2 rounded-pill shadow-sm" style="font-size: 10px; padding: 2px 6px;">ข้ามเดือน</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if(!empty($leave['med_cert_path'])): ?>
+                                                <a href="index.php?c=leave&a=download_med_cert&id=<?= (int)$leave['id'] ?>" target="_blank" rel="noopener" class="badge bg-info bg-opacity-10 text-info text-decoration-none mt-1 border border-info border-opacity-25" style="font-size: 10px;"><i class="bi bi-paperclip"></i> ดูใบรับรอง</a>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="py-3">
+                                            <span class="small bg-light px-2 py-1 rounded-2 border text-nowrap fw-medium text-secondary" style="font-size: 12px;">
+                                                <?php 
+                                                    $start_dt = getShortThaiDateLeave($leave['start_date']); $end_dt = getShortThaiDateLeave($leave['end_date']);
+                                                    echo ($start_dt === $end_dt) ? $start_dt : "{$start_dt} - {$end_dt}";
+                                                ?>
+                                            </span>
+                                        </td>
+                                        <td class="text-center py-3"><span class="fw-bold text-primary" style="font-size: 1.1rem;"><?= floatval($leave['num_days']) ?></span></td>
+                                        <td class="py-3 leave-reason-cell"><div class="text-truncate text-muted small" style="max-width: 180px;" title="<?= htmlspecialchars($leave['reason']) ?>"><?= htmlspecialchars($leave['reason']) ?></div></td>
+                                        <td class="text-center pe-4 py-3 leave-status-cell">
+                                            <!-- 🌟 ป้ายสถานะ -->
+                                            <?php 
+                                                if ($leave['status'] == 'APPROVED') { echo '<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 d-block mb-2 py-1 px-2 rounded-pill w-100"><i class="bi bi-check-circle me-1"></i> อนุมัติแล้ว</span>'; } 
+                                                elseif ($leave['status'] == 'REJECTED') { echo '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 d-block mb-2 py-1 px-2 rounded-pill w-100"><i class="bi bi-x-circle me-1"></i> ไม่อนุมัติ</span>'; } 
+                                                elseif ($leave['status'] == 'CANCELLED') { echo '<span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 d-block mb-2 py-1 px-2 rounded-pill w-100"><i class="bi bi-slash-circle me-1"></i> ยกเลิกแล้ว</span>'; } 
+                                                elseif ($leave['status'] == 'PENDING') { echo '<span class="badge bg-warning bg-opacity-25 text-dark border border-warning border-opacity-50 d-block mb-2 py-1 px-2 rounded-pill w-100"><i class="bi bi-hourglass-split me-1"></i> รอพิจารณา</span>'; } 
+                                                elseif ($leave['status'] == 'CANCEL_REQUESTED') { echo '<span class="badge bg-warning text-dark border border-warning d-block mb-2 py-1 px-2 rounded-pill w-100 shadow-sm"><i class="bi bi-exclamation-triangle-fill me-1"></i> รออนุมัติยกเลิก</span>'; }
+                                                else { echo '<span class="badge bg-light text-dark border d-block mb-2 py-1 px-2 rounded-pill w-100">สถานะไม่ทราบ</span>'; }
+                                            ?>
+                                            
+                                            <!-- ปุ่มเครื่องมือ -->
+                                            <div class="d-flex gap-2 justify-content-center">
+                                                <a href="index.php?c=leave&a=print&id=<?= $leave['id'] ?>" target="_blank" class="btn btn-soft-primary btn-sm flex-fill rounded-3 fw-bold" style="font-size: 11px;" title="พิมพ์ฟอร์มใบลา"><i class="bi bi-printer"></i> พิมพ์</a>
+                                                
+                                                <?php if (in_array($leave['status'], ['PENDING', 'APPROVED'])): ?>
+                                                    <form action="index.php?c=leave&a=cancel" method="POST" class="flex-fill m-0" onsubmit="return confirm('<?= ($leave['status']=='APPROVED') ? 'ใบลาฉบับนี้ถูกอนุมัติไปแล้ว\n\nการยกเลิกจะต้องรอให้หัวหน้าอนุมัติการยกเลิกก่อน ระบบจึงจะคืนโควตาวันลาให้ ยืนยันการส่งคำขอยกเลิกใช่หรือไม่?' : 'คุณแน่ใจหรือไม่ที่จะยกเลิกคำขอใบลาฉบับนี้?' ?>');">
+                                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
+                                                        <button type="submit" class="btn btn-soft-danger btn-sm w-100 rounded-3 fw-bold" style="font-size: 11px;" title="ยกเลิกคำขอนี้"><i class="bi bi-x-circle"></i> ยกเลิก</button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 🌟 ส่วนที่ 3: กระเป๋าวันลาคงเหลือ (Compact) -->
+    <!-- ========================================== -->
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -948,6 +979,11 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    const leaveBalanceMap = <?= json_encode(array_reduce($leave_balances ?? [], function($carry, $item) {
+        $carry[(string)($item['leave_type_name'] ?? '')] = (float)($item['remaining'] ?? 0);
+        return $carry;
+    }, []), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 
     const leaveTypeSelect = document.getElementById('leave_type'); const medCertSection = document.getElementById('med_cert_section');
     const medCertInput = document.getElementById('med_cert_file'); const leaveForm = document.getElementById('leaveForm');
@@ -970,12 +1006,41 @@ document.addEventListener('DOMContentLoaded', function() {
         else if (employeeType.includes('ภารกิจ')) { if (name.includes('ภริยาคลอด') || name.includes('ศึกษา') || name.includes('ระหว่างประเทศ') || name.includes('ติดตามคู่สมรส') || name.includes('ฟื้นฟู')) { opt.disabled = true; opt.text += ' (ไม่มีสิทธิ)'; } }
     });
 
+    function updateLeavePreview() {
+        const preview = document.getElementById('leaveRequestPreview');
+        const typeEl = document.getElementById('previewLeaveType');
+        const daysEl = document.getElementById('previewLeaveDays');
+        const balanceEl = document.getElementById('previewLeaveBalance');
+        const steps = document.querySelectorAll('.rp-leave-form-step');
+
+        if (!preview || !leaveTypeSelect) return;
+
+        const selectedOption = leaveTypeSelect.options[leaveTypeSelect.selectedIndex];
+        const leaveName = selectedOption ? (selectedOption.getAttribute('data-name') || '') : '';
+        const start = document.getElementById('start_date')?.value || '';
+        const end = document.getElementById('end_date')?.value || '';
+        const days = (start && end) ? calculateWorkingDays(start, end) : 0;
+        const remaining = Object.prototype.hasOwnProperty.call(leaveBalanceMap, leaveName) ? leaveBalanceMap[leaveName] : null;
+
+        preview.hidden = !(leaveName || start || end);
+        if (typeEl) typeEl.textContent = leaveName || '-';
+        if (daysEl) daysEl.textContent = days > 0 ? days + ' วัน' : '-';
+        if (balanceEl) balanceEl.textContent = remaining !== null ? remaining + ' วัน' : 'ไม่จำกัด/ไม่พบโควตา';
+
+        steps.forEach((step, index) => {
+            const number = index + 1;
+            const active = number === 1 ? !!leaveName : (number === 2 ? !!(start && end) : !!document.querySelector('textarea[name="reason"]')?.value.trim());
+            step.classList.toggle('rp-leave-form-step--active', active);
+        });
+    }
+
     function checkMedicalCertRequired() {
         const selectedOption = leaveTypeSelect.options[leaveTypeSelect.selectedIndex]; const leaveName = selectedOption ? selectedOption.getAttribute('data-name') : '';
         const start = document.querySelector('input[name="start_date"]').value; const end = document.querySelector('input[name="end_date"]').value;
         if (leaveName === 'ลาป่วย' && start && end) {
             if (calculateWorkingDays(start, end) >= 3) { medCertSection.style.display = 'block'; medCertInput.required = true; } else { medCertSection.style.display = 'none'; medCertInput.required = false; }
         } else { medCertSection.style.display = 'none'; medCertInput.required = false; }
+        updateLeavePreview();
     }
 
     function changeYearToBuddhist(selectedDates, dateStr, instance) {
@@ -1014,7 +1079,10 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     const startPicker = flatpickr("#start_date", flatpickrConfig); const endPicker = flatpickr("#end_date", flatpickrConfig);
-    leaveTypeSelect.addEventListener('change', checkMedicalCertRequired); if (leaveTypeSelect.value !== '') checkMedicalCertRequired();
+    leaveTypeSelect.addEventListener('change', checkMedicalCertRequired);
+    document.querySelector('textarea[name="reason"]')?.addEventListener('input', updateLeavePreview);
+    if (leaveTypeSelect.value !== '') checkMedicalCertRequired();
+    updateLeavePreview();
     if (leaveForm) { leaveForm.addEventListener('submit', function(e) { const btnSubmit = document.getElementById('btnSubmitLeave'); const btnText = document.getElementById('btnSubmitText'); if (btnSubmit.classList.contains('disabled')) { e.preventDefault(); return; } btnSubmit.classList.add('disabled'); btnSubmit.style.opacity = '0.7'; btnText.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>กำลังส่งข้อมูล...'; }); }
 });
 </script>
