@@ -145,6 +145,7 @@
         <div class="modal-content border-0 shadow-lg rounded-4">
             <!-- 🌟 แก้ไข action ให้ชี้ไปที่ Controller ของวันลาอย่างถูกต้อง -->
             <form action="index.php?c=leave&a=manage" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="action" value="update_balance">
                 <input type="hidden" name="balance_id" id="edit_balance_id">
                 
