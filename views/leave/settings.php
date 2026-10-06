@@ -90,7 +90,7 @@
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert alert-success border-0 shadow-sm rounded-3 d-flex align-items-center mb-4">
             <i class="bi bi-check-circle-fill fs-5 text-success me-3"></i> 
-            <div class="fw-bold text-dark"><?= $_SESSION['success_msg'] ?></div>
+            <div class="fw-bold text-dark"><?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); endif; ?>
@@ -110,6 +110,7 @@
         </div>
         <div class="card-body p-0">
             <form action="index.php?c=leave&a=settings" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                 <div class="table-responsive pb-2">
                     <table class="table table-hover align-middle mb-0 border-0">
                         <thead class="table-light text-dark" style="font-size: 14px;">
