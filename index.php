@@ -51,8 +51,15 @@ if (!preg_match($routePattern, $c) || !preg_match($routePattern, $a)) {
     roster_render_route_error(400, 'คำขอไม่ถูกต้อง', 'รูปแบบ Controller หรือ Action ไม่ถูกต้อง');
 }
 
-// Authentication pages are the only public application routes in this branch.
-if ($c !== 'auth' && !isset($_SESSION['user'])) {
+// Keep public routes minimal. LINE webhook validates X-Line-Signature in its controller.
+$publicRoutes = [
+    'auth' => ['index', 'login', 'logout'],
+    'linewebhook' => ['index'],
+];
+
+$isPublicRoute = isset($publicRoutes[$c]) && in_array($a, $publicRoutes[$c], true);
+
+if (!$isPublicRoute && !isset($_SESSION['user'])) {
     header('Location: index.php?c=auth&a=index');
     exit;
 }
