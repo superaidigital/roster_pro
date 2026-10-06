@@ -259,7 +259,6 @@ require_once __DIR__ . '/../components/ui.php';
         <form action="index.php" method="GET" class="rp-report-filterbar__group mb-0">
             <input type="hidden" name="c" value="report">
             <input type="hidden" name="a" value="overview">
-
             <?php if ($is_admin): ?>
                 <select name="month" class="rp-control" onchange="this.form.submit()" aria-label="เลือกเดือนรายงาน">
                     <?php foreach($thai_months as $m_num => $m_name): ?>
@@ -267,7 +266,6 @@ require_once __DIR__ . '/../components/ui.php';
                     <?php endforeach; ?>
                 </select>
             <?php endif; ?>
-
             <select name="year" class="rp-control" onchange="this.form.submit()" aria-label="เลือกปีรายงาน">
                 <?php for($i = date('Y')-2; $i <= date('Y')+1; $i++): ?>
                     <option value="<?= $i ?>" <?= $selected_year == $i ? 'selected' : '' ?>>พ.ศ. <?= $i + 543 ?></option>
@@ -293,35 +291,7 @@ require_once __DIR__ . '/../components/ui.php';
         </div>
     <?php endif; ?>
 
-    <!-- 🌟 Top KPI Cards (ดึงข้อมูลล่าสุดจากฐานข้อมูล) -->
-    <div class="row g-4 mb-4 animate-fade-in" style="animation-delay: 0.1s;">
-        <!-- 1. ความคืบหน้าการส่งเวร -->
-        <div class="col-xl-3 col-md-6">
-            <div class="kpi-card p-4 h-100 border-bottom border-primary border-4">
-                <div class="d-flex justify-content-between align-items-start mb-3">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 13px; text-transform:uppercase;">ความคืบหน้าภาพรวม</p>
-                        <h2 class="fw-bolder text-dark mb-0"><?= $completed_hospitals ?> <span class="fs-6 text-muted fw-normal">/ <?= $total_hospitals ?> แห่ง</span></h2>
-                    </div>
-                    <div class="kpi-icon-wrapper bg-primary bg-opacity-10 text-primary"><i class="bi bi-building-check"></i></div>
-                </div>
-                <div>
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="text-muted" style="font-size: 12px;">ส่งแล้ว</span>
-                        <span class="fw-bold text-primary" style="font-size: 12px;"><?= $completion_percent ?>%</span>
-                    </div>
-                    <div class="custom-progress"><div class="custom-progress-bar <?= $progress_color ?>" style="width: <?= $completion_percent ?>%;"></div></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. บุคลากรรวม & ปฏิบัติงานวันนี้ -->
-        <div class="col-xl-3 col-md-6">
-            <div class="kpi-card p-4 h-100 border-bottom border-success border-4">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 13px; text-transform:uppercase;">ผู้ปฏิบัติงานวันนี้</p>
-                        <h2 class="fw-bolder     <section class="rp-section" aria-labelledby="reportKpiTitle">
+    <section class="rp-section" aria-labelledby="reportKpiTitle">
         <?php rp_section_header('ตัวชี้วัดหลัก', 'ข้อมูลล่าสุดจากระบบสำหรับช่วงเวลาที่เลือก'); ?>
         <div class="rp-grid rp-grid--4" id="reportKpiTitle">
             <?php rp_stat_card('ความคืบหน้าการส่งเวร', $completed_hospitals . ' / ' . $total_hospitals . ' แห่ง', 'bi-building-check', 'info', '', $completion_percent . '%'); ?>
