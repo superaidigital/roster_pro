@@ -61,8 +61,10 @@ class AuthController {
                     exit;
                 }
 
-                // ล็อกอินสำเร็จ: บันทึกข้อมูลลง Session
+                // ล็อกอินสำเร็จ: เปลี่ยน Session ID เพื่อป้องกัน Session Fixation
+                session_regenerate_id(true);
                 $_SESSION['user'] = $user;
+                $_SESSION['authenticated_at'] = time();
                 unset($_SESSION['login_error']); // ล้างค่า Error
                 
                 // 📝 บันทึก Log: เข้าสู่ระบบสำเร็จ
@@ -100,7 +102,21 @@ class AuthController {
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_LOGOUT, "ออกจากระบบด้วยตนเอง");
         }
         
-        session_unset();
+        $_SESSION = [];
+
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params['path'],
+                $params['domain'],
+                $params['secure'],
+                $params['httponly']
+            );
+        }
+
         session_destroy();
         header("Location: index.php?c=auth&a=index");
         exit;
