@@ -1376,7 +1376,7 @@ function autoScheduleRoster() {
             fetch('index.php?c=ajax&a=auto_schedule', {
                 method: 'POST',
                 body: JSON.stringify({ month_year: currentMonthYear, hosp_id: targetHospId }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': ROSTER_CSRF }
             }).then(res => res.json()).then(data => {
                 if(data.status === 'success') {
                     Swal.fire('สำเร็จ', data.message, 'success').then(() => window.location.reload());
