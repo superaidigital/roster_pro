@@ -315,6 +315,30 @@ require_once __DIR__ . '/../components/ui.php';
                         <div class="form-text">User ID ขึ้นต้น U, Group ID ขึ้นต้น C หรือ Room ID ขึ้นต้น R</div>
                     </div>
 
+                    <div class="p-3 border rounded-4 bg-light mb-4">
+                        <div class="fw-bold mb-2"><i class="bi bi-broadcast me-1"></i> Webhook</div>
+                        <div class="small text-muted mb-1">Webhook URL ที่ใช้ใน LINE Developers Console</div>
+                        <code class="d-block p-2 bg-dark text-white rounded text-break mb-3"><?= htmlspecialchars(
+                            ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http')
+                            . '://' . ($_SERVER['HTTP_HOST'] ?? 'your-domain')
+                            . rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/\\')
+                            . '/index.php?c=linewebhook&a=index',
+                            ENT_QUOTES,
+                            'UTF-8'
+                        ) ?></code>
+
+                        <div class="small text-muted">Source ล่าสุดที่ Webhook รับได้</div>
+                        <?php if (!empty($settings['line_last_source_id'])): ?>
+                            <div class="mt-1">
+                                <span class="rp-badge rp-badge--success"><?= htmlspecialchars($settings['line_last_source_type'] ?? 'source', ENT_QUOTES, 'UTF-8') ?></span>
+                                <code class="ms-1"><?= htmlspecialchars($settings['line_last_source_id'], ENT_QUOTES, 'UTF-8') ?></code>
+                            </div>
+                            <div class="form-text">นำค่านี้ไปวางใน Target ID หากต้องการส่งไปยัง Source นี้</div>
+                        <?php else: ?>
+                            <div class="text-muted small mt-1">ยังไม่มีข้อมูล — เพิ่ม OA เป็นเพื่อนหรือเข้ากลุ่ม แล้วส่งข้อความหนึ่งครั้งเพื่อให้ Webhook รับ Source ID</div>
+                        <?php endif; ?>
+                    </div>
+
                     <h6 class="fw-bolder mb-3">เหตุการณ์ที่ส่งไป LINE</h6>
                     <div class="row g-3">
                         <?php
