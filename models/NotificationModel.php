@@ -128,6 +128,36 @@ class NotificationModel {
         }
     }
 
+    public function deleteNotification($id, $user_id) {
+        $stmt = $this->conn->prepare("
+            DELETE FROM {$this->table_name}
+            WHERE id = :id AND user_id = :user_id
+        ");
+        try {
+            $stmt->execute([
+                ':id' => (int)$id,
+                ':user_id' => (int)$user_id
+            ]);
+            return $stmt->rowCount() === 1;
+        } catch (PDOException $e) {
+            error_log("Delete Notification Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function deleteAllForUser($user_id) {
+        $stmt = $this->conn->prepare("
+            DELETE FROM {$this->table_name}
+            WHERE user_id = :user_id
+        ");
+        try {
+            return $stmt->execute([':user_id' => (int)$user_id]);
+        } catch (PDOException $e) {
+            error_log("Delete All Notifications Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
     /**
      * 🌟 6. ลบการแจ้งเตือนที่เก่าเกินไป (เก็บกวาดข้อมูล / Cleanup)
      * ตัวอย่างการใช้งาน: รันอัตโนมัติเมื่อครบเดือน เพื่อไม่ให้ตารางหนักเกินไป
