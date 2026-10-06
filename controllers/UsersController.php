@@ -22,6 +22,27 @@ class UsersController {
         }
     }
 
+
+    private function getCsrfToken() {
+        if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+
+    private function verifyCsrf($redirect = 'index.php?c=users') {
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $postedToken = $_POST['csrf_token'] ?? '';
+
+        if (!is_string($sessionToken) || !is_string($postedToken) ||
+            $sessionToken === '' || $postedToken === '' ||
+            !hash_equals($sessionToken, $postedToken)) {
+            $_SESSION['error_msg'] = "คำขอหมดอายุหรือไม่ถูกต้อง กรุณาลองใหม่";
+            header("Location: " . $redirect);
+            exit;
+        }
+    }
+
     // ==========================================
     // 🌟 ตรวจสอบสิทธิ์การจัดการรายบุคคล
     // ==========================================
@@ -81,6 +102,7 @@ class UsersController {
 
         // ดึงกลุ่มเรทค่าตอบแทน
         $pay_rates = $payRateModel->getAllRates();
+        $csrf_token = $this->getCsrfToken();
 
         // โหลด View
         require_once 'views/layouts/header.php';
@@ -93,6 +115,7 @@ class UsersController {
     // 🌟 2. เพิ่มผู้ใช้งานใหม่
     // ====================================================
     public function add() {
+            $this->verifyCsrf();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
@@ -141,6 +164,7 @@ class UsersController {
     // 🌟 3. แก้ไขข้อมูลผู้ใช้งาน
     // ====================================================
     public function edit() {
+            $this->verifyCsrf();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $db = (new Database())->getConnection();
@@ -200,6 +224,7 @@ class UsersController {
     // 🌟 4. ลบผู้ใช้งาน (ปรับเปลี่ยนเป็นรับ POST เพื่อความปลอดภัย)
     // ====================================================
     public function delete() {
+            $this->verifyCsrf();
         $this->checkAuth();
         
         // เปลี่ยนการตรวจสอบมารับค่า $_POST
@@ -272,6 +297,7 @@ class UsersController {
     // 🌟 5. สลับสถานะ ระงับ/เปิดใช้งาน (อัปเดตเก็บสาเหตุการระงับ)
     // ====================================================
     public function toggle() {
+            $this->verifyCsrf();
         $this->checkAuth();
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id']) && isset($_POST['status'])) {
@@ -382,13 +408,23 @@ class UsersController {
         $json = file_get_contents('php://input');
         $data = json_decode($json, true);
 
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        $postedToken = is_array($data) ? ($data['csrf_token'] ?? '') : '';
+        if (!is_string($sessionToken) || !is_string($postedToken) ||
+            $sessionToken === '' || $postedToken === '' ||
+            !hash_equals($sessionToken, $postedToken)) {
+            http_response_code(419);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+            exit;
+        }
+
         if (isset($data['order']) && is_array($data['order'])) {
             $db = (new Database())->getConnection();
             try {
                 $db->beginTransaction();
                 $stmt = $db->prepare("UPDATE users SET display_order = ? WHERE id = ?");
                 foreach ($data['order'] as $item) {
-                    $stmt->execute([$item['order'], $item['id']]);
+                    $stmt->execute([(int)$item['order'], (int)$item['id']]);
                 }
                 $db->commit();
                 echo json_encode(['success' => true]);
@@ -407,6 +443,7 @@ class UsersController {
     // 🌟 7. ลบหลายรายการพร้อมกัน (Bulk Delete)
     // ====================================================
     public function bulk_delete() {
+            $this->verifyCsrf();
         $this->checkAuth();
         
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['ids'])) {
@@ -492,6 +529,7 @@ class UsersController {
     }
 
     public function import() {
+            $this->verifyCsrf();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_FILES['import_file'])) {
             $db = (new Database())->getConnection();
@@ -537,6 +575,7 @@ class UsersController {
     // 🌟 9. ปลดล็อกบัญชีที่ถูกซ่อน (Restore / Undelete)
     // ====================================================
     public function restore() {
+            $this->verifyCsrf();
         $this->checkAuth();
         if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['id'])) {
             $db = (new Database())->getConnection();
