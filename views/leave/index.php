@@ -43,6 +43,8 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     $page_icon = 'bi-clock-history';
     $page_theme = 'secondary';
 }
+
+require_once 'views/components/ui.php';
 ?>
 <!-- นำเข้า CSS ของ Flatpickr สำหรับปฏิทิน -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -510,15 +512,23 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
     }
 </style>
 
-<div class="container-fluid leave-page-container px-3 px-md-4 py-4">
-    <!-- Modern Centered Header Card -->
-    <section class="leave-hero-card" aria-labelledby="leavePageTitle">
-        <div class="leave-hero-icon bg-<?= $page_theme ?> bg-opacity-10 text-<?= $page_theme ?>">
-            <i class="bi <?= $page_icon ?>"></i>
-        </div>
-        <h2 id="leavePageTitle" class="leave-hero-title"><?= $page_title ?></h2>
-        <p class="leave-hero-subtitle">ส่งแบบฟอร์มขออนุญาตลาออนไลน์ และตรวจสอบประวัติการลา</p>
-    </section>
+<div class="rp-page leave-page-container">
+    <?php
+    ob_start();
+    ?>
+        <a href="index.php?c=leave&a=index" class="rp-btn rp-btn--secondary">
+            <i class="bi bi-clock-history" aria-hidden="true"></i>
+            ประวัติการลา
+        </a>
+    <?php
+    $leave_header_actions = ob_get_clean();
+    rp_page_header(
+        $page_title,
+        'ตรวจสอบสิทธิ์ ยื่นคำขอ และติดตามสถานะการลาได้ในหน้าเดียว',
+        $leave_header_actions,
+        'Leave'
+    );
+    ?>
 
     <!-- แจ้งเตือนสถานะต่างๆ -->
     <?php if (isset($_SESSION['success_msg'])): ?>
@@ -540,8 +550,8 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
         <!-- 🌟 ส่วนที่ 1: ฟอร์มยื่นใบลา -->
         <!-- ========================================== -->
         <div class="col-lg-4">
-            <div class="card card-modern h-100">
-                <div class="card-header bg-white py-4 border-bottom px-4 d-flex align-items-center">
+            <div class="rp-card h-100">
+                <div class="rp-card__header">
                     <div class="icon-box-sm bg-<?= $page_theme ?> bg-opacity-10 text-<?= $page_theme ?> me-3">
                         <i class="bi bi-pencil-square"></i>
                     </div>
@@ -549,13 +559,13 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                         <?= $selected_leave_type_req ? 'แบบฟอร์ม' . htmlspecialchars($selected_leave_type_req) : 'ยื่นแบบฟอร์มขอลา' ?>
                     </h5>
                 </div>
-                <div class="card-body p-4">
+                <div class="rp-card__body">
                     <form action="index.php?c=leave&a=request" method="POST" id="leaveForm" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                         
                         <div class="mb-4">
                             <label class="form-label fw-bold text-secondary small text-uppercase">ประเภทการลา <span class="text-danger">*</span></label>
-                            <select name="leave_type_id" id="leave_type" class="form-select form-select-modern" required>
+                            <select name="leave_type_id" id="leave_type" class="form-select rp-control" required>
                                 <option value="">-- กรุณาเลือกประเภทการลา --</option>
                                 <?php foreach($leave_types as $type): 
                                     $is_selected = ($selected_leave_type_req === $type['leave_type']) ? 'selected' : '';
@@ -572,21 +582,21 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                                 <label class="form-label fw-bold text-secondary small text-uppercase">ตั้งแต่วันที่ <span class="text-danger">*</span></label>
                                 <div class="input-group-modern d-flex align-items-center bg-white">
                                     <span class="ps-3 text-primary"><i class="bi bi-calendar-event"></i></span>
-                                    <input type="text" name="start_date" id="start_date" class="form-control px-2 fw-medium" required placeholder="คลิกเลือก" readonly style="background-color: transparent;">
+                                    <input type="text" name="start_date" id="start_date" class="form-control rp-control border-0 px-2 fw-medium" required placeholder="คลิกเลือก" readonly style="background-color: transparent;">
                                 </div>
                             </div>
                             <div class="col-sm-6">
                                 <label class="form-label fw-bold text-secondary small text-uppercase">ถึงวันที่ <span class="text-danger">*</span></label>
                                 <div class="input-group-modern d-flex align-items-center bg-white">
                                     <span class="ps-3 text-danger"><i class="bi bi-calendar-check"></i></span>
-                                    <input type="text" name="end_date" id="end_date" class="form-control px-2 fw-medium" required placeholder="คลิกเลือก" readonly style="background-color: transparent;">
+                                    <input type="text" name="end_date" id="end_date" class="form-control rp-control border-0 px-2 fw-medium" required placeholder="คลิกเลือก" readonly style="background-color: transparent;">
                                 </div>
                             </div>
                         </div>
 
                         <div class="mb-4">
                             <label class="form-label fw-bold text-secondary small text-uppercase">เหตุผลการลา <span class="text-danger">*</span></label>
-                            <textarea name="reason" class="form-control form-control-modern" rows="3" maxlength="1000" aria-describedby="reasonHelp" placeholder="ระบุเหตุผลที่ชัดเจน เช่น พักผ่อนประจำปี, ป่วยเป็นไข้..." required></textarea>
+                            <textarea name="reason" class="form-control rp-control" rows="3" maxlength="1000" aria-describedby="reasonHelp" placeholder="ระบุเหตุผลที่ชัดเจน เช่น พักผ่อนประจำปี, ป่วยเป็นไข้..." required></textarea>
                             <div id="reasonHelp" class="form-text text-muted">สูงสุด 1,000 ตัวอักษร</div>
                         </div>
 
@@ -603,7 +613,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
                             </div>
                         </div>
 
-                        <button type="submit" id="btnSubmitLeave" class="btn btn-gradient-<?= $page_theme ?> w-100 fw-bold rounded-pill py-3 mt-2 shadow-sm d-flex align-items-center justify-content-center gap-2">
+                        <button type="submit" id="btnSubmitLeave" class="rp-btn rp-btn--primary w-100 mt-2">
                             <i class="bi bi-send-fill"></i> <span id="btnSubmitText">ยืนยันการส่งใบลา</span>
                         </button>
                     </form>
@@ -615,7 +625,7 @@ if ($selected_leave_type_req == 'ลาพักผ่อน') {
         <!-- 🌟 ส่วนที่ 2: ประวัติการลา และ การจัดการคำขอ -->
         <!-- ========================================== -->
         <div class="col-lg-8">
-            <div class="card card-modern h-100">
+            <div class="rp-card h-100">
                 <div class="card-header bg-white py-3 border-bottom px-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
                     <div class="d-flex align-items-center mt-1">
                         <div class="icon-box-sm bg-secondary bg-opacity-10 text-secondary me-3">
