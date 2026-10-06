@@ -171,7 +171,13 @@ $unread_count = $notifModel->getUnreadCount($user_id);
                         $date_time = date('d/m/Y H:i', strtotime($notif['created_at']));
                     ?>
                     
-                    <div class="list-group-item notif-item <?= !$is_read ? 'unread' : '' ?>" id="notif-row-<?= $notif['id'] ?>" onclick="handleNotifClick(event, <?= $notif['id'] ?>, '<?= htmlspecialchars($notif['link'] ?? '') ?>')">
+                    <div class="list-group-item notif-item <?= !$is_read ? 'unread' : '' ?>"
+                         id="notif-row-<?= (int)$notif['id'] ?>"
+                         role="button"
+                         tabindex="0"
+                         data-link="<?= htmlspecialchars((string)($notif['link'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                         onclick="handleNotifClick(event, <?= (int)$notif['id'] ?>, this.dataset.link)"
+                         onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault();handleNotifClick(event, <?= (int)$notif['id'] ?>, this.dataset.link);}">
                         <div class="d-flex align-items-start gap-3">
                             
                             <!-- Icon -->
@@ -197,7 +203,7 @@ $unread_count = $notifModel->getUnreadCount($user_id);
                             
                             <!-- Action Buttons -->
                             <div class="d-flex align-items-center align-self-center ps-2">
-                                <button class="notif-action-btn text-muted" onclick="deleteNotif(event, <?= $notif['id'] ?>)" title="ลบการแจ้งเตือนนี้">
+                                <button class="notif-action-btn text-muted" onclick="deleteNotif(event, <?= (int)$notif['id'] ?>)" title="ลบการแจ้งเตือนนี้" aria-label="ลบการแจ้งเตือนนี้">
                                     <i class="bi bi-trash3-fill"></i>
                                 </button>
                             </div>
@@ -214,43 +220,68 @@ $unread_count = $notifModel->getUnreadCount($user_id);
 </div>
 
 <script>
-// ==========================================
-// 🌟 JavaScript Functions สำหรับหน้า Notification
-// ==========================================
+// Notification actions: POST + CSRF only.
+const NOTIF_CSRF = <?= json_encode($csrf_token, JSON_UNESCAPED_SLASHES) ?>;
 
-const BASE_URL = 'index.php?c=ajax';
+function notificationPost(action, payload = {}) {
+    const body = new URLSearchParams({
+        csrf_token: NOTIF_CSRF,
+        ajax: '1',
+        ...Object.fromEntries(Object.entries(payload).map(([k, v]) => [k, String(v)]))
+    });
 
-// 1. จัดการเมื่อคลิกที่ Card (อ่าน + ไปที่ลิงก์)
-function handleNotifClick(event, id, link) {
-    // ถ้าผู้ใช้กดปุ่มลบ ให้ข้ามฟังก์ชันนี้ไป (ป้องกันการเปลี่ยนหน้า)
-    if (event.target.closest('button')) return;
-
-    // ทำเครื่องหมายว่าอ่านแล้วเงียบๆ
-    fetch(`${BASE_URL}&a=read_notif&id=${id}`).then(() => {
-        // อัปเดต UI 
-        const row = document.getElementById(`notif-row-${id}`);
-        const dot = document.getElementById(`dot-${id}`);
-        if(row) {
-            row.classList.remove('unread');
-            const title = row.querySelector('.notif-title');
-            if(title) title.classList.add('text-secondary');
+    return fetch('index.php?c=notification&a=' + encodeURIComponent(action), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body
+    }).then(async response => {
+        const data = await response.json().catch(() => ({ status: 'error', message: 'Invalid response' }));
+        if (!response.ok || data.status !== 'success') {
+            throw new Error(data.message || 'ไม่สามารถดำเนินการได้');
         }
-        if(dot) dot.remove();
-
-        // ไปที่ลิงก์ถ้ามี
-        if (link && link !== '') {
-            window.location.href = link;
-        }
+        return data;
     });
 }
 
-// 2. ลบการแจ้งเตือน 1 รายการ
+function safeNotificationDestination(link) {
+    if (typeof link !== 'string') return '';
+    const value = link.trim();
+    return /^index\.php(?:\?.*)?$/.test(value) ? value : '';
+}
+
+function handleNotifClick(event, id, link) {
+    if (event.target.closest('button')) return;
+
+    notificationPost('read', { id, url: link })
+        .then(data => {
+            const row = document.getElementById('notif-row-' + id);
+            const dot = document.getElementById('dot-' + id);
+
+            if (row) {
+                row.classList.remove('unread');
+                row.querySelector('.notif-title')?.classList.add('text-secondary');
+            }
+            dot?.remove();
+
+            updateBadgeCount();
+
+            const destination = safeNotificationDestination(data.url || link);
+            if (destination) window.location.href = destination;
+        })
+        .catch(error => {
+            Swal.fire({ icon: 'error', title: 'ไม่สามารถเปิดการแจ้งเตือนได้', text: error.message });
+        });
+}
+
 function deleteNotif(event, id) {
-    event.stopPropagation(); // ไม่ให้ทำงานทับกับการกดอ่าน
-    
+    event.stopPropagation();
+
     Swal.fire({
         title: 'ลบการแจ้งเตือน?',
-        text: "คุณต้องการลบข้อความนี้ใช่หรือไม่",
+        text: 'คุณต้องการลบข้อความนี้ใช่หรือไม่',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
@@ -258,56 +289,63 @@ function deleteNotif(event, id) {
         confirmButtonText: 'ลบเลย',
         cancelButtonText: 'ยกเลิก',
         reverseButtons: true
-    }).then((result) => {
-        if (result.isConfirmed) {
-            fetch(`${BASE_URL}&a=delete_notif&id=${id}`)
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === 'success') {
-                    const row = document.getElementById(`notif-row-${id}`);
-                    // ใส่ Animation ก่อนลบ
-                    row.classList.add('fade-out');
-                    setTimeout(() => {
-                        row.remove();
-                        checkEmptyState();
-                        updateBadgeCount();
-                    }, 300);
-                }
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        notificationPost('delete', { id })
+            .then(() => {
+                const row = document.getElementById('notif-row-' + id);
+                if (!row) return;
+
+                row.classList.add('fade-out');
+                setTimeout(() => {
+                    row.remove();
+                    checkEmptyState();
+                    updateBadgeCount();
+                }, 300);
+            })
+            .catch(error => {
+                Swal.fire({ icon: 'error', title: 'ลบไม่สำเร็จ', text: error.message });
             });
-        }
     });
 }
 
-// 3. อ่านทั้งหมด
 function markAllAsRead() {
-    fetch(`${BASE_URL}&a=read_all_notif`)
-    .then(res => res.json())
-    .then(data => {
-        if(data.status === 'success') {
+    notificationPost('read_all')
+        .then(() => {
             document.querySelectorAll('.notif-item').forEach(row => {
                 row.classList.remove('unread');
-                const title = row.querySelector('.notif-title');
-                if(title) title.classList.add('text-secondary');
-                
-                const dot = row.querySelector('.badge.bg-danger.rounded-circle');
-                if(dot) dot.remove();
+                row.querySelector('.notif-title')?.classList.add('text-secondary');
+                row.querySelector('.badge.bg-danger.rounded-circle')?.remove();
             });
-            document.getElementById('pageUnreadCount').innerText = '0';
-            
-            // อัปเดตกระดิ่งข้างบน Header ด้วย (ถ้ามี)
+
+            const pageCount = document.getElementById('pageUnreadCount');
+            if (pageCount) pageCount.innerText = '0';
+
             const topBadge = document.getElementById('notifBadge');
-            if(topBadge) topBadge.style.display = 'none';
-            
-            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'ทำเครื่องหมายอ่านแล้วทั้งหมด', showConfirmButton: false, timer: 1500 });
-        }
-    });
+            if (topBadge) {
+                topBadge.style.display = 'none';
+                topBadge.setAttribute('aria-label', 'ไม่มีรายการที่ยังไม่ได้อ่าน');
+            }
+
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: 'ทำเครื่องหมายอ่านแล้วทั้งหมด',
+                showConfirmButton: false,
+                timer: 1500
+            });
+        })
+        .catch(error => {
+            Swal.fire({ icon: 'error', title: 'ดำเนินการไม่สำเร็จ', text: error.message });
+        });
 }
 
-// 4. ลบทั้งหมด
 function deleteAllNotifs() {
     Swal.fire({
         title: 'ลบทั้งหมด?',
-        text: "ล้างประวัติการแจ้งเตือนทั้งหมดของคุณ (ไม่สามารถกู้คืนได้)",
+        text: 'ล้างประวัติการแจ้งเตือนทั้งหมดของคุณ (ไม่สามารถกู้คืนได้)',
         icon: 'error',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
@@ -315,56 +353,69 @@ function deleteAllNotifs() {
         confirmButtonText: 'ยืนยันการล้างข้อมูล',
         cancelButtonText: 'ยกเลิก',
         reverseButtons: true
-    }).then((result) => {
-        if (result.isConfirmed) {
-            fetch(`${BASE_URL}&a=delete_all_notif`)
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === 'success') {
-                    document.getElementById('notificationList').innerHTML = '';
-                    checkEmptyState();
-                    updateBadgeCount();
-                    
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'ล้างข้อมูลสำเร็จ', showConfirmButton: false, timer: 1500 });
-                }
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        notificationPost('delete_all')
+            .then(() => {
+                const list = document.getElementById('notificationList');
+                if (list) list.innerHTML = '';
+
+                checkEmptyState();
+                updateBadgeCount();
+
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'ล้างข้อมูลสำเร็จ',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+            })
+            .catch(error => {
+                Swal.fire({ icon: 'error', title: 'ล้างข้อมูลไม่สำเร็จ', text: error.message });
             });
-        }
     });
 }
 
-// Helper: ตรวจสอบว่าตารางว่างไหมเพื่อโชว์ Empty State
 function checkEmptyState() {
     const list = document.getElementById('notificationList');
-    if(list.children.length === 0) {
-        list.innerHTML = `
-            <div class="text-center py-5 my-4 fade-in">
-                <i class="bi bi-check2-circle empty-state-icon text-success"></i>
-                <h5 class="fw-bold text-secondary mt-3">เคลียร์กล่องข้อความเรียบร้อย</h5>
-                <p class="text-muted small">คุณไม่มีการแจ้งเตือนตกค้างแล้ว</p>
-            </div>
-        `;
-        // ซ่อนปุ่ม Action บนขวา
-        const btnGroup = document.querySelector('.d-flex.gap-2');
-        if(btnGroup) btnGroup.style.display = 'none';
-    }
+    if (!list || list.querySelector('.notif-item')) return;
+
+    list.innerHTML = `
+        <div class="text-center py-5 my-4 fade-in">
+            <i class="bi bi-check2-circle empty-state-icon text-success"></i>
+            <h5 class="fw-bold text-secondary mt-3">เคลียร์กล่องข้อความเรียบร้อย</h5>
+            <p class="text-muted small">คุณไม่มีการแจ้งเตือนตกค้างแล้ว</p>
+        </div>
+    `;
 }
 
-// Helper: อัปเดตตัวเลขแจ้งเตือนหลังจากลบ
 function updateBadgeCount() {
-    fetch(`${BASE_URL}&a=check_new_notif`).then(res => res.json()).then(data => {
-        if(data.status === 'success') {
-            document.getElementById('pageUnreadCount').innerText = data.unread_count;
-            
+    fetch('index.php?c=notification&a=count', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'success') return;
+
+            const count = Number(data.unread_count || 0);
+            const pageCount = document.getElementById('pageUnreadCount');
+            if (pageCount) pageCount.innerText = String(count);
+
             const topBadge = document.getElementById('notifBadge');
-            if(topBadge) {
-                if(data.unread_count > 0) {
-                    topBadge.innerText = data.unread_count > 99 ? '99+' : data.unread_count;
-                    topBadge.style.display = 'block';
-                } else {
-                    topBadge.style.display = 'none';
-                }
+            if (!topBadge) return;
+
+            if (count > 0) {
+                topBadge.innerText = count > 99 ? '99+' : String(count);
+                topBadge.style.display = 'block';
+                topBadge.setAttribute('aria-label', count + ' รายการที่ยังไม่ได้อ่าน');
+            } else {
+                topBadge.style.display = 'none';
+                topBadge.setAttribute('aria-label', 'ไม่มีรายการที่ยังไม่ได้อ่าน');
             }
-        }
-    });
+        })
+        .catch(() => {});
 }
 </script>
