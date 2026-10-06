@@ -208,6 +208,8 @@ require_once 'views/components/ui.php';
     </div>
 </div>
 
+    </section>
+
 <!-- 🌟 Modal สร้างคำขอแลกเวร -->
 <div class="modal fade" id="createSwapModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
