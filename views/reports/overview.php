@@ -168,6 +168,8 @@ if (class_exists('Database')) {
 // คำนวณเปอร์เซ็นต์ความคืบหน้ากราฟ
 $completion_percent = $total_hospitals > 0 ? round(($completed_hospitals / $total_hospitals) * 100) : 0;
 $progress_color = $completion_percent == 100 ? 'bg-success' : ($completion_percent >= 50 ? 'bg-primary' : 'bg-warning');
+
+require_once __DIR__ . '/../components/ui.php';
 ?>
 
 <style>
@@ -224,79 +226,71 @@ $progress_color = $completion_percent == 100 ? 'bg-success' : ($completion_perce
     .month-card { transition: all 0.3s ease; border-radius: 1rem; border: 1px solid #e2e8f0; }
     .month-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.06); }
 </style>
+<link rel="stylesheet" href="public/css/admin-hub.css?v=2">
 
-<div class="container-fluid px-3 px-md-4 py-4 min-vh-100 d-flex flex-column">
+<div class="rp-page">
 
-    <!-- 🌟 ส่วนหัว และ ตัวกรองหลัก -->
-    <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center mb-4 gap-3 animate-fade-in">
-        <div class="d-flex align-items-center gap-3">
-            <div class="bg-primary bg-opacity-10 text-primary rounded-4 d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" style="width: 60px; height: 60px;">
-                <i class="bi bi-bar-chart-line-fill fs-3"></i>
-            </div>
-            <div>
-                <h3 class="fw-bolder text-dark mb-1" style="letter-spacing: -0.5px;">ภาพรวมเครือข่าย (Network Overview)</h3>
-                <p class="text-muted mb-0 fw-medium" style="font-size: 14px;">แดชบอร์ดสรุปสถานะการปฏิบัติงานระดับอำเภอ <span class="badge bg-secondary ms-1"><?= $current_role ?> MODE</span></p>
-            </div>
+    <?php
+    ob_start();
+    ?>
+        <button type="button" class="rp-btn rp-btn--secondary" onclick="window.print()">
+            <i class="bi bi-printer-fill" aria-hidden="true"></i> พิมพ์
+        </button>
+        <?php if($is_admin): ?>
+            <button type="button" class="rp-btn rp-btn--success" onclick="exportTableToExcel('overviewTable', 'ภาพรวมเครือข่าย_<?= rp_e($thai_months[$selected_month]) ?>')">
+                <i class="bi bi-file-earmark-excel-fill" aria-hidden="true"></i> Excel
+            </button>
+        <?php endif; ?>
+    <?php
+    $report_actions = ob_get_clean();
+    rp_page_header(
+        'ภาพรวมเครือข่าย',
+        'สรุปสถานะตารางเวร กำลังคน การลา และงบประมาณในมุมมองเดียว',
+        $report_actions,
+        'Reports · ' . $current_role
+    );
+    ?>
+
+    <div class="rp-report-filterbar">
+        <div>
+            <strong class="d-block">ช่วงเวลารายงาน</strong>
+            <span class="rp-section-description">ข้อมูลจะปรับตามเดือนและปีที่เลือก</span>
         </div>
+        <form action="index.php" method="GET" class="rp-report-filterbar__group mb-0">
+            <input type="hidden" name="c" value="report">
+            <input type="hidden" name="a" value="overview">
 
-        <div class="d-flex flex-wrap gap-2 align-items-center bg-white p-2 rounded-pill shadow-sm border">
-            <form action="index.php" method="GET" class="d-flex gap-2 mb-0 align-items-center">
-                <input type="hidden" name="c" value="report">
-                <input type="hidden" name="a" value="overview">
-                
-                <?php if ($is_admin): ?>
-                <i class="bi bi-calendar-event text-primary ms-3"></i>
-                <select name="month" class="form-select form-select-sm border-0 bg-transparent fw-bold text-dark px-1 cursor-pointer" onchange="this.form.submit()" style="width: 110px;">
+            <?php if ($is_admin): ?>
+                <select name="month" class="rp-control" onchange="this.form.submit()" aria-label="เลือกเดือนรายงาน">
                     <?php foreach($thai_months as $m_num => $m_name): ?>
-                        <option value="<?= $m_num ?>" <?= $selected_month == $m_num ? 'selected' : '' ?>><?= $m_name ?></option>
+                        <option value="<?= rp_e($m_num) ?>" <?= $selected_month == $m_num ? 'selected' : '' ?>><?= rp_e($m_name) ?></option>
                     <?php endforeach; ?>
                 </select>
-                <?php else: ?>
-                <i class="bi bi-calendar-range text-primary ms-3"></i> <span class="fw-bold text-secondary px-1">ดูสถานะเวรของ</span>
-                <?php endif; ?>
-                
-                <select name="year" class="form-select form-select-sm border-0 bg-transparent fw-bold text-dark px-1 cursor-pointer" style="width: 85px;" onchange="this.form.submit()">
-                    <?php for($i = date('Y')-2; $i <= date('Y')+1; $i++): ?>
-                        <option value="<?= $i ?>" <?= $selected_year == $i ? 'selected' : '' ?>>ปี <?= $i + 543 ?></option>
-                    <?php endfor; ?>
-                </select>
-            </form>
-
-            <div class="vr mx-1 opacity-25"></div>
-
-            <button class="btn btn-light rounded-circle text-secondary hover-shadow" onclick="window.print()" title="พิมพ์รายงาน">
-                <i class="bi bi-printer-fill"></i>
-            </button>
-            <?php if($is_admin): ?>
-            <button class="btn btn-success rounded-pill fw-bold shadow-sm px-3" title="ส่งออกข้อมูลเป็น Excel" onclick="exportTableToExcel('overviewTable', 'ภาพรวมเครือข่าย_<?= $thai_months[$selected_month] ?>')">
-                <i class="bi bi-file-earmark-excel-fill me-1"></i> Excel
-            </button>
             <?php endif; ?>
-        </div>
+
+            <select name="year" class="rp-control" onchange="this.form.submit()" aria-label="เลือกปีรายงาน">
+                <?php for($i = date('Y')-2; $i <= date('Y')+1; $i++): ?>
+                    <option value="<?= $i ?>" <?= $selected_year == $i ? 'selected' : '' ?>>พ.ศ. <?= $i + 543 ?></option>
+                <?php endfor; ?>
+            </select>
+        </form>
     </div>
 
-    <?php 
-    // 🌟 Personalized Alert (สำหรับระดับหน่วยงาน ที่จัดเวรของตัวเอง)
-    if (!$is_admin && $my_hosp_data): 
+    <?php
+    if (!$is_admin && $my_hosp_data):
         $my_status = strtoupper($my_hosp_data['schedule_status'] ?? '');
-        $alert_class = 'alert-secondary'; $alert_icon = 'bi-info-circle'; $alert_msg = 'สถานะตารางเวรของหน่วยงานคุณ';
-        
-        if ($my_status === 'DRAFT') { $alert_class = 'alert-warning border-warning'; $alert_icon = 'bi-pencil-square'; $alert_msg = 'ตารางเวรเดือนนี้ยังจัดไม่เสร็จ (Draft) กรุณาจัดเวรและกดส่งขออนุมัติ'; }
-        elseif ($my_status === 'SUBMITTED') { $alert_class = 'alert-info border-info'; $alert_icon = 'bi-send-fill'; $alert_msg = 'ส่งตารางเวรแล้ว กำลังรอส่วนกลางพิจารณาอนุมัติ'; }
-        elseif ($my_status === 'APPROVED') { $alert_class = 'alert-success border-success'; $alert_icon = 'bi-check-circle-fill'; $alert_msg = 'ตารางเวรของท่าน <strong>ได้รับการอนุมัติเรียบร้อยแล้ว</strong>'; }
+        $status_tone = $my_status === 'APPROVED' ? 'success' : ($my_status === 'SUBMITTED' ? 'info' : 'warning');
+        $status_msg = $my_status === 'APPROVED'
+            ? 'ตารางเวรได้รับการอนุมัติเรียบร้อยแล้ว'
+            : ($my_status === 'SUBMITTED' ? 'ส่งตารางเวรแล้ว กำลังรอการพิจารณา' : 'ตารางเวรเดือนนี้ยังอยู่ระหว่างจัดทำ');
     ?>
-    <div class="alert <?= $alert_class ?> bg-white shadow-sm border-start border-4 rounded-4 mb-4 d-flex align-items-center justify-content-between p-4 animate-fade-in">
-        <div class="d-flex align-items-center gap-3">
-            <div class="fs-1 text-<?= str_replace('alert-', '', $alert_class) ?> opacity-75"><i class="bi <?= $alert_icon ?>"></i></div>
+        <div class="rp-status-panel rp-status-panel--<?= rp_e($status_tone) ?> mb-4">
             <div>
-                <h5 class="fw-bold mb-1 text-dark">สถานะหน่วยงานของท่าน (<?= htmlspecialchars($my_hosp_data['hospital_name']) ?>)</h5>
-                <p class="mb-0 text-muted"><?= $alert_msg ?></p>
+                <strong><?= rp_e($my_hosp_data['hospital_name']) ?></strong>
+                <div class="rp-section-description"><?= rp_e($status_msg) ?></div>
             </div>
+            <a href="index.php?c=roster&hospital_id=<?= (int)$my_hospital_id ?>&month=<?= rp_e($selected_year . '-' . $selected_month) ?>" class="rp-btn rp-btn--secondary rp-btn--sm">ไปยังตารางเวร</a>
         </div>
-        <a href="index.php?c=roster&hospital_id=<?= $my_hospital_id ?>&month=<?= $selected_year ?>-<?= $selected_month ?>" class="btn btn-<?= str_replace('alert-', '', $alert_class) ?> rounded-pill fw-bold px-4 shadow-sm">
-            ไปยังตารางเวร <i class="bi bi-arrow-right"></i>
-        </a>
-    </div>
     <?php endif; ?>
 
     <!-- 🌟 Top KPI Cards (ดึงข้อมูลล่าสุดจากฐานข้อมูล) -->
@@ -327,64 +321,23 @@ $progress_color = $completion_percent == 100 ? 'bg-success' : ($completion_perce
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted fw-bold mb-1" style="font-size: 13px; text-transform:uppercase;">ผู้ปฏิบัติงานวันนี้</p>
-                        <h2 class="fw-bolder text-success mb-0"><?= number_format($on_duty_today) ?> <span class="fs-6 text-muted fw-normal">คน</span></h2>
-                    </div>
-                    <div class="kpi-icon-wrapper bg-success bg-opacity-10 text-success"><i class="bi bi-person-workspace"></i></div>
-                </div>
-                <div class="mt-3 pt-3 border-top d-flex justify-content-between">
-                    <span class="text-muted small">จากบุคลากรทั้งหมด</span>
-                    <span class="fw-bold text-dark small"><?= number_format($total_staff) ?> คน</span>
-                </div>
-            </div>
+                        <h2 class="fw-bolder     <section class="rp-section" aria-labelledby="reportKpiTitle">
+        <?php rp_section_header('ตัวชี้วัดหลัก', 'ข้อมูลล่าสุดจากระบบสำหรับช่วงเวลาที่เลือก'); ?>
+        <div class="rp-grid rp-grid--4" id="reportKpiTitle">
+            <?php rp_stat_card('ความคืบหน้าการส่งเวร', $completed_hospitals . ' / ' . $total_hospitals . ' แห่ง', 'bi-building-check', 'info', '', $completion_percent . '%'); ?>
+            <?php rp_stat_card('ผู้ปฏิบัติงานวันนี้', number_format($on_duty_today) . ' คน', 'bi-person-workspace', 'success', '', 'บุคลากรทั้งหมด ' . number_format($total_staff) . ' คน'); ?>
+            <?php rp_stat_card('ลางานวันนี้', number_format($on_leave_today) . ' คน', 'bi-person-dash-fill', $on_leave_today > 0 ? 'danger' : 'primary'); ?>
+            <?php rp_stat_card($is_admin ? 'ประมาณการเบิกจ่ายรวม' : 'งบประมาณหน่วยงาน', '฿' . number_format($is_admin ? $total_budget : ($my_hosp_data['total_estimated_cost'] ?? 0)), 'bi-cash-coin', 'warning'); ?>
         </div>
-
-        <!-- 3. ลางาน/ไม่มาวันนี้ -->
-        <div class="col-xl-3 col-md-6">
-            <div class="kpi-card p-4 h-100 border-bottom border-danger border-4">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 13px; text-transform:uppercase;">ลางาน / ขาดราชการ</p>
-                        <h2 class="fw-bolder text-danger mb-0"><?= number_format($on_leave_today) ?> <span class="fs-6 text-muted fw-normal">คน</span></h2>
-                    </div>
-                    <div class="kpi-icon-wrapper bg-danger bg-opacity-10 text-danger"><i class="bi bi-person-dash-fill"></i></div>
-                </div>
-                <div class="mt-3 pt-3 border-top d-flex justify-content-between">
-                    <span class="text-muted small">สัดส่วนคนลางาน</span>
-                    <span class="fw-bold text-danger small"><?= $total_staff > 0 ? round(($on_leave_today / $total_staff) * 100, 1) : 0 ?>%</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 4. งบประมาณรวม -->
-        <div class="col-xl-3 col-md-6">
-            <div class="kpi-card p-4 h-100 border-bottom border-warning border-4" style="background: linear-gradient(to right, #fff, #fffbeb);">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <p class="text-muted fw-bold mb-1" style="font-size: 13px; text-transform:uppercase;">
-                            <?= $is_admin ? 'ประมาณการเบิกจ่ายรวม' : 'งบประมาณของหน่วยท่าน' ?>
-                        </p>
-                        <?php if ($is_admin): ?>
-                            <h3 class="fw-bolder text-dark mb-0">฿<?= number_format($total_budget) ?></h3>
-                        <?php else: ?>
-                            <h3 class="fw-bolder text-dark mb-0 text-primary">฿<?= number_format($my_hosp_data['total_estimated_cost'] ?? 0) ?></h3>
-                        <?php endif; ?>
-                    </div>
-                    <div class="kpi-icon-wrapper bg-warning bg-opacity-25 text-warning text-dark shadow-sm"><i class="bi bi-cash-coin"></i></div>
-                </div>
-                <div class="mt-3 pt-3 border-top border-warning border-opacity-25 d-flex justify-content-between">
-                    <span class="text-muted small"><?= $is_admin ? 'รวมทุกหน่วยงาน (ที่ส่งเวรแล้ว)' : 'ประมาณการจากตารางเวร' ?></span>
-                </div>
-            </div>
-        </div>
-    </div>
+    </section>
 
     <!-- ================================================================== -->
     <!-- 🏢 มุมมองสำหรับผู้ดูแลระบบส่วนกลาง (เห็นทุก รพ.สต. + สลับ Table/Card) -->
     <!-- ================================================================== -->
     <?php if ($is_admin): ?>
     
-    <div class="card card-modern flex-grow-1 d-flex flex-column animate-fade-in" style="animation-delay: 0.2s;">
-        <div class="card-header bg-white py-3 px-4 border-bottom d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+    <div class="rp-card flex-grow-1 d-flex flex-column" style="animation-delay: 0.2s;">
+        <div class="rp-card__header flex-column flex-lg-row align-items-lg-center">
             <h6 class="mb-0 fw-bolder text-dark"><i class="bi bi-list-columns-reverse text-primary me-2"></i> สรุปสถานะแยกตามหน่วยบริการ (เดือน <?= $thai_months[$selected_month] ?>)</h6>
             
             <div class="d-flex flex-wrap align-items-center gap-2">
@@ -429,7 +382,7 @@ $progress_color = $completion_percent == 100 ? 'bg-success' : ($completion_perce
 
         <!-- 🌟 มุมมอง 1: แบบตาราง (Table View) -->
         <div id="tableViewWrapper" class="table-responsive custom-scrollbar flex-grow-1">
-            <table class="table table-modern mb-0 align-middle" id="overviewTable">
+            <table class="table rp-table mb-0 align-middle" id="overviewTable">
                 <thead>
                     <tr>
                         <th class="ps-4">หน่วยบริการ / หน่วยงาน</th>
@@ -630,8 +583,8 @@ $progress_color = $completion_percent == 100 ? 'bg-success' : ($completion_perce
     <!-- ================================================================== -->
     <?php else: ?>
     
-    <div class="card card-modern flex-grow-1 d-flex flex-column animate-fade-in" style="animation-delay: 0.2s;">
-        <div class="card-header bg-white py-3 px-4 border-bottom d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+    <div class="rp-card flex-grow-1 d-flex flex-column" style="animation-delay: 0.2s;">
+        <div class="rp-card__header flex-column flex-lg-row align-items-lg-center">
             <div>
                 <h6 class="mb-0 fw-bolder text-dark"><i class="bi bi-calendar3-range text-primary me-2"></i> สถานะการส่งตารางเวร 12 เดือน (ปี พ.ศ. <?= $selected_year + 543 ?>)</h6>
                 <div class="text-muted small mt-1">คลิกที่ปุ่มเพื่อเข้าสู่หน้าจัดการตารางเวรในแต่ละเดือน</div>
@@ -676,7 +629,7 @@ $progress_color = $completion_percent == 100 ? 'bg-success' : ($completion_perce
 
         <!-- 🌟 มุมมอง 1: แบบตาราง (Table View) -->
         <div id="tableViewWrapper" class="table-responsive custom-scrollbar flex-grow-1">
-            <table class="table table-modern mb-0 align-middle" id="overviewTable">
+            <table class="table rp-table mb-0 align-middle" id="overviewTable">
                 <thead>
                     <tr>
                         <th class="ps-4" style="width: 30%;">เดือน / ปี</th>
