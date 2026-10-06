@@ -71,7 +71,9 @@
 
                 const submitters = form.querySelectorAll('button[type="submit"], input[type="submit"]');
                 submitters.forEach(function (btn) {
-                    if (btn.dataset.rpKeepEnabled === '1') return;
+                    // A named submitter may carry the action value used by legacy controllers.
+                    // Keep it enabled so its name/value remains part of the POST payload.
+                    if (btn.dataset.rpKeepEnabled === '1' || btn.hasAttribute('name')) return;
 
                     btn.disabled = true;
                     btn.setAttribute('aria-disabled', 'true');
