@@ -43,13 +43,8 @@ $users_balances = $users_balances ?? [];
         
         <div class="d-flex gap-2">
             <!-- ปุ่มประมวลผลยอดปีใหม่ -->
-            <form action="index.php?c=leave&a=process_new_year" method="POST" class="m-0">
+            <form action="index.php?c=leave&a=process_new_year" method="POST" class="m-0" onsubmit="return confirm('ยืนยันการประมวลผลตัดยอดปีใหม่?\n\nระบบจะทำการคำนวณวันลายกมาของทุกคนโดยอัตโนมัติ โดยอ้างอิงจากอายุราชการและระเบียบวันลาพักผ่อน (พนักงานจ้างจะไม่ถูกยกยอดมา)');">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
-                <div class="d-none"></div>
-                <!-- keep button behavior below -->
-                <?php /* form content continues */ ?>
-                <span class="d-none"></span>
-                 onsubmit="return confirm('ยืนยันการประมวลผลตัดยอดปีใหม่?\n\nระบบจะทำการคำนวณวันลายกมาของทุกคนโดยอัตโนมัติ โดยอ้างอิงจากอายุราชการและระเบียบวันลาพักผ่อน (พนักงานจ้างจะไม่ถูกยกยอดมา)');">
                 <button type="submit" class="btn btn-primary rounded-pill fw-bold shadow-sm px-4">
                     <i class="bi bi-arrow-repeat me-1"></i> ประมวลผลตัดยอดปีใหม่
                 </button>
@@ -61,7 +56,7 @@ $users_balances = $users_balances ?? [];
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-success border-4">
             <i class="bi bi-check-circle-fill fs-5 me-3"></i> 
-            <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['success_msg'] ?></div>
+            <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?></div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
@@ -69,7 +64,7 @@ $users_balances = $users_balances ?? [];
     <?php if (isset($_SESSION['error_msg'])): ?>
         <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-danger border-4">
             <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> 
-            <div class="fw-bold" style="font-size: 14px;"><?= $_SESSION['error_msg'] ?></div>
+            <div class="fw-bold" style="font-size: 14px;"><?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?></div>
             <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
@@ -195,6 +190,7 @@ $users_balances = $users_balances ?? [];
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
             <form action="index.php?c=leave&a=save_balance" method="POST">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="user_id" id="modal_user_id">
                 
                 <div class="modal-header border-bottom-0 bg-light rounded-top-4 pb-3">
