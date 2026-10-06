@@ -3,6 +3,7 @@
 
 require_once 'config/database.php';
 require_once 'controllers/LogsController.php';
+require_once 'services/NotificationService.php';
 
 class SettingsController {
 
@@ -283,12 +284,32 @@ class SettingsController {
             $insert_stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)");
             $update_stmt = $db->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
 
-            if ($section === 'line_notify') {
-                $settings_data['line_notify_on_submit'] = isset($settings_data['line_notify_on_submit']) ? '1' : '0';
-                $settings_data['line_notify_on_request'] = isset($settings_data['line_notify_on_request']) ? '1' : '0';
-                $settings_data['line_notify_on_holiday'] = isset($settings_data['line_notify_on_holiday']) ? '1' : '0';
+            if ($section === 'line_messaging') {
+                $allowed_keys = [
+                    'line_messaging_enabled',
+                    'line_channel_access_token',
+                    'line_channel_secret',
+                    'line_target_id',
+                    'line_messaging_on_roster',
+                    'line_messaging_on_leave',
+                    'line_messaging_on_swap',
+                    'line_messaging_on_holiday',
+                ];
+
+                foreach (['line_messaging_enabled','line_messaging_on_roster','line_messaging_on_leave','line_messaging_on_swap','line_messaging_on_holiday'] as $toggle_key) {
+                    $settings_data[$toggle_key] = isset($settings_data[$toggle_key]) ? '1' : '0';
+                }
+
+                $settings_data = array_intersect_key($settings_data, array_flip($allowed_keys));
             } elseif ($section === 'general') {
                 $settings_data['maintenance_mode'] = isset($settings_data['maintenance_mode']) ? '1' : '0';
+                $settings_data = array_intersect_key($settings_data, array_flip([
+                    'system_name',
+                    'system_short_name',
+                    'maintenance_mode',
+                ]));
+            } else {
+                throw new RuntimeException('Unknown settings section');
             }
 
             foreach ($settings_data as $key => $value) {
@@ -303,7 +324,7 @@ class SettingsController {
             }
 
             $db->commit();
-            $section_name = ($section === 'general') ? 'ข้อมูลทั่วไป' : 'LINE Notify';
+            $section_name = ($section === 'general') ? 'ข้อมูลทั่วไป' : 'LINE Messaging API';
             
             // 🌟 บันทึก Log: อัปเดตตั้งค่าส่วนกลาง
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "อัปเดตตั้งค่าระบบส่วนกลาง ({$section_name})");
@@ -326,38 +347,23 @@ class SettingsController {
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
 
         $db = (new Database())->getConnection();
-        $stmt = $db->query("SELECT setting_value FROM system_settings WHERE setting_key = 'line_notify_token'");
-        $token = $stmt->fetchColumn();
+        $service = new NotificationService($db);
+        $result = $service->testLine(
+            "🟢 ทดสอบ LINE Messaging API จาก Roster Pro\nเวลา: " . date('d/m/Y H:i:s') . " น."
+        );
 
-        if (!empty($token)) {
-            $url = "https://notify-api.line.me/api/notify";
-            $message = "🟢 ทดสอบการเชื่อมต่อระบบ Roster Pro\nเวลา: " . date('d/m/Y H:i:s') . " น.\nข้อความนี้ส่งจากการกดทดสอบระบบ";
-            
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['message' => $message]));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Content-Type: application/x-www-form-urlencoded",
-                "Authorization: Bearer " . $token
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-            $result = curl_exec($ch);
-            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            
-            if ($http_code == 200) {
-                // 🌟 บันทึก Log: แจ้งเตือนการทดสอบ LINE
-                LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "ทดสอบระบบส่งข้อความ LINE Notify สำเร็จ");
-                $_SESSION['success_msg'] = "ส่งข้อความทดสอบสำเร็จ! โปรดตรวจสอบในแอปพลิเคชัน LINE";
-            } else {
-                $_SESSION['error_msg'] = "ไม่สามารถส่งข้อความได้ (HTTP Code: $http_code)";
-            }
+        if (!empty($result['success'])) {
+            LogsController::addLog(
+                $db,
+                $_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                "ทดสอบ LINE Messaging API สำเร็จ"
+            );
+            $_SESSION['success_msg'] = "ส่งข้อความทดสอบผ่าน LINE Messaging API สำเร็จ";
         } else {
-            $_SESSION['error_msg'] = "กรุณาตั้งค่า Token ก่อนทำการทดสอบ";
+            $_SESSION['error_msg'] = "ส่ง LINE ไม่สำเร็จ: " . ($result['message'] ?? 'Unknown error');
         }
+
         header("Location: index.php?c=settings&a=system");
         exit;
     }
