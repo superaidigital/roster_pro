@@ -48,7 +48,7 @@ try {
     }
 } catch (Exception $e) {}
 
-require_once 'views/components/ui.php';
+require_once __DIR__ . '/../components/ui.php';
 ?>
 
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
