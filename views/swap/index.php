@@ -6,6 +6,21 @@ $current_user_id = $_SESSION['user']['id'];
 $hospital_id = $_SESSION['user']['hospital_id'];
 $is_manager = in_array(strtoupper($_SESSION['user']['role']), ['DIRECTOR', 'SCHEDULER', 'ADMIN', 'SUPERADMIN']);
 
+$swap_counts = [
+    'total' => count($swaps),
+    'target' => 0,
+    'director' => 0,
+    'approved' => 0,
+    'rejected' => 0,
+];
+foreach ($swaps as $swap_item) {
+    $status = $swap_item['status'] ?? '';
+    if ($status === 'PENDING_TARGET') $swap_counts['target']++;
+    elseif ($status === 'PENDING_DIRECTOR') $swap_counts['director']++;
+    elseif ($status === 'APPROVED') $swap_counts['approved']++;
+    else $swap_counts['rejected']++;
+}
+
 // 🌟 ฟังก์ชันแปลงวันที่เป็นรูปแบบภาษาไทย (เช่น 15 มี.ค. 2567)
 if (!function_exists('thai_date_format')) {
     function thai_date_format($date_string, $show_time = false) {
@@ -71,6 +86,7 @@ require_once __DIR__ . '/../components/ui.php';
     .input-group-modern { border: 1px solid #e2e8f0; border-radius: 0.5rem; overflow: hidden; }
     .input-group-modern .form-control { border: none; box-shadow: none; }
 </style>
+<link rel="stylesheet" href="public/css/swap-workflow.css?v=2">
 
 <div class="rp-page">
 
@@ -95,26 +111,153 @@ require_once __DIR__ . '/../components/ui.php';
     );
     ?>
 
-    <!-- Alerts -->
+    <!-- Feedback -->
     <?php if (isset($_SESSION['success_msg'])): ?>
-        <div class="alert bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 border-start border-success border-4 fw-bold shadow-sm">
-            <i class="bi bi-check-circle-fill fs-5 me-3"></i> <?= htmlspecialchars((string)$_SESSION['success_msg'], ENT_QUOTES, 'UTF-8') ?>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--success" role="status" aria-live="polite">
+            <span class="rp-alert__icon"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['success_msg']) ?></div>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
+
     <?php if (isset($_SESSION['error_msg'])): ?>
-        <div class="alert bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 border-start border-danger border-4 fw-bold shadow-sm">
-            <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> <?= htmlspecialchars((string)$_SESSION['error_msg'], ENT_QUOTES, 'UTF-8') ?>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--danger" role="alert">
+            <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['error_msg']) ?></div>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
-    <!-- ตารางแสดงรายการแลกเวร -->
-    <section class="rp-section"><div class="rp-card overflow-hidden mb-4">
-        <div class="card-body p-0">
-            <div class="table-responsive">
+    <section class="rp-section" aria-labelledby="swapOverviewTitle">
+        <?php rp_section_header('ภาพรวมคำขอ', 'เห็นสถานะสำคัญก่อนลงรายละเอียดแต่ละรายการ'); ?>
+        <div class="rp-swap-overview" id="swapOverviewTitle">
+            <div class="rp-swap-kpi">
+                <div class="rp-swap-kpi__label">คำขอทั้งหมด</div>
+                <div class="rp-swap-kpi__value"><?= number_format($swap_counts['total']) ?></div>
+            </div>
+            <div class="rp-swap-kpi">
+                <div class="rp-swap-kpi__label">รอเพื่อนยืนยัน</div>
+                <div class="rp-swap-kpi__value"><?= number_format($swap_counts['target']) ?></div>
+            </div>
+            <div class="rp-swap-kpi">
+                <div class="rp-swap-kpi__label">รอผู้จัดเวรอนุมัติ</div>
+                <div class="rp-swap-kpi__value"><?= number_format($swap_counts['director']) ?></div>
+            </div>
+            <div class="rp-swap-kpi">
+                <div class="rp-swap-kpi__label">อนุมัติแล้ว</div>
+                <div class="rp-swap-kpi__value"><?= number_format($swap_counts['approved']) ?></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- รายการคำขอแลกเวร -->
+    <section class="rp-section">
+        <?php rp_section_header('รายการแลกเวร', 'ติดตามคำขอของคุณและรายการที่ต้องดำเนินการ'); ?>
+
+        <div class="d-md-none rp-swap-mobile-list mb-3">
+            <?php if (empty($swaps)): ?>
+                <div class="rp-card">
+                    <?php rp_empty_state('bi-arrow-left-right', 'ยังไม่มีคำขอแลกเวร', 'เมื่อสร้างคำขอใหม่ รายการจะปรากฏที่นี่', 'ยื่นขอแลกเวร', '#createSwapModal'); ?>
+                </div>
+            <?php else: ?>
+                <?php foreach ($swaps as $swap):
+                    $req_date_th = thai_date_format($swap['requestor_date']);
+                    $tar_date_th = thai_date_format($swap['target_date']);
+                    $created_at_th = thai_date_format($swap['created_at'], true);
+
+                    $status_class = 'rp-swap-status--rejected';
+                    $status_text = 'ปฏิเสธ/ยกเลิก';
+                    $status_icon = 'bi-x-circle';
+                    if ($swap['status'] === 'PENDING_TARGET') {
+                        $status_class = 'rp-swap-status--target';
+                        $status_text = 'รอเพื่อนยืนยัน';
+                        $status_icon = 'bi-hourglass-split';
+                    } elseif ($swap['status'] === 'PENDING_DIRECTOR') {
+                        $status_class = 'rp-swap-status--director';
+                        $status_text = 'รอผู้จัดเวรอนุมัติ';
+                        $status_icon = 'bi-person-workspace';
+                    } elseif ($swap['status'] === 'APPROVED') {
+                        $status_class = 'rp-swap-status--approved';
+                        $status_text = 'อนุมัติแล้ว';
+                        $status_icon = 'bi-check-circle';
+                    }
+
+                    $req_shift_class = (strtoupper($swap['requestor_shift']) === 'M' || $swap['requestor_shift'] === 'เช้า') ? 'rp-swap-shift--m' : ((strtoupper($swap['requestor_shift']) === 'A' || strpos($swap['requestor_shift'], 'บ') !== false) ? 'rp-swap-shift--a' : 'rp-swap-shift--n');
+                    $tar_shift_class = (strtoupper($swap['target_shift']) === 'M' || $swap['target_shift'] === 'เช้า') ? 'rp-swap-shift--m' : ((strtoupper($swap['target_shift']) === 'A' || strpos($swap['target_shift'], 'บ') !== false) ? 'rp-swap-shift--a' : 'rp-swap-shift--n');
+                ?>
+                    <article class="rp-card rp-card__body rp-swap-card">
+                        <div class="rp-swap-card__head">
+                            <div>
+                                <h3 class="rp-swap-card__title"><?= rp_e($swap['requestor_name']) ?> ↔ <?= rp_e($swap['target_name']) ?></h3>
+                                <div class="rp-swap-card__meta">ส่งคำขอ <?= rp_e($created_at_th) ?></div>
+                            </div>
+                            <span class="rp-swap-status <?= rp_e($status_class) ?>">
+                                <i class="bi <?= rp_e($status_icon) ?>" aria-hidden="true"></i><?= rp_e($status_text) ?>
+                            </span>
+                        </div>
+
+                        <div class="rp-swap-card__route">
+                            <div class="rp-swap-card__side">
+                                <div class="rp-swap-card__side-label">เวรของผู้ขอ</div>
+                                <div class="rp-swap-card__side-name"><?= rp_e($swap['requestor_name']) ?></div>
+                                <div class="rp-swap-card__side-date"><?= rp_e($req_date_th) ?> <span class="rp-swap-shift <?= rp_e($req_shift_class) ?>"><?= rp_e($swap['requestor_shift']) ?></span></div>
+                            </div>
+                            <i class="bi bi-arrow-left-right rp-swap-card__arrow" aria-hidden="true"></i>
+                            <div class="rp-swap-card__side">
+                                <div class="rp-swap-card__side-label">เวรของคู่แลก</div>
+                                <div class="rp-swap-card__side-name"><?= rp_e($swap['target_name']) ?></div>
+                                <div class="rp-swap-card__side-date"><?= rp_e($tar_date_th) ?> <span class="rp-swap-shift <?= rp_e($tar_shift_class) ?>"><?= rp_e($swap['target_shift']) ?></span></div>
+                            </div>
+                        </div>
+
+                        <?php if (!empty($swap['reason'])): ?>
+                            <div class="rp-swap-card__reason"><strong>เหตุผล:</strong> <?= nl2br(rp_e($swap['reason'])) ?></div>
+                        <?php endif; ?>
+
+                        <div class="rp-swap-card__actions">
+                            <?php if ($swap['status'] === 'PENDING_TARGET' && (int)$swap['target_user_id'] === (int)$current_user_id): ?>
+                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ยืนยันรับข้อเสนอแลกเวรนี้?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                    <input type="hidden" name="act" value="accept">
+                                    <button class="rp-btn rp-btn--success w-100" type="submit"><i class="bi bi-check-lg"></i> ยอมรับ</button>
+                                </form>
+                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ปฏิเสธข้อเสนอนี้?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                    <input type="hidden" name="act" value="reject">
+                                    <button class="rp-btn rp-btn--danger w-100" type="submit"><i class="bi bi-x-lg"></i> ปฏิเสธ</button>
+                                </form>
+                            <?php elseif ($swap['status'] === 'PENDING_DIRECTOR' && $is_manager): ?>
+                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ยืนยันอนุมัติและสลับตารางเวรทันที?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                    <input type="hidden" name="act" value="approve">
+                                    <button class="rp-btn rp-btn--success w-100" type="submit"><i class="bi bi-check-circle"></i> อนุมัติ</button>
+                                </form>
+                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ไม่อนุมัติคำขอนี้?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                    <input type="hidden" name="act" value="decline">
+                                    <button class="rp-btn rp-btn--danger w-100" type="submit"><i class="bi bi-x-circle"></i> ไม่อนุมัติ</button>
+                                </form>
+                            <?php elseif (in_array($swap['status'], ['PENDING_TARGET', 'PENDING_DIRECTOR'], true) && (int)$swap['requestor_id'] === (int)$current_user_id): ?>
+                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ยืนยันยกเลิกคำขอแลกเวรนี้?');">
+                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                    <input type="hidden" name="act" value="cancel">
+                                    <button class="rp-btn rp-btn--secondary w-100" type="submit"><i class="bi bi-x-circle"></i> ยกเลิกคำขอ</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <div class="rp-card overflow-hidden mb-4 d-none d-md-block">
+        <div class="rp-card__body p-0">
+            <div class="table-responsive rp-data-table-wrap">
                 <table class="table rp-table mb-0 align-middle text-center">
                     <thead>
                         <tr>
@@ -130,11 +273,8 @@ require_once __DIR__ . '/../components/ui.php';
                     <tbody>
                         <?php if (empty($swaps)): ?>
                             <tr>
-                                <td colspan="7" class="py-5 text-muted fw-bold">
-                                    <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 70px; height: 70px;">
-                                        <i class="bi bi-inbox fs-1 text-secondary opacity-50"></i>
-                                    </div><br>
-                                    ไม่มีรายการขอแลกเวร
+                                <td colspan="7">
+                                    <?php rp_empty_state('bi-inbox', 'ยังไม่มีคำขอแลกเวร', 'เมื่อมีคำขอใหม่ รายการจะปรากฏที่นี่'); ?>
                                 </td>
                             </tr>
                         <?php else: ?>
@@ -178,21 +318,50 @@ require_once __DIR__ . '/../components/ui.php';
                                             // กรณีคนถูกขอแลก (เพื่อน) ต้องกดยอมรับ/ปฏิเสธ
                                             if ($swap['status'] == 'PENDING_TARGET' && $swap['target_user_id'] == $current_user_id): 
                                         ?>
-                                            <a href="index.php?c=swap&a=action&act=accept&id=<?= $swap['id'] ?>" class="btn btn-sm btn-success rounded-pill fw-bold shadow-sm" onclick="return confirm('ยืนยันรับข้อเสนอแลกเวรนี้?');"><i class="bi bi-check-lg"></i> ยอมรับ</a>
-                                            <a href="index.php?c=swap&a=action&act=reject&id=<?= $swap['id'] ?>" class="btn btn-sm btn-danger rounded-pill fw-bold shadow-sm ms-1" onclick="return confirm('ปฏิเสธข้อเสนอนี้?');"><i class="bi bi-x-lg"></i> ปฏิเสธ</a>
+                                            <div class="d-flex gap-1 justify-content-center">
+                                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ยืนยันรับข้อเสนอแลกเวรนี้?');">
+                                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                    <input type="hidden" name="act" value="accept">
+                                                    <button class="rp-btn rp-btn--success rp-btn--sm" type="submit">ยอมรับ</button>
+                                                </form>
+                                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ปฏิเสธข้อเสนอนี้?');">
+                                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                    <input type="hidden" name="act" value="reject">
+                                                    <button class="rp-btn rp-btn--danger rp-btn--sm" type="submit">ปฏิเสธ</button>
+                                                </form>
+                                            </div>
                                         
                                         <?php 
                                             // กรณีผู้จัดเวร/ผอ. ต้องกดอนุมัติ
                                             elseif ($swap['status'] == 'PENDING_DIRECTOR' && $is_manager): 
                                         ?>
-                                            <a href="index.php?c=swap&a=action&act=approve&id=<?= $swap['id'] ?>" class="btn btn-sm btn-primary rounded-pill fw-bold shadow-sm" onclick="return confirm('ยืนยันอนุมัติและสลับตารางเวรทันที?');"><i class="bi bi-check-circle"></i> อนุมัติ</a>
-                                            <a href="index.php?c=swap&a=action&act=decline&id=<?= $swap['id'] ?>" class="btn btn-sm btn-outline-danger rounded-pill fw-bold ms-1" onclick="return confirm('ไม่อนุมัติคำขอนี้?');"><i class="bi bi-x-circle"></i> ไม่อนุมัติ</a>
+                                            <div class="d-flex gap-1 justify-content-center">
+                                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ยืนยันอนุมัติและสลับตารางเวรทันที?');">
+                                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                    <input type="hidden" name="act" value="approve">
+                                                    <button class="rp-btn rp-btn--success rp-btn--sm" type="submit">อนุมัติ</button>
+                                                </form>
+                                                <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('ไม่อนุมัติคำขอนี้?');">
+                                                    <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                                    <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                    <input type="hidden" name="act" value="decline">
+                                                    <button class="rp-btn rp-btn--danger rp-btn--sm" type="submit">ไม่อนุมัติ</button>
+                                                </form>
+                                            </div>
                                         
                                         <?php 
                                             // กรณีผู้ขอแลกเวรเอง ต้องการ "ลบ/ยกเลิกคำขอ" ของตัวเอง
                                             elseif (in_array($swap['status'], ['PENDING_TARGET', 'PENDING_DIRECTOR']) && $swap['requestor_id'] == $current_user_id): 
                                         ?>
-                                            <a href="index.php?c=swap&a=action&act=cancel&id=<?= $swap['id'] ?>" class="btn btn-sm btn-secondary rounded-pill fw-bold shadow-sm" onclick="return confirm('คุณต้องการยกเลิกและลบคำขอแลกเวรนี้ใช่หรือไม่?');"><i class="bi bi-trash"></i> ยกเลิกคำขอ</a>
+                                            <form method="POST" action="index.php?c=swap&a=action" onsubmit="return confirm('คุณต้องการยกเลิกคำขอแลกเวรนี้ใช่หรือไม่?');">
+                                                <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
+                                                <input type="hidden" name="id" value="<?= (int)$swap['id'] ?>">
+                                                <input type="hidden" name="act" value="cancel">
+                                                <button class="rp-btn rp-btn--secondary rp-btn--sm" type="submit"><i class="bi bi-x-circle"></i> ยกเลิกคำขอ</button>
+                                            </form>
 
                                         <?php else: ?>
                                             <span class="text-muted small">-</span>
@@ -211,15 +380,22 @@ require_once __DIR__ . '/../components/ui.php';
     </section>
 
 <!-- 🌟 Modal สร้างคำขอแลกเวร -->
-<div class="modal fade" id="createSwapModal" tabindex="-1">
+<div class="modal fade rp-swap-modal" id="createSwapModal" tabindex="-1" aria-labelledby="createSwapModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form action="index.php?c=swap&a=create" method="POST">
+            <form action="index.php?c=swap&a=create" method="POST" id="swapRequestForm">
+                <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
                 <div class="modal-header border-bottom-0 bg-light rounded-top-4 pb-3">
-                    <h5 class="modal-title fw-bold text-dark"><i class="bi bi-arrow-left-right text-primary me-2"></i> สร้างคำขอแลกเวรใหม่</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title fw-bold text-dark" id="createSwapModalLabel"><i class="bi bi-arrow-left-right text-primary me-2"></i> สร้างคำขอแลกเวรใหม่</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
                 </div>
                 <div class="modal-body p-4 bg-white">
+                    <div class="rp-swap-flow" aria-label="ขั้นตอนสร้างคำขอแลกเวร">
+                        <div class="rp-swap-flow__step rp-swap-flow__step--active" data-swap-step="1"><span class="rp-swap-flow__number">1</span><span>เวรของฉัน</span></div>
+                        <div class="rp-swap-flow__step" data-swap-step="2"><span class="rp-swap-flow__number">2</span><span>เลือกคู่แลก</span></div>
+                        <div class="rp-swap-flow__step" data-swap-step="3"><span class="rp-swap-flow__number">3</span><span>เวรเพื่อน</span></div>
+                        <div class="rp-swap-flow__step" data-swap-step="4"><span class="rp-swap-flow__number">4</span><span>ตรวจสอบ</span></div>
+                    </div>
                     <div class="row g-4">
                         
                         <!-- ฝั่งผู้ขอแลก (ตัวเอง) -->
@@ -229,12 +405,12 @@ require_once __DIR__ . '/../components/ui.php';
                                 <label class="form-label small fw-bold">วันที่คุณมีเวรอยู่ <span class="text-danger">*</span></label>
                                 <div class="input-group-modern d-flex align-items-center bg-white shadow-sm">
                                     <span class="ps-3 text-primary"><i class="bi bi-calendar-event"></i></span>
-                                    <input type="text" name="requestor_date" id="my_date_swap" class="form-control bg-white" placeholder="เลือกวันที่..." required>
+                                    <input type="text" name="requestor_date" id="my_date_swap" class="rp-control" placeholder="เลือกวันที่..." required>
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">ผลัด (กะ) ที่จะให้เพื่อน <span class="text-danger">*</span></label>
-                                <select name="requestor_shift" id="my_shift_swap" class="form-select shadow-sm rounded-3 bg-light" required>
+                                <select name="requestor_shift" id="my_shift_swap" class="rp-control" required>
                                     <option value="">-- เลือกวันที่ก่อน --</option>
                                     <option value="M">เช้า (M)</option>
                                     <option value="A">บ่าย (บ) / A</option>
@@ -248,7 +424,7 @@ require_once __DIR__ . '/../components/ui.php';
                             <h6 class="fw-bold text-danger mb-3"><i class="bi bi-people-fill"></i> เวรเพื่อน (ต้องการรับแทน)</h6>
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">เลือกเพื่อนร่วมงาน <span class="text-danger">*</span></label>
-                                <select name="target_user_id" id="target_user_id_select" class="form-select shadow-sm rounded-3" required style="width: 100%;">
+                                <select name="target_user_id" id="target_user_id_select" class="rp-control" required style="width: 100%;">
                                     <option value="">-- เลือกเจ้าหน้าที่ --</option>
                                     <?php foreach($staff_list as $staff): ?>
                                         <?php if($staff['id'] != $current_user_id): ?>
@@ -261,12 +437,12 @@ require_once __DIR__ . '/../components/ui.php';
                                 <label class="form-label small fw-bold">วันที่เพื่อนมีเวร <span class="text-danger">*</span></label>
                                 <div class="input-group-modern d-flex align-items-center bg-white shadow-sm">
                                     <span class="ps-3 text-danger"><i class="bi bi-calendar-event"></i></span>
-                                    <input type="text" name="target_date" id="target_date_swap" class="form-control bg-white" placeholder="เลือกเจ้าหน้าที่ก่อน..." required>
+                                    <input type="text" name="target_date" id="target_date_swap" class="rp-control" placeholder="เลือกเจ้าหน้าที่ก่อน..." required>
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label small fw-bold">ผลัด (กะ) ที่จะรับแทน <span class="text-danger">*</span></label>
-                                <select name="target_shift" id="target_shift_swap" class="form-select shadow-sm rounded-3 bg-light" required readonly style="pointer-events: none;">
+                                <select name="target_shift" id="target_shift_swap" class="rp-control" required readonly style="pointer-events: none;">
                                     <option value="">-- เลือกวันที่ก่อน --</option>
                                     <option value="M">เช้า (M)</option>
                                     <option value="A">บ่าย (บ) / A</option>
@@ -275,15 +451,31 @@ require_once __DIR__ . '/../components/ui.php';
                             </div>
                         </div>
 
+                        <div class="col-12">
+                            <div class="rp-swap-preview" id="swapPreview" hidden aria-live="polite">
+                                <div class="rp-swap-preview__side">
+                                    <div class="rp-swap-preview__label">เวรของคุณที่จะให้</div>
+                                    <div class="rp-swap-preview__name"><?= rp_e($_SESSION['user']['name'] ?? 'คุณ') ?></div>
+                                    <div class="rp-swap-preview__shift" id="swapPreviewMine">-</div>
+                                </div>
+                                <div class="rp-swap-preview__arrow"><i class="bi bi-arrow-left-right"></i></div>
+                                <div class="rp-swap-preview__side">
+                                    <div class="rp-swap-preview__label">เวรที่จะรับจากเพื่อน</div>
+                                    <div class="rp-swap-preview__name" id="swapPreviewTargetName">-</div>
+                                    <div class="rp-swap-preview__shift" id="swapPreviewTarget">-</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-12 mt-2">
                             <label class="form-label small fw-bold text-muted">เหตุผลที่ขอแลกเวร (ระบุหรือไม่ก็ได้)</label>
-                            <textarea name="reason" class="form-control shadow-sm rounded-3" rows="2" placeholder="เช่น ติดธุระส่วนตัว, ไปราชการ..."></textarea>
+                            <textarea name="reason" class="rp-control" rows="2" maxlength="1000" placeholder="เช่น ติดธุระส่วนตัว, ไปราชการ..."></textarea>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer border-top-0 bg-light rounded-bottom-4">
-                    <button type="button" class="btn btn-secondary rounded-pill fw-bold px-4" data-bs-dismiss="modal">ยกเลิก</button>
-                    <button type="submit" class="btn btn-primary rounded-pill fw-bold shadow-sm px-4"><i class="bi bi-send me-1"></i> ส่งคำขอแลกเวร</button>
+                    <button type="button" class="rp-btn rp-btn--secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                    <button type="submit" class="rp-btn rp-btn--primary" id="swapSubmitBtn"><i class="bi bi-send me-1"></i><span id="swapSubmitText">ส่งคำขอแลกเวร</span></button>
                 </div>
             </form>
         </div>
@@ -299,6 +491,37 @@ let myDatePickerInstance = null;
 let targetDatePickerInstance = null;
 
 document.addEventListener('DOMContentLoaded', function() {
+    const swapForm = document.getElementById('swapRequestForm');
+    const preview = document.getElementById('swapPreview');
+
+    function selectedText(id) {
+        const el = document.getElementById(id);
+        if (!el || !el.options || el.selectedIndex < 0) return '';
+        return el.options[el.selectedIndex].textContent.trim();
+    }
+
+    function updateSwapPreview() {
+        const myDate = document.getElementById('my_date_swap')?.value || '';
+        const myShift = document.getElementById('my_shift_swap')?.value || '';
+        const targetId = document.getElementById('target_user_id_select')?.value || '';
+        const targetDate = document.getElementById('target_date_swap')?.value || '';
+        const targetShift = document.getElementById('target_shift_swap')?.value || '';
+        const steps = document.querySelectorAll('[data-swap-step]');
+
+        if (preview) {
+            preview.hidden = !(myDate || targetId || targetDate);
+            const mine = document.getElementById('swapPreviewMine');
+            const target = document.getElementById('swapPreviewTarget');
+            const targetName = document.getElementById('swapPreviewTargetName');
+            if (mine) mine.textContent = (myDate && myShift) ? myDate + ' · ' + myShift : '-';
+            if (target) target.textContent = (targetDate && targetShift) ? targetDate + ' · ' + targetShift : '-';
+            if (targetName) targetName.textContent = targetId ? selectedText('target_user_id_select') : '-';
+        }
+
+        const complete = [!!(myDate && myShift), !!targetId, !!(targetDate && targetShift), !!(myDate && myShift && targetId && targetDate && targetShift)];
+        steps.forEach((step, index) => step.classList.toggle('rp-swap-flow__step--active', complete[index]));
+    }
+
     
     // ตั้งค่า Select2 ให้กับ Dropdown รายชื่อ
     if ($.fn.select2) {
@@ -338,6 +561,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const shiftSelect = document.getElementById('my_shift_swap');
                     autoSelectShift(shiftType, shiftSelect);
                 }
+                updateSwapPreview();
             }
         });
 
@@ -357,6 +581,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const shiftSelect = document.getElementById('target_shift_swap');
                     autoSelectShift(shiftType, shiftSelect);
                 }
+                updateSwapPreview();
             }
         });
     }
@@ -376,6 +601,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             selectElement.value = shiftType; // เผื่อเป็นค่าอื่น
         }
+        updateSwapPreview();
     }
 
     // 🌟 เมื่อเปลี่ยนชื่อเพื่อน ให้ปลดล็อกวันในปฏิทินเฉพาะวันที่เพื่อนมีเวร
@@ -393,6 +619,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!userId) {
             if (targetDatePickerInstance) targetDatePickerInstance.set('disable', [() => true]);
+            updateSwapPreview();
             return;
         }
         
@@ -408,7 +635,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 targetDatePickerInstance.set('enable', availableDates); // อนุญาตเฉพาะวันที่ระบุ
             }
         }
+        updateSwapPreview();
     });
+
+    ['my_shift_swap', 'target_shift_swap'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', updateSwapPreview);
+    });
+
+    if (swapForm) {
+        swapForm.addEventListener('submit', function(e) {
+            const btn = document.getElementById('swapSubmitBtn');
+            const text = document.getElementById('swapSubmitText');
+            if (btn && btn.disabled) {
+                e.preventDefault();
+                return;
+            }
+            if (btn) btn.disabled = true;
+            if (text) text.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>กำลังส่ง...';
+        });
+    }
 
     // รีเซ็ตฟอร์มเมื่อปิด Modal
     var myModalEl = document.getElementById('createSwapModal');
@@ -418,6 +663,7 @@ document.addEventListener('DOMContentLoaded', function() {
             $('#target_user_id_select').val(null).trigger('change');
             if(myDatePickerInstance) myDatePickerInstance.clear();
             if(targetDatePickerInstance) targetDatePickerInstance.clear();
+            updateSwapPreview();
         });
     }
 });
