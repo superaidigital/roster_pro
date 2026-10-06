@@ -420,3 +420,112 @@
 @keyframes rp-shimmer {
     100% { transform: translateX(100%); }
 }
+
+
+/* Phase 2 shared feedback + compact controls */
+.rp-btn--sm {
+    min-height: 36px;
+    padding: .48rem .7rem;
+    border-radius: .65rem;
+    font-size: .76rem;
+}
+
+.rp-btn--success {
+    background: var(--rp-success-600);
+    border-color: var(--rp-success-600);
+    color: #fff;
+}
+
+.rp-btn--success:hover {
+    background: var(--rp-success-700);
+    color: #fff;
+}
+
+.rp-btn--warning {
+    background: var(--rp-warning-50);
+    border-color: #fcd34d;
+    color: var(--rp-warning-700);
+}
+
+.rp-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    margin-bottom: 1rem;
+    padding: .85rem 1rem;
+    border: 1px solid var(--rp-border);
+    border-left-width: 4px;
+    border-radius: var(--rp-radius-md);
+    background: var(--rp-surface);
+    box-shadow: var(--rp-shadow-xs);
+    font-size: .84rem;
+    line-height: 1.5;
+}
+
+.rp-alert__icon {
+    flex: 0 0 auto;
+    margin-top: .05rem;
+    font-size: 1rem;
+}
+
+.rp-alert__content {
+    min-width: 0;
+    flex: 1;
+}
+
+.rp-alert--success {
+    border-left-color: var(--rp-success-600);
+    background: var(--rp-success-50);
+    color: var(--rp-success-700);
+}
+
+.rp-alert--danger {
+    border-left-color: var(--rp-danger-600);
+    background: var(--rp-danger-50);
+    color: var(--rp-danger-700);
+}
+
+.rp-alert--warning {
+    border-left-color: var(--rp-warning-600);
+    background: var(--rp-warning-50);
+    color: var(--rp-warning-700);
+}
+
+.rp-alert--info {
+    border-left-color: var(--rp-info-600);
+    background: var(--rp-info-50);
+    color: var(--rp-info-700);
+}
+
+.rp-status-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .9rem 1rem;
+    border: 1px solid var(--rp-border);
+    border-left: 4px solid var(--rp-primary-600);
+    border-radius: var(--rp-radius-lg);
+    background: var(--rp-surface);
+    box-shadow: var(--rp-shadow-xs);
+}
+
+.rp-status-panel--success { border-left-color: var(--rp-success-600); }
+.rp-status-panel--warning { border-left-color: var(--rp-warning-600); }
+.rp-status-panel--danger { border-left-color: var(--rp-danger-600); }
+.rp-status-panel--info { border-left-color: var(--rp-info-600); }
+
+.rp-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    flex-wrap: wrap;
+}
+
+.rp-toolbar__group {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
