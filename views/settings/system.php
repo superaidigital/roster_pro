@@ -4,6 +4,7 @@
 $role = strtoupper($_SESSION['user']['role'] ?? '');
 $is_superadmin = ($role === 'SUPERADMIN');
 $settings = $settings ?? []; // รับค่าจาก Controller
+require_once __DIR__ . '/../components/ui.php';
 ?>
 
 <style>
@@ -99,137 +100,112 @@ $settings = $settings ?? []; // รับค่าจาก Controller
     .modern-switch .form-check-input { width: 44px; height: 24px; cursor: pointer; }
     .modern-switch .form-check-input:checked { background-color: #10b981; border-color: #10b981; }
 </style>
+<link rel="stylesheet" href="public/css/admin-hub.css?v=2">
 
-<div class="container-fluid px-3 px-md-4 py-4 min-vh-100 d-flex flex-column">
+<div class="rp-page">
     
-    <!-- 🌟 Header -->
-    <div class="card border-0 shadow-sm rounded-4 mb-4 bg-white animate-fade-in" style="animation-delay: 0.1s;">
-        <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="bg-primary bg-opacity-10 text-primary rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 64px; height: 64px;">
-                    <i class="bi bi-gear-wide-connected fs-1"></i>
-                </div>
-                <div>
-                    <h3 class="fw-bolder text-dark mb-1" style="letter-spacing: -0.5px;">ตั้งค่าระบบส่วนกลาง (System Settings)</h3>
-                    <p class="text-muted mb-0 fw-medium" style="font-size: 14.5px;">ศูนย์รวมการตั้งค่าโครงสร้างระบบ สิทธิการใช้งาน และการแจ้งเตือน</p>
-                </div>
-            </div>
-            <?php if ($is_superadmin): ?>
-                <div class="text-end d-none d-md-block">
-                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-3 py-2 rounded-pill fw-bold">
-                        <i class="bi bi-shield-lock-fill me-1"></i> SUPERADMIN MODE
-                    </span>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
+    <?php
+    ob_start();
+    if ($is_superadmin):
+    ?>
+        <span class="rp-badge rp-badge--danger"><i class="bi bi-shield-lock-fill" aria-hidden="true"></i> SUPERADMIN</span>
+    <?php
+    endif;
+    $settings_header_actions = ob_get_clean();
 
-    <!-- 🌟 Alerts -->
+    rp_page_header(
+        'ตั้งค่าระบบส่วนกลาง',
+        'จัดการค่าพื้นฐาน การแจ้งเตือน วันหยุด สิทธิ์ และการดูแลระบบจากศูนย์กลางเดียว',
+        $settings_header_actions,
+        'System Settings'
+    );
+    ?>
+
     <?php if (isset($_SESSION['success_msg'])): ?>
-        <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-success border-4 animate-fade-in">
-            <i class="bi bi-check-circle-fill fs-5 me-3"></i> <div class="fw-bold" style="font-size: 14.5px;"><?= $_SESSION['success_msg'] ?></div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--success" role="status" aria-live="polite">
+            <span class="rp-alert__icon"><i class="bi bi-check-circle-fill"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['success_msg']) ?></div>
         </div>
         <?php unset($_SESSION['success_msg']); ?>
     <?php endif; ?>
+
     <?php if (isset($_SESSION['error_msg'])): ?>
-        <div class="alert border-0 bg-danger bg-opacity-10 text-danger rounded-4 d-flex align-items-center mb-4 p-3 shadow-sm border-start border-danger border-4 animate-fade-in">
-            <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i> <div class="fw-bold" style="font-size: 14.5px;"><?= $_SESSION['error_msg'] ?></div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        <div class="rp-alert rp-alert--danger" role="alert">
+            <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle-fill"></i></span>
+            <div class="rp-alert__content"><?= rp_e($_SESSION['error_msg']) ?></div>
         </div>
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
-    <!-- 🌟 Grid Menu (แผงควบคุมระบบ) -->
-    <div class="row g-4">
-        
-        <!-- 1. ข้อมูลทั่วไป -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.1s;">
-            <a href="#" class="setting-card p-4" data-bs-toggle="modal" data-bs-target="#generalSettingsModal">
-                <div class="icon-box grad-blue"><i class="bi bi-sliders"></i></div>
-                <div class="card-title-modern">ข้อมูลทั่วไปของระบบ</div>
-                <p class="card-text-modern">ตั้งค่าชื่อระบบ เปิด-ปิดโหมดซ่อมบำรุง และการตั้งค่าทำงานพื้นฐาน</p>
+    <section class="rp-section" aria-labelledby="settingsToolsTitle">
+        <?php rp_section_header('เครื่องมือระบบ', 'เลือกหมวดที่ต้องการจัดการ ระบบจะแสดงเฉพาะรายการที่สิทธิ์ของคุณเข้าถึงได้'); ?>
+        <div class="rp-settings-grid" id="settingsToolsTitle">
+            <a href="#" class="rp-setting-card" data-bs-toggle="modal" data-bs-target="#generalSettingsModal">
+                <span class="rp-setting-card__icon"><i class="bi bi-sliders"></i></span>
+                <h2 class="rp-setting-card__title">ข้อมูลทั่วไปของระบบ</h2>
+                <p class="rp-setting-card__description">ชื่อระบบ โหมดซ่อมบำรุง และค่าพื้นฐานสำหรับการทำงาน</p>
+                <div class="rp-setting-card__footer">เปิดการตั้งค่า →</div>
             </a>
-        </div>
 
-        <!-- 2. LINE Notify -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.2s;">
-            <a href="#" class="setting-card p-4" data-bs-toggle="modal" data-bs-target="#lineNotifyModal">
-                <div class="icon-box grad-green"><i class="bi bi-line"></i></div>
-                <div class="card-title-modern">การแจ้งเตือน LINE</div>
-                <p class="card-text-modern">จัดการ Token เชื่อมต่อ LINE API สำหรับแจ้งเตือนวันลาและตารางเวร</p>
+            <a href="#" class="rp-setting-card rp-setting-card--success" data-bs-toggle="modal" data-bs-target="#lineNotifyModal">
+                <span class="rp-setting-card__icon"><i class="bi bi-bell"></i></span>
+                <h2 class="rp-setting-card__title">การแจ้งเตือน</h2>
+                <p class="rp-setting-card__description">กำหนดช่องทางและเหตุการณ์ที่ต้องส่งการแจ้งเตือนจากระบบ</p>
+                <div class="rp-setting-card__footer">ตั้งค่าการแจ้งเตือน →</div>
             </a>
-        </div>
 
-        <!-- 3. วันหยุดราชการ -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.3s;">
-            <a href="index.php?c=settings&a=holidays" class="setting-card p-4">
-                <div class="icon-box grad-red"><i class="bi bi-calendar2-heart"></i></div>
-                <div class="card-title-modern">วันหยุดราชการ / นักขัตฤกษ์</div>
-                <p class="card-text-modern">กำหนดวันหยุดประจำปี หรือดึงข้อมูลอัตโนมัติ เพื่อใช้ประมวลผลวันลา</p>
+            <a href="index.php?c=settings&a=holidays" class="rp-setting-card rp-setting-card--danger">
+                <span class="rp-setting-card__icon"><i class="bi bi-calendar2-heart"></i></span>
+                <h2 class="rp-setting-card__title">วันหยุดราชการ</h2>
+                <p class="rp-setting-card__description">กำหนดวันหยุดเพื่อใช้คำนวณวันลาและตารางปฏิบัติงาน</p>
+                <div class="rp-setting-card__footer">จัดการวันหยุด →</div>
             </a>
-        </div>
 
-        <!-- 4. กลุ่มสายงาน / เรทค่าตอบแทน -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.4s;">
-            <a href="index.php?c=settings&a=shift_types" class="setting-card p-4">
-                <div class="icon-box grad-orange"><i class="bi bi-cash-coin"></i></div>
-                <div class="card-title-modern">กลุ่มสายงาน / ค่าเวร</div>
-                <p class="card-text-modern">จัดการกลุ่มวิชาชีพ และกำหนดเรทค่าเวรนอกเวลาราชการ (ร, ย, บ)</p>
+            <a href="index.php?c=settings&a=shift_types" class="rp-setting-card rp-setting-card--warning">
+                <span class="rp-setting-card__icon"><i class="bi bi-cash-coin"></i></span>
+                <h2 class="rp-setting-card__title">กลุ่มสายงาน / ค่าเวร</h2>
+                <p class="rp-setting-card__description">กำหนดกลุ่มวิชาชีพและอัตราค่าตอบแทนของเวรแต่ละประเภท</p>
+                <div class="rp-setting-card__footer">จัดการอัตรา →</div>
             </a>
-        </div>
 
-        <!-- 5. สถานะระบบเซิร์ฟเวอร์ -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.5s;">
-            <a href="index.php?c=settings&a=system_status" class="setting-card p-4">
-                <div class="icon-box grad-cyan"><i class="bi bi-hdd-network"></i></div>
-                <div class="card-title-modern">สถานะเซิร์ฟเวอร์ (Server)</div>
-                <p class="card-text-modern">ตรวจสอบพื้นที่จัดเก็บข้อมูล เวอร์ชัน PHP และสถานะการเชื่อมต่อฐานข้อมูล</p>
+            <a href="index.php?c=settings&a=system_status" class="rp-setting-card rp-setting-card--info">
+                <span class="rp-setting-card__icon"><i class="bi bi-hdd-network"></i></span>
+                <h2 class="rp-setting-card__title">สถานะเซิร์ฟเวอร์</h2>
+                <p class="rp-setting-card__description">ตรวจฐานข้อมูล พื้นที่จัดเก็บ และข้อมูลสภาพแวดล้อมของเซิร์ฟเวอร์</p>
+                <div class="rp-setting-card__footer">ตรวจสอบสถานะ →</div>
             </a>
-        </div>
 
-        <!-- 6. ประวัติการใช้งาน -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.6s;">
-            <a href="index.php?c=logs" class="setting-card p-4">
-                <div class="icon-box grad-dark"><i class="bi bi-journal-code"></i></div>
-                <div class="card-title-modern">ประวัติการใช้งาน (Logs)</div>
-                <p class="card-text-modern">ติดตามความเคลื่อนไหว ตรวจสอบการเพิ่ม/ลบ/แก้ไขข้อมูลในระบบ</p>
+            <a href="index.php?c=logs" class="rp-setting-card">
+                <span class="rp-setting-card__icon"><i class="bi bi-journal-code"></i></span>
+                <h2 class="rp-setting-card__title">ประวัติการใช้งาน</h2>
+                <p class="rp-setting-card__description">ตรวจสอบการเพิ่ม แก้ไข ลบ และกิจกรรมสำคัญที่เกิดขึ้นในระบบ</p>
+                <div class="rp-setting-card__footer">เปิด Audit Log →</div>
             </a>
-        </div>
 
-        <?php if ($is_superadmin): ?>
-        <!-- 7. จัดการสิทธิ์เมนู (เฉพาะ SUPERADMIN) -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.7s;">
-            <a href="index.php?c=settings&a=menus" class="setting-card p-4">
-                <div class="icon-box grad-purple"><i class="bi bi-ui-checks-grid"></i></div>
-                <div class="card-title-modern">จัดการสิทธิ์เมนู (Permissions)</div>
-                <p class="card-text-modern">เปิด/ปิด เมนูต่างๆ ของระบบ และกำหนดสิทธิ์การเข้าถึงแบบละเอียด</p>
-                <div class="position-absolute top-0 end-0 mt-3 me-3"><i class="bi bi-shield-lock-fill text-danger fs-5 opacity-50"></i></div>
-            </a>
-        </div>
+            <?php if ($is_superadmin): ?>
+                <a href="index.php?c=settings&a=menus" class="rp-setting-card rp-setting-card--violet">
+                    <span class="rp-setting-card__icon"><i class="bi bi-ui-checks-grid"></i></span>
+                    <h2 class="rp-setting-card__title">สิทธิ์เมนู</h2>
+                    <p class="rp-setting-card__description">กำหนดเมนูที่แต่ละบทบาทสามารถเห็นและเข้าใช้งานได้</p>
+                    <div class="rp-setting-card__footer">จัดการสิทธิ์ →</div>
+                </a>
 
-        <!-- 8. สำรองฐานข้อมูล (เฉพาะ SUPERADMIN) -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.8s;">
-            <a href="index.php?c=settings&a=backup" class="setting-card p-4">
-                <div class="icon-box" style="background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); --icon-shadow: rgba(20, 184, 166, 0.3); --card-color: #14b8a6;"><i class="bi bi-database-down"></i></div>
-                <div class="card-title-modern">สำรองข้อมูล (Backup Data)</div>
-                <p class="card-text-modern">ดาวน์โหลดไฟล์สำรองฐานข้อมูล (.sql) เพื่อป้องกันข้อมูลสูญหาย</p>
-                <div class="position-absolute top-0 end-0 mt-3 me-3"><i class="bi bi-shield-lock-fill text-danger fs-5 opacity-50"></i></div>
-            </a>
-        </div>
+                <a href="index.php?c=settings&a=backup" class="rp-setting-card rp-setting-card--success">
+                    <span class="rp-setting-card__icon"><i class="bi bi-database-down"></i></span>
+                    <h2 class="rp-setting-card__title">สำรองข้อมูล</h2>
+                    <p class="rp-setting-card__description">สร้าง ดาวน์โหลด และตรวจสอบไฟล์สำรองฐานข้อมูลของระบบ</p>
+                    <div class="rp-setting-card__footer">จัดการ Backup →</div>
+                </a>
 
-        <!-- 🌟 9. ล้างข้อมูลระบบ (Factory Reset) 🌟 -->
-        <div class="col-xl-3 col-lg-4 col-sm-6 animate-fade-in" style="animation-delay: 0.9s;">
-            <a href="#" data-bs-toggle="modal" data-bs-target="#resetSystemModal" class="setting-card p-4" style="border: 1px solid #fca5a5; background-color: #fef2f2;">
-                <div class="icon-box" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); --icon-shadow: rgba(239, 68, 68, 0.4); --card-color: #ef4444;"><i class="bi bi-exclamation-octagon-fill"></i></div>
-                <div class="card-title-modern text-danger">รีเซ็ตระบบ (Factory Reset)</div>
-                <p class="card-text-modern text-danger opacity-75">ล้างข้อมูลตารางเวร วันลา และประวัติ เพื่อเริ่มต้นใช้งานรอบปีใหม่</p>
-                <div class="position-absolute top-0 end-0 mt-3 me-3"><i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i></div>
-            </a>
+                <a href="#" data-bs-toggle="modal" data-bs-target="#resetSystemModal" class="rp-setting-card rp-setting-card--critical">
+                    <span class="rp-setting-card__icon"><i class="bi bi-exclamation-octagon-fill"></i></span>
+                    <h2 class="rp-setting-card__title">Factory Reset</h2>
+                    <p class="rp-setting-card__description">ล้างข้อมูลตารางเวร วันลา และข้อมูลรอบปีเพื่อเริ่มต้นระบบใหม่</p>
+                    <div class="rp-setting-card__footer">การดำเนินการความเสี่ยงสูง →</div>
+                </a>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
-
-    </div>
+    </section>
 </div>
 
 <!-- ================= 🌟 Modal 1: ตั้งค่าข้อมูลทั่วไป ================= -->
@@ -238,7 +214,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header border-bottom-0 bg-primary bg-opacity-10 pb-3 p-4">
                 <h5 class="modal-title fw-bolder text-primary"><i class="bi bi-sliders me-2"></i> ข้อมูลทั่วไปของระบบ</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
             <form action="index.php?c=settings&a=update_system" method="POST">
                 <input type="hidden" name="section" value="general">
@@ -278,7 +254,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header border-bottom-0 bg-success bg-opacity-10 pb-3 p-4">
                 <h5 class="modal-title fw-bolder text-success"><i class="bi bi-line me-2"></i> ตั้งค่าการแจ้งเตือน LINE Notify</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
             <div class="modal-body p-4 bg-white modern-input-group">
                 <form action="index.php?c=settings&a=update_system" method="POST" id="lineNotifyForm">
@@ -340,7 +316,7 @@ $settings = $settings ?? []; // รับค่าจาก Controller
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header border-bottom-0 bg-danger bg-opacity-10 pb-3 p-4">
                 <h5 class="modal-title fw-bolder text-danger"><i class="bi bi-exclamation-octagon-fill me-2"></i> ยืนยันการรีเซ็ตระบบ (Factory Reset)</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
             
             <form action="index.php?c=settings&a=factory_reset" method="POST" id="resetForm">
