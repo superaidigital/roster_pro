@@ -12,9 +12,21 @@ $files = $files ?? [];
             </p>
         </div>
         <div class="rp-page-header__actions">
-            <a href="index.php?c=data43&a=index" class="rp-btn rp-btn--secondary">
+            <a href="index.php?c=data43&a=index<?= !empty($submission['hospital_id']) ? '&hospital_id='.(int)$submission['hospital_id'] : '' ?>" class="rp-btn rp-btn--secondary">
                 <i class="bi bi-arrow-left"></i> กลับ
             </a>
+            <?php if (!empty($is_admin)): ?>
+                <form action="index.php?c=data43&a=delete_submission"
+                      method="POST"
+                      class="d-inline"
+                      onsubmit="return confirm('ยืนยันลบ Submission #<?= (int)$submission['id'] ?> ?\n\nข้อมูลรายการไฟล์และ Aggregate เชิงพื้นที่ที่เกี่ยวข้องจะถูกลบด้วย และไม่สามารถย้อนกลับได้');">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                    <input type="hidden" name="id" value="<?= (int)$submission['id'] ?>">
+                    <button type="submit" class="rp-btn rp-btn--danger">
+                        <i class="bi bi-trash3"></i> ลบชุดข้อมูล
+                    </button>
+                </form>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -29,6 +41,16 @@ $files = $files ?? [];
         <div class="rp-alert rp-alert--warning mb-3">
             <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle"></i></span>
             <div class="rp-alert__content"><?= htmlspecialchars($submission['error_summary'], ENT_QUOTES, 'UTF-8') ?></div>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($is_admin)): ?>
+        <div class="rp-alert rp-alert--warning mb-3">
+            <span class="rp-alert__icon"><i class="bi bi-shield-exclamation"></i></span>
+            <div class="rp-alert__content">
+                สิทธิ์ ADMIN สามารถลบ Submission นี้ได้ การลบจะลบ metadata ของไฟล์และ Aggregate เชิงพื้นที่ของ Submission นี้ด้วย
+                แต่ไม่มีไฟล์ ZIP ต้นฉบับค้างอยู่ในระบบ เนื่องจากไฟล์ชั่วคราวถูกลบหลังประมวลผลแล้ว
+            </div>
         </div>
     <?php endif; ?>
 
