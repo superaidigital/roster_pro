@@ -200,6 +200,58 @@ class Data43SubmissionModel {
         return $row;
     }
 
+    public function qualityIssueSchemaReady(): bool {
+        try {
+            $stmt = $this->db->query("SHOW TABLES LIKE 'data43_quality_issues'");
+            return (bool)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    public function saveQualityIssues(int $submissionId, array $issues): void {
+        if (!$this->qualityIssueSchemaReady()) return;
+
+        $this->db->prepare("DELETE FROM data43_quality_issues WHERE submission_id = ?")->execute([$submissionId]);
+        if (!$issues) return;
+
+        $stmt = $this->db->prepare("
+            INSERT INTO data43_quality_issues
+                (submission_id, file_code, severity, rule_code, field_name, issue_count, sample_rows_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+
+        foreach ($issues as $issue) {
+            $stmt->execute([
+                $submissionId,
+                (string)($issue['file_code'] ?? ''),
+                (string)($issue['severity'] ?? 'WARNING'),
+                (string)($issue['rule_code'] ?? 'UNKNOWN'),
+                $issue['field_name'] ?? null,
+                (int)($issue['issue_count'] ?? 0),
+                json_encode(array_values((array)($issue['sample_rows'] ?? [])), JSON_UNESCAPED_UNICODE),
+            ]);
+        }
+    }
+
+    public function getQualityIssues(int $submissionId): array {
+        if (!$this->qualityIssueSchemaReady()) return [];
+        $stmt = $this->db->prepare("
+            SELECT file_code, severity, rule_code, field_name, issue_count, sample_rows_json
+            FROM data43_quality_issues
+            WHERE submission_id = ?
+            ORDER BY FIELD(severity,'ERROR','WARNING','INFO'), file_code, rule_code
+        ");
+        $stmt->execute([$submissionId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['sample_rows'] = json_decode((string)($row['sample_rows_json'] ?? '[]'), true) ?: [];
+            unset($row['sample_rows_json']);
+        }
+        unset($row);
+        return $rows;
+    }
+
     public function getHistory(?int $hospitalId, int $limit = 100): array {
         $limit = max(1, min($limit, 500));
 
