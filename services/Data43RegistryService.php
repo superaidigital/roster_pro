@@ -83,7 +83,7 @@ final class Data43RegistryService
         if($fileCode==='HOME' && $data['HID']==='') $data['HID']=$this->model->generateHid($hospitalId);
 
         foreach($data as $name=>$value){
-            if(str_starts_with($name,'DATE_') || in_array($name,['BIRTH','DDISCHARGE','DDEATH','DATE_DIAG','DATE_SERV','DATE_DETECT'],true)){
+            if(str_starts_with($name,'DATE_') || in_array($name,['BIRTH','DDISCHARGE','DDEATH','DATE_DIAG','DATE_SERV','DATE_DETECT','DATE_DISAB','LMP','EDC','OUTDATE'],true)){
                 if($value!=='' && !preg_match('/^\d{8}$/',$value)){
                     $converted=Data43ValidationService::buddhistToDate8($value);
                     if($converted!==null) $data[$name]=$converted;
@@ -92,7 +92,7 @@ final class Data43RegistryService
         }
         if(isset($data['VILLAGE'])) $data['VILLAGE']=Data43ValidationService::normalizeVillage($data['VILLAGE']) ?? '';
 
-        if(in_array($fileCode,['ADDRESS','CHRONIC','DEATH'],true) && !empty($data['PID'])){
+        if(in_array($fileCode,['ADDRESS','CHRONIC','DEATH','DISABILITY','SERVICE','NCDSCREEN','PRENATAL','ANC'],true) && !empty($data['PID'])){
             $person=$this->findPersonByPid($hospitalId,$data['PID']);
             if(!$person) throw new RuntimeException('ไม่พบ PERSON ของ PID ที่เลือก');
             if(array_key_exists('CID',$data)) $data['CID']=(string)($person['CID'] ?? '');
@@ -431,6 +431,12 @@ final class Data43RegistryService
             'HOME'=>'บ้าน '.($data['HOUSE']??'-').' · HID '.($data['HID']??''),
             'CHRONIC'=>($data['CHRONIC']??'').' · PID '.($data['PID']??''),
             'DEATH'=>'PID '.($data['PID']??'').' · '.($data['DDEATH']??''),
+            'DISABILITY'=>'ประเภท '.($data['DISABTYPE']??'-').' · PID '.($data['PID']??''),
+            'SERVICE'=>'SEQ '.($data['SEQ']??'-').' · PID '.($data['PID']??''),
+            'NCDSCREEN'=>'คัดกรอง '.($data['DATE_SERV']??'-').' · PID '.($data['PID']??''),
+            'PRENATAL'=>'ครรภ์ '.($data['GRAVIDA']??'-').' · PID '.($data['PID']??''),
+            'ANC'=>'ANC '.($data['DATE_SERV']??'-').' · PID '.($data['PID']??''),
+            'VILLAGE'=>'VID '.($data['VID']??'-'),
             default=>$fileCode.' · '.($data['PID']??$data['HID']??''),
         };
     }
