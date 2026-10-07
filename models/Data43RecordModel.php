@@ -6,7 +6,12 @@ class Data43RecordModel
     public function schemaReady(): bool
     {
         try {
-            return (bool)$this->db->query("SHOW TABLES LIKE 'data43_records'")->fetchColumn();
+            foreach (['data43_records','data43_search_tokens','data43_record_audit'] as $table) {
+                $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
+                $stmt->execute([$table]);
+                if (!$stmt->fetchColumn()) return false;
+            }
+            return true;
         } catch (Throwable $e) { return false; }
     }
 
@@ -64,7 +69,7 @@ class Data43RecordModel
     public function listByFile(int $hospitalId, string $fileCode, int $limit=100): array
     {
         $limit=max(1,min(500,$limit));
-        $stmt=$this->db->prepare("SELECT id,file_code,pid_ref,hid_ref,created_at,updated_at FROM data43_records WHERE hospital_id=? AND file_code=? AND deleted_at IS NULL ORDER BY updated_at DESC,id DESC LIMIT {$limit}");
+        $stmt=$this->db->prepare("SELECT * FROM data43_records WHERE hospital_id=? AND file_code=? AND deleted_at IS NULL ORDER BY updated_at DESC,id DESC LIMIT {$limit}");
         $stmt->execute([$hospitalId,$fileCode]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -73,6 +78,13 @@ class Data43RecordModel
     {
         $stmt=$this->db->prepare("SELECT * FROM data43_records WHERE hospital_id=? AND pid_ref=? AND deleted_at IS NULL ORDER BY file_code,id");
         $stmt->execute([$hospitalId,$pid]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function listByHid(int $hospitalId, string $hid): array
+    {
+        $stmt=$this->db->prepare("SELECT * FROM data43_records WHERE hospital_id=? AND hid_ref=? AND deleted_at IS NULL ORDER BY file_code,id");
+        $stmt->execute([$hospitalId,$hid]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -107,8 +119,19 @@ class Data43RecordModel
 
     public function softDelete(int $id,int $hospitalId,int $userId): void
     {
-        $stmt=$this->db->prepare("UPDATE data43_records SET deleted_at=NOW(),updated_by=? WHERE id=? AND hospital_id=? AND deleted_at IS NULL");
+        // Rotate unique/searchable hashes so a logically deleted PK/CID can be
+        // re-created without colliding with the tombstone row.
+        $stmt=$this->db->prepare("
+            UPDATE data43_records
+            SET deleted_at=NOW(),
+                updated_by=?,
+                cid_hash=NULL,
+                record_key_hash=SHA2(CONCAT(record_key_hash,'|DELETED|',id,'|',NOW(6)),256)
+            WHERE id=? AND hospital_id=? AND deleted_at IS NULL
+        ");
         $stmt->execute([$userId,$id,$hospitalId]);
+        if($stmt->rowCount()===0) throw new RuntimeException('ไม่พบข้อมูลที่ต้องการลบ');
+        $this->db->prepare("DELETE FROM data43_search_tokens WHERE record_id=?")->execute([$id]);
     }
 
     public function addAudit(?int $recordId,int $hospitalId,string $fileCode,string $action,int $userId,?string $recordKeyHash,array $changedFields=[]): void
