@@ -6,12 +6,51 @@ class Data43SubmissionModel {
 
     public function __construct(PDO $db) {
         $this->db = $db;
+        $this->ensureCompatibilitySchema();
+    }
+
+    /**
+     * Keep older Data43 installations compatible with additive metadata fields.
+     * This only adds missing nullable columns; it never drops/renames user data.
+     * If the DB account cannot ALTER TABLE, the normal migration warning is used.
+     */
+    private function ensureCompatibilitySchema(): void {
+        try {
+            $table = $this->db->query("SHOW TABLES LIKE 'data43_submissions'")->fetchColumn();
+            if (!$table) return;
+
+            $stmt = $this->db->query("SHOW COLUMNS FROM data43_submissions");
+            $columns = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+            $alters = [];
+            if (!in_array('standard_version', $columns, true)) {
+                $alters[] = "ADD COLUMN standard_version VARCHAR(20) NULL AFTER purpose_code";
+            }
+            if (!in_array('profile_code', $columns, true)) {
+                $after = in_array('standard_version', $columns, true) ? 'standard_version' : 'purpose_code';
+                $alters[] = "ADD COLUMN profile_code VARCHAR(40) NULL AFTER {$after}";
+            }
+
+            if ($alters) {
+                $this->db->exec("ALTER TABLE data43_submissions " . implode(', ', $alters));
+            }
+        } catch (Throwable $e) {
+            error_log('Data43 compatibility schema check failed: ' . $e->getMessage());
+        }
     }
 
     public function schemaReady(): bool {
         try {
             $stmt = $this->db->query("SHOW TABLES LIKE 'data43_submissions'");
-            return (bool)$stmt->fetchColumn();
+            if (!(bool)$stmt->fetchColumn()) return false;
+
+            $stmt = $this->db->query("SHOW COLUMNS FROM data43_submissions");
+            $columns = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+            foreach (['standard_version','profile_code'] as $required) {
+                if (!in_array($required, $columns, true)) return false;
+            }
+            return true;
         } catch (Throwable $e) {
             return false;
         }
