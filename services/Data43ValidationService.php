@@ -154,13 +154,18 @@ final class Data43ValidationService
         $cid = trim((string)($data['CID'] ?? ''));
         if ($cid !== '' && !self::validateCid($cid)) $errors['CID'] = 'เลขบัตรประชาชน 13 หลักไม่ผ่าน checksum';
 
-        foreach (['BIRTH','MOVEIN','DDISCHARGE','DDEATH','DATE_DIAG','DATE_DISCH','DATE_SERV','DATE_DETECT','DATE_DISAB','LMP','EDC','DATE_HCT'] as $field) {
+        foreach (['BIRTH','MOVEIN','DDISCHARGE','DDEATH','DATE_DIAG','DATE_DISCH','DATE_SERV','DATE_DETECT','DATE_DISAB','LMP','DATE_HCT'] as $field) {
             if (!empty($data[$field]) && !self::validateDate8((string)$data[$field])) {
                 $errors[$field] = 'วันที่ไม่ถูกต้องหรือเกินวันที่ปัจจุบัน';
             }
         }
 
-        foreach (['DIAGCODE','CHRONIC','CAUSEDEATH_A','CAUSEDEATH_B','CAUSEDEATH_C','CAUSEDEATH_D'] as $field) {
+        // EDC is an expected delivery date and is allowed to be in the future.
+        if (!empty($data['EDC']) && !self::validateDate8((string)$data['EDC'], true)) {
+            $errors['EDC'] = 'กำหนดคลอดไม่ใช่วันที่ที่ถูกต้อง';
+        }
+
+        foreach (['DIAGCODE','CHRONIC','CDEATH_A','CDEATH_B','CDEATH_C','CDEATH_D','ODISEASE'] as $field) {
             if (!empty($data[$field]) && !self::validateIcd10Tm((string)$data[$field])) {
                 $errors[$field] = 'รหัส ICD-10-TM ไม่ถูกต้อง';
             }
@@ -187,7 +192,48 @@ final class Data43ValidationService
                 $errors['DATE_DISCH'] = 'สถานะโรคนี้ควรระบุวันที่จำหน่าย';
             }
         }
-        if ($fileCode === 'DEATH' && empty($data['DDEATH'])) $errors['DDEATH'] = 'กรุณาระบุวันที่เสียชีวิต';
+        if ($fileCode === 'DEATH' && empty($data['DDEATH'])) {
+            $errors['DDEATH'] = 'กรุณาระบุวันที่เสียชีวิต';
+        }
+
+        if ($fileCode === 'SERVICE') {
+            if ((string)($data['TYPEIN'] ?? '') === '3' && empty($data['REFERINHOSP'])) {
+                $errors['REFERINHOSP'] = 'เมื่อ TYPEIN = 3 ต้องระบุหน่วยบริการที่ส่งมา';
+            }
+            if ((string)($data['TYPEOUT'] ?? '') === '3' && empty($data['REFEROUTHOSP'])) {
+                $errors['REFEROUTHOSP'] = 'เมื่อ TYPEOUT = 3 ต้องระบุหน่วยบริการที่ส่งต่อ';
+            }
+        }
+
+        if ($fileCode === 'NCDSCREEN') {
+            $bsTest = (string)($data['BSTEST'] ?? '');
+            if ($bsTest !== '' && $bsTest !== '9' && trim((string)($data['BSLEVEL'] ?? '')) === '') {
+                $errors['BSLEVEL'] = 'เมื่อมีการตรวจน้ำตาล ต้องระบุระดับน้ำตาลในเลือด';
+            }
+        }
+
+        if ($fileCode === 'HOME') {
+            $lat = trim((string)($data['LATITUDE'] ?? ''));
+            $lng = trim((string)($data['LONGITUDE'] ?? ''));
+            if (($lat === '') xor ($lng === '')) {
+                $errors[$lat === '' ? 'LATITUDE' : 'LONGITUDE'] = 'Latitude และ Longitude ต้องบันทึกเป็นคู่';
+            }
+        }
+
+        if ($fileCode === 'ANC') {
+            $ga = trim((string)($data['GA'] ?? ''));
+            if ($ga !== '' && (!ctype_digit($ga) || (int)$ga < 0 || (int)$ga > 45)) {
+                $errors['GA'] = 'อายุครรภ์ต้องอยู่ระหว่าง 0-45 สัปดาห์';
+            }
+        }
+
+        if ($fileCode === 'PRENATAL') {
+            $lmp = preg_replace('/\D/', '', (string)($data['LMP'] ?? ''));
+            $edc = preg_replace('/\D/', '', (string)($data['EDC'] ?? ''));
+            if (strlen($lmp) === 8 && strlen($edc) === 8 && $edc < $lmp) {
+                $errors['EDC'] = 'กำหนดคลอดต้องไม่น้อยกว่าวันแรกของประจำเดือนครั้งสุดท้าย';
+            }
+        }
 
         return $errors;
     }
