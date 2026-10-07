@@ -346,5 +346,220 @@ class Data43SubmissionModel {
         $stmt->execute($params);
         return (int)$stmt->fetchColumn();
     }
+
+
+    public function spatialSchemaReady(): bool {
+        try {
+            $stmt = $this->db->query("SHOW TABLES LIKE 'data43_area_metrics'");
+            return (bool)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    public function addSpatialMetrics(
+        int $submissionId,
+        int $hospitalId,
+        string $reportMonth,
+        array $metrics
+    ): int {
+        if (empty($metrics) || !$this->spatialSchemaReady()) {
+            return 0;
+        }
+
+        $stmt = $this->db->prepare("
+            INSERT INTO data43_area_metrics
+                (submission_id, hospital_id, report_month, area_level,
+                 changwat_code, ampur_code, tambon_code, village_code,
+                 source_file_code, metric_code, metric_value,
+                 centroid_lat, centroid_lng, geo_point_count)
+            VALUES
+                (:submission_id, :hospital_id, :report_month, :area_level,
+                 :changwat_code, :ampur_code, :tambon_code, :village_code,
+                 :source_file_code, :metric_code, :metric_value,
+                 :centroid_lat, :centroid_lng, :geo_point_count)
+        ");
+
+        $count = 0;
+        $this->db->beginTransaction();
+        try {
+            foreach ($metrics as $metric) {
+                $stmt->execute([
+                    ':submission_id' => $submissionId,
+                    ':hospital_id' => $hospitalId,
+                    ':report_month' => $reportMonth,
+                    ':area_level' => $metric['area_level'],
+                    ':changwat_code' => $metric['changwat_code'],
+                    ':ampur_code' => $metric['ampur_code'],
+                    ':tambon_code' => $metric['tambon_code'],
+                    ':village_code' => $metric['village_code'],
+                    ':source_file_code' => $metric['source_file_code'],
+                    ':metric_code' => $metric['metric_code'],
+                    ':metric_value' => (int)$metric['metric_value'],
+                    ':centroid_lat' => $metric['centroid_lat'],
+                    ':centroid_lng' => $metric['centroid_lng'],
+                    ':geo_point_count' => (int)$metric['geo_point_count'],
+                ]);
+                $count++;
+            }
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        return $count;
+    }
+
+    public function getSpatialMetricOptions(string $reportMonth, ?int $hospitalId = null): array {
+        if (!$this->spatialSchemaReady()) return [];
+
+        $sql = "
+            SELECT DISTINCT m.metric_code, m.source_file_code
+            FROM data43_area_metrics m
+            JOIN (
+                SELECT hospital_id, report_month, MAX(id) AS latest_id
+                FROM data43_submissions
+                WHERE report_month = ?
+                GROUP BY hospital_id, report_month
+            ) latest ON latest.latest_id = m.submission_id
+            WHERE m.report_month = ?
+        ";
+        $params = [$reportMonth, $reportMonth];
+
+        if ($hospitalId !== null) {
+            $sql .= " AND m.hospital_id = ? ";
+            $params[] = $hospitalId;
+        }
+
+        $sql .= " ORDER BY m.metric_code, m.source_file_code";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getSpatialSummary(
+        string $reportMonth,
+        string $areaLevel,
+        ?string $metricCode = null,
+        ?int $hospitalId = null
+    ): array {
+        if (!$this->spatialSchemaReady()) return [];
+
+        $allowedLevels = ['AMPUR','TAMBON','VILLAGE'];
+        if (!in_array($areaLevel, $allowedLevels, true)) {
+            $areaLevel = 'TAMBON';
+        }
+
+        $sql = "
+            SELECT
+                m.changwat_code,
+                m.ampur_code,
+                m.tambon_code,
+                m.village_code,
+                SUM(m.metric_value) AS metric_value,
+                SUM(m.geo_point_count) AS geo_point_count,
+                CASE
+                    WHEN SUM(m.geo_point_count) > 0
+                    THEN SUM(COALESCE(m.centroid_lat,0) * m.geo_point_count) / SUM(m.geo_point_count)
+                    ELSE NULL
+                END AS centroid_lat,
+                CASE
+                    WHEN SUM(m.geo_point_count) > 0
+                    THEN SUM(COALESCE(m.centroid_lng,0) * m.geo_point_count) / SUM(m.geo_point_count)
+                    ELSE NULL
+                END AS centroid_lng,
+                COUNT(DISTINCT m.hospital_id) AS hospital_count,
+                COUNT(DISTINCT m.source_file_code) AS source_file_count
+            FROM data43_area_metrics m
+            JOIN (
+                SELECT hospital_id, report_month, MAX(id) AS latest_id
+                FROM data43_submissions
+                WHERE report_month = ?
+                GROUP BY hospital_id, report_month
+            ) latest ON latest.latest_id = m.submission_id
+            WHERE m.report_month = ?
+              AND m.area_level = ?
+        ";
+        $params = [$reportMonth, $reportMonth, $areaLevel];
+
+        if ($metricCode !== null && $metricCode !== '') {
+            $sql .= " AND m.metric_code = ? ";
+            $params[] = $metricCode;
+        }
+
+        if ($hospitalId !== null) {
+            $sql .= " AND m.hospital_id = ? ";
+            $params[] = $hospitalId;
+        }
+
+        $sql .= "
+            GROUP BY
+                m.changwat_code,
+                m.ampur_code,
+                m.tambon_code,
+                m.village_code
+            ORDER BY metric_value DESC
+        ";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getSpatialCoverageByHospital(
+        string $reportMonth,
+        string $areaLevel,
+        ?int $hospitalId = null
+    ): array {
+        if (!$this->spatialSchemaReady()) return [];
+
+        $allowedLevels = ['AMPUR','TAMBON','VILLAGE'];
+        if (!in_array($areaLevel, $allowedLevels, true)) {
+            $areaLevel = 'TAMBON';
+        }
+
+        $sql = "
+            SELECT
+                h.id AS hospital_id,
+                h.hospital_code,
+                h.name AS hospital_name,
+                COUNT(DISTINCT CONCAT_WS(
+                    '-',
+                    COALESCE(m.changwat_code,''),
+                    COALESCE(m.ampur_code,''),
+                    COALESCE(m.tambon_code,''),
+                    COALESCE(m.village_code,'')
+                )) AS area_count,
+                SUM(m.metric_value) AS metric_value
+            FROM data43_area_metrics m
+            JOIN (
+                SELECT hospital_id, report_month, MAX(id) AS latest_id
+                FROM data43_submissions
+                WHERE report_month = ?
+                GROUP BY hospital_id, report_month
+            ) latest ON latest.latest_id = m.submission_id
+            JOIN hospitals h ON h.id = m.hospital_id
+            WHERE m.report_month = ?
+              AND m.area_level = ?
+        ";
+        $params = [$reportMonth, $reportMonth, $areaLevel];
+
+        if ($hospitalId !== null) {
+            $sql .= " AND m.hospital_id = ? ";
+            $params[] = $hospitalId;
+        }
+
+        $sql .= "
+            GROUP BY h.id, h.hospital_code, h.name
+            ORDER BY metric_value DESC, h.name ASC
+        ";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
 ?>
