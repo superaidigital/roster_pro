@@ -689,7 +689,7 @@ $header_page_icon = $page_context[2];
             </div>
         </div>
 
-        <div class="d-flex align-items-center gap-1 gap-md-2">
+        <div class="d-flex align-items-center gap-1 gap-md-2 rp-topbar-actions">
         <?php if(isset($_SESSION['user'])): ?>
         
         <!-- 🔔 Notification Dropdown -->
@@ -853,74 +853,76 @@ $header_page_icon = $page_context[2];
     });
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Topbar dropdowns use one explicit click lifecycle.
-        // This avoids duplicate Bootstrap Data API bindings from page-specific scripts.
+        // Roster Pro topbar dropdown controller.
+        // Uses a single local implementation to avoid conflicts from duplicated Bootstrap bundles.
         const topbarDropdownIds = ['notificationDropdownToggle', 'profileDropdownToggle'];
+
+        function closeTopbarDropdown(exceptId = null) {
+            topbarDropdownIds.forEach(function(id) {
+                if (id === exceptId) return;
+                const toggle = document.getElementById(id);
+                if (!toggle) return;
+                const menuId = toggle.getAttribute('aria-controls');
+                const menu = menuId ? document.getElementById(menuId) : null;
+                menu?.classList.remove('show');
+                toggle.setAttribute('aria-expanded', 'false');
+            });
+        }
 
         topbarDropdownIds.forEach(function(id) {
             const toggle = document.getElementById(id);
             if (!toggle || toggle.dataset.rpDropdownBound === '1') return;
 
+            const menuId = toggle.getAttribute('aria-controls');
+            const menu = menuId ? document.getElementById(menuId) : null;
+            if (!menu) return;
+
             toggle.dataset.rpDropdownBound = '1';
 
-            if (window.bootstrap && bootstrap.Dropdown) {
-                const instance = bootstrap.Dropdown.getOrCreateInstance(toggle, {
-                    boundary: 'viewport',
-                    autoClose: id === 'notificationDropdownToggle' ? 'outside' : true
-                });
+            toggle.addEventListener('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
 
-                toggle.addEventListener('click', function(event) {
+                const willOpen = !menu.classList.contains('show');
+                closeTopbarDropdown(id);
+
+                menu.classList.toggle('show', willOpen);
+                toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+
+                if (willOpen) {
+                    const rect = toggle.getBoundingClientRect();
+                    menu.style.position = 'fixed';
+                    menu.style.top = (rect.bottom + 8) + 'px';
+                    menu.style.right = Math.max(12, window.innerWidth - rect.right) + 'px';
+                    menu.style.left = 'auto';
+                    menu.style.zIndex = '5000';
+                }
+            });
+
+            toggle.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    event.stopPropagation();
+                    toggle.click();
+                }
+            });
 
-                    // Close the other topbar dropdown first.
-                    topbarDropdownIds.forEach(function(otherId) {
-                        if (otherId === id) return;
-                        const otherToggle = document.getElementById(otherId);
-                        if (!otherToggle) return;
-                        const otherInstance = bootstrap.Dropdown.getInstance(otherToggle);
-                        if (otherInstance) otherInstance.hide();
-                    });
+            menu.addEventListener('click', function(event) {
+                event.stopPropagation();
+            });
+        });
 
-                    instance.toggle();
-                });
-            } else {
-                // Lightweight fallback if Bootstrap JS fails to initialize.
-                const menuId = toggle.getAttribute('aria-controls');
-                const menu = menuId ? document.getElementById(menuId) : null;
-
-                toggle.addEventListener('click', function(event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    if (!menu) return;
-
-                    const willOpen = !menu.classList.contains('show');
-                    document.querySelectorAll('.top-navbar .dropdown-menu.show').forEach(function(openMenu) {
-                        openMenu.classList.remove('show');
-                    });
-                    document.querySelectorAll('.top-navbar [aria-expanded="true"]').forEach(function(openToggle) {
-                        openToggle.setAttribute('aria-expanded', 'false');
-                    });
-
-                    menu.classList.toggle('show', willOpen);
-                    toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-                });
-            }
+        document.addEventListener('click', function() {
+            closeTopbarDropdown();
         });
 
         document.addEventListener('keydown', function(event) {
-            if (event.key !== 'Escape') return;
-            topbarDropdownIds.forEach(function(id) {
-                const toggle = document.getElementById(id);
-                if (!toggle) return;
-                if (window.bootstrap && bootstrap.Dropdown) {
-                    bootstrap.Dropdown.getInstance(toggle)?.hide();
-                } else {
-                    const menu = document.getElementById(toggle.getAttribute('aria-controls') || '');
-                    menu?.classList.remove('show');
-                    toggle.setAttribute('aria-expanded', 'false');
-                }
-            });
+            if (event.key === 'Escape') {
+                closeTopbarDropdown();
+            }
+        });
+
+        window.addEventListener('resize', function() {
+            closeTopbarDropdown();
         });
 
         const modals = document.querySelectorAll('.modal');
