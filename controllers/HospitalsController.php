@@ -317,9 +317,9 @@ class HospitalsController {
         $output = fopen('php://output', 'w');
         // ใส่ BOM สำหรับให้ Excel รองรับภาษาไทยสมบูรณ์
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
-        fputcsv($output, ['รหัสอ้างอิง (ID)', 'รหัสหน่วยบริการ (5 หลัก)', 'ชื่อหน่วยบริการ']);
-        fputcsv($output, ['h990', '09990', 'รพ.สต. ตัวอย่างที่ 1']);
-        fputcsv($output, ['h991', '09991', 'รพ.สต. ตัวอย่างที่ 2']);
+        fputcsv($output, ['รหัสอ้างอิง (ID)', 'รหัสหน่วยบริการ (5 หลัก)', 'รหัสหน่วยบริการ (9 หลัก)', 'ชื่อหน่วยบริการ']);
+        fputcsv($output, ['h990', '09990', '000009990', 'รพ.สต. ตัวอย่างที่ 1']);
+        fputcsv($output, ['h991', '09991', '000009991', 'รพ.สต. ตัวอย่างที่ 2']);
         fclose($output);
         exit;
     }
@@ -358,17 +358,25 @@ class HospitalsController {
                     $row_count++;
                     if ($row_count == 1) continue; // ข้ามแถว Header
                     
-                    if (empty($data[0]) && empty($data[1]) && empty($data[2])) continue;
+                    if (empty($data[0]) && empty($data[1]) && empty($data[2]) && empty($data[3])) continue;
 
                     $id = trim($data[0] ?? '');
                     $code = trim($data[1] ?? '');
-                    $name = trim($data[2] ?? '');
+                    $code9 = trim($data[2] ?? '');
+                    $name = trim($data[3] ?? '');
+
+                    if (!preg_match('/^\\d{5}$/', $code) || !preg_match('/^\\d{9}$/', $code9) || $name === '') {
+                        $error_count++;
+                        continue;
+                    }
 
                     if (!empty($name)) {
-                        // ป้องกันชื่อซ้ำก่อนนำเข้า
                         if (!$hospitalModel->checkNameExists($name)) {
-                            // เรียกใช้ addHospital แบบ Parameter แยก (รองรับโครงสร้างแบบเก่าของไฟล์ CSV)
-                            if ($hospitalModel->addHospital($name, $code)) {
+                            if ($hospitalModel->addHospital([
+                                'name' => $name,
+                                'hospital_code' => $code,
+                                'hospital_code9' => $code9,
+                            ])) {
                                 $success_count++;
                             } else {
                                 $error_count++;
