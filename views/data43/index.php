@@ -167,7 +167,7 @@ $is_admin = $is_admin ?? false;
                                     <th class="text-center">ชุดข้อมูล</th>
                                     <th class="text-center">สถานะ</th>
                                     <th>ผู้ส่ง / เวลา</th>
-                                    <th class="text-end">รายละเอียด</th>
+                                    <th class="text-end">จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -207,9 +207,23 @@ $is_admin = $is_admin ?? false;
                                             <div class="small text-muted"><?= htmlspecialchars($row['uploaded_at'], ENT_QUOTES, 'UTF-8') ?></div>
                                         </td>
                                         <td class="text-end">
-                                            <a href="index.php?c=data43&a=detail&id=<?= (int)$row['id'] ?>" class="rp-btn rp-btn--secondary rp-btn--sm">
-                                                <i class="bi bi-eye"></i> ดู
-                                            </a>
+                                            <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-wrap">
+                                                <a href="index.php?c=data43&a=detail&id=<?= (int)$row['id'] ?>" class="rp-btn rp-btn--secondary rp-btn--sm">
+                                                    <i class="bi bi-eye"></i> ดู
+                                                </a>
+                                                <?php if ($is_admin): ?>
+                                                    <form action="index.php?c=data43&a=delete_submission"
+                                                          method="POST"
+                                                          class="d-inline"
+                                                          onsubmit="return confirm('ยืนยันลบชุดข้อมูล #<?= (int)$row['id'] ?> ของ <?= htmlspecialchars(addslashes($row['hospital_name']), ENT_QUOTES, 'UTF-8') ?> รอบ <?= htmlspecialchars($row['report_month'], ENT_QUOTES, 'UTF-8') ?> ?\n\nการลบจะลบ metadata รายการไฟล์และข้อมูลวิเคราะห์เชิงพื้นที่ของ Submission นี้ด้วย และไม่สามารถย้อนกลับได้');">
+                                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="id" value="<?= (int)$row['id'] ?>">
+                                                        <button type="submit" class="rp-btn rp-btn--danger rp-btn--sm" title="ลบชุดข้อมูล">
+                                                            <i class="bi bi-trash3"></i> ลบ
+                                                        </button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
