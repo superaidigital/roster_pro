@@ -54,6 +54,9 @@ foreach ($trend as $t) {
             </p>
         </div>
         <div class="rp-page-header__actions">
+            <a href="index.php?c=data43&a=spatial&month=<?= urlencode($report_month) ?><?= $selected_hospital_id ? '&hospital_id='.(int)$selected_hospital_id : '' ?>" class="rp-btn rp-btn--secondary">
+                <i class="bi bi-geo-alt-fill"></i> วิเคราะห์เชิงพื้นที่
+            </a>
             <a href="index.php?c=data43&a=index<?= $selected_hospital_id ? '&hospital_id='.(int)$selected_hospital_id : '' ?>" class="rp-btn rp-btn--primary">
                 <i class="bi bi-cloud-arrow-up"></i> นำส่งข้อมูล
             </a>
