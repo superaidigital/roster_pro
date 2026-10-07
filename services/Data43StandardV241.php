@@ -130,10 +130,10 @@ final class Data43StandardV241
     public static function criticalHeaders(string $fileCode): array
     {
         return match ($fileCode) {
-            'PERSON' => ['HOSPCODE','PID','BIRTH','TYPEAREA','D_UPDATE'],
+            'PERSON' => ['HOSPCODE','PID','HID','BIRTH','DISCHARGE','TYPEAREA','D_UPDATE'],
             'ADDRESS' => ['HOSPCODE','PID','ADDRESSTYPE','VILLAGE','TAMBON','AMPUR','CHANGWAT','D_UPDATE'],
             'CHRONIC' => ['HOSPCODE','PID','DATE_DIAG','CHRONIC','TYPEDISCH','D_UPDATE'],
-            'HOME' => ['HOSPCODE','HID','TAMBON','AMPUR','CHANGWAT','D_UPDATE'],
+            'HOME' => ['HOSPCODE','HID','VILLAGE','TAMBON','AMPUR','CHANGWAT','D_UPDATE'],
             'VILLAGE' => ['HOSPCODE','VID','D_UPDATE'],
             'DISABILITY' => ['HOSPCODE','PID','DISABTYPE','DATE_DETECT','D_UPDATE'],
             'SERVICE' => ['HOSPCODE','PID','SEQ','DATE_SERV'],
