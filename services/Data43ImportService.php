@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/Data43StandardV241.php';
+require_once __DIR__ . '/Data43ValidationService.php';
 
 class Data43ImportService {
     private const MAX_ZIP_BYTES = 209715200; // 200 MB
@@ -159,11 +160,13 @@ class Data43ImportService {
             $missingExpected = array_values(array_diff($expectedCodes, $detectedExpected));
 
             $linkage = $this->buildSpatialLinkage($textFiles);
+            $qualityIssues = $this->inspectCoreQuality($textFiles, $linkage);
             $spatialMetrics = $this->buildSpatialMetrics($textFiles, $linkage);
 
             return [
                 'files' => $files,
                 'spatial_metrics' => $spatialMetrics,
+                'quality_issues' => $qualityIssues,
                 'quality_summary' => [
                     'standard_version' => Data43StandardV241::VERSION,
                     'profile_code' => Data43StandardV241::PROFILE,
@@ -179,6 +182,8 @@ class Data43ImportService {
                     'linked_homes' => count($linkage['homes']),
                     'unresolved_people' => (int)($linkage['unresolved_people'] ?? 0),
                     'address_only_people' => (int)($linkage['address_only_people'] ?? 0),
+                    'quality_issue_rules' => count($qualityIssues),
+                    'quality_issue_count' => array_sum(array_map(static fn(array $i): int => (int)($i['issue_count'] ?? 0), $qualityIssues)),
                 ],
             ];
         } finally {
