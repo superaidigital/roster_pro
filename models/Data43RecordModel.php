@@ -6,10 +6,13 @@ class Data43RecordModel
     public function schemaReady(): bool
     {
         try {
+            $stmt = $this->db->prepare(
+                "SELECT COUNT(*) FROM information_schema.tables
+                 WHERE table_schema = DATABASE() AND table_name = ?"
+            );
             foreach (['data43_records','data43_search_tokens','data43_record_audit'] as $table) {
-                $stmt = $this->db->prepare("SHOW TABLES LIKE ?");
                 $stmt->execute([$table]);
-                if (!$stmt->fetchColumn()) return false;
+                if ((int)$stmt->fetchColumn() !== 1) return false;
             }
             return true;
         } catch (Throwable $e) { return false; }
