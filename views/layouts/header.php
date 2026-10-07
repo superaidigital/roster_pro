@@ -694,7 +694,7 @@ $header_page_icon = $page_context[2];
         
         <!-- 🔔 Notification Dropdown -->
         <div class="dropdown">
-            <button class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="การแจ้งเตือน">
+            <button id="notificationDropdownToggle" class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-haspopup="true" aria-controls="notificationDropdownMenu" aria-label="การแจ้งเตือน">
                 <i class="bi bi-bell-fill fs-5"></i>
                 <?php if($unread_count > 0): ?>
                     <span class="notif-badge" id="notifBadge" style="display: block;" aria-live="polite" aria-label="<?= (int)$unread_count ?> รายการที่ยังไม่ได้อ่าน"><?= $unread_count > 99 ? '99+' : $unread_count ?></span>
@@ -703,7 +703,7 @@ $header_page_icon = $page_context[2];
                 <?php endif; ?>
             </button>
             
-            <div class="dropdown-menu dropdown-menu-end dropdown-menu-notif p-0 shadow border mt-2">
+            <div id="notificationDropdownMenu" class="dropdown-menu dropdown-menu-end dropdown-menu-notif p-0 shadow border mt-2" aria-labelledby="notificationDropdownToggle">
                 <div class="notif-header bg-light p-3 border-bottom d-flex justify-content-between align-items-center" style="border-radius: 1rem 1rem 0 0;">
                     <h6 class="mb-0 fw-bolder text-dark"><i class="bi bi-bell-fill text-primary me-2"></i> แจ้งเตือน</h6>
                     <a href="index.php?c=notification" class="text-decoration-none small fw-bold text-primary hover-shadow">ดูทั้งหมด</a>
@@ -778,15 +778,15 @@ $header_page_icon = $page_context[2];
 
         <!-- 👤 Profile Dropdown -->
         <div class="dropdown">
-            <a href="#" class="profile-pill" data-bs-toggle="dropdown" aria-expanded="false" aria-label="เมนูผู้ใช้ <?= htmlspecialchars($_SESSION['user']['name'] ?? '') ?>">
+            <button id="profileDropdownToggle" type="button" class="profile-pill border-0 bg-transparent" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true" aria-controls="profileDropdownMenu" aria-label="เมนูผู้ใช้ <?= htmlspecialchars($_SESSION['user']['name'] ?? '') ?>">
                 <div class="user-avatar"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></div>
                 <div class="d-none d-md-block text-start lh-1 pe-2">
                     <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
                     <div class="text-primary fw-bold" style="font-size: 11px;"><?= htmlspecialchars($_SESSION['user']['role']) ?></div>
                 </div>
                 <i class="bi bi-chevron-down d-none d-md-block text-muted me-2" style="font-size: 12px;"></i>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end shadow-sm border mt-2">
+            </button>
+            <ul id="profileDropdownMenu" class="dropdown-menu dropdown-menu-end shadow-sm border mt-2" aria-labelledby="profileDropdownToggle">
                 <li class="px-3 py-2 border-bottom mb-2 d-md-none bg-light">
                     <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
                     <div class="text-primary fw-bold" style="font-size: 11px;"><?= htmlspecialchars($_SESSION['user']['role']) ?></div>
@@ -853,6 +853,19 @@ $header_page_icon = $page_context[2];
     });
 
     document.addEventListener('DOMContentLoaded', function() {
+        // Explicitly initialize topbar dropdowns so they remain reliable
+        // even when other page scripts manipulate Bootstrap components.
+        if (window.bootstrap && bootstrap.Dropdown) {
+            ['notificationDropdownToggle', 'profileDropdownToggle'].forEach(function(id) {
+                const toggle = document.getElementById(id);
+                if (toggle) {
+                    bootstrap.Dropdown.getOrCreateInstance(toggle, {
+                        boundary: 'viewport'
+                    });
+                }
+            });
+        }
+
         const modals = document.querySelectorAll('.modal');
         modals.forEach(modal => { document.body.appendChild(modal); });
 
