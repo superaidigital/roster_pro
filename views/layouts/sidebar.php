@@ -919,11 +919,30 @@ if (!function_exists('renderSidebarMenu')) {
                 <?php endif; ?>
 
                 <?php if (in_array('data43', $allowed_controllers)): ?>
-                <li class="nav-item">
-                    <a class="nav-link <?= ($c == 'data43') ? 'active' : '' ?>" href="index.php?c=data43&a=index">
-                        <i class="bi bi-file-earmark-zip-fill text-warning"></i>
-                        <span class="sidebar-text">นำส่งข้อมูล 43 แฟ้ม</span>
+                <li class="nav-item sidebar-dropdown-container data43-dropdown-container">
+                    <a class="nav-link <?= ($c == 'data43') ? 'active' : 'collapsed' ?> d-flex justify-content-between align-items-center"
+                       data-bs-toggle="collapse" href="#data43Menu" role="button"
+                       aria-expanded="<?= ($c == 'data43') ? 'true' : 'false' ?>">
+                        <div>
+                            <i class="bi bi-file-earmark-zip-fill text-warning"></i>
+                            <span class="sidebar-text">ข้อมูล 43 แฟ้ม</span>
+                        </div>
+                        <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
                     </a>
+                    <div class="collapse <?= ($c == 'data43') ? 'show' : '' ?>" id="data43Menu">
+                        <ul class="sidebar-menu pb-0 mt-1 mb-2 p-0 position-relative" style="gap:2px;">
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'dashboard') ? 'active' : '' ?>" href="index.php?c=data43&a=dashboard">
+                                    แดชบอร์ด 43 แฟ้ม
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && in_array($a, ['index','detail'])) ? 'active' : '' ?>" href="index.php?c=data43&a=index">
+                                    นำส่งข้อมูล / ประวัติ
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </li>
                 <?php endif; ?>
 
