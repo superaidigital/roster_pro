@@ -368,7 +368,7 @@ class Data43SubmissionModel {
     }
 
     public function getLowestFileCoverage(string $reportMonth, ?int $hospitalId = null, int $limit = 10): array {
-        $limit = max(1, min($limit, 43));
+        $limit = max(1, min($limit, 52));
 
         $sql = "
             SELECT f.file_code,
@@ -662,7 +662,7 @@ class Data43SubmissionModel {
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return Data43PrivacyService::suppressRows($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
 
