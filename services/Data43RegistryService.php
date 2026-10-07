@@ -22,7 +22,15 @@ final class Data43RegistryService
 
     public function getHospitalDefaults(int $hospitalId): array
     {
-        $stmt=$this->db->prepare("SELECT hospital_code,hospital_code9 FROM hospitals WHERE id=? AND deleted_at IS NULL LIMIT 1");
+        $hasCode9=false;
+        try{
+            $column=$this->db->query("SHOW COLUMNS FROM hospitals LIKE 'hospital_code9'")->fetch(PDO::FETCH_ASSOC);
+            $hasCode9=(bool)$column;
+        }catch(Throwable $e){$hasCode9=false;}
+        $sql=$hasCode9
+            ? "SELECT hospital_code,hospital_code9 FROM hospitals WHERE id=? AND deleted_at IS NULL LIMIT 1"
+            : "SELECT hospital_code,NULL AS hospital_code9 FROM hospitals WHERE id=? AND deleted_at IS NULL LIMIT 1";
+        $stmt=$this->db->prepare($sql);
         $stmt->execute([$hospitalId]);
         $row=$stmt->fetch(PDO::FETCH_ASSOC) ?: [];
         return [
@@ -255,6 +263,27 @@ final class Data43RegistryService
 
         $this->model->addAudit(null,$hospitalId,$fileCode,'EXPORT',$userId,null,[]);
         return $path;
+    }
+
+    public function exportZip(int $hospitalId,int $userId,array $fileCodes,string $format,string $workDir): string
+    {
+        if(!class_exists('ZipArchive')) throw new RuntimeException('PHP Zip extension ยังไม่ได้เปิดใช้งาน');
+        if(!is_dir($workDir) && !mkdir($workDir,0750,true) && !is_dir($workDir)) throw new RuntimeException('สร้างพื้นที่ส่งออกไม่สำเร็จ');
+        $format=$format==='csv'?'csv':'txt';
+        $zipPath=$workDir.DIRECTORY_SEPARATOR.'DATA43_'.date('Ymd_His').'.zip';
+        $zip=new ZipArchive();
+        if($zip->open($zipPath,ZipArchive::CREATE|ZipArchive::OVERWRITE)!==true) throw new RuntimeException('สร้าง ZIP ไม่สำเร็จ');
+
+        try{
+            foreach($fileCodes as $fileCode){
+                if(!Data43FormRegistry::get($fileCode)) continue;
+                $path=$this->exportFile($hospitalId,$userId,$fileCode,$format,$workDir);
+                $zip->addFile($path,basename($path));
+            }
+        }finally{$zip->close();}
+
+        $this->model->addAudit(null,$hospitalId,'ALL','EXPORT',$userId,null,[]);
+        return $zipPath;
     }
 
     public function delete(int $hospitalId,int $userId,int $id): void
