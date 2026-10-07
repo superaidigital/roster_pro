@@ -616,30 +616,71 @@ class Data43Controller
     public function registry_export(): void
     {
         $this->requireAccess();
-        $hospitalId=$this->selectedHospitalId();
-        $fileCode=strtoupper(trim((string)($_GET['file'] ?? 'PERSON')));
-        $format=strtolower(trim((string)($_GET['format'] ?? 'txt')));
-        if(!in_array($format,['txt','csv','zip'],true)) $format='txt';
-        if(!$hospitalId){$_SESSION['error_msg']='กรุณาเลือกหน่วยบริการ';header('Location: index.php?c=data43&a=registry');exit;}
 
-        $workDir=dirname(__DIR__).DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'data43_export'.DIRECTORY_SEPARATOR.'job_'.bin2hex(random_bytes(8));
-        try{
-            $service=new Data43RegistryService((new Database())->getConnection());
-            if($format==='zip'){
-                $inner=strtolower(trim((string)($_GET['inner'] ?? 'txt')));
-                if(!in_array($inner,['txt','csv'],true))$inner='txt';
-                $path=$service->exportZip((int)$hospitalId,(int)$_SESSION['user']['id'],Data43FormRegistry::codes(),$inner,$workDir);
-                header('Content-Type: application/zip');
-                header('Content-Disposition: attachment; filename="DATA43_'.date('Ymd_His').'.zip"');
-            }else{
-                $path=$service->exportFile((int)$hospitalId,(int)$_SESSION['user']['id'],$fileCode,$format,$workDir);
-                header('Content-Type: '.($format==='csv'?'text/csv':'text/plain').'; charset=utf-8');
-                header('Content-Disposition: attachment; filename="'.$fileCode.'.'.$format.'"');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $_SESSION['error_msg'] = 'การส่งออกข้อมูลต้องยืนยันผ่านแบบฟอร์มที่ปลอดภัย';
+            header('Location: index.php?c=data43&a=registry');
+            exit;
+        }
+
+        try {
+            $this->verifyCsrf();
+            $hospitalId = $this->resolveUploadHospitalId();
+            $fileCode = strtoupper(trim((string)($_POST['file'] ?? 'PERSON')));
+            $format = strtolower(trim((string)($_POST['format'] ?? 'txt')));
+            if (!in_array($format, ['txt','csv','zip'], true)) $format = 'txt';
+
+            $workDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage'
+                . DIRECTORY_SEPARATOR . 'data43_export'
+                . DIRECTORY_SEPARATOR . 'job_' . bin2hex(random_bytes(8));
+
+            try {
+                $db = (new Database())->getConnection();
+                $service = new Data43RegistryService($db);
+
+                if ($format === 'zip') {
+                    $inner = strtolower(trim((string)($_POST['inner'] ?? 'txt')));
+                    if (!in_array($inner, ['txt','csv'], true)) $inner = 'txt';
+                    $path = $service->exportZip(
+                        $hospitalId,
+                        (int)$_SESSION['user']['id'],
+                        Data43FormRegistry::codes(),
+                        $inner,
+                        $workDir
+                    );
+                    header('Content-Type: application/zip');
+                    header('Content-Disposition: attachment; filename="DATA43_' . date('Ymd_His') . '.zip"');
+                } else {
+                    if (!Data43FormRegistry::get($fileCode)) {
+                        throw new RuntimeException('ไม่รู้จักแฟ้มที่ต้องการส่งออก');
+                    }
+                    $path = $service->exportFile(
+                        $hospitalId,
+                        (int)$_SESSION['user']['id'],
+                        $fileCode,
+                        $format,
+                        $workDir
+                    );
+                    header('Content-Type: ' . ($format === 'csv' ? 'text/csv' : 'text/plain') . '; charset=utf-8');
+                    header('Content-Disposition: attachment; filename="' . $fileCode . '.' . $format . '"');
+                }
+
+                header('X-Content-Type-Options: nosniff');
+                header('Cache-Control: no-store, private');
+                header('Content-Length: ' . filesize($path));
+                readfile($path);
+            } finally {
+                Data43ImportService::recursiveDelete($workDir);
             }
-            header('Content-Length: '.filesize($path));
-            readfile($path);
-        }finally{
-            Data43ImportService::recursiveDelete($workDir);
+        } catch (Throwable $e) {
+            error_log('Data43 export error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = $e->getMessage();
+            $query = '';
+            if (in_array($this->role(), self::ADMIN_ROLES, true) && !empty($_POST['hospital_id'])) {
+                $query = '&hospital_id=' . (int)$_POST['hospital_id'];
+            }
+            header('Location: index.php?c=data43&a=registry' . $query);
         }
         exit;
     }
