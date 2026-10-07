@@ -298,18 +298,23 @@ class Data43Controller
                     ? hash_hmac('sha256', $clientIp, session_id())
                     : null;
 
+                $quality = $inspection['quality_summary'] ?? [];
+                $expectedFiles = max(1, (int)($quality['expected_files'] ?? 45));
+                $detectedExpected = max(0, (int)($quality['detected_expected_files'] ?? 0));
+
                 $submissionId = $model->createSubmission([
                     'hospital_id' => $hospitalId,
                     'report_month' => $reportMonth,
                     'original_filename' => mb_substr($originalFilename, 0, 180, 'UTF-8'),
                     'archive_sha256' => $inspection['archive_sha256'],
                     'purpose_code' => 'PUBLIC_HEALTH_REPORTING',
-                    'expected_files' => 43,
+                    'standard_version' => (string)($quality['standard_version'] ?? '2.4.1'),
+                    'profile_code' => (string)($quality['profile_code'] ?? 'RPHST_V241'),
+                    'expected_files' => $expectedFiles,
                     'uploaded_by' => (int)$_SESSION['user']['id'],
                     'client_ip_hash' => $ipHash,
                 ]);
 
-                $uniqueCodes = [];
                 $totalRows = 0;
                 $validFiles = 0;
 
@@ -318,7 +323,6 @@ class Data43Controller
 
                     if (($file['status'] ?? '') === 'VALID') {
                         $validFiles++;
-                        $uniqueCodes[(string)$file['file_code']] = true;
                         if ($file['row_count'] !== null) {
                             $totalRows += (int)$file['row_count'];
                         }
@@ -340,11 +344,24 @@ class Data43Controller
                     }
                 }
 
-                $detected = count($uniqueCodes);
-                $status = $detected >= 43 ? 'COMPLETE' : 'INCOMPLETE';
-                $errorSummary = $status === 'INCOMPLETE'
-                    ? "ตรวจพบ {$detected} ชุดข้อมูล จากที่คาดหวัง 43 ชุด"
-                    : null;
+                $detected = $detectedExpected;
+                $missingCodes = array_values((array)($quality['missing_expected_codes'] ?? []));
+                $headerIssues = (array)($quality['header_issues'] ?? []);
+                $status = ($detected >= $expectedFiles && empty($headerIssues)) ? 'COMPLETE' : 'INCOMPLETE';
+
+                $summaryParts = [];
+                if ($detected < $expectedFiles) {
+                    $summaryParts[] = "ตรวจพบ {$detected}/{$expectedFiles} โครงสร้างสำหรับ รพ.สต.";
+                }
+                if (!empty($missingCodes)) {
+                    $preview = implode(', ', array_slice($missingCodes, 0, 8));
+                    $more = count($missingCodes) > 8 ? ' +' . (count($missingCodes) - 8) . ' แฟ้ม' : '';
+                    $summaryParts[] = 'ขาด: ' . $preview . $more;
+                }
+                if (!empty($headerIssues)) {
+                    $summaryParts[] = 'พบปัญหาโครงสร้างคอลัมน์ ' . count($headerIssues) . ' แฟ้ม';
+                }
+                $errorSummary = $summaryParts ? mb_substr(implode(' | ', $summaryParts), 0, 500, 'UTF-8') : null;
 
                 $model->finishSubmission(
                     $submissionId,
@@ -358,12 +375,12 @@ class Data43Controller
                     $db,
                     $_SESSION['user']['id'],
                     LogsController::ACTION_CREATE,
-                    "นำส่งข้อมูล 43 แฟ้ม Submission #{$submissionId}, Hospital #{$hospitalId}, รอบ {$reportMonth}, ตรวจพบ {$detected} ชุด"
+                    "นำส่งข้อมูลมาตรฐานสุขภาพ v2.4.1 Submission #{$submissionId}, Hospital #{$hospitalId}, รอบ {$reportMonth}, ตรวจพบ {$detected}/{$expectedFiles} โครงสร้าง รพ.สต."
                 );
 
                 $_SESSION['success_msg'] = $status === 'COMPLETE'
-                    ? "นำส่งข้อมูลสำเร็จ ตรวจพบครบ {$detected} ชุดข้อมูล"
-                    : "รับไฟล์เรียบร้อย แต่ตรวจพบ {$detected} จาก 43 ชุด กรุณาตรวจสอบรายละเอียด";
+                    ? "นำส่งข้อมูลสำเร็จ ตรวจพบครบ {$detected}/{$expectedFiles} โครงสร้างตาม Profile รพ.สต. Version 2.4.1"
+                    : "รับไฟล์เรียบร้อย ตรวจพบ {$detected}/{$expectedFiles} โครงสร้างตาม Profile รพ.สต. กรุณาตรวจสอบแฟ้มที่ขาด/คอลัมน์สำคัญ";
 
             } catch (Throwable $e) {
                 if ($submissionId) {
