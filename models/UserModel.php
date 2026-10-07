@@ -145,8 +145,9 @@ class UserModel {
     // ดึงรายชื่อคนที่จะจัดเวร (ใช้งานเฉพาะคนที่ show_in_roster = 1)
     public function getActiveStaffForSchedule($hospital_id = null) {
         $query = "SELECT * FROM " . $this->table_name . " 
-                  WHERE is_active = 1 
-                  AND deleted_at IS NULL 
+                  WHERE is_active = 1
+                  AND deleted_at IS NULL
+                  AND UPPER(COALESCE(role, 'STAFF')) NOT IN ('SUPERADMIN', 'ADMIN', 'HR')
                   AND (show_in_roster = 1 OR show_in_roster IS NULL) ";
                   
         if ($hospital_id !== null) {
