@@ -774,3 +774,25 @@ body.rp-roster-focus-mode main.rp-main-content {
 body.rp-roster-focus-mode .pwa-toast {
     display: none !important;
 }
+
+
+/* Fullscreen action controls must stay above every roster layer. */
+.rp-roster-workspace.is-fullscreen .rp-roster-focusbar {
+    position: relative !important;
+    z-index: 7100 !important;
+    pointer-events: auto !important;
+}
+
+.rp-roster-workspace.is-fullscreen .rp-roster-focusbar__actions,
+.rp-roster-workspace.is-fullscreen .rp-roster-focusbar__actions *,
+.rp-roster-workspace.is-fullscreen #rosterFullscreenExit,
+.rp-roster-workspace.is-fullscreen #rosterStaffPanelToggle {
+    position: relative;
+    z-index: 7101 !important;
+    pointer-events: auto !important;
+}
+
+.rp-roster-workspace.is-fullscreen .rp-roster-board {
+    position: relative;
+    z-index: 1;
+}
