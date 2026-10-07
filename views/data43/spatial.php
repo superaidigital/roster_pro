@@ -340,7 +340,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                     <?php foreach (array_slice($rankRows,0,15) as $row):
                         $count = (int)($row['metric_value'] ?? 0);
                         $value = $display_mode === 'rate' ? (float)($row['display_value'] ?? 0) : (float)$count;
-                        $pct = $count >= 5 ? min(100,($value/$maxRank)*100) : 0;
+                        $pct = empty($row['privacy_suppressed']) ? min(100,($value/$maxRank)*100) : 0;
                     ?>
                     <div class="data43-rank-row">
                         <div class="fw-bold small"><?= htmlspecialchars(data43_area_label($row,$area_level),ENT_QUOTES,'UTF-8') ?></div>
@@ -375,7 +375,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                     <?php foreach (array_slice($hospital_coverage,0,15) as $row): ?>
                         <div class="d-flex justify-content-between gap-2 mb-2">
                             <span class="text-truncate"><?= htmlspecialchars($row['hospital_name'],ENT_QUOTES,'UTF-8') ?></span>
-                            <strong><?= data43_privacy_count((int)$row['metric_value']) ?></strong>
+                            <strong><?= data43_privacy_count((int)$row['metric_value'], !empty($row['privacy_suppressed'])) ?></strong>
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -387,7 +387,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
         <div class="rp-card__header">
             <div>
                 <h2 class="rp-card__title mb-1">รายละเอียดตามพื้นที่</h2>
-                <div class="small text-muted">จำนวน ประชากรฐาน และอัตราต่อ 1,000 คน</div>
+                <div class="small text-muted">จำนวน ประชากรฐาน และ<?= $display_mode === 'rate' ? ' '.$metric_unit : 'ค่าตัวชี้วัด' ?></div>
             </div>
         </div>
         <div class="rp-card__body p-0">
@@ -398,7 +398,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                             <th>รหัสพื้นที่</th>
                             <th class="text-end">จำนวน</th>
                             <th class="text-end">ประชากรฐาน</th>
-                            <th class="text-end">อัตรา / 1,000</th>
+                            <th class="text-end"><?= htmlspecialchars($metric_unit ?: 'ค่าตัวชี้วัด',ENT_QUOTES,'UTF-8') ?></th>
                             <th class="text-center">รพ.สต.</th>
                             <th class="text-center">แหล่งแฟ้ม</th>
                         </tr>
@@ -412,7 +412,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                             <td class="text-end fw-bold"><?= data43_privacy_count($count, !empty($row['privacy_suppressed'])) ?></td>
                             <td class="text-end"><?= number_format((int)($row['population_value'] ?? 0)) ?></td>
                             <td class="text-end">
-                                <?= !empty($row['privacy_suppressed']) ? '&lt;5 / ปกปิด' : ($row['display_value'] !== null ? number_format((float)$row['display_value'],2) : '–') ?>
+                                <?= !empty($row['privacy_suppressed']) ? 'ปกปิด' : ($row['display_value'] !== null ? number_format((float)$row['display_value'],2) : '–') ?>
                             </td>
                             <td class="text-center"><?= (int)($row['hospital_count'] ?? 0) ?></td>
                             <td class="text-center"><?= (int)($row['source_file_count'] ?? 0) ?></td>
