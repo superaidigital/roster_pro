@@ -6,6 +6,7 @@ require_once 'services/Data43MetricRegistry.php';
 require_once 'services/Data43RegistryService.php';
 require_once 'services/Data43FormRegistry.php';
 require_once 'services/Data43SystemHealthService.php';
+require_once 'services/Data43StorageService.php';
 require_once 'controllers/LogsController.php';
 
 class Data43Controller
@@ -285,13 +286,7 @@ class Data43Controller
                 throw new RuntimeException('กรุณาเลือกไฟล์ ZIP');
             }
 
-            $workRoot = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'data43_temp';
-            if (!is_dir($workRoot) && !mkdir($workRoot, 0750, true) && !is_dir($workRoot)) {
-                throw new RuntimeException('ไม่สามารถสร้างพื้นที่ประมวลผลชั่วคราวได้');
-            }
-
-            $workDir = $workRoot . DIRECTORY_SEPARATOR
-                . 'job_' . date('Ymd_His') . '_' . bin2hex(random_bytes(8));
+            $workDir = Data43StorageService::createJobDirectory('import');
 
             $service = new Data43ImportService();
             $submissionId = null;
@@ -427,7 +422,7 @@ class Data43Controller
                 }
                 throw $e;
             } finally {
-                Data43ImportService::recursiveDelete($workDir);
+                Data43StorageService::recursiveDelete($workDir);
             }
 
         } catch (Throwable $e) {
@@ -631,9 +626,7 @@ class Data43Controller
             $format = strtolower(trim((string)($_POST['format'] ?? 'txt')));
             if (!in_array($format, ['txt','csv','zip'], true)) $format = 'txt';
 
-            $workDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage'
-                . DIRECTORY_SEPARATOR . 'data43_export'
-                . DIRECTORY_SEPARATOR . 'job_' . bin2hex(random_bytes(8));
+            $workDir = Data43StorageService::createJobDirectory('export');
 
             try {
                 $db = (new Database())->getConnection();
@@ -671,7 +664,7 @@ class Data43Controller
                 header('Content-Length: ' . filesize($path));
                 readfile($path);
             } finally {
-                Data43ImportService::recursiveDelete($workDir);
+                Data43StorageService::recursiveDelete($workDir);
             }
         } catch (Throwable $e) {
             error_log('Data43 export error: ' . $e->getMessage());
