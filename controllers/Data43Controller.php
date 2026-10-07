@@ -127,6 +127,112 @@ class Data43Controller
         echo "</main></div></body></html>";
     }
 
+    public function dashboard(): void
+    {
+        $this->requireAccess();
+
+        $db = (new Database())->getConnection();
+        $model = new Data43SubmissionModel($db);
+
+        $schema_ready = $model->schemaReady();
+        $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
+        $selected_hospital_id = $this->selectedHospitalId();
+        $report_month = trim((string)($_GET['month'] ?? date('Y-m')));
+
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
+            $report_month = date('Y-m');
+        }
+
+        $hospitals = [];
+        if ($is_admin) {
+            $stmt = $db->query("
+                SELECT id, hospital_code, name
+                FROM hospitals
+                WHERE is_active = 1
+                  AND deleted_at IS NULL
+                  AND COALESCE(hospital_code, '') <> '0'
+                ORDER BY name ASC
+            ");
+            $hospitals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $scopeHospitalId = $is_admin ? $selected_hospital_id : $selected_hospital_id;
+
+        $tracking = $schema_ready
+            ? $model->getHospitalTracking($report_month, $scopeHospitalId)
+            : [];
+        $latest_rows = $schema_ready
+            ? $model->getLatestStatusRows($report_month, $scopeHospitalId)
+            : [];
+        $trend = $schema_ready
+            ? $model->getTrend($scopeHospitalId, 12)
+            : [];
+        $low_coverage = $schema_ready
+            ? $model->getLowestFileCoverage($report_month, $scopeHospitalId, 10)
+            : [];
+        $attempts = $schema_ready
+            ? $model->getMonthSubmissionAttempts($report_month, $scopeHospitalId)
+            : 0;
+
+        $total_hospitals = $schema_ready
+            ? $model->getActiveHospitalCount($scopeHospitalId)
+            : 0;
+
+        $dashboard = [
+            'total_hospitals' => $total_hospitals,
+            'submitted' => 0,
+            'not_submitted' => 0,
+            'complete' => 0,
+            'incomplete' => 0,
+            'failed' => 0,
+            'processing' => 0,
+            'submission_rate' => 0.0,
+            'completeness_rate' => 0.0,
+            'total_rows' => 0,
+            'attempts' => $attempts,
+        ];
+
+        $detectedSum = 0;
+        $expectedSum = 0;
+
+        foreach ($tracking as $row) {
+            if (empty($row['submission_id'])) {
+                $dashboard['not_submitted']++;
+                continue;
+            }
+
+            $dashboard['submitted']++;
+            $status = (string)($row['status'] ?? '');
+            if ($status === 'COMPLETE') $dashboard['complete']++;
+            elseif ($status === 'INCOMPLETE') $dashboard['incomplete']++;
+            elseif ($status === 'FAILED') $dashboard['failed']++;
+            elseif ($status === 'PROCESSING') $dashboard['processing']++;
+
+            $detectedSum += (int)($row['detected_files'] ?? 0);
+            $expectedSum += max(0, (int)($row['expected_files'] ?? 0));
+            $dashboard['total_rows'] += (int)($row['total_rows'] ?? 0);
+        }
+
+        if ($dashboard['total_hospitals'] > 0) {
+            $dashboard['submission_rate'] = round(
+                ($dashboard['submitted'] / $dashboard['total_hospitals']) * 100,
+                1
+            );
+        }
+
+        if ($expectedSum > 0) {
+            $dashboard['completeness_rate'] = round(
+                ($detectedSum / $expectedSum) * 100,
+                1
+            );
+        }
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/dashboard.php';
+        echo "</main></div></body></html>";
+    }
+
     public function upload(): void
     {
         $this->requireAccess();
