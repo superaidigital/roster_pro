@@ -68,7 +68,7 @@ function render(fileCode,data){
    }
  });
  bindTypeahead();
- if(fileCode==='HOME') addGpsButton();
+ if(['HOME','VILLAGE'].includes(fileCode)) addGpsButton();
  if(prefillPid && ['ADDRESS','CHRONIC','DEATH'].includes(fileCode) && !data.PID){
    const h=fieldsEl.querySelector('[data-search-value][data-name="PID"]');
    const d=fieldsEl.querySelector('[data-search-display][data-name="PID"]');
