@@ -683,3 +683,89 @@ body.rp-roster-focus-mode main.rp-main-content {
     min-height: 0;
     overflow-y: auto;
 }
+
+
+/* Compact focus-mode details and adaptive staff drawer */
+.rp-roster-workspace.is-fullscreen .rp-roster-dropzone td {
+    height: 64px !important;
+    padding: .45rem .75rem !important;
+}
+
+.rp-roster-workspace.is-fullscreen .rp-roster-dropzone td > i {
+    display: inline-block !important;
+    margin: 0 .35rem 0 0 !important;
+    font-size: 1rem !important;
+    vertical-align: middle;
+}
+
+.rp-roster-workspace.is-fullscreen .rp-roster-dropzone td > .fw-bold {
+    font-size: .76rem !important;
+}
+
+.rp-roster-workspace.is-fullscreen .rp-roster-dropzone td > .text-muted {
+    display: none !important;
+}
+
+@media (max-width: 1179.98px) {
+    .rp-roster-workspace.is-fullscreen {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .rp-roster-workspace.is-fullscreen .rp-roster-board {
+        grid-column: 1 !important;
+    }
+
+    .rp-roster-workspace.is-fullscreen .rp-staff-panel {
+        position: fixed !important;
+        top: 74px !important;
+        right: 12px !important;
+        bottom: 12px !important;
+        left: auto !important;
+        z-index: 7050 !important;
+        width: min(330px, calc(100vw - 24px)) !important;
+        height: auto !important;
+        border-radius: 1rem;
+        box-shadow: 0 20px 50px rgba(15,23,42,.22);
+    }
+
+    .rp-roster-workspace.is-fullscreen .rp-roster-person-head,
+    .rp-roster-workspace.is-fullscreen .rp-roster-person-cell {
+        min-width: 210px !important;
+        width: 210px !important;
+    }
+
+    .rp-roster-workspace.is-fullscreen .rp-roster-date,
+    .rp-roster-workspace.is-fullscreen .rp-roster-cell {
+        min-width: 42px !important;
+        width: 42px !important;
+    }
+
+    .rp-roster-workspace.is-fullscreen .rp-roster-table {
+        min-width: max(1060px, calc(210px + (var(--rp-roster-days, 31) * 42px))) !important;
+    }
+}
+
+@media (max-width: 760px) {
+    .rp-roster-workspace.is-fullscreen {
+        padding: .45rem !important;
+        gap: .45rem !important;
+    }
+
+    .rp-roster-workspace.is-fullscreen .rp-roster-focusbar {
+        min-height: 52px;
+        padding: .5rem .65rem;
+    }
+
+    .rp-roster-focusbar__meta {
+        display: none;
+    }
+
+    .rp-roster-focusbar__actions {
+        gap: .3rem;
+    }
+
+    .rp-roster-workspace.is-fullscreen .rp-roster-table-wrap {
+        height: calc(100dvh - 68px) !important;
+        max-height: calc(100dvh - 68px) !important;
+    }
+}
