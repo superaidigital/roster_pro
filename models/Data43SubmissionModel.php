@@ -101,12 +101,14 @@ class Data43SubmissionModel {
                 (submission_id, standard_version, profile_code, catalog_count,
                  expected_files, detected_expected_files, linked_people, linked_homes,
                  unresolved_people, address_only_people, unknown_files_count,
-                 header_issue_files, missing_codes_json, unknown_files_json, header_issues_json)
+                 header_issue_files, invalid_expected_files,
+                 missing_codes_json, invalid_expected_codes_json, unknown_files_json, header_issues_json)
             VALUES
                 (:submission_id, :standard_version, :profile_code, :catalog_count,
                  :expected_files, :detected_expected_files, :linked_people, :linked_homes,
                  :unresolved_people, :address_only_people, :unknown_files_count,
-                 :header_issue_files, :missing_codes_json, :unknown_files_json, :header_issues_json)
+                 :header_issue_files, :invalid_expected_files,
+                 :missing_codes_json, :invalid_expected_codes_json, :unknown_files_json, :header_issues_json)
             ON DUPLICATE KEY UPDATE
                 standard_version = VALUES(standard_version),
                 profile_code = VALUES(profile_code),
@@ -119,7 +121,9 @@ class Data43SubmissionModel {
                 address_only_people = VALUES(address_only_people),
                 unknown_files_count = VALUES(unknown_files_count),
                 header_issue_files = VALUES(header_issue_files),
+                invalid_expected_files = VALUES(invalid_expected_files),
                 missing_codes_json = VALUES(missing_codes_json),
+                invalid_expected_codes_json = VALUES(invalid_expected_codes_json),
                 unknown_files_json = VALUES(unknown_files_json),
                 header_issues_json = VALUES(header_issues_json)
         ");
@@ -136,7 +140,9 @@ class Data43SubmissionModel {
             ':address_only_people' => (int)($summary['address_only_people'] ?? 0),
             ':unknown_files_count' => count((array)($summary['unknown_files'] ?? [])),
             ':header_issue_files' => count((array)($summary['header_issues'] ?? [])),
+            ':invalid_expected_files' => count((array)($summary['invalid_expected_codes'] ?? [])),
             ':missing_codes_json' => json_encode(array_values((array)($summary['missing_expected_codes'] ?? [])), JSON_UNESCAPED_UNICODE),
+            ':invalid_expected_codes_json' => json_encode(array_values((array)($summary['invalid_expected_codes'] ?? [])), JSON_UNESCAPED_UNICODE),
             ':unknown_files_json' => json_encode(array_values((array)($summary['unknown_files'] ?? [])), JSON_UNESCAPED_UNICODE),
             ':header_issues_json' => json_encode((array)($summary['header_issues'] ?? []), JSON_UNESCAPED_UNICODE),
         ]);
@@ -149,7 +155,7 @@ class Data43SubmissionModel {
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) return null;
 
-        foreach (['missing_codes_json','unknown_files_json','header_issues_json'] as $key) {
+        foreach (['missing_codes_json','invalid_expected_codes_json','unknown_files_json','header_issues_json'] as $key) {
             $row[$key] = json_decode((string)($row[$key] ?? '[]'), true) ?: [];
         }
         return $row;
