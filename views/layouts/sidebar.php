@@ -59,19 +59,24 @@ try {
     // Fallback: หากตารางระบบเมนูมีปัญหา ให้โหลดสิทธิ์พื้นฐาน
     error_log("Sidebar Menu Query Error: " . $e->getMessage());
     if (in_array($role, ['SUPERADMIN', 'ADMIN'])) {
-        $allowed_controllers = ['roster', 'report', 'leave', 'staff', 'users', 'settings', 'logs', 'hospitals', 'hr'];
+        $allowed_controllers = ['roster', 'report', 'leave', 'data43', 'staff', 'users', 'settings', 'logs', 'hospitals', 'hr'];
     } else if ($role === 'HR') {
         $allowed_controllers = ['staff', 'users', 'hr'];
     } else if ($role === 'DIRECTOR') {
-        $allowed_controllers = ['roster', 'report', 'leave', 'staff', 'settings', 'hr'];
+        $allowed_controllers = ['roster', 'report', 'leave', 'data43', 'staff', 'settings', 'hr'];
     } else if ($role === 'SCHEDULER') {
-        $allowed_controllers = ['roster', 'report', 'leave', 'staff'];
+        $allowed_controllers = ['roster', 'report', 'leave', 'data43', 'staff'];
     } else {
-        $allowed_controllers = ['roster', 'leave'];
+        $allowed_controllers = ['roster', 'leave', 'data43'];
     }
 }
 
 $allowed_controllers = array_unique($allowed_controllers);
+
+// โมดูลนำส่งข้อมูล 43 แฟ้ม: ใช้ได้กับทุกบทบาทปฏิบัติงาน ยกเว้น HR
+if ($role !== 'HR') {
+    $allowed_controllers[] = 'data43';
+}
 
 // 🌟 HARDCODE OVERRIDE: จัดการสิทธิ์ HR ให้แน่ชัด
 if ($role === 'HR') {
@@ -894,7 +899,7 @@ if (!function_exists('renderSidebarMenu')) {
             <?php endif; ?>
 
             <!-- 🌟 หมวดหมู่: การปฏิบัติงาน -->
-            <?php if (in_array('roster', $allowed_controllers) || in_array('report', $allowed_controllers) || in_array('leave', $allowed_controllers)): ?>
+            <?php if (in_array('roster', $allowed_controllers) || in_array('report', $allowed_controllers) || in_array('leave', $allowed_controllers) || in_array('data43', $allowed_controllers)): ?>
             <li class="sidebar-heading <?= $role === 'HR' ? '' : 'mt-2' ?>">การปฏิบัติงาน</li>
             
                 <?php if (in_array('roster', $allowed_controllers)): ?>
@@ -909,6 +914,15 @@ if (!function_exists('renderSidebarMenu')) {
                 <li class="nav-item">
                     <a class="nav-link <?= ($c == 'report' && $a == 'overview') ? 'active' : '' ?>" href="index.php?c=report&a=overview">
                         <i class="bi bi-bar-chart-line-fill text-success"></i> <span class="sidebar-text">ติดตามการส่งเวร</span>
+                    </a>
+                </li>
+                <?php endif; ?>
+
+                <?php if (in_array('data43', $allowed_controllers)): ?>
+                <li class="nav-item">
+                    <a class="nav-link <?= ($c == 'data43') ? 'active' : '' ?>" href="index.php?c=data43&a=index">
+                        <i class="bi bi-file-earmark-zip-fill text-warning"></i>
+                        <span class="sidebar-text">นำส่งข้อมูล 43 แฟ้ม</span>
                     </a>
                 </li>
                 <?php endif; ?>
