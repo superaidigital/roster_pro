@@ -1029,9 +1029,12 @@ function setRosterFocusMode(enabled) {
         }
     }
 
-    // Keep the edited table area visible after the layout changes.
+    // Keep the editable table area stable after the layout changes.
     requestAnimationFrame(() => {
-        document.getElementById('rosterTable')?.focus({ preventScroll: true });
+        const tableWrap = workspace.querySelector('.rp-roster-table-wrap');
+        if (tableWrap) {
+            tableWrap.scrollTop = Math.max(0, tableWrap.scrollTop);
+        }
     });
 }
 
