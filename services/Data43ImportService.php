@@ -81,6 +81,7 @@ class Data43ImportService {
             $detectedCodes = [];
             $unknownFiles = [];
             $headerIssues = [];
+            $invalidExpectedCodes = [];
 
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $stat = $zip->statIndex($i, ZipArchive::FL_UNCHANGED);
@@ -126,6 +127,7 @@ class Data43ImportService {
 
                 if ($canonical) {
                     $detectedCodes[$canonical] = true;
+                    if ($status === 'ERROR') $invalidExpectedCodes[$canonical] = true;
                 } else {
                     $unknownFiles[] = basename($name);
                 }
@@ -172,6 +174,7 @@ class Data43ImportService {
                     'missing_expected_codes' => $missingExpected,
                     'unknown_files' => $unknownFiles,
                     'header_issues' => $headerIssues,
+                    'invalid_expected_codes' => array_keys($invalidExpectedCodes),
                     'linked_people' => count($linkage['people']),
                     'linked_homes' => count($linkage['homes']),
                     'unresolved_people' => (int)($linkage['unresolved_people'] ?? 0),
