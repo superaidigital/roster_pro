@@ -33,9 +33,18 @@ final class Data43RegistryService
         $stmt=$this->db->prepare($sql);
         $stmt->execute([$hospitalId]);
         $row=$stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $hospcode=trim((string)($row['hospital_code'] ?? ''));
+        if($hospcode!=='' && ctype_digit($hospcode)) {
+            $hospcode=str_pad($hospcode,5,'0',STR_PAD_LEFT);
+        }
+        $hospcode9=trim((string)($row['hospital_code9'] ?? ''));
+        if($hospcode9!=='' && ctype_digit($hospcode9)) {
+            $hospcode9=str_pad($hospcode9,9,'0',STR_PAD_LEFT);
+        }
+
         return [
-            'HOSPCODE'=>trim((string)($row['hospital_code'] ?? '')),
-            'HOSPCODE9'=>trim((string)($row['hospital_code9'] ?? '')),
+            'HOSPCODE'=>$hospcode,
+            'HOSPCODE9'=>$hospcode9,
         ];
     }
 
@@ -90,6 +99,7 @@ final class Data43RegistryService
         }
 
         $errors=Data43ValidationService::validateRecord($fileCode,$data);
+        $errors=array_merge($errors,Data43ValidationService::validateSchemaFields($schema,$data));
         foreach($schema['fields'] as $field){
             if(!empty($field['required']) && trim((string)($data[$field['name']] ?? ''))===''){
                 $errors[$field['name']]='กรุณากรอกข้อมูล';
