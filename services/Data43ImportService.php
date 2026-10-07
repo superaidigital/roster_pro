@@ -191,6 +191,164 @@ class Data43ImportService {
         }
     }
 
+    private function inspectCoreQuality(array $textFiles, array $linkage): array {
+        $issues = [];
+        $pkSeen = [];
+        $cidSeen = [];
+
+        foreach ($textFiles as $fileCode => $_parts) {
+            $pkHeaders = Data43StandardV241::primaryKeyHeaders($fileCode);
+
+            foreach ($this->fileParts($textFiles, $fileCode) as $part) {
+                $delimiter = $this->detectDelimiter($part['path']);
+                $fh = fopen($part['path'], 'rb');
+                if (!$fh) continue;
+
+                try {
+                    $header = fgetcsv($fh, 0, $delimiter, '"', '\\');
+                    if (!is_array($header) || !$header) continue;
+
+                    $h = $this->headerMap($header);
+                    $rowNumber = 1;
+
+                    while (($row = fgetcsv($fh, 0, $delimiter, '"', '\\')) !== false) {
+                        $rowNumber++;
+                        if (!is_array($row) || $row === [null]) continue;
+
+                        if ($pkHeaders) {
+                            $keyParts = [];
+                            $complete = true;
+                            foreach ($pkHeaders as $name) {
+                                $idx = $this->findHeaderIndex($h, [$name]);
+                                $value = $this->stringValue($row, $idx);
+                                if ($value === null) {
+                                    $complete = false;
+                                    break;
+                                }
+                                $keyParts[] = strtoupper($value);
+                            }
+                            if ($complete) {
+                                $hash = hash('sha256', $fileCode . '|' . implode('|', $keyParts));
+                                if (isset($pkSeen[$fileCode][$hash])) {
+                                    $this->addQualityIssue($issues, $fileCode, 'ERROR', 'DUPLICATE_PK', null, $rowNumber);
+                                } else {
+                                    $pkSeen[$fileCode][$hash] = true;
+                                }
+                            }
+                        }
+
+                        if ($fileCode === 'PERSON') {
+                            $cid = $this->stringValue($row, $this->findHeaderIndex($h, ['CID']));
+                            if ($cid !== null) {
+                                $digits = preg_replace('/\D/', '', $cid);
+                                if (!Data43ValidationService::validateCid($digits)) {
+                                    $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_CID', 'CID', $rowNumber);
+                                } elseif (isset($cidSeen[$digits])) {
+                                    $this->addQualityIssue($issues, $fileCode, 'ERROR', 'DUPLICATE_CID', 'CID', $rowNumber);
+                                } else {
+                                    $cidSeen[$digits] = true;
+                                }
+                            }
+
+                            $hid = $this->stringValue($row, $this->findHeaderIndex($h, ['HID']));
+                            if ($hid !== null && !isset($linkage['homes'][$hid])) {
+                                $this->addQualityIssue($issues, $fileCode, 'WARNING', 'ORPHAN_HID', 'HID', $rowNumber);
+                            }
+
+                            $discharge = $this->stringValue($row, $this->findHeaderIndex($h, ['DISCHARGE']));
+                            $ddischarge = $this->stringValue($row, $this->findHeaderIndex($h, ['DDISCHARGE']));
+                            if (in_array((string)$discharge, ['1','2','3'], true) && empty($ddischarge)) {
+                                $this->addQualityIssue($issues, $fileCode, 'ERROR', 'MISSING_DDISCHARGE', 'DDISCHARGE', $rowNumber);
+                            }
+
+                            foreach (['BIRTH','DDISCHARGE'] as $field) {
+                                $value = $this->stringValue($row, $this->findHeaderIndex($h, [$field]));
+                                if ($value !== null && !Data43ValidationService::validateDate8($value)) {
+                                    $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_DATE', $field, $rowNumber);
+                                }
+                            }
+                        }
+
+                        if ($fileCode === 'CHRONIC') {
+                            $diag = $this->stringValue($row, $this->findHeaderIndex($h, ['CHRONIC']));
+                            if ($diag !== null && !Data43ValidationService::validateIcd10Tm($diag)) {
+                                $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_ICD10', 'CHRONIC', $rowNumber);
+                            }
+
+                            foreach (['DATE_DIAG','DATE_DISCH'] as $field) {
+                                $value = $this->stringValue($row, $this->findHeaderIndex($h, [$field]));
+                                if ($value !== null && !Data43ValidationService::validateDate8($value)) {
+                                    $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_DATE', $field, $rowNumber);
+                                }
+                            }
+
+                            $typeDisch = $this->stringValue($row, $this->findHeaderIndex($h, ['TYPEDISCH']));
+                            $dateDisch = $this->stringValue($row, $this->findHeaderIndex($h, ['DATE_DISCH']));
+                            if ($typeDisch !== null && !in_array($typeDisch, ['03','05'], true) && empty($dateDisch)) {
+                                $this->addQualityIssue($issues, $fileCode, 'WARNING', 'MISSING_DATE_DISCH', 'DATE_DISCH', $rowNumber);
+                            }
+                        }
+
+                        if ($fileCode === 'DEATH') {
+                            $date = $this->stringValue($row, $this->findHeaderIndex($h, ['DDEATH']));
+                            if ($date !== null && !Data43ValidationService::validateDate8($date)) {
+                                $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_DATE', 'DDEATH', $rowNumber);
+                            }
+                            $cdeath = $this->stringValue($row, $this->findHeaderIndex($h, ['CDEATH']));
+                            if ($cdeath !== null && !Data43ValidationService::validateCdeath($cdeath)) {
+                                $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_CDEATH', 'CDEATH', $rowNumber);
+                            }
+                        }
+
+                        if (in_array($fileCode, ['SERVICE','ANC','NCDSCREEN','DISABILITY','CHRONIC','DEATH','ADDRESS'], true)) {
+                            $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
+                            if ($pid !== null && !isset($linkage['people'][$pid])) {
+                                $this->addQualityIssue($issues, $fileCode, 'WARNING', 'ORPHAN_PID', 'PID', $rowNumber);
+                            }
+                        }
+
+                        if (in_array($fileCode, ['SERVICE','ANC','NCDSCREEN'], true)) {
+                            $date = $this->stringValue($row, $this->findHeaderIndex($h, ['DATE_SERV']));
+                            if ($date !== null && !Data43ValidationService::validateDate8($date)) {
+                                $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_DATE', 'DATE_SERV', $rowNumber);
+                            }
+                        }
+                    }
+                } finally {
+                    fclose($fh);
+                }
+            }
+        }
+
+        return array_values($issues);
+    }
+
+    private function addQualityIssue(
+        array &$issues,
+        string $fileCode,
+        string $severity,
+        string $ruleCode,
+        ?string $fieldName,
+        int $rowNumber
+    ): void {
+        $key = implode('|', [$fileCode,$severity,$ruleCode,$fieldName ?? '']);
+        if (!isset($issues[$key])) {
+            $issues[$key] = [
+                'file_code' => $fileCode,
+                'severity' => $severity,
+                'rule_code' => $ruleCode,
+                'field_name' => $fieldName,
+                'issue_count' => 0,
+                'sample_rows' => [],
+            ];
+        }
+
+        $issues[$key]['issue_count']++;
+        if (count($issues[$key]['sample_rows']) < 5) {
+            $issues[$key]['sample_rows'][] = $rowNumber;
+        }
+    }
+
     private function buildSpatialLinkage(array $textFiles): array {
         $homes = [];
         $addresses = [];
