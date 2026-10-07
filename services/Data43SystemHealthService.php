@@ -37,6 +37,7 @@ final class Data43SystemHealthService
         }
 
         $checks[] = $this->checkEncryptionKey();
+        $checks[] = $this->checkHospitalCode9Coverage();
 
         $projectRoot = dirname(__DIR__);
         foreach ([
