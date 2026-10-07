@@ -207,6 +207,10 @@ $roster_csrf_token = $_SESSION['csrf_token'];
                     <i class="bi bi-bar-chart-fill" aria-hidden="true"></i>
                     สรุปยอดเดือนนี้
                 </button>
+                <button type="button" class="rp-btn rp-btn--primary rp-btn--sm" id="rosterFullscreenBtn" aria-controls="rosterWorkspace" aria-pressed="false">
+                    <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i>
+                    <span>ขยายตารางเต็มจอ</span>
+                </button>
             </div>
         </div>
 
@@ -411,7 +415,27 @@ $roster_csrf_token = $_SESSION['csrf_token'];
             </div>
         </section>
 
-        <div class="rp-roster-workspace d-none d-lg-grid">
+        <div class="rp-roster-workspace d-none d-lg-grid" id="rosterWorkspace">
+            <div class="rp-roster-focusbar" aria-label="เครื่องมือโหมดจัดเวรเต็มจอ">
+                <div class="rp-roster-focusbar__copy">
+                    <div class="rp-roster-focusbar__title">
+                        <i class="bi bi-calendar3"></i>
+                        ตารางปฏิบัติงาน · <?= rp_e($display_month_text) ?>
+                    </div>
+                    <div class="rp-roster-focusbar__meta"><?= rp_e($hospital_name ?? '') ?></div>
+                </div>
+                <div class="rp-roster-focusbar__actions">
+                    <button type="button" class="rp-btn rp-btn--secondary rp-btn--sm" id="rosterStaffPanelToggle" aria-pressed="false">
+                        <i class="bi bi-people-fill"></i>
+                        <span>ซ่อนรายชื่อ</span>
+                    </button>
+                    <button type="button" class="rp-btn rp-btn--danger rp-btn--sm" id="rosterFullscreenExit">
+                        <i class="bi bi-fullscreen-exit"></i>
+                        ออกจากเต็มจอ
+                    </button>
+                </div>
+            </div>
+
             <!-- 🌟 ตารางเวรหลัก -->
             <div class="rp-roster-board">
                 <div class="rp-card overflow-hidden">
@@ -977,7 +1001,77 @@ let payCalcModal = null;
 let holidayInfoModal = null;
 let selectedHolidayDate = '';
 
+function setRosterFocusMode(enabled) {
+    const workspace = document.getElementById('rosterWorkspace');
+    const trigger = document.getElementById('rosterFullscreenBtn');
+    if (!workspace) return;
+
+    workspace.classList.toggle('is-fullscreen', enabled);
+    document.body.classList.toggle('rp-roster-focus-mode', enabled);
+
+    if (trigger) {
+        trigger.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+        const icon = trigger.querySelector('i');
+        const label = trigger.querySelector('span');
+        if (icon) icon.className = enabled ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen';
+        if (label) label.textContent = enabled ? 'ออกจากเต็มจอ' : 'ขยายตารางเต็มจอ';
+    }
+
+    if (!enabled) {
+        workspace.classList.remove('is-staff-hidden');
+        const staffToggle = document.getElementById('rosterStaffPanelToggle');
+        if (staffToggle) {
+            staffToggle.setAttribute('aria-pressed', 'false');
+            const label = staffToggle.querySelector('span');
+            const icon = staffToggle.querySelector('i');
+            if (label) label.textContent = 'ซ่อนรายชื่อ';
+            if (icon) icon.className = 'bi bi-people-fill';
+        }
+    }
+
+    // Keep the edited table area visible after the layout changes.
+    requestAnimationFrame(() => {
+        document.getElementById('rosterTable')?.focus({ preventScroll: true });
+    });
+}
+
+function toggleRosterStaffPanel() {
+    const workspace = document.getElementById('rosterWorkspace');
+    const button = document.getElementById('rosterStaffPanelToggle');
+    if (!workspace || !button) return;
+
+    const hidden = !workspace.classList.contains('is-staff-hidden');
+    workspace.classList.toggle('is-staff-hidden', hidden);
+    button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+
+    const label = button.querySelector('span');
+    const icon = button.querySelector('i');
+    if (label) label.textContent = hidden ? 'แสดงรายชื่อ' : 'ซ่อนรายชื่อ';
+    if (icon) icon.className = hidden ? 'bi bi-people' : 'bi bi-people-fill';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    const fullscreenBtn = document.getElementById('rosterFullscreenBtn');
+    const fullscreenExit = document.getElementById('rosterFullscreenExit');
+    const staffPanelToggle = document.getElementById('rosterStaffPanelToggle');
+
+    fullscreenBtn?.addEventListener('click', function() {
+        const workspace = document.getElementById('rosterWorkspace');
+        setRosterFocusMode(!workspace?.classList.contains('is-fullscreen'));
+    });
+
+    fullscreenExit?.addEventListener('click', function() {
+        setRosterFocusMode(false);
+    });
+
+    staffPanelToggle?.addEventListener('click', toggleRosterStaffPanel);
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && document.getElementById('rosterWorkspace')?.classList.contains('is-fullscreen')) {
+            event.preventDefault();
+            setRosterFocusMode(false);
+        }
+    });
     
     // 🌟 ระบบค้นหาหน่วยบริการและเดือน (Dropdown)
     const setupDropdownSearch = (inputId, optionClass, hiddenInputId, formId) => {
