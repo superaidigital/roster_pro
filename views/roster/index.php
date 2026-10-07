@@ -1025,6 +1025,10 @@ function setRosterFocusMode(enabled) {
     workspace.classList.toggle('is-fullscreen', enabled);
     document.body.classList.toggle('rp-roster-focus-mode', enabled);
 
+    if (enabled) {
+        document.getElementById('pwaInstallToast')?.classList.remove('show');
+    }
+
     if (trigger) {
         trigger.setAttribute('aria-pressed', enabled ? 'true' : 'false');
         const icon = trigger.querySelector('i');
