@@ -158,6 +158,7 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = s.id
             JOIN hospitals h ON s.hospital_id = h.id
@@ -166,6 +167,7 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, COUNT(*) AS submission_count
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) rc
               ON rc.hospital_id = s.hospital_id
@@ -220,6 +222,7 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, COUNT(*) AS submission_count
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) rc
               ON rc.hospital_id = h.id
@@ -303,6 +306,7 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = s.id
             WHERE s.report_month = ?
@@ -423,6 +427,7 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
@@ -489,6 +494,7 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
@@ -579,6 +585,7 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             JOIN hospitals h ON h.id = m.hospital_id
