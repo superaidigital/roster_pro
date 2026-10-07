@@ -429,7 +429,11 @@ $roster_csrf_token = $_SESSION['csrf_token'];
                         <i class="bi bi-people-fill"></i>
                         <span>ซ่อนรายชื่อ</span>
                     </button>
-                    <button type="button" class="rp-btn rp-btn--danger rp-btn--sm" id="rosterFullscreenExit">
+                    <button type="button"
+                            class="rp-btn rp-btn--danger rp-btn--sm"
+                            id="rosterFullscreenExit"
+                            data-roster-action="exit-fullscreen"
+                            onclick="exitRosterFocusMode(event)">
                         <i class="bi bi-fullscreen-exit"></i>
                         ออกจากเต็มจอ
                     </button>
@@ -1017,7 +1021,49 @@ function setRosterStaffPanelState(hidden) {
     }
 }
 
+function exitRosterFocusMode(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const workspace = document.getElementById('rosterWorkspace');
+    if (!workspace) return false;
+
+    workspace.classList.remove('is-fullscreen', 'is-staff-hidden');
+    document.body.classList.remove('rp-roster-focus-mode');
+
+    const trigger = document.getElementById('rosterFullscreenBtn');
+    if (trigger) {
+        trigger.setAttribute('aria-pressed', 'false');
+        const icon = trigger.querySelector('i');
+        const label = trigger.querySelector('span');
+        if (icon) icon.className = 'bi bi-arrows-fullscreen';
+        if (label) label.textContent = 'ขยายตารางเต็มจอ';
+    }
+
+    setRosterStaffPanelState(false);
+
+    // Clear any stale fixed-position values left by older cached CSS/JS.
+    workspace.style.removeProperty('position');
+    workspace.style.removeProperty('inset');
+    workspace.style.removeProperty('width');
+    workspace.style.removeProperty('height');
+    workspace.style.removeProperty('z-index');
+
+    window.setTimeout(() => {
+        workspace.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    }, 0);
+
+    return false;
+}
+
 function setRosterFocusMode(enabled) {
+    if (!enabled) {
+        exitRosterFocusMode();
+        return;
+    }
+
     const workspace = document.getElementById('rosterWorkspace');
     const trigger = document.getElementById('rosterFullscreenBtn');
     if (!workspace) return;
@@ -1068,16 +1114,19 @@ document.addEventListener('DOMContentLoaded', function() {
         setRosterFocusMode(!workspace?.classList.contains('is-fullscreen'));
     });
 
-    fullscreenExit?.addEventListener('click', function() {
-        setRosterFocusMode(false);
-    });
+    // Capture-level fallback: guarantees the exit action even if another
+    // component stops bubbling or a stale Bootstrap listener is present.
+    document.addEventListener('click', function(event) {
+        const exitButton = event.target.closest('[data-roster-action="exit-fullscreen"]');
+        if (!exitButton) return;
+        exitRosterFocusMode(event);
+    }, true);
 
     staffPanelToggle?.addEventListener('click', toggleRosterStaffPanel);
 
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape' && document.getElementById('rosterWorkspace')?.classList.contains('is-fullscreen')) {
-            event.preventDefault();
-            setRosterFocusMode(false);
+            exitRosterFocusMode(event);
         }
     });
     
