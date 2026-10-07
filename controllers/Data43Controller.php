@@ -2,6 +2,7 @@
 require_once 'config/database.php';
 require_once 'models/Data43SubmissionModel.php';
 require_once 'services/Data43ImportService.php';
+require_once 'services/Data43MetricRegistry.php';
 require_once 'controllers/LogsController.php';
 
 class Data43Controller
@@ -439,9 +440,14 @@ class Data43Controller
             $area_level = 'CHANGWAT';
         }
 
-        $allowedMetrics = ['DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE'];
+        $allowedMetrics = Data43MetricRegistry::allowedCodes();
         if (!in_array($metric_code, $allowedMetrics, true)) {
             $metric_code = 'DM';
+        }
+        $metric_definition = Data43MetricRegistry::get($metric_code) ?? Data43MetricRegistry::get('DM');
+
+        if (!Data43MetricRegistry::canUseRateMode($metric_code)) {
+            $display_mode = 'count';
         }
 
         if (!in_array($display_mode, ['count','rate'], true)) {
@@ -511,7 +517,7 @@ class Data43Controller
             $value = (int)($row['metric_value'] ?? 0);
             $population = (int)($row['population_value'] ?? 0);
             $displayValue = $display_mode === 'rate'
-                ? (float)($row['rate_per_1000'] ?? 0)
+                ? (float)($row['display_value'] ?? 0)
                 : (float)$value;
 
             $spatial_summary['records'] += $value;
@@ -523,12 +529,22 @@ class Data43Controller
             }
         }
 
-        if ($spatial_summary['population'] > 0) {
-            $spatial_summary['rate_per_1000'] = round(
-                ($spatial_summary['records'] / $spatial_summary['population']) * 1000,
-                2
-            );
+        $summaryDenominator = null;
+        if (($metric_definition['denominator'] ?? null) === 'POPULATION') {
+            $summaryDenominator = (int)$spatial_summary['population'];
+        } else {
+            $summaryDenominator = 0;
+            foreach ($spatial_rows as $row) {
+                $summaryDenominator += (int)($row['denominator_value'] ?? 0);
+            }
         }
+        $spatial_summary['denominator'] = $summaryDenominator;
+        $spatial_summary['display_value'] = Data43MetricRegistry::calculate(
+            $metric_code,
+            (int)$spatial_summary['records'],
+            $metric_definition['denominator'] === null ? null : $summaryDenominator
+        );
+        $spatial_summary['display_unit'] = (string)($metric_definition['unit'] ?? '');
 
         foreach ($hospital_coverage as $row) {
             $hospitalSet[(int)$row['hospital_id']] = true;
