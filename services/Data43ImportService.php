@@ -9,7 +9,7 @@ class Data43ImportService {
     private const MAX_ENTRY_BYTES = 268435456; // 256 MB
     private const MAX_COMPRESSION_RATIO = 200;
 
-    public function inspectUploadedZip(array $upload, string $workDir): array {
+    public function inspectUploadedZip(array $upload, string $workDir, ?string $expectedHospcode = null): array {
         $this->validateUpload($upload);
 
         if (!is_dir($workDir) && !mkdir($workDir, 0750, true) && !is_dir($workDir)) {
@@ -27,13 +27,14 @@ class Data43ImportService {
             throw new RuntimeException('ไม่สามารถสร้างโฟลเดอร์แตกไฟล์ได้');
         }
 
-        $inspection = $this->extractSafe($zipPath, $extractDir);
+        $inspection = $this->extractSafe($zipPath, $extractDir, $expectedHospcode);
 
         return [
             'archive_sha256' => $archiveHash,
             'files' => $inspection['files'],
             'spatial_metrics' => $inspection['spatial_metrics'],
             'quality_summary' => $inspection['quality_summary'],
+            'quality_issues' => $inspection['quality_issues'] ?? [],
         ];
     }
 
@@ -62,7 +63,7 @@ class Data43ImportService {
         }
     }
 
-    private function extractSafe(string $zipPath, string $extractDir): array {
+    private function extractSafe(string $zipPath, string $extractDir, ?string $expectedHospcode = null): array {
         if (!class_exists('ZipArchive')) {
             throw new RuntimeException('PHP Zip extension ยังไม่ได้เปิดใช้งาน');
         }
@@ -137,6 +138,8 @@ class Data43ImportService {
                     $missingHeaders = $this->missingCriticalHeaders($target, $canonical);
                     if ($missingHeaders) {
                         $headerIssues[$canonical] = $missingHeaders;
+                        $status = 'ERROR';
+                        $invalidExpectedCodes[$canonical] = true;
                         $error = 'ขาดคอลัมน์สำคัญ: ' . implode(', ', $missingHeaders);
                     }
                     $textFiles[$canonical] ??= [];
@@ -159,8 +162,21 @@ class Data43ImportService {
             $detectedExpected = array_values(array_intersect($expectedCodes, array_keys($detectedCodes)));
             $missingExpected = array_values(array_diff($expectedCodes, $detectedExpected));
 
+            $packageProfile = $this->detectPackageProfile($textFiles);
             $linkage = $this->buildSpatialLinkage($textFiles);
-            $qualityIssues = $this->inspectCoreQuality($textFiles, $linkage);
+            $qualityIssues = $this->inspectCoreQuality($textFiles, $linkage, $expectedHospcode);
+
+            if (!$packageProfile['strict']) {
+                $qualityIssues[] = [
+                    'file_code' => 'PACKAGE',
+                    'severity' => 'WARNING',
+                    'rule_code' => 'LEGACY_V241_COMPAT',
+                    'field_name' => 'HOSPCODE9',
+                    'issue_count' => 1,
+                    'sample_rows' => [],
+                ];
+            }
+
             $spatialMetrics = $this->buildSpatialMetrics($textFiles, $linkage);
 
             return [
@@ -169,7 +185,7 @@ class Data43ImportService {
                 'quality_issues' => $qualityIssues,
                 'quality_summary' => [
                     'standard_version' => Data43StandardV241::VERSION,
-                    'profile_code' => Data43StandardV241::PROFILE,
+                    'profile_code' => $packageProfile['code'],
                     'catalog_count' => Data43StandardV241::totalStructures(),
                     'expected_files' => Data43StandardV241::rphstExpectedCount(),
                     'detected_expected_files' => count($detectedExpected),
@@ -191,7 +207,7 @@ class Data43ImportService {
         }
     }
 
-    private function inspectCoreQuality(array $textFiles, array $linkage): array {
+    private function inspectCoreQuality(array $textFiles, array $linkage, ?string $expectedHospcode = null): array {
         $issues = [];
         $pkSeen = [];
         $cidSeen = [];
@@ -215,6 +231,24 @@ class Data43ImportService {
                         $rowNumber++;
                         if (!is_array($row) || $row === [null]) continue;
 
+                        if (count($row) !== count($header)) {
+                            $this->addQualityIssue($issues, $fileCode, 'ERROR', 'COLUMN_COUNT_MISMATCH', null, $rowNumber);
+                        }
+
+                        $hospcode = $this->stringValue($row, $this->findHeaderIndex($h, ['HOSPCODE']));
+                        if ($hospcode !== null) {
+                            if (!preg_match('/^\d{5}$/', $hospcode)) {
+                                $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_HOSPCODE', 'HOSPCODE', $rowNumber);
+                            } elseif ($expectedHospcode !== null && $expectedHospcode !== '' && $hospcode !== $expectedHospcode) {
+                                $this->addQualityIssue($issues, $fileCode, 'ERROR', 'HOSPCODE_MISMATCH', 'HOSPCODE', $rowNumber);
+                            }
+                        }
+
+                        $dUpdate = $this->stringValue($row, $this->findHeaderIndex($h, ['D_UPDATE']));
+                        if ($dUpdate !== null && !Data43ValidationService::validateDateTime14($dUpdate)) {
+                            $this->addQualityIssue($issues, $fileCode, 'ERROR', 'INVALID_D_UPDATE', 'D_UPDATE', $rowNumber);
+                        }
+
                         if ($pkHeaders) {
                             $keyParts = [];
                             $complete = true;
@@ -227,7 +261,9 @@ class Data43ImportService {
                                 }
                                 $keyParts[] = strtoupper($value);
                             }
-                            if ($complete) {
+                            if (!$complete) {
+                                $this->addQualityIssue($issues, $fileCode, 'ERROR', 'MISSING_PK', null, $rowNumber);
+                            } else {
                                 $hash = hash('sha256', $fileCode . '|' . implode('|', $keyParts));
                                 if (isset($pkSeen[$fileCode][$hash])) {
                                     $this->addQualityIssue($issues, $fileCode, 'ERROR', 'DUPLICATE_PK', null, $rowNumber);
@@ -347,6 +383,26 @@ class Data43ImportService {
         if (count($issues[$key]['sample_rows']) < 5) {
             $issues[$key]['sample_rows'][] = $rowNumber;
         }
+    }
+
+    private function detectPackageProfile(array $textFiles): array
+    {
+        $personParts = $this->fileParts($textFiles, 'PERSON');
+        if (!$personParts) {
+            return ['code'=>'RPHST_V241_PARTIAL','strict'=>false];
+        }
+
+        foreach ($personParts as $part) {
+            $headers = $this->readHeaderMap($part['path']);
+            if (isset($headers['HOSPCODE9'])) {
+                return ['code'=>Data43StandardV241::PROFILE,'strict'=>true];
+            }
+        }
+
+        // Real-world legacy F43 exports commonly predate the HOSPCODE9 extension.
+        // They may still be imported for quality/spatial analysis, but must not be
+        // represented as strictly conformant Version 2.4.1 packages.
+        return ['code'=>'RPHST_V241_LEGACY_COMPAT','strict'=>false];
     }
 
     private function buildSpatialLinkage(array $textFiles): array {
