@@ -119,6 +119,10 @@ class Data43ImportService {
                 $rowCount = in_array($ext, ['csv','txt'], true) ? $this->countTextRows($target) : null;
                 $status = $canonical ? 'VALID' : 'SKIPPED';
                 $error = $canonical ? null : 'ไม่สามารถจับคู่ชื่อไฟล์กับโครงสร้างมาตรฐาน Version 2.4.1';
+                if ($canonical && $ext === 'xlsx') {
+                    $status = 'ERROR';
+                    $error = 'ไฟล์ XLSX ยังไม่รองรับการตรวจ row/schema แบบ streaming กรุณาส่ง CSV หรือ TXT';
+                }
 
                 if ($canonical) {
                     $detectedCodes[$canonical] = true;
@@ -132,7 +136,8 @@ class Data43ImportService {
                         $headerIssues[$canonical] = $missingHeaders;
                         $error = 'ขาดคอลัมน์สำคัญ: ' . implode(', ', $missingHeaders);
                     }
-                    $textFiles[$canonical] = ['path'=>$target,'code'=>$canonical,'name'=>basename($name)];
+                    $textFiles[$canonical] ??= [];
+                    $textFiles[$canonical][] = ['path'=>$target,'code'=>$canonical,'name'=>basename($name)];
                 }
 
                 $files[] = [
@@ -169,6 +174,8 @@ class Data43ImportService {
                     'header_issues' => $headerIssues,
                     'linked_people' => count($linkage['people']),
                     'linked_homes' => count($linkage['homes']),
+                    'unresolved_people' => (int)($linkage['unresolved_people'] ?? 0),
+                    'address_only_people' => (int)($linkage['address_only_people'] ?? 0),
                 ],
             ];
         } finally {
@@ -181,66 +188,79 @@ class Data43ImportService {
         $addresses = [];
         $villageCentroids = [];
         $people = [];
+        $unresolvedPeople = 0;
+        $addressOnlyPeople = 0;
 
-        if (isset($textFiles['HOME'])) {
-            $this->walkTextRows($textFiles['HOME']['path'], function(array $row, array $h) use (&$homes): void {
+        foreach ($this->fileParts($textFiles, 'HOME') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (&$homes): void {
                 $hid = $this->stringValue($row, $this->findHeaderIndex($h, ['HID']));
                 if ($hid === null) return;
                 $area = $this->areaFromRow($row, $h);
                 if (!$this->hasArea($area)) return;
+
+                // Household coordinates are sensitive. They are used only transiently and
+                // will be replaced by VILLAGE centroid when village master data exists.
                 $area['lat'] = $this->coordinateValue($row, $this->findHeaderIndex($h, ['LATITUDE','LAT']), -90, 90);
                 $area['lng'] = $this->coordinateValue($row, $this->findHeaderIndex($h, ['LONGITUDE','LON','LNG']), -180, 180);
                 $homes[$hid] = $area;
             });
         }
 
-        if (isset($textFiles['VILLAGE'])) {
-            $this->walkTextRows($textFiles['VILLAGE']['path'], function(array $row, array $h) use (&$villageCentroids): void {
-                $vid = preg_replace('/[^0-9]/', '', (string)($this->stringValue($row, $this->findHeaderIndex($h, ['VID'])) ?? ''));
-                if (strlen($vid) !== 8) return;
+        foreach ($this->fileParts($textFiles, 'VILLAGE') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (&$villageCentroids): void {
+                $rawVid = strtoupper(trim((string)($this->stringValue($row, $this->findHeaderIndex($h, ['VID'])) ?? '')));
+                if (!preg_match('/^[0-9]{6}[0-9A-Z]{2}$/', $rawVid)) return;
+
                 $area = [
-                    'changwat'=>substr($vid,0,2),
-                    'ampur'=>substr($vid,2,2),
-                    'tambon'=>substr($vid,4,2),
-                    'village'=>substr($vid,6,2),
+                    'changwat'=>substr($rawVid,0,2),
+                    'ampur'=>substr($rawVid,2,2),
+                    'tambon'=>substr($rawVid,4,2),
+                    'village'=>substr($rawVid,6,2),
                     'lat'=>$this->coordinateValue($row, $this->findHeaderIndex($h, ['LATITUDE','LAT']), -90, 90),
                     'lng'=>$this->coordinateValue($row, $this->findHeaderIndex($h, ['LONGITUDE','LON','LNG']), -180, 180),
                 ];
-                $villageCentroids[$vid] = $area;
+                $villageCentroids[$rawVid] = $area;
             });
         }
 
-        if (isset($textFiles['ADDRESS'])) {
-            $this->walkTextRows($textFiles['ADDRESS']['path'], function(array $row, array $h) use (&$addresses): void {
+        // ADDRESS is retained only for quality diagnostics. It is not used as the
+        // residential prevalence fallback because the standard states in-area
+        // residential location is represented by HOME.
+        foreach ($this->fileParts($textFiles, 'ADDRESS') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (&$addresses): void {
                 $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
                 if ($pid === null) return;
                 $area = $this->areaFromRow($row, $h);
                 if (!$this->hasArea($area)) return;
-                $addressType = $this->stringValue($row, $this->findHeaderIndex($h, ['ADDRESSTYPE']));
-                $priority = $addressType === '2' ? 2 : 1;
-                if (!isset($addresses[$pid]) || $priority >= ($addresses[$pid]['_priority'] ?? 0)) {
-                    $area['_priority'] = $priority;
-                    $addresses[$pid] = $area;
-                }
+                $addresses[$pid] = $area;
             });
         }
 
-        if (isset($textFiles['PERSON'])) {
-            $this->walkTextRows($textFiles['PERSON']['path'], function(array $row, array $h) use (&$people, $homes, $addresses, $villageCentroids): void {
+        foreach ($this->fileParts($textFiles, 'PERSON') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (
+                &$people, $homes, $addresses, $villageCentroids, &$unresolvedPeople, &$addressOnlyPeople
+            ): void {
                 $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
                 if ($pid === null) return;
 
                 $hid = $this->stringValue($row, $this->findHeaderIndex($h, ['HID']));
-                $area = ($hid !== null && isset($homes[$hid])) ? $homes[$hid] : ($addresses[$pid] ?? null);
-                if (!is_array($area) || !$this->hasArea($area)) return;
+                $area = ($hid !== null && isset($homes[$hid])) ? $homes[$hid] : null;
 
-                unset($area['_priority']);
-                if (($area['lat'] ?? null) === null || ($area['lng'] ?? null) === null) {
-                    $vid = ($area['changwat'] ?? '') . ($area['ampur'] ?? '') . ($area['tambon'] ?? '') . ($area['village'] ?? '');
-                    if (isset($villageCentroids[$vid])) {
-                        $area['lat'] = $villageCentroids[$vid]['lat'];
-                        $area['lng'] = $villageCentroids[$vid]['lng'];
-                    }
+                if (!is_array($area) || !$this->hasArea($area)) {
+                    $unresolvedPeople++;
+                    if (isset($addresses[$pid])) $addressOnlyPeople++;
+                    return;
+                }
+
+                // Prefer public-area village centroid over household coordinates.
+                $vid = ($area['changwat'] ?? '') . ($area['ampur'] ?? '') . ($area['tambon'] ?? '') . ($area['village'] ?? '');
+                if (isset($villageCentroids[$vid])) {
+                    $area['lat'] = $villageCentroids[$vid]['lat'];
+                    $area['lng'] = $villageCentroids[$vid]['lng'];
+                } else {
+                    // Do not allow household coordinates to flow into analytics.
+                    $area['lat'] = null;
+                    $area['lng'] = null;
                 }
 
                 $people[$pid] = [
@@ -252,7 +272,14 @@ class Data43ImportService {
             });
         }
 
-        return ['homes'=>$homes,'addresses'=>$addresses,'villages'=>$villageCentroids,'people'=>$people];
+        return [
+            'homes'=>$homes,
+            'addresses'=>$addresses,
+            'villages'=>$villageCentroids,
+            'people'=>$people,
+            'unresolved_people'=>$unresolvedPeople,
+            'address_only_people'=>$addressOnlyPeople,
+        ];
     }
 
     private function buildSpatialMetrics(array $textFiles, array $linkage): array {
@@ -278,10 +305,13 @@ class Data43ImportService {
             if ($age !== null && $age >= 60) {
                 $this->accumulateMetric($groups, $area, 'PERSON', 'ELDERLY', $identity);
             }
+            if ($age !== null && $age >= 35) {
+                $this->accumulateMetric($groups, $area, 'PERSON', 'NCD_SCREEN_TARGET', $identity);
+            }
         }
 
-        if (isset($textFiles['CHRONIC'])) {
-            $this->walkTextRows($textFiles['CHRONIC']['path'], function(array $row, array $h) use (&$groups, $linkage): void {
+        foreach ($this->fileParts($textFiles, 'CHRONIC') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (&$groups, $linkage): void {
                 $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
                 if ($pid === null || !isset($linkage['people'][$pid])) return;
                 $area = $linkage['people'][$pid]['area'];
@@ -294,8 +324,8 @@ class Data43ImportService {
             });
         }
 
-        if (isset($textFiles['DISABILITY'])) {
-            $this->walkTextRows($textFiles['DISABILITY']['path'], function(array $row, array $h) use (&$groups, $linkage): void {
+        foreach ($this->fileParts($textFiles, 'DISABILITY') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (&$groups, $linkage): void {
                 $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
                 if ($pid === null || !isset($linkage['people'][$pid])) return;
                 $identity = hash('sha256', 'DISABILITY|' . $pid);
@@ -303,8 +333,8 @@ class Data43ImportService {
             });
         }
 
-        if (isset($textFiles['ANC'])) {
-            $this->walkTextRows($textFiles['ANC']['path'], function(array $row, array $h) use (&$groups, $linkage): void {
+        foreach ($this->fileParts($textFiles, 'ANC') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (&$groups, $linkage): void {
                 $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
                 if ($pid === null || !isset($linkage['people'][$pid])) return;
                 $seq = $this->stringValue($row, $this->findHeaderIndex($h, ['SEQ']));
@@ -314,8 +344,8 @@ class Data43ImportService {
             });
         }
 
-        if (isset($textFiles['SERVICE'])) {
-            $this->walkTextRows($textFiles['SERVICE']['path'], function(array $row, array $h) use (&$groups, $linkage): void {
+        foreach ($this->fileParts($textFiles, 'SERVICE') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (&$groups, $linkage): void {
                 $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
                 if ($pid === null || !isset($linkage['people'][$pid])) return;
                 $seq = $this->stringValue($row, $this->findHeaderIndex($h, ['SEQ']));
@@ -325,8 +355,8 @@ class Data43ImportService {
             });
         }
 
-        if (isset($textFiles['NCDSCREEN'])) {
-            $this->walkTextRows($textFiles['NCDSCREEN']['path'], function(array $row, array $h) use (&$groups, $linkage): void {
+        foreach ($this->fileParts($textFiles, 'NCDSCREEN') as $part) {
+            $this->walkTextRows($part['path'], function(array $row, array $h) use (&$groups, $linkage): void {
                 $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
                 if ($pid === null || !isset($linkage['people'][$pid])) return;
                 $seq = $this->stringValue($row, $this->findHeaderIndex($h, ['SEQ']));
@@ -405,6 +435,12 @@ class Data43ImportService {
 
     private function hasArea(array $area): bool {
         return !empty($area['changwat']) && !empty($area['ampur']) && !empty($area['tambon']);
+    }
+
+    private function fileParts(array $textFiles, string $code): array {
+        $parts = $textFiles[$code] ?? [];
+        if (isset($parts['path'])) return [$parts]; // backward compatibility
+        return is_array($parts) ? array_values($parts) : [];
     }
 
     private function missingCriticalHeaders(string $path, string $fileCode): array {
