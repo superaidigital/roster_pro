@@ -391,6 +391,7 @@ class SettingsController {
         $holidayModel = new HolidayModel($db);
         $year = filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT) ?: (int)date('Y');
         $holidays = $holidayModel->getAllHolidays($year);
+        $holiday_schema = $holidayModel->getSchemaStatus();
 
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
@@ -444,6 +445,46 @@ class SettingsController {
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "ลบวันหยุดนักขัตฤกษ์: {$holiday_name}");
             $_SESSION['success_msg'] = "ลบวันหยุดเรียบร้อยแล้ว";
         }
+        header("Location: index.php?c=settings&a=holidays");
+        exit;
+    }
+
+    public function toggle_holiday() {
+        $this->requirePost();
+        $this->requireAccess(['SUPERADMIN', 'ADMIN']);
+
+        $db = (new Database())->getConnection();
+        require_once 'models/HolidayModel.php';
+        $holidayModel = new HolidayModel($db);
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $status = filter_input(INPUT_POST, 'status', FILTER_VALIDATE_INT);
+
+        if (!$id || !in_array($status, [0, 1], true)) {
+            $_SESSION['error_msg'] = "คำขอเปลี่ยนสถานะวันหยุดไม่ถูกต้อง";
+            header("Location: index.php?c=settings&a=holidays");
+            exit;
+        }
+
+        $schema = $holidayModel->getSchemaStatus();
+        if (empty($schema['is_active'])) {
+            $_SESSION['error_msg'] = "ฐานข้อมูลยังไม่มีคอลัมน์ is_active กรุณารัน migration วันหยุดก่อนใช้งานสถานะเปิด/ปิด";
+            header("Location: index.php?c=settings&a=holidays");
+            exit;
+        }
+
+        if ($holidayModel->toggleStatus($id, $status)) {
+            LogsController::addLog(
+                $db,
+                $_SESSION['user']['id'],
+                LogsController::ACTION_UPDATE,
+                "เปลี่ยนสถานะวันหยุด ID: {$id} เป็น " . ($status ? 'เปิดใช้งาน' : 'ปิดใช้งาน')
+            );
+            $_SESSION['success_msg'] = "เปลี่ยนสถานะวันหยุดเรียบร้อยแล้ว";
+        } else {
+            $_SESSION['error_msg'] = "ไม่สามารถเปลี่ยนสถานะวันหยุดได้";
+        }
+
         header("Location: index.php?c=settings&a=holidays");
         exit;
     }
