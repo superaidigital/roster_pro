@@ -84,6 +84,77 @@ class Data43SubmissionModel {
         $stmt->execute([$status, $detectedFiles, $totalRows, $errorSummary, $id]);
     }
 
+    public function qualitySchemaReady(): bool {
+        try {
+            $stmt = $this->db->query("SHOW TABLES LIKE 'data43_quality_summary'");
+            return (bool)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    public function saveQualitySummary(int $submissionId, array $summary): void {
+        if (!$this->qualitySchemaReady()) return;
+
+        $stmt = $this->db->prepare("
+            INSERT INTO data43_quality_summary
+                (submission_id, standard_version, profile_code, catalog_count,
+                 expected_files, detected_expected_files, linked_people, linked_homes,
+                 unresolved_people, address_only_people, unknown_files_count,
+                 header_issue_files, missing_codes_json, unknown_files_json, header_issues_json)
+            VALUES
+                (:submission_id, :standard_version, :profile_code, :catalog_count,
+                 :expected_files, :detected_expected_files, :linked_people, :linked_homes,
+                 :unresolved_people, :address_only_people, :unknown_files_count,
+                 :header_issue_files, :missing_codes_json, :unknown_files_json, :header_issues_json)
+            ON DUPLICATE KEY UPDATE
+                standard_version = VALUES(standard_version),
+                profile_code = VALUES(profile_code),
+                catalog_count = VALUES(catalog_count),
+                expected_files = VALUES(expected_files),
+                detected_expected_files = VALUES(detected_expected_files),
+                linked_people = VALUES(linked_people),
+                linked_homes = VALUES(linked_homes),
+                unresolved_people = VALUES(unresolved_people),
+                address_only_people = VALUES(address_only_people),
+                unknown_files_count = VALUES(unknown_files_count),
+                header_issue_files = VALUES(header_issue_files),
+                missing_codes_json = VALUES(missing_codes_json),
+                unknown_files_json = VALUES(unknown_files_json),
+                header_issues_json = VALUES(header_issues_json)
+        ");
+        $stmt->execute([
+            ':submission_id' => $submissionId,
+            ':standard_version' => (string)($summary['standard_version'] ?? '2.4.1'),
+            ':profile_code' => (string)($summary['profile_code'] ?? 'RPHST_V241'),
+            ':catalog_count' => (int)($summary['catalog_count'] ?? 0),
+            ':expected_files' => (int)($summary['expected_files'] ?? 0),
+            ':detected_expected_files' => (int)($summary['detected_expected_files'] ?? 0),
+            ':linked_people' => (int)($summary['linked_people'] ?? 0),
+            ':linked_homes' => (int)($summary['linked_homes'] ?? 0),
+            ':unresolved_people' => (int)($summary['unresolved_people'] ?? 0),
+            ':address_only_people' => (int)($summary['address_only_people'] ?? 0),
+            ':unknown_files_count' => count((array)($summary['unknown_files'] ?? [])),
+            ':header_issue_files' => count((array)($summary['header_issues'] ?? [])),
+            ':missing_codes_json' => json_encode(array_values((array)($summary['missing_expected_codes'] ?? [])), JSON_UNESCAPED_UNICODE),
+            ':unknown_files_json' => json_encode(array_values((array)($summary['unknown_files'] ?? [])), JSON_UNESCAPED_UNICODE),
+            ':header_issues_json' => json_encode((array)($summary['header_issues'] ?? []), JSON_UNESCAPED_UNICODE),
+        ]);
+    }
+
+    public function getQualitySummary(int $submissionId): ?array {
+        if (!$this->qualitySchemaReady()) return null;
+        $stmt = $this->db->prepare("SELECT * FROM data43_quality_summary WHERE submission_id = ? LIMIT 1");
+        $stmt->execute([$submissionId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+
+        foreach (['missing_codes_json','unknown_files_json','header_issues_json'] as $key) {
+            $row[$key] = json_decode((string)($row[$key] ?? '[]'), true) ?: [];
+        }
+        return $row;
+    }
+
     public function getHistory(?int $hospitalId, int $limit = 100): array {
         $limit = max(1, min($limit, 500));
 
