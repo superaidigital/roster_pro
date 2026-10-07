@@ -293,3 +293,233 @@
         width: 100%;
     }
 }
+
+
+/* =========================================================
+   Leave page proportion tune — desktop / tablet
+   Keeps the workflow intact while making the workspace use
+   the available canvas more naturally.
+   ========================================================= */
+.rp-page.leave-page-container {
+    width: min(calc(100% - 1rem), 1380px) !important;
+    max-width: 1380px !important;
+    padding-top: 1rem !important;
+    padding-bottom: 2rem !important;
+}
+
+.leave-page-container .rp-page-header {
+    margin-bottom: 1rem;
+    padding: 1rem 1.25rem;
+}
+
+.leave-page-container .rp-page-header__title {
+    font-size: clamp(1.28rem, 1.7vw, 1.62rem);
+}
+
+.leave-page-container .rp-page-header__subtitle {
+    margin-top: .2rem;
+    font-size: .82rem;
+}
+
+.leave-page-container .rp-leave-wallet {
+    width: 100%;
+    max-width: none;
+    margin: 0 0 1rem;
+}
+
+.leave-page-container .rp-leave-wallet__summary {
+    min-height: 64px;
+    padding: .65rem .8rem;
+}
+
+.leave-page-container .rp-leave-wallet__balances {
+    flex-wrap: nowrap;
+}
+
+.leave-page-container .rp-leave-balance-chip {
+    min-width: 88px;
+    padding: .4rem .55rem;
+}
+
+.leave-page-container .leave-wallet-toggle {
+    min-width: 112px;
+}
+
+/* Replace the Bootstrap 4/8 split with a slightly wider request form.
+   38/62 gives form controls enough room while keeping history dominant. */
+.leave-page-container .leave-main-grid {
+    width: 100%;
+    max-width: none;
+    margin: 0 !important;
+    display: grid;
+    grid-template-columns: minmax(360px, .78fr) minmax(0, 1.22fr);
+    gap: 1rem;
+}
+
+.leave-page-container .leave-main-grid > [class*="col-"] {
+    width: auto !important;
+    max-width: none !important;
+    padding: 0 !important;
+}
+
+.leave-page-container .leave-main-grid > .col-lg-4,
+.leave-page-container .leave-main-grid > .col-lg-8 {
+    min-width: 0;
+}
+
+.leave-page-container .leave-main-grid .rp-card {
+    border-radius: 1rem;
+}
+
+.leave-page-container .leave-main-grid .rp-card.h-100 {
+    height: auto !important;
+}
+
+.leave-page-container .leave-main-grid .rp-card__header {
+    min-height: 58px;
+    padding: .85rem 1rem;
+}
+
+.leave-page-container .leave-main-grid .rp-card__body {
+    padding: 1rem;
+}
+
+.leave-page-container .leave-main-grid h5 {
+    font-size: 1rem;
+}
+
+.leave-page-container .rp-leave-form-steps {
+    gap: .35rem;
+    margin-bottom: .85rem;
+}
+
+.leave-page-container .rp-leave-form-step {
+    justify-content: center;
+    padding: .45rem .4rem;
+}
+
+.leave-page-container #leaveForm .mb-4 {
+    margin-bottom: .9rem !important;
+}
+
+.leave-page-container #leaveForm .row.g-3 {
+    --bs-gutter-x: .7rem;
+    --bs-gutter-y: .7rem;
+}
+
+.leave-page-container #leaveForm .form-label {
+    margin-bottom: .35rem;
+    font-size: .72rem !important;
+}
+
+.leave-page-container #leaveForm .rp-control,
+.leave-page-container #leaveForm .input-group-modern {
+    min-height: 42px;
+}
+
+.leave-page-container #leaveForm textarea.rp-control {
+    min-height: 84px;
+}
+
+.leave-page-container .rp-leave-history-toolbar {
+    margin-left: auto;
+    flex-wrap: nowrap;
+}
+
+.leave-page-container .rp-leave-history-toolbar .rp-control {
+    min-width: 128px;
+    height: 40px;
+}
+
+.leave-page-container #leaveHistorySearch {
+    min-width: 155px;
+}
+
+.leave-page-container .table-responsive,
+.leave-page-container .rp-data-table-wrap {
+    min-height: 330px;
+    max-height: 520px;
+}
+
+.leave-page-container .rp-table th,
+.leave-page-container .rp-table td {
+    padding-top: .72rem;
+    padding-bottom: .72rem;
+    vertical-align: middle;
+}
+
+@media (min-width: 1200px) {
+    .leave-page-container .leave-main-grid {
+        grid-template-columns: minmax(380px, 40%) minmax(0, 60%);
+    }
+}
+
+@media (max-width: 1199.98px) and (min-width: 992px) {
+    .rp-page.leave-page-container {
+        width: min(calc(100% - .75rem), 1280px) !important;
+    }
+
+    .leave-page-container .leave-main-grid {
+        grid-template-columns: minmax(340px, 42%) minmax(0, 58%);
+    }
+
+    .leave-page-container .rp-leave-wallet__balances {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .leave-page-container .rp-leave-wallet__balances::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .rp-page.leave-page-container {
+        width: min(calc(100% - .75rem), 100%) !important;
+        padding-top: .75rem !important;
+    }
+
+    .leave-page-container .leave-main-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: .85rem;
+    }
+
+    .leave-page-container .rp-leave-history-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .leave-page-container .table-responsive,
+    .leave-page-container .rp-data-table-wrap {
+        min-height: 260px;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .rp-page.leave-page-container {
+        width: calc(100% - .5rem) !important;
+        padding-bottom: 4.5rem !important;
+    }
+
+    .leave-page-container .rp-page-header {
+        padding: .85rem;
+        margin-bottom: .75rem;
+    }
+
+    .leave-page-container .rp-leave-wallet {
+        margin-bottom: .75rem;
+    }
+
+    .leave-page-container .leave-main-grid .rp-card__header,
+    .leave-page-container .leave-main-grid .rp-card__body {
+        padding: .8rem;
+    }
+
+    .leave-page-container .rp-leave-history-toolbar,
+    .leave-page-container .rp-leave-history-toolbar form,
+    .leave-page-container .rp-leave-history-toolbar .rp-control,
+    .leave-page-container #leaveHistorySearch {
+        width: 100%;
+        min-width: 0;
+    }
+}
