@@ -389,7 +389,8 @@ class SettingsController {
         $db = (new Database())->getConnection();
         require_once 'models/HolidayModel.php';
         $holidayModel = new HolidayModel($db);
-        $holidays = $holidayModel->getAllHolidays();
+        $year = filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT) ?: (int)date('Y');
+        $holidays = $holidayModel->getAllHolidays($year);
 
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
@@ -405,7 +406,16 @@ class SettingsController {
         $holidayModel = new HolidayModel($db);
         
         if (!empty($_POST['holiday_date']) && !empty($_POST['holiday_name'])) {
-            $holidayModel->addHoliday($_POST['holiday_date'], $_POST['holiday_name']);
+            $holiday_type = strtoupper(trim((string)($_POST['holiday_type'] ?? 'REGULAR')));
+            if (!in_array($holiday_type, ['REGULAR', 'COMPENSATION', 'SPECIAL'], true)) {
+                $holiday_type = 'REGULAR';
+            }
+
+            $holidayModel->addHoliday(
+                $_POST['holiday_date'],
+                trim((string)$_POST['holiday_name']),
+                $holiday_type
+            );
             
             // 🌟 บันทึก Log: เพิ่มวันหยุด
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "เพิ่มวันหยุดนักขัตฤกษ์ด้วยตนเอง: " . $_POST['holiday_name']);
@@ -448,9 +458,22 @@ class SettingsController {
         $result = $holidayModel->syncHolidaysFromAPI($year);
 
         if($result['success']) {
-            // 🌟 บันทึก Log: ซิงค์ API
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "ซิงค์วันหยุดจาก BOT API ปี {$year} สำเร็จ ({$result['added']} วัน)");
-            $_SESSION['success_msg'] = "ดึงข้อมูลสำเร็จ! เพิ่มวันหยุดใหม่ {$result['added']} วัน (ข้ามวันซ้ำ {$result['skipped']} วัน)";
+            $provider = $result['provider'] ?? 'Holiday Provider';
+            $isFallback = !empty($result['fallback']);
+
+            LogsController::addLog(
+                $db,
+                $_SESSION['user']['id'],
+                LogsController::ACTION_CREATE,
+                "ซิงค์วันหยุดปี {$year} จาก {$provider} สำเร็จ ({$result['added']} วัน)"
+            );
+
+            $_SESSION['success_msg'] =
+                "ซิงค์วันหยุดสำเร็จจาก {$provider}: เพิ่ม {$result['added']} วัน"
+                . " (ข้ามวันซ้ำ {$result['skipped']} วัน)"
+                . ($isFallback
+                    ? " — API หลักไม่มีข้อมูล จึงใช้ชุดวันหยุดราชการไทยสำรองที่ตรวจสอบไว้"
+                    : "");
         } else {
             $_SESSION['error_msg'] = "เกิดข้อผิดพลาด: " . $result['message'];
         }
