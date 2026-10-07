@@ -371,6 +371,11 @@ class Data43ImportService {
         $code = strtoupper($fileCode);
         $metrics = [];
 
+        if (str_contains($code, 'HOME') || str_contains($code, 'ADDRESS')) {
+            // Spatial reference only. It is never exposed as a health indicator.
+            $metrics[] = 'GEO_REFERENCE';
+        }
+
         if (str_contains($code, 'PERSON')) {
             $metrics[] = 'POPULATION';
             $age = $this->ageYears($row, $headerMap);
