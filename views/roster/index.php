@@ -529,7 +529,7 @@ $roster_csrf_token = $_SESSION['csrf_token'];
                                         ?>
                                         <!-- 🌟 แนบ data-id ไว้ให้ SortableJS -->
                                         <tr class="roster-staff-row" id="row-staff-<?= htmlspecialchars($staff['id']) ?>" data-id="<?= htmlspecialchars($staff['id']) ?>" style="<?= $is_visible ? '' : 'display: none;' ?>">
-                                            <td class="text-start px-3 shadow-sm bg-white" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0; <?php if($is_external) echo 'background-color: #fef2f2 !important;'; ?>">
+                                            <td class="rp-roster-person-cell text-start px-3 shadow-sm bg-white" style="left: 0; position: sticky; z-index: 5; border-right: 2px solid #e2e8f0; <?php if($is_external) echo 'background-color: #fef2f2 !important;'; ?>">
                                                 <div class="fw-bold text-dark d-flex align-items-center justify-content-between">
                                                     <div class="d-flex align-items-center text-truncate pe-2">
                                                         <?php if ($canEdit && !$is_external): ?>
@@ -1001,6 +1001,22 @@ let payCalcModal = null;
 let holidayInfoModal = null;
 let selectedHolidayDate = '';
 
+function setRosterStaffPanelState(hidden) {
+    const workspace = document.getElementById('rosterWorkspace');
+    const button = document.getElementById('rosterStaffPanelToggle');
+    if (!workspace) return;
+
+    workspace.classList.toggle('is-staff-hidden', hidden);
+
+    if (button) {
+        button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        const label = button.querySelector('span');
+        const icon = button.querySelector('i');
+        if (label) label.textContent = hidden ? 'แสดงรายชื่อ' : 'ซ่อนรายชื่อ';
+        if (icon) icon.className = hidden ? 'bi bi-people' : 'bi bi-people-fill';
+    }
+}
+
 function setRosterFocusMode(enabled) {
     const workspace = document.getElementById('rosterWorkspace');
     const trigger = document.getElementById('rosterFullscreenBtn');
@@ -1017,19 +1033,13 @@ function setRosterFocusMode(enabled) {
         if (label) label.textContent = enabled ? 'ออกจากเต็มจอ' : 'ขยายตารางเต็มจอ';
     }
 
-    if (!enabled) {
-        workspace.classList.remove('is-staff-hidden');
-        const staffToggle = document.getElementById('rosterStaffPanelToggle');
-        if (staffToggle) {
-            staffToggle.setAttribute('aria-pressed', 'false');
-            const label = staffToggle.querySelector('span');
-            const icon = staffToggle.querySelector('i');
-            if (label) label.textContent = 'ซ่อนรายชื่อ';
-            if (icon) icon.className = 'bi bi-people-fill';
-        }
+    if (enabled) {
+        // Preserve table width on narrow desktop/devtools by opening with staff drawer hidden.
+        setRosterStaffPanelState(window.innerWidth < 1180);
+    } else {
+        setRosterStaffPanelState(false);
     }
 
-    // Keep the editable table area stable after the layout changes.
     requestAnimationFrame(() => {
         const tableWrap = workspace.querySelector('.rp-roster-table-wrap');
         if (tableWrap) {
@@ -1040,17 +1050,8 @@ function setRosterFocusMode(enabled) {
 
 function toggleRosterStaffPanel() {
     const workspace = document.getElementById('rosterWorkspace');
-    const button = document.getElementById('rosterStaffPanelToggle');
-    if (!workspace || !button) return;
-
-    const hidden = !workspace.classList.contains('is-staff-hidden');
-    workspace.classList.toggle('is-staff-hidden', hidden);
-    button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
-
-    const label = button.querySelector('span');
-    const icon = button.querySelector('i');
-    if (label) label.textContent = hidden ? 'แสดงรายชื่อ' : 'ซ่อนรายชื่อ';
-    if (icon) icon.className = hidden ? 'bi bi-people' : 'bi bi-people-fill';
+    if (!workspace) return;
+    setRosterStaffPanelState(!workspace.classList.contains('is-staff-hidden'));
 }
 
 document.addEventListener('DOMContentLoaded', function() {
