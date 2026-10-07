@@ -20,6 +20,7 @@ final class Data43SystemHealthService
             'data43_submission_files',
             'data43_area_metrics',
             'data43_quality_summary',
+            'data43_quality_issues',
             'data43_records',
             'data43_search_tokens',
             'data43_record_audit',
