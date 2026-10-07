@@ -1,0 +1,75 @@
+<?php
+$files = $files ?? [];
+?>
+<div class="rp-page">
+    <div class="rp-page-header mb-3">
+        <div>
+            <div class="rp-page-header__eyebrow">SUBMISSION #<?= (int)$submission['id'] ?></div>
+            <h1 class="rp-page-header__title">รายละเอียดการนำส่งข้อมูล 43 แฟ้ม</h1>
+            <p class="rp-page-header__subtitle mb-0">
+                <?= htmlspecialchars($submission['hospital_name'], ENT_QUOTES, 'UTF-8') ?>
+                · รอบ <?= htmlspecialchars($submission['report_month'], ENT_QUOTES, 'UTF-8') ?>
+            </p>
+        </div>
+        <div class="rp-page-header__actions">
+            <a href="index.php?c=data43&a=index" class="rp-btn rp-btn--secondary">
+                <i class="bi bi-arrow-left"></i> กลับ
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">ตรวจพบ</div><div class="fs-3 fw-bold"><?= (int)$submission['detected_files'] ?>/<?= (int)$submission['expected_files'] ?></div></div></div>
+        <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">จำนวนข้อมูล</div><div class="fs-3 fw-bold"><?= number_format((int)$submission['total_rows']) ?></div></div></div>
+        <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">สถานะ</div><div class="fs-5 fw-bold"><?= htmlspecialchars($submission['status'], ENT_QUOTES, 'UTF-8') ?></div></div></div>
+        <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">เวลานำส่ง</div><div class="fw-bold"><?= htmlspecialchars($submission['uploaded_at'], ENT_QUOTES, 'UTF-8') ?></div></div></div>
+    </div>
+
+    <?php if (!empty($submission['error_summary'])): ?>
+        <div class="rp-alert rp-alert--warning mb-3">
+            <span class="rp-alert__icon"><i class="bi bi-exclamation-triangle"></i></span>
+            <div class="rp-alert__content"><?= htmlspecialchars($submission['error_summary'], ENT_QUOTES, 'UTF-8') ?></div>
+        </div>
+    <?php endif; ?>
+
+    <section class="rp-card">
+        <div class="rp-card__header">
+            <div>
+                <h2 class="rp-card__title mb-1">ไฟล์ที่ตรวจพบ</h2>
+                <div class="text-muted small">ไม่แสดงหรือบันทึกข้อมูล PII รายบุคคลในหน้านี้</div>
+            </div>
+        </div>
+        <div class="rp-card__body p-0">
+            <div class="table-responsive">
+                <table class="rp-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>รหัส/ชื่อชุดข้อมูล</th>
+                            <th>ชื่อไฟล์</th>
+                            <th>ประเภท</th>
+                            <th class="text-end">ขนาด</th>
+                            <th class="text-end">แถว</th>
+                            <th class="text-center">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($files as $file): ?>
+                        <tr>
+                            <td><code><?= htmlspecialchars($file['file_code'], ENT_QUOTES, 'UTF-8') ?></code></td>
+                            <td><?= htmlspecialchars($file['original_filename'], ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= strtoupper(htmlspecialchars($file['extension'], ENT_QUOTES, 'UTF-8')) ?></td>
+                            <td class="text-end"><?= number_format(((int)$file['file_size']) / 1024, 1) ?> KB</td>
+                            <td class="text-end"><?= $file['row_count'] === null ? '-' : number_format((int)$file['row_count']) ?></td>
+                            <td class="text-center">
+                                <span class="rp-badge rp-badge--<?= $file['status'] === 'VALID' ? 'success' : 'danger' ?>">
+                                    <?= htmlspecialchars($file['status'], ENT_QUOTES, 'UTF-8') ?>
+                                </span>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
