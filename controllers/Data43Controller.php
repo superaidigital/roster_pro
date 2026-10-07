@@ -325,6 +325,21 @@ class Data43Controller
                     }
                 }
 
+                // Persist privacy-preserving spatial aggregates when the spatial schema is installed.
+                // Failure here must not invalidate the core 43-file submission.
+                if (!empty($inspection['spatial_metrics']) && $model->spatialSchemaReady()) {
+                    try {
+                        $model->addSpatialMetrics(
+                            $submissionId,
+                            $hospitalId,
+                            $reportMonth,
+                            $inspection['spatial_metrics']
+                        );
+                    } catch (Throwable $spatialError) {
+                        error_log('Data43 spatial aggregate error: ' . $spatialError->getMessage());
+                    }
+                }
+
                 $detected = count($uniqueCodes);
                 $status = $detected >= 43 ? 'COMPLETE' : 'INCOMPLETE';
                 $errorSummary = $status === 'INCOMPLETE'
@@ -378,6 +393,102 @@ class Data43Controller
 
         header('Location: index.php?c=data43&a=index' . $query);
         exit;
+    }
+
+    public function spatial(): void
+    {
+        $this->requireAccess();
+
+        $db = (new Database())->getConnection();
+        $model = new Data43SubmissionModel($db);
+
+        $schema_ready = $model->schemaReady();
+        $spatial_schema_ready = $model->spatialSchemaReady();
+        $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
+        $selected_hospital_id = $this->selectedHospitalId();
+        $report_month = trim((string)($_GET['month'] ?? date('Y-m')));
+        $area_level = strtoupper(trim((string)($_GET['level'] ?? 'TAMBON')));
+        $metric_code = strtoupper(trim((string)($_GET['metric'] ?? '')));
+
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
+            $report_month = date('Y-m');
+        }
+
+        if (!in_array($area_level, ['AMPUR','TAMBON','VILLAGE'], true)) {
+            $area_level = 'TAMBON';
+        }
+
+        $hospitals = [];
+        if ($is_admin) {
+            $stmt = $db->query("
+                SELECT id, hospital_code, name
+                FROM hospitals
+                WHERE is_active = 1
+                  AND deleted_at IS NULL
+                  AND COALESCE(hospital_code, '') <> '0'
+                ORDER BY name ASC
+            ");
+            $hospitals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $scopeHospitalId = $selected_hospital_id;
+        $metric_options = $spatial_schema_ready
+            ? $model->getSpatialMetricOptions($report_month, $scopeHospitalId)
+            : [];
+
+        $validMetrics = array_values(array_unique(array_map(
+            static fn(array $row): string => (string)$row['metric_code'],
+            $metric_options
+        )));
+
+        if ($metric_code !== '' && !in_array($metric_code, $validMetrics, true)) {
+            $metric_code = '';
+        }
+
+        $spatial_rows = $spatial_schema_ready
+            ? $model->getSpatialSummary(
+                $report_month,
+                $area_level,
+                $metric_code !== '' ? $metric_code : null,
+                $scopeHospitalId
+            )
+            : [];
+
+        $hospital_coverage = $spatial_schema_ready
+            ? $model->getSpatialCoverageByHospital(
+                $report_month,
+                $area_level,
+                $scopeHospitalId
+            )
+            : [];
+
+        $spatial_summary = [
+            'areas' => count($spatial_rows),
+            'records' => 0,
+            'hospitals' => 0,
+            'geocoded_areas' => 0,
+            'max_value' => 0,
+        ];
+
+        $hospitalSet = [];
+        foreach ($spatial_rows as $row) {
+            $value = (int)($row['metric_value'] ?? 0);
+            $spatial_summary['records'] += $value;
+            $spatial_summary['max_value'] = max($spatial_summary['max_value'], $value);
+            if (!empty($row['centroid_lat']) && !empty($row['centroid_lng'])) {
+                $spatial_summary['geocoded_areas']++;
+            }
+        }
+
+        foreach ($hospital_coverage as $row) {
+            $hospitalSet[(int)$row['hospital_id']] = true;
+        }
+        $spatial_summary['hospitals'] = count($hospitalSet);
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/spatial.php';
+        echo "</main></div></body></html>";
     }
 
     public function detail(): void
