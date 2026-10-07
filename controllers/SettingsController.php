@@ -308,6 +308,22 @@ class SettingsController {
                     'system_short_name',
                     'maintenance_mode',
                 ]));
+
+                $settings_data['system_name'] = trim((string)($settings_data['system_name'] ?? ''));
+                $settings_data['system_short_name'] = trim((string)($settings_data['system_short_name'] ?? ''));
+
+                if ($settings_data['system_name'] === '' || $settings_data['system_short_name'] === '') {
+                    throw new InvalidArgumentException('กรุณาระบุชื่อระบบและชื่อย่อระบบ');
+                }
+
+                if (mb_strlen($settings_data['system_name'], 'UTF-8') > 150 ||
+                    mb_strlen($settings_data['system_short_name'], 'UTF-8') > 60) {
+                    throw new InvalidArgumentException('ชื่อระบบยาวเกินกว่าที่กำหนด');
+                }
+
+                // Sync key รุ่นเก่าเพื่อให้ View/โมดูลเดิมแสดงค่าชุดเดียวกัน
+                $settings_data['app_name'] = $settings_data['system_short_name'];
+                $settings_data['app_subtitle'] = $settings_data['system_name'];
             } else {
                 throw new RuntimeException('Unknown settings section');
             }
