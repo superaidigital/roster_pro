@@ -5,6 +5,7 @@ require_once 'services/Data43ImportService.php';
 require_once 'services/Data43MetricRegistry.php';
 require_once 'services/Data43RegistryService.php';
 require_once 'services/Data43FormRegistry.php';
+require_once 'services/Data43SystemHealthService.php';
 require_once 'controllers/LogsController.php';
 
 class Data43Controller
@@ -427,6 +428,26 @@ class Data43Controller
 
         header('Location: index.php?c=data43&a=index' . $query);
         exit;
+    }
+
+    public function health(): void
+    {
+        $this->requireAccess();
+
+        if ($this->data43Role() !== 'ADMIN') {
+            http_response_code(403);
+            $_SESSION['error_msg'] = 'เฉพาะผู้ดูแลระบบเท่านั้นที่ตรวจสุขภาพระบบได้';
+            header('Location: index.php?c=data43&a=index');
+            exit;
+        }
+
+        $db=(new Database())->getConnection();
+        $health=(new Data43SystemHealthService($db))->inspect();
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/health.php';
+        echo "</main></div></body></html>";
     }
 
     public function registry(): void
