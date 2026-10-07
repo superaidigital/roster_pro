@@ -1,10 +1,11 @@
 // ที่อยู่ไฟล์: sw.js (ต้องวางไว้ที่โฟลเดอร์ Root นอกสุด คู่กับ index.php)
 
-const CACHE_NAME = 'rosterpro-cache-v1.0';
+const CACHE_NAME = 'rosterpro-cache-v1.1';
 
 // ไฟล์คงที่ที่ต้องการแคชเก็บไว้ในเครื่องเพื่อความรวดเร็ว
 const urlsToCache = [
     './manifest.json',
+    './assets/icons/roster-pro.svg',
     // หากมีไฟล์ CSS/JS ของตัวเองในเครื่อง สามารถเพิ่มลงในนี้ได้ เช่น
     // './assets/css/style.css',
 ];
