@@ -30,7 +30,7 @@ $levelLabels = [
 ];
 
 function data43_privacy_count(int $value, bool $suppressed = false): string {
-    if ($suppressed) return '&lt;5 / ปกปิด';
+    if ($suppressed) return 'ปกปิด';
     return number_format($value);
 }
 
@@ -302,7 +302,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                 <hr>
                 <div class="data43-map-note">
                     <strong>PDPA:</strong> ระบบไม่แสดงตำแหน่งบุคคล บ้าน หรือพิกัดรายคน
-                    และค่าพื้นที่ที่มีจำนวน 1–4 รายจะแสดงเป็น <strong>&lt;5</strong> พร้อมไม่ใช้ค่าจริงในการไล่สี
+                    พื้นที่ที่มีจำนวน 1–4 รายและอย่างน้อยอีก 1 พื้นที่ประกอบจะถูก <strong>ปกปิด</strong> เพื่อลดการอนุมานย้อนกลับ
                 </div>
                 <?php if ($area_level === 'VILLAGE'): ?>
                     <div class="rp-alert rp-alert--info mt-3 mb-0">
@@ -319,7 +319,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
             <div class="rp-card__header">
                 <div>
                     <h2 class="rp-card__title mb-1">อันดับพื้นที่</h2>
-                    <div class="small text-muted">เรียงตาม <?= $display_mode === 'rate' ? 'อัตรา' : 'จำนวน' ?> สูงสุด</div>
+                    <div class="small text-muted">เรียงตาม <?= $display_mode === 'rate' ? htmlspecialchars($metric_unit,ENT_QUOTES,'UTF-8') : 'จำนวน' ?> สูงสุด</div>
                 </div>
             </div>
             <div class="rp-card__body">
@@ -333,7 +333,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                 $maxRank = 1.0;
                 foreach ($rankRows as $r) {
                     $v = $display_mode === 'rate' ? (float)($r['display_value'] ?? 0) : (float)($r['metric_value'] ?? 0);
-                    if ((int)($r['metric_value'] ?? 0) >= 5) $maxRank = max($maxRank,$v);
+                    if (empty($r['privacy_suppressed'])) $maxRank = max($maxRank,$v);
                 }
                 ?>
                 <div class="data43-rank">
@@ -347,7 +347,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                         <div class="data43-rank-bar"><span style="width:<?= $pct ?>%"></span></div>
                         <div class="fw-bold text-end">
                             <?php if (!empty($row['privacy_suppressed'])): ?>
-                                &lt;5 / ปกปิด
+                                ปกปิด
                             <?php elseif ($display_mode === 'rate'): ?>
                                 <?= $row['display_value'] !== null ? number_format((float)$row['display_value'],2) : '–' ?>
                             <?php else: ?>
@@ -466,7 +466,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
 
     function colorFor(row) {
         if (!row || row.suppressed || maxValue <= 0) return noData;
-        const value = mode === 'rate' ? Number(row.rate ?? 0) : Number(row.count ?? 0);
+        const value = mode === 'rate' ? Number(row.value ?? 0) : Number(row.count ?? 0);
         if (value <= breaks[1]) return colors[0];
         if (value <= breaks[2]) return colors[1];
         if (value <= breaks[3]) return colors[2];
@@ -476,7 +476,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
 
     function privacyText(row) {
         if (!row) return 'ไม่มีข้อมูล';
-        if (row.suppressed) return '&lt;5';
+        if (row.suppressed) return 'ปกปิด';
         if (mode === 'rate') return row.value == null ? '–' : Number(row.value).toLocaleString('th-TH',{maximumFractionDigits:2});
         return Number(row.count).toLocaleString('th-TH');
     }
@@ -536,7 +536,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                 rowsHtml.push('<div class="data43-legend-row"><span class="data43-swatch" style="background:'+colors[i]+'"></span>'+fmt(lo)+' – '+fmt(hi)+'</div>');
             }
         }
-        rowsHtml.push('<div class="data43-legend-row"><span class="data43-swatch" style="background:'+noData+'"></span>ไม่มีข้อมูล / จำนวน &lt;5</div>');
+        rowsHtml.push('<div class="data43-legend-row"><span class="data43-swatch" style="background:'+noData+'"></span>ไม่มีข้อมูล / ข้อมูลถูกปกปิด</div>');
         el.innerHTML = rowsHtml.join('');
     }
 
@@ -559,9 +559,9 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
 
             circle.bindPopup(
                 '<strong>หมู่ '+row.village+'</strong><br>'+
-                'จำนวน: '+(row.suppressed ? '&lt;5' : Number(row.count).toLocaleString('th-TH'))+'<br>'+
+                'จำนวน: '+(row.suppressed ? 'ปกปิด' : Number(row.count).toLocaleString('th-TH'))+'<br>'+
                 'ประชากรฐาน: '+Number(row.population).toLocaleString('th-TH')+'<br>'+
-                'อัตรา/1,000: '+(row.suppressed ? '&lt;5' : (row.value == null ? '–' : Number(row.value).toFixed(2)))
+                'ค่าตัวชี้วัด: '+(row.suppressed ? 'ปกปิด' : (row.value == null ? '–' : Number(row.value).toFixed(2)))
             );
             bounds.push([row.lat,row.lng]);
         });
@@ -598,8 +598,8 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                     const props = feature.properties || {};
                     const key = featureKey(props);
                     const row = byKey.get(key);
-                    const countText = !row ? '0' : (row.suppressed ? '&lt;5' : Number(row.count).toLocaleString('th-TH'));
-                    const rateText = !row || row.value == null ? '–' : (row.suppressed ? '&lt;5' : Number(row.value).toFixed(2));
+                    const countText = !row ? '0' : (row.suppressed ? 'ปกปิด' : Number(row.count).toLocaleString('th-TH'));
+                    const rateText = !row || row.value == null ? '–' : (row.suppressed ? 'ปกปิด' : Number(row.value).toFixed(2));
                     const url = nextUrl(props);
 
                     shape.bindTooltip(nameFor(props),{sticky:true});
@@ -607,7 +607,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                         '<strong>'+nameFor(props)+'</strong><br>'+
                         'จำนวน: '+countText+'<br>'+
                         'ประชากรฐาน: '+(!row ? '0' : Number(row.population).toLocaleString('th-TH'))+'<br>'+
-                        'อัตรา/1,000: '+rateText+
+                        'ค่าตัวชี้วัด: '+rateText+
                         (url ? '<br><a href="'+url+'" class="fw-bold">เจาะลึกระดับถัดไป →</a>' : '')
                     );
 
