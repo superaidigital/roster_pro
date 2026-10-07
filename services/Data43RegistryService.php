@@ -179,6 +179,51 @@ final class Data43RegistryService
         return $grouped;
     }
 
+    public function overview(int $hospitalId): array
+    {
+        $people=$this->model->listForExport($hospitalId,'PERSON');
+        $chronic=$this->model->listForExport($hospitalId,'CHRONIC');
+        $summary=[
+            'people'=>0,
+            'typearea'=>['1'=>0,'2'=>0,'3'=>0,'4'=>0,'5'=>0],
+            'age'=>['0-14'=>0,'15-59'=>0,'60+'=>0,'unknown'=>0],
+            'chronic_people'=>0,
+            'dm'=>0,
+            'ht'=>0,
+            'missing_home'=>0,
+        ];
+        $chronicPids=[];$dm=[];$ht=[];
+        foreach($people as $row){
+            $data=$this->decodeRow($row)['data'];
+            $summary['people']++;
+            $type=(string)($data['TYPEAREA']??'');
+            if(isset($summary['typearea'][$type])) $summary['typearea'][$type]++;
+            $birth=(string)($data['BIRTH']??'');
+            $age=null;
+            if(preg_match('/^(\d{4})(\d{2})(\d{2})$/',$birth,$m) && checkdate((int)$m[2],(int)$m[3],(int)$m[1])){
+                $age=(int)(new DateTimeImmutable($m[1].'-'.$m[2].'-'.$m[3]))->diff(new DateTimeImmutable('today'))->y;
+            }
+            if($age===null)$summary['age']['unknown']++;
+            elseif($age<15)$summary['age']['0-14']++;
+            elseif($age<60)$summary['age']['15-59']++;
+            else $summary['age']['60+']++;
+            if(empty($data['HID']))$summary['missing_home']++;
+        }
+        foreach($chronic as $row){
+            $data=$this->decodeRow($row)['data'];
+            $pid=(string)($data['PID']??'');
+            $diag=strtoupper((string)($data['CHRONIC']??''));
+            if($pid==='')continue;
+            $chronicPids[$pid]=true;
+            if(preg_match('/^E1[0-4]/',$diag))$dm[$pid]=true;
+            if(preg_match('/^I1[0-5]/',$diag))$ht[$pid]=true;
+        }
+        $summary['chronic_people']=count($chronicPids);
+        $summary['dm']=count($dm);
+        $summary['ht']=count($ht);
+        return $summary;
+    }
+
     public function exportFile(int $hospitalId,int $userId,string $fileCode,string $format,string $workDir): string
     {
         $headers=Data43FormRegistry::exportHeaders($fileCode);
