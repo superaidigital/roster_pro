@@ -117,6 +117,28 @@ class Data43RecordModel
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function countPidReferences(int $hospitalId, string $pid, ?int $excludeId = null): int
+    {
+        $sql = "SELECT COUNT(*) FROM data43_records
+                WHERE hospital_id=? AND pid_ref=? AND file_code<>'PERSON' AND deleted_at IS NULL";
+        $params = [$hospitalId, $pid];
+        if ($excludeId) { $sql .= " AND id<>?"; $params[] = $excludeId; }
+        $stmt=$this->db->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function countHidReferences(int $hospitalId, string $hid, ?int $excludeId = null): int
+    {
+        $sql = "SELECT COUNT(*) FROM data43_records
+                WHERE hospital_id=? AND hid_ref=? AND file_code='PERSON' AND deleted_at IS NULL";
+        $params = [$hospitalId, $hid];
+        if ($excludeId) { $sql .= " AND id<>?"; $params[] = $excludeId; }
+        $stmt=$this->db->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+
     public function softDelete(int $id,int $hospitalId,int $userId): void
     {
         // Rotate unique/searchable hashes so a logically deleted PK/CID can be
