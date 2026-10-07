@@ -124,6 +124,27 @@
         });
     }
 
+    function cleanupModalArtifacts() {
+        const visibleModals = document.querySelectorAll('.modal.show');
+        if (visibleModals.length === 0) {
+            document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
+                backdrop.remove();
+            });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+        }
+    }
+
+    function closeTopbarMenusBeforeModal() {
+        document.querySelectorAll('.top-navbar .dropdown-menu.show').forEach(function (menu) {
+            menu.classList.remove('show');
+        });
+        document.querySelectorAll('.top-navbar [aria-expanded="true"]').forEach(function (toggle) {
+            toggle.setAttribute('aria-expanded', 'false');
+        });
+    }
+
     function enhanceModals(root) {
         root.querySelectorAll('.modal').forEach(function (modal) {
             if (modal.dataset.rpQaModalBound === '1') return;
@@ -139,9 +160,36 @@
                 modal.setAttribute('aria-labelledby', title.id);
             }
 
+            modal.addEventListener('show.bs.modal', function () {
+                closeTopbarMenusBeforeModal();
+
+                // Do not allow multiple visible modals/backdrops to stack.
+                document.querySelectorAll('.modal.show').forEach(function (otherModal) {
+                    if (otherModal === modal) return;
+                    const instance = window.bootstrap?.Modal?.getInstance(otherModal);
+                    if (instance) {
+                        instance.hide();
+                    } else {
+                        otherModal.classList.remove('show');
+                        otherModal.style.display = 'none';
+                        otherModal.setAttribute('aria-hidden', 'true');
+                    }
+                });
+            });
+
             modal.addEventListener('shown.bs.modal', function () {
+                // Bootstrap should leave exactly one backdrop for one modal.
+                const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+                backdrops.slice(0, -1).forEach(function (backdrop) {
+                    backdrop.remove();
+                });
+
                 const first = modal.querySelector('[autofocus], input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href]');
                 if (first) first.focus({ preventScroll: true });
+            });
+
+            modal.addEventListener('hidden.bs.modal', function () {
+                window.setTimeout(cleanupModalArtifacts, 0);
             });
         });
     }
