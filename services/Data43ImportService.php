@@ -206,7 +206,7 @@ class Data43ImportService {
             return [];
         }
 
-        $metricCode = $this->metricCodeForFile($fileCode);
+        $identityIndex = $this->findHeaderIndex($headerMap, ['PID','PERSON_ID','CID','HN']);
         $groups = [];
 
         try {
@@ -218,8 +218,11 @@ class Data43ImportService {
                 $tambon = $this->areaValue($row, $areaCols['TAMBON'], 2);
                 $village = $this->areaValue($row, $areaCols['VILLAGE'], 2);
 
-                // We only keep administrative codes, never address text or citizen identifiers.
+                // Keep only administrative codes and aggregate statistics; identifiers are never persisted.
                 $levels = [];
+                if ($changwat !== null) {
+                    $levels[] = ['CHANGWAT', $changwat, null, null, null];
+                }
                 if ($ampur !== null) {
                     $levels[] = ['AMPUR', $changwat, $ampur, null, null];
                 }
@@ -230,42 +233,66 @@ class Data43ImportService {
                     $levels[] = ['VILLAGE', $changwat, $ampur, $tambon, $village];
                 }
 
+                $metricCodes = $this->metricCodesForRow($fileCode, $row, $headerMap);
+                if (empty($metricCodes)) continue;
+
                 $lat = $this->coordinateValue($row, $areaCols['LATITUDE'], -90, 90);
                 $lng = $this->coordinateValue($row, $areaCols['LONGITUDE'], -180, 180);
-
-                foreach ($levels as [$level, $cw, $ap, $tb, $vl]) {
-                    $key = implode('|', [
-                        $level,
-                        $cw ?? '',
-                        $ap ?? '',
-                        $tb ?? '',
-                        $vl ?? '',
-                        $fileCode,
-                        $metricCode,
-                    ]);
-
-                    if (!isset($groups[$key])) {
-                        $groups[$key] = [
-                            'area_level' => $level,
-                            'changwat_code' => $cw,
-                            'ampur_code' => $ap,
-                            'tambon_code' => $tb,
-                            'village_code' => $vl,
-                            'source_file_code' => $fileCode,
-                            'metric_code' => $metricCode,
-                            'metric_value' => 0,
-                            'lat_sum' => 0.0,
-                            'lng_sum' => 0.0,
-                            'geo_point_count' => 0,
-                        ];
+                $identity = null;
+                if ($identityIndex !== null && array_key_exists($identityIndex, $row)) {
+                    $rawIdentity = trim((string)$row[$identityIndex]);
+                    if ($rawIdentity !== '') {
+                        // Used only for in-memory de-duplication; never written to DB/log.
+                        $identity = hash('sha256', $rawIdentity);
                     }
+                }
 
-                    $groups[$key]['metric_value']++;
+                foreach ($metricCodes as $metricCode) {
+                    foreach ($levels as [$level, $cw, $ap, $tb, $vl]) {
+                        $key = implode('|', [
+                            $level,
+                            $cw ?? '',
+                            $ap ?? '',
+                            $tb ?? '',
+                            $vl ?? '',
+                            $fileCode,
+                            $metricCode,
+                        ]);
 
-                    if ($lat !== null && $lng !== null) {
-                        $groups[$key]['lat_sum'] += $lat;
-                        $groups[$key]['lng_sum'] += $lng;
-                        $groups[$key]['geo_point_count']++;
+                        if (!isset($groups[$key])) {
+                            $groups[$key] = [
+                                'area_level' => $level,
+                                'changwat_code' => $cw,
+                                'ampur_code' => $ap,
+                                'tambon_code' => $tb,
+                                'village_code' => $vl,
+                                'source_file_code' => $fileCode,
+                                'metric_code' => $metricCode,
+                                'metric_value' => 0,
+                                'lat_sum' => 0.0,
+                                'lng_sum' => 0.0,
+                                'geo_point_count' => 0,
+                                '_seen' => [],
+                            ];
+                        }
+
+                        // Disease/person indicators should represent people where PID/CID is available.
+                        // SERVICE remains a service-event count.
+                        $dedupe = $metricCode !== 'SERVICE' && $identity !== null;
+                        if ($dedupe && isset($groups[$key]['_seen'][$identity])) {
+                            continue;
+                        }
+                        if ($dedupe) {
+                            $groups[$key]['_seen'][$identity] = true;
+                        }
+
+                        $groups[$key]['metric_value']++;
+
+                        if ($lat !== null && $lng !== null) {
+                            $groups[$key]['lat_sum'] += $lat;
+                            $groups[$key]['lng_sum'] += $lng;
+                            $groups[$key]['geo_point_count']++;
+                        }
                     }
                 }
             }
@@ -340,12 +367,81 @@ class Data43ImportService {
         return ($value >= $min && $value <= $max) ? $value : null;
     }
 
-    private function metricCodeForFile(string $fileCode): string {
+    private function metricCodesForRow(string $fileCode, array $row, array $headerMap): array {
         $code = strtoupper($fileCode);
-        if (str_contains($code, 'HOME')) return 'HOUSEHOLD_RECORDS';
-        if (str_contains($code, 'ADDRESS')) return 'ADDRESS_RECORDS';
-        if (str_contains($code, 'PERSON')) return 'PERSON_RECORDS';
-        return 'RECORDS';
+        $metrics = [];
+
+        if (str_contains($code, 'PERSON')) {
+            $metrics[] = 'POPULATION';
+            $age = $this->ageYears($row, $headerMap);
+            if ($age !== null && $age >= 60) {
+                $metrics[] = 'ELDERLY';
+            }
+        }
+
+        if (str_contains($code, 'ANC')) {
+            $metrics[] = 'ANC';
+        }
+
+        if (str_contains($code, 'DISABILITY')) {
+            $metrics[] = 'DISABLED';
+        }
+
+        if (preg_match('/(^|_)SERVICE($|_)/', $code)) {
+            $metrics[] = 'SERVICE';
+        }
+
+        if (str_contains($code, 'CHRONIC')) {
+            $metrics[] = 'NCD';
+        }
+
+        if (str_contains($code, 'DIAGNOSIS') || str_contains($code, 'CHRONIC')) {
+            $diagIndex = $this->findHeaderIndex($headerMap, ['DIAGCODE','DIAG','ICD10','ICD10_CODE','CHRONIC']);
+            $diag = '';
+            if ($diagIndex !== null && array_key_exists($diagIndex, $row)) {
+                $diag = strtoupper(preg_replace('/[^A-Z0-9.]/', '', trim((string)$row[$diagIndex])) ?: '');
+            }
+
+            if (preg_match('/^E1[0-4]/', $diag)) {
+                $metrics[] = 'DM';
+                $metrics[] = 'NCD';
+            }
+            if (preg_match('/^I1[0-5]/', $diag)) {
+                $metrics[] = 'HT';
+                $metrics[] = 'NCD';
+            }
+        }
+
+        return array_values(array_unique($metrics));
+    }
+
+    private function ageYears(array $row, array $headerMap): ?int {
+        $ageIndex = $this->findHeaderIndex($headerMap, ['AGE','AGE_Y','AGE_YEAR','AGE_YEARS']);
+        if ($ageIndex !== null && isset($row[$ageIndex]) && is_numeric(trim((string)$row[$ageIndex]))) {
+            $age = (int)$row[$ageIndex];
+            return ($age >= 0 && $age <= 130) ? $age : null;
+        }
+
+        $birthIndex = $this->findHeaderIndex($headerMap, ['BIRTH','BIRTHDATE','DATE_BIRTH','DOB']);
+        if ($birthIndex === null || !array_key_exists($birthIndex, $row)) return null;
+
+        $digits = preg_replace('/[^0-9]/', '', trim((string)$row[$birthIndex]));
+        if (strlen($digits) !== 8) return null;
+
+        $year = (int)substr($digits, 0, 4);
+        $month = (int)substr($digits, 4, 2);
+        $day = (int)substr($digits, 6, 2);
+        if ($year > 2400) $year -= 543;
+        if (!checkdate($month, $day, $year)) return null;
+
+        try {
+            $birth = new DateTimeImmutable(sprintf('%04d-%02d-%02d', $year, $month, $day));
+            $today = new DateTimeImmutable('today');
+            if ($birth > $today) return null;
+            return (int)$birth->diff($today)->y;
+        } catch (Throwable $e) {
+            return null;
+        }
     }
 
     private function countTextRows(string $path): int {
