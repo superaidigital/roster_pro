@@ -31,7 +31,7 @@ $files = $files ?? [];
     </div>
 
     <div class="row g-3 mb-3">
-        <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">ตรวจพบ</div><div class="fs-3 fw-bold"><?= (int)$submission['detected_files'] ?>/<?= (int)$submission['expected_files'] ?></div></div></div>
+        <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">ตรวจพบตาม Profile</div><div class="fs-3 fw-bold"><?= (int)$submission['detected_files'] ?>/<?= (int)$submission['expected_files'] ?></div></div></div>
         <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">จำนวนข้อมูล</div><div class="fs-3 fw-bold"><?= number_format((int)$submission['total_rows']) ?></div></div></div>
         <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">สถานะ</div><div class="fs-5 fw-bold"><?= htmlspecialchars($submission['status'], ENT_QUOTES, 'UTF-8') ?></div></div></div>
         <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">เวลานำส่ง</div><div class="fw-bold"><?= htmlspecialchars($submission['uploaded_at'], ENT_QUOTES, 'UTF-8') ?></div></div></div>
@@ -58,7 +58,7 @@ $files = $files ?? [];
         <div class="rp-card__header">
             <div>
                 <h2 class="rp-card__title mb-1">ไฟล์ที่ตรวจพบ</h2>
-                <div class="text-muted small">ไม่แสดงหรือบันทึกข้อมูล PII รายบุคคลในหน้านี้</div>
+                <div class="text-muted small">มาตรฐาน <?= htmlspecialchars((string)($submission['standard_version'] ?? '2.4.1'), ENT_QUOTES, 'UTF-8') ?> · Profile <?= htmlspecialchars((string)($submission['profile_code'] ?? 'RPHST_V241'), ENT_QUOTES, 'UTF-8') ?> · ไม่แสดง PII รายบุคคล</div>
             </div>
         </div>
         <div class="rp-card__body p-0">
@@ -83,9 +83,12 @@ $files = $files ?? [];
                             <td class="text-end"><?= number_format(((int)$file['file_size']) / 1024, 1) ?> KB</td>
                             <td class="text-end"><?= $file['row_count'] === null ? '-' : number_format((int)$file['row_count']) ?></td>
                             <td class="text-center">
-                                <span class="rp-badge rp-badge--<?= $file['status'] === 'VALID' ? 'success' : 'danger' ?>">
+                                <span class="rp-badge rp-badge--<?= $file['status'] === 'VALID' ? 'success' : ($file['status'] === 'SKIPPED' ? 'warning' : 'danger') ?>">
                                     <?= htmlspecialchars($file['status'], ENT_QUOTES, 'UTF-8') ?>
                                 </span>
+                                <?php if (!empty($file['error_message'])): ?>
+                                    <div class="small text-muted mt-1"><?= htmlspecialchars($file['error_message'], ENT_QUOTES, 'UTF-8') ?></div>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
