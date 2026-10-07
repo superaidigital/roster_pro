@@ -103,6 +103,9 @@ $prefill_pid=trim((string)($_GET['pid']??''));
         <a class="rp-btn rp-btn--secondary" href="index.php?c=data43&a=registry_export&file=<?= urlencode($file_code) ?>&format=csv<?= $selected_hospital_id?'&hospital_id='.(int)$selected_hospital_id:'' ?>">
           <i class="bi bi-filetype-csv"></i> CSV
         </a>
+        <a class="rp-btn rp-btn--secondary" href="index.php?c=data43&a=registry_export&format=zip&inner=txt<?= $selected_hospital_id?'&hospital_id='.(int)$selected_hospital_id:'' ?>">
+          <i class="bi bi-file-earmark-zip"></i> ZIP รวม
+        </a>
         <button type="button" class="rp-btn rp-btn--primary" data-d43-add="<?= htmlspecialchars($file_code,ENT_QUOTES,'UTF-8') ?>">
           <i class="bi bi-plus-circle"></i> เพิ่ม
         </button>
@@ -126,12 +129,14 @@ $prefill_pid=trim((string)($_GET['pid']??''));
                 </a>
               <?php endif; ?>
               <button type="button" class="rp-btn rp-btn--secondary" data-d43-edit="<?= (int)$row['id'] ?>"><i class="bi bi-pencil"></i> แก้ไข</button>
+              <?php if(($data43_role??'SURVEYOR')==='ADMIN'): ?>
               <form method="POST" action="index.php?c=data43&a=registry_delete" onsubmit="return confirm('ยืนยันลบรายการนี้?');">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token,ENT_QUOTES,'UTF-8') ?>">
                 <input type="hidden" name="record_id" value="<?= (int)$row['id'] ?>">
                 <?php if($selected_hospital_id): ?><input type="hidden" name="hospital_id" value="<?= (int)$selected_hospital_id ?>"><?php endif; ?>
                 <button class="rp-btn rp-btn--danger" type="submit"><i class="bi bi-trash3"></i></button>
               </form>
+              <?php endif; ?>
             </div>
           </div>
           <?php endforeach; ?>
