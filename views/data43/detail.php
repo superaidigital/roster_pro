@@ -1,6 +1,7 @@
 <?php
 $files = $files ?? [];
 $quality_summary = $quality_summary ?? null;
+$quality_issues = $quality_issues ?? [];
 ?>
 <div class="rp-page">
     <div class="rp-page-header mb-3">
@@ -85,6 +86,49 @@ $quality_summary = $quality_summary ?? null;
                             <?= htmlspecialchars(implode(', ',(array)$columns),ENT_QUOTES,'UTF-8') ?></div>
                     <?php endforeach; ?>
                 <?php endif; ?>
+            </div>
+        </section>
+    <?php endif; ?>
+
+    <?php if (!empty($quality_issues)): ?>
+        <section class="rp-card mb-3">
+            <div class="rp-card__header">
+                <div>
+                    <h2 class="rp-card__title mb-1"><i class="bi bi-clipboard2-pulse me-2"></i>ผลตรวจคุณภาพระดับข้อมูล</h2>
+                    <div class="small text-muted">แสดงเฉพาะกฎ จำนวนปัญหา และเลขแถวตัวอย่าง ไม่บันทึกค่าข้อมูลส่วนบุคคล</div>
+                </div>
+            </div>
+            <div class="rp-card__body p-0">
+                <div class="table-responsive">
+                    <table class="rp-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>แฟ้ม</th>
+                                <th>ระดับ</th>
+                                <th>กฎตรวจสอบ</th>
+                                <th>ฟิลด์</th>
+                                <th class="text-end">จำนวน</th>
+                                <th>แถวตัวอย่าง</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach($quality_issues as $issue): ?>
+                            <tr>
+                                <td><code><?= htmlspecialchars((string)$issue['file_code'],ENT_QUOTES,'UTF-8') ?></code></td>
+                                <td>
+                                    <span class="rp-badge rp-badge--<?= $issue['severity']==='ERROR'?'danger':($issue['severity']==='WARNING'?'warning':'info') ?>">
+                                        <?= htmlspecialchars((string)$issue['severity'],ENT_QUOTES,'UTF-8') ?>
+                                    </span>
+                                </td>
+                                <td><?= htmlspecialchars((string)$issue['rule_code'],ENT_QUOTES,'UTF-8') ?></td>
+                                <td><?= htmlspecialchars((string)($issue['field_name']??'-'),ENT_QUOTES,'UTF-8') ?></td>
+                                <td class="text-end fw-bold"><?= number_format((int)$issue['issue_count']) ?></td>
+                                <td><?= htmlspecialchars(implode(', ',array_map('strval',(array)($issue['sample_rows']??[]))),ENT_QUOTES,'UTF-8') ?: '-' ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
     <?php endif; ?>
