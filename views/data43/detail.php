@@ -48,6 +48,17 @@ $quality_issues = $quality_issues ?? [];
                 </div>
             </div>
             <div class="rp-card__body">
+                <div class="mb-3">
+                    <?php
+                    $profileCode = (string)($quality_summary['profile_code'] ?? $submission['profile_code'] ?? '');
+                    $strictProfile = $profileCode === 'RPHST_V241';
+                    ?>
+                    <span class="rp-badge rp-badge--<?= $strictProfile ? 'success' : 'warning' ?>">
+                        <?= $strictProfile ? 'MOPH 2.4.1 STRICT' : 'LEGACY / COMPATIBILITY MODE' ?>
+                    </span>
+                    <span class="small text-muted ms-2"><?= htmlspecialchars($profileCode,ENT_QUOTES,'UTF-8') ?></span>
+                </div>
+
                 <div class="row g-3">
                     <div class="col-md-3"><div class="small text-muted">โครงสร้างตาม Profile</div><div class="fs-4 fw-bold"><?= (int)$quality_summary['detected_expected_files'] ?>/<?= (int)$quality_summary['expected_files'] ?></div></div>
                     <div class="col-md-3"><div class="small text-muted">เชื่อม PERSON → HOME ได้</div><div class="fs-4 fw-bold"><?= number_format((int)$quality_summary['linked_people']) ?></div></div>
@@ -64,6 +75,18 @@ $quality_issues = $quality_issues ?? [];
                             <span class="rp-badge rp-badge--warning"><?= htmlspecialchars((string)$code,ENT_QUOTES,'UTF-8') ?></span>
                         <?php endforeach; ?>
                     </div>
+                <?php endif; ?>
+
+                <?php $unknownFiles = (array)($quality_summary['unknown_files_json'] ?? []); ?>
+                <?php if ($unknownFiles): ?>
+                    <hr>
+                    <div class="fw-bold mb-2">ไฟล์ส่วนขยาย / ไม่อยู่ใน 52 โครงสร้างมาตรฐาน</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach ($unknownFiles as $filename): ?>
+                            <span class="rp-badge rp-badge--info"><?= htmlspecialchars((string)$filename,ENT_QUOTES,'UTF-8') ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="small text-muted mt-2">ระบบเก็บเฉพาะ metadata ของไฟล์เหล่านี้และไม่ใช้เป็นตัวชี้วัดมาตรฐานจนกว่าจะมี mapping ที่กำหนดไว้</div>
                 <?php endif; ?>
 
                 <?php $invalidExpected = (array)($quality_summary['invalid_expected_codes_json'] ?? []); ?>
