@@ -796,3 +796,45 @@ body.rp-roster-focus-mode .pwa-toast {
     position: relative;
     z-index: 1;
 }
+
+
+/* Native Fullscreen API support */
+#rosterWorkspace:fullscreen,
+#rosterWorkspace:-webkit-full-screen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: .75rem !important;
+    background: var(--rp-bg) !important;
+    overflow: hidden !important;
+}
+
+#rosterWorkspace:fullscreen .rp-roster-focusbar,
+#rosterWorkspace:-webkit-full-screen .rp-roster-focusbar {
+    position: relative !important;
+    z-index: 100 !important;
+    pointer-events: auto !important;
+}
+
+#rosterWorkspace:fullscreen #rosterFullscreenExit,
+#rosterWorkspace:-webkit-full-screen #rosterFullscreenExit,
+#rosterWorkspace:fullscreen #rosterStaffPanelToggle,
+#rosterWorkspace:-webkit-full-screen #rosterStaffPanelToggle {
+    position: relative !important;
+    z-index: 110 !important;
+    pointer-events: auto !important;
+}
+
+#rosterWorkspace:fullscreen .rp-roster-table-wrap,
+#rosterWorkspace:-webkit-full-screen .rp-roster-table-wrap {
+    height: calc(100vh - 84px) !important;
+    max-height: calc(100vh - 84px) !important;
+}
+
+#rosterWorkspace:fullscreen .rp-roster-board,
+#rosterWorkspace:-webkit-full-screen .rp-roster-board {
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
