@@ -3,16 +3,24 @@ require_once __DIR__ . '/../models/Data43RecordModel.php';
 require_once __DIR__ . '/Data43CryptoService.php';
 require_once __DIR__ . '/Data43ValidationService.php';
 require_once __DIR__ . '/Data43FormRegistry.php';
+require_once __DIR__ . '/Data43StorageService.php';
 
 final class Data43RegistryService
 {
     private Data43RecordModel $model;
-    private Data43CryptoService $crypto;
+    private ?Data43CryptoService $crypto = null;
 
     public function __construct(private PDO $db)
     {
         $this->model = new Data43RecordModel($db);
-        $this->crypto = new Data43CryptoService();
+    }
+
+    private function crypto(): Data43CryptoService
+    {
+        if ($this->crypto === null) {
+            $this->crypto = new Data43CryptoService();
+        }
+        return $this->crypto;
     }
 
     public function schemaReady(): bool
@@ -125,12 +133,12 @@ final class Data43RegistryService
             throw new RuntimeException('พบ Primary Key ซ้ำในแฟ้ม '.$fileCode);
         }
 
-        $cidHash=$this->crypto->cidHash($data['CID'] ?? null);
+        $cidHash=$this->crypto()->cidHash($data['CID'] ?? null);
         if($fileCode==='PERSON' && $cidHash && $this->model->existsCidHash($hospitalId,$cidHash,$recordId)){
             throw new RuntimeException('พบ CID ซ้ำในทะเบียน PERSON');
         }
 
-        $encrypted=$this->crypto->encrypt($data);
+        $encrypted=$this->crypto()->encrypt($data);
         $pidRef=trim((string)($data['PID'] ?? '')) ?: null;
         $hidRef=trim((string)($data['HID'] ?? '')) ?: null;
         $row=[
@@ -203,7 +211,7 @@ final class Data43RegistryService
         $type=strtoupper($type)==='HOME'?'HOME':'PERSON';
         $query=trim($query);
         if(mb_strlen($query,'UTF-8')<2) return [];
-        $token=$this->crypto->blindToken($query);
+        $token=$this->crypto()->blindToken($query);
         $rows=$this->model->searchByToken($hospitalId,$type,$token,20);
         $out=[];
         foreach($rows as $row){
@@ -431,12 +439,12 @@ final class Data43RegistryService
             $data['DISCHARGE']='1';
             $data['DDISCHARGE']=$deathDate;
             $data['D_UPDATE']=date('YmdHis');
-            $enc=$this->crypto->encrypt($data);
+            $enc=$this->crypto()->encrypt($data);
             $schema=Data43FormRegistry::get('PERSON');
             $recordKey=$this->recordKey($hospitalId,$schema['pk'],$data);
             $this->model->update((int)$row['id'],$hospitalId,[
                 ':record_key_hash'=>$recordKey,':pid_ref'=>$pid,':hid_ref'=>$data['HID']??null,
-                ':cid_hash'=>$this->crypto->cidHash($data['CID']??null),':payload_ciphertext'=>$enc['ciphertext'],
+                ':cid_hash'=>$this->crypto()->cidHash($data['CID']??null),':payload_ciphertext'=>$enc['ciphertext'],
                 ':payload_nonce'=>$enc['nonce'],':payload_algorithm'=>$enc['algorithm'],':payload_sha256'=>$enc['sha256'],':updated_by'=>$userId,
             ]);
             $this->model->addAudit((int)$row['id'],$hospitalId,'PERSON','UPDATE',$userId,$recordKey,['DISCHARGE','DDISCHARGE','D_UPDATE']);
@@ -449,12 +457,12 @@ final class Data43RegistryService
         $tokens=[];
         if($fileCode==='PERSON'){
             foreach([(string)($data['PID']??''),(string)($data['CID']??''),trim(($data['NAME']??'').' '.($data['LNAME']??''))] as $value){
-                $tokens=array_merge($tokens,$this->crypto->prefixTokens($value));
+                $tokens=array_merge($tokens,$this->crypto()->prefixTokens($value));
             }
             $this->model->replaceSearchTokens($recordId,'PERSON',$tokens);
         }elseif($fileCode==='HOME'){
             foreach([(string)($data['HID']??''),(string)($data['HOUSE']??'')] as $value){
-                $tokens=array_merge($tokens,$this->crypto->prefixTokens($value));
+                $tokens=array_merge($tokens,$this->crypto()->prefixTokens($value));
             }
             $this->model->replaceSearchTokens($recordId,'HOME',$tokens);
         }
@@ -472,7 +480,7 @@ final class Data43RegistryService
         return [
             'id'=>(int)$row['id'],
             'file_code'=>(string)$row['file_code'],
-            'data'=>$this->crypto->decrypt((string)$row['payload_ciphertext'],(string)$row['payload_nonce'],(string)$row['payload_algorithm']),
+            'data'=>$this->crypto()->decrypt((string)$row['payload_ciphertext'],(string)$row['payload_nonce'],(string)$row['payload_algorithm']),
             'created_at'=>$row['created_at']??null,
             'updated_at'=>$row['updated_at']??null,
         ];
