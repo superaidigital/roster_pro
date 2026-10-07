@@ -1,5 +1,6 @@
 <?php
 $files = $files ?? [];
+$quality_summary = $quality_summary ?? null;
 ?>
 <div class="rp-page">
     <div class="rp-page-header mb-3">
@@ -36,6 +37,46 @@ $files = $files ?? [];
         <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">สถานะ</div><div class="fs-5 fw-bold"><?= htmlspecialchars($submission['status'], ENT_QUOTES, 'UTF-8') ?></div></div></div>
         <div class="col-md-3"><div class="rp-card p-3"><div class="small text-muted">เวลานำส่ง</div><div class="fw-bold"><?= htmlspecialchars($submission['uploaded_at'], ENT_QUOTES, 'UTF-8') ?></div></div></div>
     </div>
+
+    <?php if (!empty($quality_summary)): ?>
+        <section class="rp-card mb-3">
+            <div class="rp-card__header">
+                <div>
+                    <h2 class="rp-card__title mb-1"><i class="bi bi-shield-check me-2"></i>คุณภาพข้อมูล</h2>
+                    <div class="text-muted small">สรุปการตรวจโครงสร้างและการเชื่อมโยง โดยไม่เก็บ PID/CID/HID ในรายงานนี้</div>
+                </div>
+            </div>
+            <div class="rp-card__body">
+                <div class="row g-3">
+                    <div class="col-md-3"><div class="small text-muted">โครงสร้างตาม Profile</div><div class="fs-4 fw-bold"><?= (int)$quality_summary['detected_expected_files'] ?>/<?= (int)$quality_summary['expected_files'] ?></div></div>
+                    <div class="col-md-3"><div class="small text-muted">เชื่อม PERSON → HOME ได้</div><div class="fs-4 fw-bold"><?= number_format((int)$quality_summary['linked_people']) ?></div></div>
+                    <div class="col-md-3"><div class="small text-muted">หา HOME ไม่พบ</div><div class="fs-4 fw-bold text-warning"><?= number_format((int)$quality_summary['unresolved_people']) ?></div></div>
+                    <div class="col-md-3"><div class="small text-muted">ปัญหา Header</div><div class="fs-4 fw-bold text-danger"><?= (int)$quality_summary['header_issue_files'] ?></div></div>
+                </div>
+
+                <?php $missing = (array)($quality_summary['missing_codes_json'] ?? []); ?>
+                <?php if ($missing): ?>
+                    <hr>
+                    <div class="fw-bold mb-2">โครงสร้างที่ยังไม่พบ</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach ($missing as $code): ?>
+                            <span class="rp-badge rp-badge--warning"><?= htmlspecialchars((string)$code,ENT_QUOTES,'UTF-8') ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php $headerIssues = (array)($quality_summary['header_issues_json'] ?? []); ?>
+                <?php if ($headerIssues): ?>
+                    <hr>
+                    <div class="fw-bold mb-2">คอลัมน์สำคัญที่ขาด</div>
+                    <?php foreach ($headerIssues as $code=>$columns): ?>
+                        <div class="small mb-1"><code><?= htmlspecialchars((string)$code,ENT_QUOTES,'UTF-8') ?></code> :
+                            <?= htmlspecialchars(implode(', ',(array)$columns),ENT_QUOTES,'UTF-8') ?></div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <?php if (!empty($submission['error_summary'])): ?>
         <div class="rp-alert rp-alert--warning mb-3">
