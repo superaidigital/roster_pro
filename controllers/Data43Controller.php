@@ -583,15 +583,23 @@ class Data43Controller
         $hospitalId=$this->selectedHospitalId();
         $fileCode=strtoupper(trim((string)($_GET['file'] ?? 'PERSON')));
         $format=strtolower(trim((string)($_GET['format'] ?? 'txt')));
-        if(!in_array($format,['txt','csv'],true)) $format='txt';
+        if(!in_array($format,['txt','csv','zip'],true)) $format='txt';
         if(!$hospitalId){$_SESSION['error_msg']='กรุณาเลือกหน่วยบริการ';header('Location: index.php?c=data43&a=registry');exit;}
 
         $workDir=dirname(__DIR__).DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'data43_export'.DIRECTORY_SEPARATOR.'job_'.bin2hex(random_bytes(8));
         try{
             $service=new Data43RegistryService((new Database())->getConnection());
-            $path=$service->exportFile((int)$hospitalId,(int)$_SESSION['user']['id'],$fileCode,$format,$workDir);
-            header('Content-Type: '.($format==='csv'?'text/csv':'text/plain').'; charset=utf-8');
-            header('Content-Disposition: attachment; filename="'.$fileCode.'.'.$format.'"');
+            if($format==='zip'){
+                $inner=strtolower(trim((string)($_GET['inner'] ?? 'txt')));
+                if(!in_array($inner,['txt','csv'],true))$inner='txt';
+                $path=$service->exportZip((int)$hospitalId,(int)$_SESSION['user']['id'],Data43FormRegistry::codes(),$inner,$workDir);
+                header('Content-Type: application/zip');
+                header('Content-Disposition: attachment; filename="DATA43_'.date('Ymd_His').'.zip"');
+            }else{
+                $path=$service->exportFile((int)$hospitalId,(int)$_SESSION['user']['id'],$fileCode,$format,$workDir);
+                header('Content-Type: '.($format==='csv'?'text/csv':'text/plain').'; charset=utf-8');
+                header('Content-Disposition: attachment; filename="'.$fileCode.'.'.$format.'"');
+            }
             header('Content-Length: '.filesize($path));
             readfile($path);
         }finally{
