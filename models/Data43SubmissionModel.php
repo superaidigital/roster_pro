@@ -426,6 +426,7 @@ class Data43SubmissionModel {
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
+              AND m.metric_code IN ('DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE','POPULATION')
         ";
         $params = [$reportMonth, $reportMonth];
 
@@ -434,7 +435,7 @@ class Data43SubmissionModel {
             $params[] = $hospitalId;
         }
 
-        $sql .= " ORDER BY m.metric_code, m.source_file_code";
+        $sql .= " ORDER BY FIELD(m.metric_code,'DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE','POPULATION'), m.source_file_code";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -443,14 +444,21 @@ class Data43SubmissionModel {
     public function getSpatialSummary(
         string $reportMonth,
         string $areaLevel,
-        ?string $metricCode = null,
-        ?int $hospitalId = null
+        string $metricCode = 'DM',
+        ?int $hospitalId = null,
+        ?string $ampurCode = null,
+        ?string $tambonCode = null
     ): array {
         if (!$this->spatialSchemaReady()) return [];
 
-        $allowedLevels = ['AMPUR','TAMBON','VILLAGE'];
+        $allowedLevels = ['CHANGWAT','AMPUR','TAMBON','VILLAGE'];
         if (!in_array($areaLevel, $allowedLevels, true)) {
-            $areaLevel = 'TAMBON';
+            $areaLevel = 'CHANGWAT';
+        }
+
+        $allowedMetrics = ['DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE'];
+        if (!in_array($metricCode, $allowedMetrics, true)) {
+            $metricCode = 'DM';
         }
 
         $sql = "
@@ -459,20 +467,23 @@ class Data43SubmissionModel {
                 m.ampur_code,
                 m.tambon_code,
                 m.village_code,
-                SUM(m.metric_value) AS metric_value,
-                SUM(m.geo_point_count) AS geo_point_count,
+                SUM(CASE WHEN m.metric_code = ? THEN m.metric_value ELSE 0 END) AS metric_value,
+                SUM(CASE WHEN m.metric_code = 'POPULATION' THEN m.metric_value ELSE 0 END) AS population_value,
+                SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END) AS geo_point_count,
                 CASE
-                    WHEN SUM(m.geo_point_count) > 0
-                    THEN SUM(COALESCE(m.centroid_lat,0) * m.geo_point_count) / SUM(m.geo_point_count)
+                    WHEN SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END) > 0
+                    THEN SUM(CASE WHEN m.metric_code = ? THEN COALESCE(m.centroid_lat,0) * m.geo_point_count ELSE 0 END)
+                         / SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END)
                     ELSE NULL
                 END AS centroid_lat,
                 CASE
-                    WHEN SUM(m.geo_point_count) > 0
-                    THEN SUM(COALESCE(m.centroid_lng,0) * m.geo_point_count) / SUM(m.geo_point_count)
+                    WHEN SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END) > 0
+                    THEN SUM(CASE WHEN m.metric_code = ? THEN COALESCE(m.centroid_lng,0) * m.geo_point_count ELSE 0 END)
+                         / SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END)
                     ELSE NULL
                 END AS centroid_lng,
-                COUNT(DISTINCT m.hospital_id) AS hospital_count,
-                COUNT(DISTINCT m.source_file_code) AS source_file_count
+                COUNT(DISTINCT CASE WHEN m.metric_code = ? THEN m.hospital_id END) AS hospital_count,
+                COUNT(DISTINCT CASE WHEN m.metric_code = ? THEN m.source_file_code END) AS source_file_count
             FROM data43_area_metrics m
             JOIN (
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
@@ -482,17 +493,28 @@ class Data43SubmissionModel {
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
               AND m.area_level = ?
+              AND (m.metric_code = ? OR m.metric_code = 'POPULATION')
         ";
-        $params = [$reportMonth, $reportMonth, $areaLevel];
 
-        if ($metricCode !== null && $metricCode !== '') {
-            $sql .= " AND m.metric_code = ? ";
-            $params[] = $metricCode;
-        }
+        $params = [
+            $metricCode, $metricCode,
+            $metricCode, $metricCode, $metricCode,
+            $metricCode, $metricCode, $metricCode,
+            $metricCode, $metricCode,
+            $reportMonth, $reportMonth, $areaLevel, $metricCode
+        ];
 
         if ($hospitalId !== null) {
             $sql .= " AND m.hospital_id = ? ";
             $params[] = $hospitalId;
+        }
+        if ($ampurCode !== null && $ampurCode !== '') {
+            $sql .= " AND m.ampur_code = ? ";
+            $params[] = $ampurCode;
+        }
+        if ($tambonCode !== null && $tambonCode !== '') {
+            $sql .= " AND m.tambon_code = ? ";
+            $params[] = $tambonCode;
         }
 
         $sql .= "
@@ -501,24 +523,42 @@ class Data43SubmissionModel {
                 m.ampur_code,
                 m.tambon_code,
                 m.village_code
+            HAVING metric_value > 0 OR population_value > 0
             ORDER BY metric_value DESC
         ";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as &$row) {
+            $value = (int)($row['metric_value'] ?? 0);
+            $population = (int)($row['population_value'] ?? 0);
+            $row['rate_per_1000'] = $population > 0
+                ? round(($value / $population) * 1000, 2)
+                : null;
+        }
+        unset($row);
+
+        return $rows;
     }
 
     public function getSpatialCoverageByHospital(
         string $reportMonth,
         string $areaLevel,
+        string $metricCode = 'DM',
         ?int $hospitalId = null
     ): array {
         if (!$this->spatialSchemaReady()) return [];
 
-        $allowedLevels = ['AMPUR','TAMBON','VILLAGE'];
+        $allowedLevels = ['CHANGWAT','AMPUR','TAMBON','VILLAGE'];
         if (!in_array($areaLevel, $allowedLevels, true)) {
-            $areaLevel = 'TAMBON';
+            $areaLevel = 'CHANGWAT';
+        }
+
+        $allowedMetrics = ['DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE'];
+        if (!in_array($metricCode, $allowedMetrics, true)) {
+            $metricCode = 'DM';
         }
 
         $sql = "
@@ -544,8 +584,9 @@ class Data43SubmissionModel {
             JOIN hospitals h ON h.id = m.hospital_id
             WHERE m.report_month = ?
               AND m.area_level = ?
+              AND m.metric_code = ?
         ";
-        $params = [$reportMonth, $reportMonth, $areaLevel];
+        $params = [$reportMonth, $reportMonth, $areaLevel, $metricCode];
 
         if ($hospitalId !== null) {
             $sql .= " AND m.hospital_id = ? ";
