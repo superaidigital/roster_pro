@@ -38,9 +38,22 @@ final class Data43CryptoService
         }
 
         $configuredPath = trim((string)(getenv('DATA43_KEY_FILE') ?: ''));
-        $keyPath = $configuredPath !== ''
-            ? $configuredPath
-            : $this->defaultDevelopmentKeyPath();
+
+        if ($configuredPath !== '') {
+            $keyPath = $configuredPath;
+        } else {
+            // Backward compatibility: if an earlier development build already
+            // generated a key under storage/secrets, keep using it so existing
+            // encrypted records remain decryptable. New keys are never created there.
+            $legacyPath = dirname(__DIR__)
+                . DIRECTORY_SEPARATOR . 'storage'
+                . DIRECTORY_SEPARATOR . 'secrets'
+                . DIRECTORY_SEPARATOR . 'data43_record.key';
+
+            $keyPath = is_file($legacyPath)
+                ? $legacyPath
+                : $this->defaultDevelopmentKeyPath();
+        }
 
         $directory = dirname($keyPath);
 
