@@ -1,0 +1,127 @@
+:root{
+  color-scheme:light dark;
+  --login-bg:#eef4ff;
+  --login-panel:#ffffff;
+  --login-text:#10233f;
+  --login-muted:#64748b;
+  --login-line:#dbe5f2;
+  --login-primary:#1769e0;
+  --login-primary-2:#11a7a0;
+  --login-danger:#c62828;
+  --login-shadow:0 28px 80px rgba(15,35,70,.16);
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body.login-page{
+  margin:0;
+  min-height:100vh;
+  font-family:'Noto Sans Thai',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:var(--login-text);
+  background:
+    radial-gradient(circle at 16% 18%,rgba(23,105,224,.16),transparent 30%),
+    radial-gradient(circle at 80% 82%,rgba(17,167,160,.14),transparent 32%),
+    var(--login-bg);
+  overflow-x:hidden;
+}
+.login-shell{min-height:100vh;display:grid;place-items:center;padding:clamp(16px,3vw,42px);position:relative;isolation:isolate}
+.login-network{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none}
+.login-network::before,
+.login-network::after{
+  content:"";position:absolute;inset:-12%;opacity:.42;
+  background-image:
+    radial-gradient(circle,rgba(23,105,224,.38) 0 2px,transparent 2.5px),
+    linear-gradient(35deg,transparent 49.4%,rgba(23,105,224,.08) 49.5% 50.5%,transparent 50.6%);
+  background-size:64px 64px,128px 128px;
+  animation:networkDrift 22s linear infinite;
+}
+.login-network::after{transform:rotate(180deg) scale(1.15);opacity:.24;animation-duration:31s}
+.login-card{
+  width:min(1120px,100%);
+  min-height:640px;
+  display:grid;
+  grid-template-columns:minmax(0,1.04fr) minmax(380px,.96fr);
+  background:color-mix(in srgb,var(--login-panel) 96%,transparent);
+  border:1px solid color-mix(in srgb,var(--login-line) 82%,transparent);
+  border-radius:30px;
+  overflow:hidden;
+  box-shadow:var(--login-shadow);
+  backdrop-filter:blur(18px);
+}
+.login-scene{
+  position:relative;overflow:hidden;padding:48px;color:white;
+  display:flex;flex-direction:column;justify-content:space-between;
+  background:
+    radial-gradient(circle at 74% 22%,rgba(255,255,255,.18),transparent 22%),
+    linear-gradient(150deg,#0d5cc7 0%,#1677e8 46%,#0d978f 100%);
+}
+.login-scene-copy{position:relative;z-index:6;max-width:510px}
+.login-kicker{font-size:.78rem;font-weight:800;letter-spacing:.15em;text-transform:uppercase;opacity:.82}
+.login-scene h1{font-size:clamp(2rem,4vw,3.75rem);line-height:1.08;margin:.6rem 0 1rem;font-weight:850}
+.login-scene p{font-size:1rem;line-height:1.8;opacity:.88;max-width:46ch}
+.health-scene{position:relative;height:330px;margin-top:28px;z-index:2}
+.village-ground{position:absolute;left:-12%;right:-12%;bottom:-86px;height:230px;border-radius:50% 50% 0 0;background:rgba(5,74,96,.34)}
+.house{position:absolute;bottom:66px;width:84px;height:58px;background:rgba(255,255,255,.92);border-radius:8px;box-shadow:0 10px 30px rgba(3,40,80,.2)}
+.house::before{content:"";position:absolute;left:8px;right:8px;top:-35px;height:52px;background:#f5b14b;clip-path:polygon(50% 0,100% 70%,86% 70%,86% 100%,14% 100%,14% 70%,0 70%)}
+.house::after{content:"";position:absolute;width:18px;height:31px;background:#4a6988;left:33px;bottom:0;border-radius:4px 4px 0 0}
+.house.h1{left:8%}.house.h2{left:31%;bottom:90px;transform:scale(.78)}.house.h3{right:12%;bottom:80px;transform:scale(1.08)}
+.map-pin{position:absolute;left:58%;top:18px;width:66px;height:66px;border-radius:50% 50% 50% 0;background:#fff;transform:rotate(-45deg);box-shadow:0 16px 36px rgba(3,40,80,.25);animation:pinFloat 4s ease-in-out infinite}
+.map-pin::after{content:"";position:absolute;width:24px;height:24px;border-radius:50%;background:#14a39a;left:21px;top:21px}
+.pulse-line{position:absolute;left:3%;right:3%;top:52%;height:120px}
+.pulse-line svg{width:100%;height:100%;overflow:visible}
+.pulse-line polyline{fill:none;stroke:rgba(255,255,255,.9);stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:12 9;animation:pulseDash 8s linear infinite}
+.scene-dot{position:absolute;width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.75);box-shadow:0 0 0 8px rgba(255,255,255,.08);animation:dotPulse 2.8s ease-in-out infinite}
+.scene-dot.d1{left:17%;top:24%}.scene-dot.d2{left:44%;top:12%;animation-delay:.8s}.scene-dot.d3{right:8%;top:38%;animation-delay:1.4s}.scene-dot.d4{left:73%;bottom:20%;animation-delay:2s}
+.login-form-pane{padding:clamp(34px,5vw,68px);display:flex;align-items:center;background:var(--login-panel)}
+.login-form-wrap{width:100%;max-width:440px;margin:auto}
+.login-mobile-brand{display:none}
+.login-title{font-size:2rem;font-weight:850;margin:0 0 .35rem}
+.login-subtitle{color:var(--login-muted);margin:0 0 1.8rem}
+.login-alert{display:flex;gap:.7rem;align-items:flex-start;padding:.85rem 1rem;border-radius:14px;margin-bottom:1rem;font-size:.9rem}
+.login-alert-danger{background:rgba(198,40,40,.09);color:var(--login-danger);border:1px solid rgba(198,40,40,.16)}
+.login-alert-success{background:rgba(16,136,99,.09);color:#087f5b;border:1px solid rgba(16,136,99,.16)}
+.float-field{position:relative;margin-bottom:1rem}
+.float-field input{
+  width:100%;height:58px;border:1px solid var(--login-line);border-radius:15px;background:color-mix(in srgb,var(--login-panel) 92%,#edf4ff);
+  color:var(--login-text);font:inherit;padding:20px 48px 8px 46px;outline:none;transition:.2s ease;
+}
+.float-field input:focus{border-color:var(--login-primary);box-shadow:0 0 0 4px rgba(23,105,224,.12);background:var(--login-panel)}
+.float-field label{position:absolute;left:46px;top:18px;color:var(--login-muted);font-size:.92rem;pointer-events:none;transition:.18s ease;transform-origin:left center}
+.float-field input:focus+label,
+.float-field input:not(:placeholder-shown)+label{top:7px;font-size:.68rem;font-weight:700;color:var(--login-primary)}
+.field-icon{position:absolute;left:16px;top:18px;color:var(--login-muted);z-index:2}
+.password-toggle{position:absolute;right:10px;top:10px;width:38px;height:38px;border:0;border-radius:10px;background:transparent;color:var(--login-muted);cursor:pointer}
+.password-toggle:hover,.password-toggle:focus-visible{background:rgba(23,105,224,.08);color:var(--login-primary);outline:none}
+.caps-warning{display:none;margin:-.35rem 0 .85rem;color:#a15c00;font-size:.8rem}
+.caps-warning.is-visible{display:flex;gap:.35rem;align-items:center}
+.login-submit{width:100%;height:54px;border:0;border-radius:15px;color:white;font:inherit;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--login-primary),#1555c7 56%,var(--login-primary-2));box-shadow:0 12px 26px rgba(23,105,224,.22);transition:.2s ease}
+.login-submit:hover{transform:translateY(-1px);box-shadow:0 16px 30px rgba(23,105,224,.28)}
+.login-submit:active{transform:none}
+.login-footnote{margin-top:1.35rem;color:var(--login-muted);font-size:.76rem;text-align:center}
+@keyframes networkDrift{to{transform:translate3d(64px,64px,0)}}
+@keyframes pinFloat{0%,100%{transform:translateY(0) rotate(-45deg)}50%{transform:translateY(-12px) rotate(-45deg)}}
+@keyframes pulseDash{to{stroke-dashoffset:-210}}
+@keyframes dotPulse{0%,100%{opacity:.45;transform:scale(.85)}50%{opacity:1;transform:scale(1.15)}}
+@media (max-width:860px){
+  .login-card{grid-template-columns:1fr;min-height:auto;max-width:560px}
+  .login-scene{display:none}
+  .login-form-pane{min-height:620px}
+  .login-mobile-brand{display:flex;gap:.7rem;align-items:center;margin-bottom:1.6rem;font-weight:850;color:var(--login-primary)}
+  .login-mobile-brand i{font-size:2rem}
+}
+@media (max-width:540px){
+  .login-shell{padding:0}
+  .login-card{min-height:100vh;border:0;border-radius:0;box-shadow:none}
+  .login-form-pane{padding:28px 20px}
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --login-bg:#07111f;--login-panel:#0d1a2b;--login-text:#edf4ff;--login-muted:#9badc2;--login-line:#263a51;
+    --login-shadow:0 28px 90px rgba(0,0,0,.4)
+  }
+  body.login-page{background:radial-gradient(circle at 18% 15%,rgba(23,105,224,.18),transparent 30%),radial-gradient(circle at 82% 82%,rgba(17,167,160,.13),transparent 30%),var(--login-bg)}
+  .float-field input{background:#102036}
+  .login-alert-danger{color:#ff9d9d}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
