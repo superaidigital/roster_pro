@@ -10,6 +10,7 @@ final class Data43FormRegistry
                 'pk'=>['HOSPCODE','PID'],
                 'fields'=>[
                     ['name'=>'HOSPCODE','label'=>'รหัสหน่วยบริการ','type'=>'auto','required'=>true],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto'],
                     ['name'=>'PID','label'=>'PID','type'=>'auto','required'=>true],
                     ['name'=>'CID','label'=>'เลขบัตรประชาชน','type'=>'text','maxlength'=>13],
                     ['name'=>'HID','label'=>'HID / บ้าน','type'=>'home-search'],
