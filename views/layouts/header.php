@@ -842,19 +842,30 @@ $header_page_icon = $page_context[2];
     let deferredPrompt;
 
     window.addEventListener('beforeinstallprompt', (e) => {
+        // Keep the install prompt under our control so it never interrupts
+        // roster editing or other transactional workflows.
         e.preventDefault();
         deferredPrompt = e;
 
         const dismissedAt = parseInt(localStorage.getItem('pwaDismissedAt') || '0', 10);
         const sevenDays = 7 * 24 * 60 * 60 * 1000;
-        const canShow = !dismissedAt || (Date.now() - dismissedAt) > sevenDays;
+        const canShowByTime = !dismissedAt || (Date.now() - dismissedAt) > sevenDays;
+        const currentController = <?= json_encode($current_c ?? 'dashboard', JSON_UNESCAPED_SLASHES) ?>;
+        const isSafeAutoPromptPage = currentController === 'dashboard';
 
-        if (canShow) {
+        if (canShowByTime && isSafeAutoPromptPage) {
             setTimeout(() => {
+                if (document.body.classList.contains('rp-roster-focus-mode')) return;
                 const toast = document.getElementById('pwaInstallToast');
                 if (toast) toast.classList.add('show');
             }, 2500);
         }
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        document.getElementById('pwaInstallToast')?.classList.remove('show');
+        localStorage.setItem('pwaInstalled', '1');
     });
 
     document.addEventListener('DOMContentLoaded', function() {
