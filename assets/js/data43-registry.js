@@ -35,6 +35,8 @@ function fieldHtml(f){
      Object.entries(f.options||{}).map(function(pair){return '<option value="'+esc(pair[0])+'">'+esc(pair[1])+'</option>';}).join('')+'</select>';
  }else if(f.type==='thai-date'){
    control='<input type="text" inputmode="numeric" data-thai-date data-name="'+esc(f.name)+'" placeholder="วว/ดด/พ.ศ."'+req+'>';
+ }else if(f.type==='auto'||f.type==='auto-person'){
+   control='<input type="text" data-name="'+esc(f.name)+'" readonly aria-readonly="true" placeholder="ระบบกำหนดอัตโนมัติ">';
  }else if(f.type==='person-search'||f.type==='home-search'){
    const type=f.type==='home-search'?'HOME':'PERSON';
    control='<input type="text" autocomplete="off" data-search="'+type+'" data-search-display data-name="'+esc(f.name)+'"'+req+' placeholder="พิมพ์อย่างน้อย 2 ตัวอักษร">'+
