@@ -395,7 +395,7 @@ class Data43ImportService {
             $metrics[] = 'NCD';
         }
 
-        if (str_contains($code, 'DIAGNOSIS') || str_contains($code, 'CHRONIC')) {
+        if (str_contains($code, 'CHRONIC')) {
             $diagIndex = $this->findHeaderIndex($headerMap, ['DIAGCODE','DIAG','ICD10','ICD10_CODE','CHRONIC']);
             $diag = '';
             if ($diagIndex !== null && array_key_exists($diagIndex, $row)) {
