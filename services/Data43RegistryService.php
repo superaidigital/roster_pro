@@ -45,6 +45,15 @@ final class Data43RegistryService
         if(!$schema) throw new RuntimeException('ยังไม่รองรับแบบฟอร์มแฟ้ม '.$fileCode);
 
         $defaults=$this->getHospitalDefaults($hospitalId);
+        $existing=null;
+        if($recordId){
+            $existing=$this->model->find($recordId,$hospitalId);
+            if(!$existing) throw new RuntimeException('ไม่พบรายการที่ต้องการแก้ไข');
+            if(strtoupper((string)$existing['file_code'])!==$fileCode) {
+                throw new RuntimeException('ไม่สามารถเปลี่ยนชนิดแฟ้มของรายการเดิมได้');
+            }
+        }
+
         $data=[];
         foreach($schema['fields'] as $field){
             $name=$field['name'];
@@ -54,6 +63,12 @@ final class Data43RegistryService
         $data['HOSPCODE']=$defaults['HOSPCODE'];
         if(array_key_exists('HOSPCODE9',$data)) $data['HOSPCODE9']=$defaults['HOSPCODE9'];
         $data['D_UPDATE']=date('YmdHis');
+
+        if($recordId && $existing){
+            $original=$this->decodeRow($existing)['data'];
+            if($fileCode==='PERSON') $data['PID']=(string)($original['PID'] ?? '');
+            if($fileCode==='HOME') $data['HID']=(string)($original['HID'] ?? '');
+        }
 
         if($fileCode==='PERSON' && $data['PID']==='') $data['PID']=$this->model->generatePid($hospitalId);
         if($fileCode==='HOME' && $data['HID']==='') $data['HID']=$this->model->generateHid($hospitalId);
@@ -110,6 +125,13 @@ final class Data43RegistryService
         $this->db->beginTransaction();
         try{
             $changedFields=array_keys($data);
+            if($recordId && $existing){
+                $before=$this->decodeRow($existing)['data'];
+                $changedFields=[];
+                foreach($data as $key=>$value){
+                    if((string)($before[$key] ?? '') !== (string)$value) $changedFields[]=$key;
+                }
+            }
             if($recordId){
                 $this->model->update($recordId,$hospitalId,$row);
                 $id=$recordId;
@@ -146,8 +168,7 @@ final class Data43RegistryService
     {
         $rows=$this->model->listByFile($hospitalId,$fileCode,$limit);
         foreach($rows as &$row){
-            $full=$this->model->find((int)$row['id'],$hospitalId);
-            $payload=$full ? $this->decodeRow($full)['data'] : [];
+            $payload=$this->decodeRow($row)['data'];
             $row['display']=$this->displayLabel($fileCode,$payload);
         }
         unset($row);
@@ -169,7 +190,6 @@ final class Data43RegistryService
                 'id'=>(int)$row['id'],
                 'pid'=>$data['PID'] ?? null,
                 'hid'=>$data['HID'] ?? null,
-                'cid'=>$type==='PERSON' ? ($data['CID'] ?? null) : null,
                 'label'=>$this->displayLabel($type,$data),
             ];
         }
@@ -180,10 +200,25 @@ final class Data43RegistryService
     {
         $rows=$this->model->listByPid($hospitalId,$pid);
         $grouped=[];
+        $homeIds=[];
+
         foreach($rows as $row){
             $decoded=$this->decodeRow($row);
             $grouped[$row['file_code']][]=$decoded;
+
+            if($row['file_code']==='PERSON'){
+                $hid=trim((string)($decoded['data']['HID'] ?? ''));
+                if($hid!=='') $homeIds[$hid]=true;
+            }
         }
+
+        foreach(array_keys($homeIds) as $hid){
+            foreach($this->model->listByHid($hospitalId,$hid) as $homeRow){
+                if($homeRow['file_code']!=='HOME') continue;
+                $grouped['HOME'][]=$this->decodeRow($homeRow);
+            }
+        }
+
         return $grouped;
     }
 
