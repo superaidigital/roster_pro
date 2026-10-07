@@ -68,6 +68,17 @@ class HospitalsController {
             'address' => trim($_POST['address'] ?? '')
         ];
 
+        if (!preg_match('/^\d{5}$/', $data['hospital_code'])) {
+            $_SESSION['error_msg'] = "รหัสหน่วยบริการต้องเป็นตัวเลข 5 หลัก";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
+        if (!preg_match('/^\d{9}$/', $data['hospital_code9'])) {
+            $_SESSION['error_msg'] = "HOSPCODE9 ต้องเป็นตัวเลข 9 หลัก";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
+
         if ($hospitalModel->checkNameExists($data['name'])) {
             $_SESSION['error_msg'] = "ชื่อหน่วยบริการนี้มีอยู่ในระบบแล้ว";
         } else {
@@ -116,6 +127,17 @@ class HospitalsController {
             'phone' => trim($_POST['phone'] ?? ''),
             'address' => trim($_POST['address'] ?? '')
         ];
+
+        if (!preg_match('/^\d{5}$/', $data['hospital_code'])) {
+            $_SESSION['error_msg'] = "รหัสหน่วยบริการต้องเป็นตัวเลข 5 หลัก";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
+        if (!preg_match('/^\d{9}$/', $data['hospital_code9'])) {
+            $_SESSION['error_msg'] = "HOSPCODE9 ต้องเป็นตัวเลข 9 หลัก";
+            header("Location: index.php?c=hospitals");
+            exit;
+        }
 
         if (!empty($id)) {
             if ($hospitalModel->checkNameExists($data['name'], $id)) {
