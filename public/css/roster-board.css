@@ -769,3 +769,8 @@ body.rp-roster-focus-mode main.rp-main-content {
         max-height: calc(100dvh - 68px) !important;
     }
 }
+
+
+body.rp-roster-focus-mode .pwa-toast {
+    display: none !important;
+}
