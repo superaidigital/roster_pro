@@ -36,7 +36,7 @@ final class Data43ValidationService
     {
         $code = strtoupper(trim((string)$code));
         if ($code === '') return true;
-        return preg_match('/^[A-TV-Z][0-9]{2}(?:\.[0-9A-Z]{1,4})?$/', $code) === 1;
+        return preg_match('/^[A-TV-Z][0-9]{2}(?:\.?[0-9A-Z]{1,4})?$/', $code) === 1;
     }
 
     public static function validateCdeath(?string $code): bool
@@ -154,7 +154,7 @@ final class Data43ValidationService
         $cid = trim((string)($data['CID'] ?? ''));
         if ($cid !== '' && !self::validateCid($cid)) $errors['CID'] = 'เลขบัตรประชาชน 13 หลักไม่ผ่าน checksum';
 
-        foreach (['BIRTH','DDISCHARGE','DDEATH','DATE_DIAG','DATE_SERV','DATE_DETECT','DATE_DISAB','LMP','EDC','DATE_HCT','OUTDATE'] as $field) {
+        foreach (['BIRTH','MOVEIN','DDISCHARGE','DDEATH','DATE_DIAG','DATE_DISCH','DATE_SERV','DATE_DETECT','DATE_DISAB','LMP','EDC','DATE_HCT'] as $field) {
             if (!empty($data[$field]) && !self::validateDate8((string)$data[$field])) {
                 $errors[$field] = 'วันที่ไม่ถูกต้องหรือเกินวันที่ปัจจุบัน';
             }
@@ -171,6 +171,21 @@ final class Data43ValidationService
 
         if ($fileCode === 'PERSON' && in_array((string)($data['DISCHARGE'] ?? ''), ['1','2','3'], true) && empty($data['DDISCHARGE'])) {
             $errors['DDISCHARGE'] = 'เมื่อ DISCHARGE = 1/2/3 ต้องระบุวันที่จำหน่าย';
+        }
+
+        if ($fileCode === 'HOME' && !empty($data['OUTDATE']) && !self::validateDateTime14((string)$data['OUTDATE'])) {
+            $errors['OUTDATE'] = 'OUTDATE ของ HOME ต้องเป็น YYYYMMDDHHMMSS';
+        }
+
+        if ($fileCode === 'VILLAGE' && !empty($data['OUTDATE']) && !self::validateDate8((string)$data['OUTDATE'])) {
+            $errors['OUTDATE'] = 'OUTDATE ของ VILLAGE ต้องเป็น YYYYMMDD';
+        }
+
+        if ($fileCode === 'CHRONIC') {
+            $status = (string)($data['TYPEDISCH'] ?? '');
+            if ($status !== '' && !in_array($status, ['03','05'], true) && empty($data['DATE_DISCH'])) {
+                $errors['DATE_DISCH'] = 'สถานะโรคนี้ควรระบุวันที่จำหน่าย';
+            }
         }
         if ($fileCode === 'DEATH' && empty($data['DDEATH'])) $errors['DDEATH'] = 'กรุณาระบุวันที่เสียชีวิต';
 
