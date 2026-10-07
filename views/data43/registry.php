@@ -97,15 +97,24 @@ $prefill_pid=trim((string)($_GET['pid']??''));
         <div class="small text-muted">แสดง 100 รายการล่าสุด · ข้อมูลสำคัญถูกเข้ารหัสในฐานข้อมูล</div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a class="rp-btn rp-btn--secondary" href="index.php?c=data43&a=registry_export&file=<?= urlencode($file_code) ?>&format=txt<?= $selected_hospital_id?'&hospital_id='.(int)$selected_hospital_id:'' ?>">
-          <i class="bi bi-filetype-txt"></i> TXT
-        </a>
-        <a class="rp-btn rp-btn--secondary" href="index.php?c=data43&a=registry_export&file=<?= urlencode($file_code) ?>&format=csv<?= $selected_hospital_id?'&hospital_id='.(int)$selected_hospital_id:'' ?>">
-          <i class="bi bi-filetype-csv"></i> CSV
-        </a>
-        <a class="rp-btn rp-btn--secondary" href="index.php?c=data43&a=registry_export&format=zip&inner=txt<?= $selected_hospital_id?'&hospital_id='.(int)$selected_hospital_id:'' ?>">
-          <i class="bi bi-file-earmark-zip"></i> ZIP รวม
-        </a>
+        <?php foreach (['txt'=>'TXT','csv'=>'CSV'] as $fmt=>$label): ?>
+        <form method="POST" action="index.php?c=data43&a=registry_export" class="d-inline">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token,ENT_QUOTES,'UTF-8') ?>">
+          <input type="hidden" name="file" value="<?= htmlspecialchars($file_code,ENT_QUOTES,'UTF-8') ?>">
+          <input type="hidden" name="format" value="<?= $fmt ?>">
+          <?php if($selected_hospital_id): ?><input type="hidden" name="hospital_id" value="<?= (int)$selected_hospital_id ?>"><?php endif; ?>
+          <button class="rp-btn rp-btn--secondary" type="submit">
+            <i class="bi bi-filetype-<?= $fmt ?>"></i> <?= $label ?>
+          </button>
+        </form>
+        <?php endforeach; ?>
+        <form method="POST" action="index.php?c=data43&a=registry_export" class="d-inline">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token,ENT_QUOTES,'UTF-8') ?>">
+          <input type="hidden" name="format" value="zip">
+          <input type="hidden" name="inner" value="txt">
+          <?php if($selected_hospital_id): ?><input type="hidden" name="hospital_id" value="<?= (int)$selected_hospital_id ?>"><?php endif; ?>
+          <button class="rp-btn rp-btn--secondary" type="submit"><i class="bi bi-file-earmark-zip"></i> ZIP รวม</button>
+        </form>
         <button type="button" class="rp-btn rp-btn--primary" data-d43-add="<?= htmlspecialchars($file_code,ENT_QUOTES,'UTF-8') ?>">
           <i class="bi bi-plus-circle"></i> เพิ่ม
         </button>
