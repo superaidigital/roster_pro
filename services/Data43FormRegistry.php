@@ -231,8 +231,13 @@ final class Data43FormRegistry
                     ['name'=>'PAYPRICE','label'=>'ค่าบริการที่ต้องจ่ายเอง','type'=>'decimal','required'=>true],
                     ['name'=>'ACTUALPAY','label'=>'เงินที่จ่ายจริง','type'=>'decimal','required'=>true],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
+                    ['name'=>'HSUB','label'=>'หน่วยบริการรอง','type'=>'text','maxlength'=>5],
                     ['name'=>'CID','label'=>'CID','type'=>'auto-person'],
                     ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
+                    ['name'=>'HOSP9_MAIN','label'=>'หน่วยบริการหลัก 9 หลัก','type'=>'text','maxlength'=>9],
+                    ['name'=>'REFERINHOSP9','label'=>'หน่วยบริการที่ส่งมา 9 หลัก','type'=>'text','maxlength'=>9],
+                    ['name'=>'REFEROUTHOSP9','label'=>'หน่วยบริการที่ส่งไป 9 หลัก','type'=>'text','maxlength'=>9],
+                    ['name'=>'HOSP9_SUB','label'=>'หน่วยบริการรอง 9 หลัก','type'=>'text','maxlength'=>9],
                 ],
             ],
             'NCDSCREEN' => [
