@@ -469,17 +469,17 @@ class Data43SubmissionModel {
                 m.village_code,
                 SUM(CASE WHEN m.metric_code = ? THEN m.metric_value ELSE 0 END) AS metric_value,
                 SUM(CASE WHEN m.metric_code = 'POPULATION' THEN m.metric_value ELSE 0 END) AS population_value,
-                SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END) AS geo_point_count,
+                SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END) AS geo_point_count,
                 CASE
-                    WHEN SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END) > 0
-                    THEN SUM(CASE WHEN m.metric_code = ? THEN COALESCE(m.centroid_lat,0) * m.geo_point_count ELSE 0 END)
-                         / SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END)
+                    WHEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END) > 0
+                    THEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN COALESCE(m.centroid_lat,0) * m.geo_point_count ELSE 0 END)
+                         / SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END)
                     ELSE NULL
                 END AS centroid_lat,
                 CASE
-                    WHEN SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END) > 0
-                    THEN SUM(CASE WHEN m.metric_code = ? THEN COALESCE(m.centroid_lng,0) * m.geo_point_count ELSE 0 END)
-                         / SUM(CASE WHEN m.metric_code = ? THEN m.geo_point_count ELSE 0 END)
+                    WHEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END) > 0
+                    THEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN COALESCE(m.centroid_lng,0) * m.geo_point_count ELSE 0 END)
+                         / SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END)
                     ELSE NULL
                 END AS centroid_lng,
                 COUNT(DISTINCT CASE WHEN m.metric_code = ? THEN m.hospital_id END) AS hospital_count,
@@ -493,7 +493,7 @@ class Data43SubmissionModel {
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
               AND m.area_level = ?
-              AND (m.metric_code = ? OR m.metric_code = 'POPULATION')
+              AND (m.metric_code = ? OR m.metric_code IN ('POPULATION','GEO_REFERENCE'))
         ";
 
         $params = [
