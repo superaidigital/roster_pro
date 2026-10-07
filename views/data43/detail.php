@@ -65,6 +65,17 @@ $quality_summary = $quality_summary ?? null;
                     </div>
                 <?php endif; ?>
 
+                <?php $invalidExpected = (array)($quality_summary['invalid_expected_codes_json'] ?? []); ?>
+                <?php if ($invalidExpected): ?>
+                    <hr>
+                    <div class="fw-bold mb-2">แฟ้มที่ตรวจพบแต่ยังประมวลผลไม่ได้</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach ($invalidExpected as $code): ?>
+                            <span class="rp-badge rp-badge--danger"><?= htmlspecialchars((string)$code,ENT_QUOTES,'UTF-8') ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
                 <?php $headerIssues = (array)($quality_summary['header_issues_json'] ?? []); ?>
                 <?php if ($headerIssues): ?>
                     <hr>
