@@ -3,6 +3,8 @@
 
 require_once 'config/database.php';
 require_once 'models/LeaveModel.php';
+require_once 'models/LeaveTemplateModel.php';
+require_once 'services/LeaveDocumentService.php';
 require_once 'models/UserModel.php';
 require_once 'models/HolidayModel.php';
 require_once 'models/NotificationModel.php';
@@ -966,6 +968,359 @@ class LeaveController {
         }
 
         require_once 'views/layouts/header.php'; require_once 'views/layouts/sidebar.php'; require_once 'views/leave/report.php'; echo "</div></div></body></html>";
+    }
+
+    // ==========================================
+    // Phase 12.1: จัดการแบบฟอร์มวันลา
+    // ==========================================
+    public function templates() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_ADMIN_ROLES, true)) {
+            header("Location: index.php?c=leave");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $templateModel = new LeaveTemplateModel($db);
+        $leaveModel = new LeaveModel($db);
+
+        $csrf_token = $this->getCsrfToken();
+        $schema_ready = $templateModel->schemaReady();
+        $templates = $schema_ready ? $templateModel->getAllTemplates() : [];
+        $leave_types = $leaveModel->getAllLeaveQuotas();
+        $placeholders = LeaveDocumentService::placeholderCatalog();
+
+        $hospitals = [];
+        try {
+            $stmt = $db->query("SELECT id, name FROM hospitals WHERE deleted_at IS NULL ORDER BY name ASC");
+            $hospitals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            $stmt = $db->query("SELECT id, name FROM hospitals ORDER BY name ASC");
+            $hospitals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/leave/templates.php';
+        echo "</div></div></body></html>";
+    }
+
+    public function template_upload() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_ADMIN_ROLES, true)) {
+            http_response_code(403);
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $this->verifyCsrf("index.php?c=leave&a=templates");
+
+        $db = (new Database())->getConnection();
+        $templateModel = new LeaveTemplateModel($db);
+
+        if (!$templateModel->schemaReady()) {
+            $_SESSION['error_msg'] = "กรุณารัน migration 20261007_leave_form_templates.sql ก่อน";
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $templateName = trim((string)($_POST['template_name'] ?? ''));
+        $leaveTypeId = filter_input(INPUT_POST, 'leave_type_id', FILTER_VALIDATE_INT) ?: null;
+        $hospitalId = filter_input(INPUT_POST, 'hospital_id', FILTER_VALIDATE_INT) ?: null;
+        $notes = trim((string)($_POST['notes'] ?? ''));
+        $upload = $_FILES['template_file'] ?? null;
+
+        if ($templateName === '' || mb_strlen($templateName, 'UTF-8') > 180) {
+            $_SESSION['error_msg'] = "กรุณาระบุชื่อแบบฟอร์มให้ถูกต้อง";
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        if (!is_array($upload) || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK ||
+            empty($upload['tmp_name']) || !is_uploaded_file($upload['tmp_name'])) {
+            $_SESSION['error_msg'] = "กรุณาเลือกไฟล์ DOCX หรือ PDF";
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        if ((int)($upload['size'] ?? 0) <= 0 || (int)$upload['size'] > 10 * 1024 * 1024) {
+            $_SESSION['error_msg'] = "ไฟล์ Template ต้องมีขนาดไม่เกิน 10 MB";
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = (string)$finfo->file($upload['tmp_name']);
+        $ext = strtolower(pathinfo((string)$upload['name'], PATHINFO_EXTENSION));
+
+        $fileType = null;
+        if ($ext === 'docx' && in_array($mime, [
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/zip',
+            'application/octet-stream'
+        ], true)) {
+            $fileType = 'DOCX';
+        } elseif ($ext === 'pdf' && $mime === 'application/pdf') {
+            $fileType = 'PDF';
+        }
+
+        if (!$fileType) {
+            $_SESSION['error_msg'] = "รองรับเฉพาะไฟล์ DOCX หรือ PDF เท่านั้น";
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $storageDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'leave_templates';
+        if (!is_dir($storageDir) && !mkdir($storageDir, 0750, true) && !is_dir($storageDir)) {
+            $_SESSION['error_msg'] = "ไม่สามารถสร้างพื้นที่จัดเก็บ Template ได้";
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $version = $templateModel->getNextVersion($leaveTypeId, $hospitalId, $templateName);
+        $safeName = 'leave_template_' . date('Ymd_His') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+        $target = $storageDir . DIRECTORY_SEPARATOR . $safeName;
+
+        if (!move_uploaded_file($upload['tmp_name'], $target)) {
+            $_SESSION['error_msg'] = "ไม่สามารถบันทึกไฟล์ Template ได้";
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $mappingStatus = $fileType === 'DOCX' ? 'READY' : 'PENDING';
+        try {
+            $templateId = $templateModel->createTemplate([
+                'template_name' => $templateName,
+                'leave_type_id' => $leaveTypeId,
+                'hospital_id' => $hospitalId,
+                'file_type' => $fileType,
+                'original_filename' => basename((string)$upload['name']),
+                'stored_path' => 'storage/leave_templates/' . $safeName,
+                'version' => $version,
+                'mapping_status' => $mappingStatus,
+                'notes' => $notes,
+                'created_by' => (int)$_SESSION['user']['id'],
+            ]);
+
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "อัปโหลดแบบฟอร์มวันลา ID {$templateId} ({$fileType})");
+            $_SESSION['success_msg'] = $fileType === 'DOCX'
+                ? "อัปโหลด Word Template สำเร็จ พร้อมใช้งาน Placeholder"
+                : "อัปโหลด PDF Template สำเร็จ และรอ Mapping ตำแหน่งใน Phase 12.2";
+        } catch (Throwable $e) {
+            @unlink($target);
+            error_log("Leave template upload error: " . $e->getMessage());
+            $_SESSION['error_msg'] = "ไม่สามารถบันทึกข้อมูล Template ได้";
+        }
+
+        header("Location: index.php?c=leave&a=templates");
+        exit;
+    }
+
+    public function template_toggle() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_ADMIN_ROLES, true)) {
+            http_response_code(403);
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $this->verifyCsrf("index.php?c=leave&a=templates");
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $active = filter_input(INPUT_POST, 'active', FILTER_VALIDATE_INT);
+
+        if (!$id || !in_array($active, [0,1], true)) {
+            $_SESSION['error_msg'] = "คำขอไม่ถูกต้อง";
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $db = (new Database())->getConnection();
+        $model = new LeaveTemplateModel($db);
+        $model->toggleActive($id, (bool)$active);
+        $_SESSION['success_msg'] = "อัปเดตสถานะ Template แล้ว";
+        header("Location: index.php?c=leave&a=templates");
+        exit;
+    }
+
+    public function template_archive() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_ADMIN_ROLES, true)) {
+            http_response_code(403);
+            exit;
+        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("Location: index.php?c=leave&a=templates");
+            exit;
+        }
+
+        $this->verifyCsrf("index.php?c=leave&a=templates");
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        if ($id) {
+            $db = (new Database())->getConnection();
+            (new LeaveTemplateModel($db))->archive($id);
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_DELETE, "เก็บ Template วันลาเข้าคลัง ID {$id}");
+            $_SESSION['success_msg'] = "เก็บ Template เข้าคลังแล้ว";
+        }
+        header("Location: index.php?c=leave&a=templates");
+        exit;
+    }
+
+    public function template_download() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_ADMIN_ROLES, true)) {
+            http_response_code(403);
+            exit;
+        }
+
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        $db = (new Database())->getConnection();
+        $template = $id ? (new LeaveTemplateModel($db))->findById($id) : null;
+
+        if (!$template) {
+            http_response_code(404);
+            exit("ไม่พบ Template");
+        }
+
+        $absolute = realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . ltrim(str_replace('/', DIRECTORY_SEPARATOR, $template['stored_path']), DIRECTORY_SEPARATOR));
+        $root = realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'leave_templates');
+        if (!$absolute || !$root || strpos($absolute, $root . DIRECTORY_SEPARATOR) !== 0 || !is_file($absolute)) {
+            http_response_code(404);
+            exit("ไม่พบไฟล์ Template");
+        }
+
+        $mime = $template['file_type'] === 'PDF'
+            ? 'application/pdf'
+            : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . filesize($absolute));
+        header('Content-Disposition: attachment; filename="' . rawurlencode($template['original_filename']) . '"');
+        header('X-Content-Type-Options: nosniff');
+        readfile($absolute);
+        exit;
+    }
+
+    public function generate_document() {
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        $requestId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$requestId) {
+            http_response_code(400);
+            exit("คำขอไม่ถูกต้อง");
+        }
+
+        $db = (new Database())->getConnection();
+        $docService = new LeaveDocumentService($db);
+        $templateModel = new LeaveTemplateModel($db);
+        $leave = $docService->buildLeaveData($requestId);
+
+        $role = $this->currentRole();
+        $owner = (int)$leave['user_id'] === (int)$_SESSION['user']['id'];
+        $global = in_array($role, self::LEAVE_ADMIN_ROLES, true);
+        $local = in_array($role, ['DIRECTOR','SCHEDULER'], true)
+            && (int)$leave['hospital_id'] === (int)($_SESSION['user']['hospital_id'] ?? 0);
+
+        if (!$owner && !$global && !$local) {
+            http_response_code(403);
+            exit("คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้");
+        }
+
+        if (!$templateModel->schemaReady()) {
+            $_SESSION['error_msg'] = "ระบบแบบฟอร์มยังไม่ได้ติดตั้งฐานข้อมูล";
+            header("Location: index.php?c=leave&a=index");
+            exit;
+        }
+
+        $template = $templateModel->resolveActiveTemplate((int)$leave['leave_type_id'], (int)$leave['hospital_id']);
+        if (!$template) {
+            $_SESSION['error_msg'] = "ยังไม่มี Word Template ที่เปิดใช้งานสำหรับประเภทการลานี้";
+            header("Location: index.php?c=leave&a=index");
+            exit;
+        }
+
+        $source = realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . ltrim(str_replace('/', DIRECTORY_SEPARATOR, $template['stored_path']), DIRECTORY_SEPARATOR));
+        $root = realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'leave_templates');
+        if (!$source || !$root || strpos($source, $root . DIRECTORY_SEPARATOR) !== 0) {
+            http_response_code(404);
+            exit("ไม่พบ Template");
+        }
+
+        $status = strtoupper((string)$leave['status']) === 'APPROVED' ? 'FINAL' : 'DRAFT';
+        $outDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'leave_documents' . DIRECTORY_SEPARATOR . strtolower($status);
+        $filename = 'leave_' . $requestId . '_v' . (int)$template['version'] . '_' . date('YmdHis') . '.docx';
+        $output = $outDir . DIRECTORY_SEPARATOR . $filename;
+
+        try {
+            $docService->renderDocx($source, $output, $docService->replacementMap($leave));
+            $hash = hash_file('sha256', $output);
+            $documentId = $templateModel->recordGenerated([
+                'leave_request_id' => $requestId,
+                'template_id' => (int)$template['id'],
+                'template_version' => (int)$template['version'],
+                'document_path' => 'storage/leave_documents/' . strtolower($status) . '/' . $filename,
+                'original_filename' => $filename,
+                'document_hash' => $hash,
+                'document_status' => $status,
+                'generated_by' => (int)$_SESSION['user']['id'],
+                'finalized_at' => $status === 'FINAL' ? date('Y-m-d H:i:s') : null,
+            ]);
+
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "สร้างเอกสารใบลา DOCX ID {$documentId} จาก Leave {$requestId}");
+            header("Location: index.php?c=leave&a=download_generated&id=" . $documentId);
+            exit;
+        } catch (Throwable $e) {
+            error_log("Generate leave DOCX error: " . $e->getMessage());
+            $_SESSION['error_msg'] = "สร้างเอกสารไม่สำเร็จ: " . $e->getMessage();
+            header("Location: index.php?c=leave&a=index");
+            exit;
+        }
+    }
+
+    public function download_generated() {
+        if (!isset($_SESSION['user'])) {
+            header("Location: index.php?c=auth&a=index");
+            exit;
+        }
+
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        $db = (new Database())->getConnection();
+        $doc = $id ? (new LeaveTemplateModel($db))->getGeneratedById($id) : null;
+
+        if (!$doc) {
+            http_response_code(404);
+            exit("ไม่พบเอกสาร");
+        }
+
+        $role = $this->currentRole();
+        $allowed = (int)$doc['user_id'] === (int)$_SESSION['user']['id']
+            || in_array($role, self::LEAVE_ADMIN_ROLES, true)
+            || (in_array($role, ['DIRECTOR','SCHEDULER'], true)
+                && (int)$doc['hospital_id'] === (int)($_SESSION['user']['hospital_id'] ?? 0));
+
+        if (!$allowed) {
+            http_response_code(403);
+            exit;
+        }
+
+        $absolute = realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . ltrim(str_replace('/', DIRECTORY_SEPARATOR, $doc['document_path']), DIRECTORY_SEPARATOR));
+        $root = realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'leave_documents');
+
+        if (!$absolute || !$root || strpos($absolute, $root . DIRECTORY_SEPARATOR) !== 0 || !is_file($absolute)) {
+            http_response_code(404);
+            exit("ไม่พบไฟล์เอกสาร");
+        }
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        header('Content-Length: ' . filesize($absolute));
+        header('Content-Disposition: attachment; filename="' . rawurlencode($doc['original_filename']) . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        readfile($absolute);
+        exit;
     }
 
     public function download_med_cert() {
