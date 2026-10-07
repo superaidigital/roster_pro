@@ -93,3 +93,29 @@ SOURCE database/migrations/20261007_data43_spatial_choropleth.sql;
 ```
 
 หลัง migration ให้นำส่ง ZIP รอบเดือนที่ต้องการวิเคราะห์ใหม่ เพื่อ rebuild aggregate ด้วย linkage รุ่น 2.4.1
+
+
+## 7. Data43 v2 hardening
+
+รอบปรับปรุงนี้เพิ่มหลักการ production-safety ดังนี้
+
+- Metric Registry แยกนิยาม numerator/denominator/unit ออกจาก Controller/View
+- DM/HT/NCD/DISABLED/SERVICE ใช้ rate ต่อ 1,000 เมื่อมีประชากรฐาน
+- ELDERLY แสดงร้อยละของประชากร
+- ANC เป็นจำนวนครั้ง ไม่บังคับหารประชากร
+- NCD_SCREEN ใช้กลุ่มเป้าหมายอายุ 35 ปีขึ้นไปเป็น denominator
+- รองรับไฟล์ชนิดเดียวกันหลาย part ภายใน ZIP
+- XLSX จะไม่ถูกถือว่า VALID แบบ metadata-only อีกต่อไป หากยังไม่มี streaming reader
+- ADDRESS ไม่ถูกใช้เป็น fallback ที่อยู่อาศัยสำหรับ prevalence; คนที่หา HOME ไม่พบถูกนับเป็น unresolved
+- VILLAGE.VID รองรับรูปแบบตัวอักษร เช่น A0/B9/Z9
+- Analytics ใช้ VILLAGE centroid ก่อน household coordinates และไม่ส่ง household coordinates ไปยัง aggregate
+- เพิ่ม primary + complementary suppression สำหรับ small cell
+- เพิ่มตาราง data43_quality_summary เพื่อเก็บ diagnostics แบบ aggregate
+
+### Migration เพิ่มเติม
+
+```sql
+SOURCE database/migrations/20261007_data43_quality_v2.sql;
+```
+
+หลังอัปเดต migration ให้ re-import รอบเดือนที่ต้องการวิเคราะห์ใหม่ เพื่อให้ denominator, privacy flags และ linkage diagnostics ถูกสร้างจาก logic รุ่นล่าสุด
