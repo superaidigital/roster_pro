@@ -375,7 +375,7 @@ if (!empty($hospital_ids)) {
                     <div class="p-3 bg-warning bg-opacity-10 rounded border border-warning border-opacity-25 text-start">
                         <div class="fw-bold text-dark mb-1" style="font-size: 13px;"><i class="bi bi-info-circle-fill text-warning me-1"></i> คำแนะนำก่อนอัปโหลด:</div>
                         <ul class="text-muted mb-0 ps-3" style="font-size: 12px; line-height: 1.6;">
-                            <li>รูปแบบตารางต้องเรียงคอลัมน์: <b>รหัสอ้างอิง(ID)</b>, <b>รหัส 5 หลัก</b>, <b>ชื่อ รพ.สต.</b></li>
+                            <li>รูปแบบตารางต้องเรียงคอลัมน์: <b>รหัสอ้างอิง(ID)</b>, <b>รหัส 5 หลัก</b>, <b>รหัส 9 หลัก (HOSPCODE9)</b>, <b>ชื่อ รพ.สต.</b></li>
                             <li>แถวแรกสุด (Header) จะถูกข้ามไม่อ่านข้อมูล</li>
                             <li>รหัสอ้างอิงระบบ (ID) ต้องไม่ซ้ำกับของเดิมที่มีอยู่ (เช่น h99, h100)</li>
                         </ul>
