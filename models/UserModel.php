@@ -1,6 +1,8 @@
 <?php
 // ที่อยู่ไฟล์: models/UserModel.php
 
+require_once __DIR__ . '/../lib/ElectronicSignature.php';
+
 class UserModel {
     private $conn;
     private $table_name = "users";
@@ -37,7 +39,12 @@ class UserModel {
                 'deleted_at' => "DATETIME NULL DEFAULT NULL COMMENT 'เวลาที่ถูกลบ (Soft Delete)'",
                 'show_in_roster' => "TINYINT(1) DEFAULT 1 COMMENT '1=Show in roster, 0=Hide'",
                 // 🌟 เพิ่มคอลัมน์ Signature Path สำหรับเก็บลายเซ็นอิเล็กทรอนิกส์ (Base64)
-                'signature_path' => "LONGTEXT NULL COMMENT 'เก็บลายมือชื่ออิเล็กทรอนิกส์ (Base64)'"
+                'signature_path' => "LONGTEXT NULL COMMENT 'เก็บลายมือชื่ออิเล็กทรอนิกส์ (Base64)'",
+                'signature_sha256' => "CHAR(64) NULL",
+                'signature_method' => "VARCHAR(20) NULL",
+                'signature_updated_at' => "DATETIME NULL",
+                'signature_pdpa_notice_version' => "VARCHAR(50) NULL",
+                'signature_pdpa_ack_at' => "DATETIME NULL"
             ];
 
             $columns_to_add = [];
@@ -281,17 +288,72 @@ class UserModel {
     }
 
     // ====================================================
-    // 🌟 5. ฟังก์ชันใหม่: อัปเดตลายเซ็นอิเล็กทรอนิกส์ลงฐานข้อมูล
+    // 🌟 5. ลายเซ็นอิเล็กทรอนิกส์
     // ====================================================
-    public function updateSignature($id, $signature_base64) {
-        $query = "UPDATE " . $this->table_name . " SET signature_path = :signature WHERE id = :id";
+    public function updateSignature(
+        $id,
+        $signature_base64,
+        string $method,
+        string $privacyNoticeVersion
+    ) {
+        try {
+            if ($privacyNoticeVersion !== ElectronicSignature::PRIVACY_NOTICE_VERSION) {
+                throw new InvalidArgumentException('Electronic signature privacy notice version is invalid.');
+            }
+
+            $signature = ElectronicSignature::normalize((string)$signature_base64, $method);
+
+            $query = "UPDATE " . $this->table_name . "
+                      SET signature_path = :signature,
+                          signature_sha256 = :sha256,
+                          signature_method = :method,
+                          signature_updated_at = NOW(),
+                          signature_pdpa_notice_version = :notice_version,
+                          signature_pdpa_ack_at = NOW()
+                      WHERE id = :id";
+
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindValue(':signature', $signature['data_url'], PDO::PARAM_STR);
+            $stmt->bindValue(':sha256', $signature['sha256'], PDO::PARAM_STR);
+            $stmt->bindValue(':method', $signature['method'], PDO::PARAM_STR);
+            $stmt->bindValue(':notice_version', $privacyNoticeVersion, PDO::PARAM_STR);
+            $stmt->bindValue(':id', (int)$id, PDO::PARAM_INT);
+
+            return $stmt->execute();
+        } catch (Throwable $e) {
+            error_log("Update Signature Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getSignatureRecord(int $id): ?array {
+        $query = "SELECT signature_path, signature_sha256, signature_method, signature_updated_at,
+                         signature_pdpa_notice_version, signature_pdpa_ack_at
+                  FROM " . $this->table_name . "
+                  WHERE id = :id AND deleted_at IS NULL
+                  LIMIT 1";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':signature', $signature_base64);
-        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    public function clearSignature(int $id): bool {
+        $query = "UPDATE " . $this->table_name . "
+                  SET signature_path = NULL,
+                      signature_sha256 = NULL,
+                      signature_method = NULL,
+                      signature_updated_at = NOW()
+                  WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+
         try {
             return $stmt->execute();
         } catch (PDOException $e) {
-            error_log("Update Signature Error: " . $e->getMessage());
+            error_log("Clear Signature Error: " . $e->getMessage());
             return false;
         }
     }
