@@ -361,9 +361,20 @@ class Data43Controller
                 $missingCodes = array_values((array)($quality['missing_expected_codes'] ?? []));
                 $headerIssues = (array)($quality['header_issues'] ?? []);
                 $invalidExpectedCodes = array_values((array)($quality['invalid_expected_codes'] ?? []));
-                $status = ($detected >= $expectedFiles && empty($headerIssues) && empty($invalidExpectedCodes))
-                    ? 'COMPLETE'
-                    : 'INCOMPLETE';
+                $rowQualityIssues = (array)($inspection['quality_issues'] ?? []);
+                $rowQualityErrorCount = 0;
+                foreach ($rowQualityIssues as $issue) {
+                    if (($issue['severity'] ?? '') === 'ERROR') {
+                        $rowQualityErrorCount += (int)($issue['issue_count'] ?? 0);
+                    }
+                }
+
+                $status = (
+                    $detected >= $expectedFiles
+                    && empty($headerIssues)
+                    && empty($invalidExpectedCodes)
+                    && $rowQualityErrorCount === 0
+                ) ? 'COMPLETE' : 'INCOMPLETE';
 
                 $summaryParts = [];
                 if ($detected < $expectedFiles) {
@@ -379,6 +390,9 @@ class Data43Controller
                 }
                 if (!empty($invalidExpectedCodes)) {
                     $summaryParts[] = 'แฟ้มที่ยังประมวลผลไม่ได้: ' . implode(', ', array_slice($invalidExpectedCodes, 0, 8));
+                }
+                if ($rowQualityErrorCount > 0) {
+                    $summaryParts[] = 'พบข้อผิดพลาดระดับข้อมูล ' . number_format($rowQualityErrorCount) . ' รายการ';
                 }
                 $errorSummary = $summaryParts ? mb_substr(implode(' | ', $summaryParts), 0, 500, 'UTF-8') : null;
 
