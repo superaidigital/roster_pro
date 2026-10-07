@@ -75,8 +75,15 @@ final class Data43RegistryService
 
         if($recordId && $existing){
             $original=$this->decodeRow($existing)['data'];
-            if($fileCode==='PERSON') $data['PID']=(string)($original['PID'] ?? '');
-            if($fileCode==='HOME') $data['HID']=(string)($original['HID'] ?? '');
+
+            // Primary-key fields identify the logical record. Changing them through
+            // an edit would silently turn one record into another and can break
+            // child references. Create a new record instead if the key must change.
+            foreach((array)($schema['pk'] ?? []) as $pkField){
+                if(array_key_exists($pkField,$original)){
+                    $data[$pkField]=(string)$original[$pkField];
+                }
+            }
         }
 
         if($fileCode==='PERSON' && $data['PID']==='') $data['PID']=$this->model->generatePid($hospitalId);
