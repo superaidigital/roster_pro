@@ -694,7 +694,7 @@ $header_page_icon = $page_context[2];
         
         <!-- 🔔 Notification Dropdown -->
         <div class="dropdown">
-            <button id="notificationDropdownToggle" class="nav-icon-btn position-relative" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-haspopup="true" aria-controls="notificationDropdownMenu" aria-label="การแจ้งเตือน">
+            <button id="notificationDropdownToggle" class="nav-icon-btn position-relative" type="button" data-bs-auto-close="outside" aria-expanded="false" aria-haspopup="true" aria-controls="notificationDropdownMenu" aria-label="การแจ้งเตือน">
                 <i class="bi bi-bell-fill fs-5"></i>
                 <?php if($unread_count > 0): ?>
                     <span class="notif-badge" id="notifBadge" style="display: block;" aria-live="polite" aria-label="<?= (int)$unread_count ?> รายการที่ยังไม่ได้อ่าน"><?= $unread_count > 99 ? '99+' : $unread_count ?></span>
@@ -778,7 +778,7 @@ $header_page_icon = $page_context[2];
 
         <!-- 👤 Profile Dropdown -->
         <div class="dropdown">
-            <button id="profileDropdownToggle" type="button" class="profile-pill border-0 bg-transparent" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true" aria-controls="profileDropdownMenu" aria-label="เมนูผู้ใช้ <?= htmlspecialchars($_SESSION['user']['name'] ?? '') ?>">
+            <button id="profileDropdownToggle" type="button" class="profile-pill border-0 bg-transparent" aria-expanded="false" aria-haspopup="true" aria-controls="profileDropdownMenu" aria-label="เมนูผู้ใช้ <?= htmlspecialchars($_SESSION['user']['name'] ?? '') ?>">
                 <div class="user-avatar"><?= mb_substr($_SESSION['user']['name'], 0, 1, 'UTF-8') ?></div>
                 <div class="d-none d-md-block text-start lh-1 pe-2">
                     <div class="fw-bold text-dark" style="font-size: 14px;"><?= htmlspecialchars($_SESSION['user']['name']) ?></div>
@@ -853,18 +853,75 @@ $header_page_icon = $page_context[2];
     });
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Explicitly initialize topbar dropdowns so they remain reliable
-        // even when other page scripts manipulate Bootstrap components.
-        if (window.bootstrap && bootstrap.Dropdown) {
-            ['notificationDropdownToggle', 'profileDropdownToggle'].forEach(function(id) {
-                const toggle = document.getElementById(id);
-                if (toggle) {
-                    bootstrap.Dropdown.getOrCreateInstance(toggle, {
-                        boundary: 'viewport'
+        // Topbar dropdowns use one explicit click lifecycle.
+        // This avoids duplicate Bootstrap Data API bindings from page-specific scripts.
+        const topbarDropdownIds = ['notificationDropdownToggle', 'profileDropdownToggle'];
+
+        topbarDropdownIds.forEach(function(id) {
+            const toggle = document.getElementById(id);
+            if (!toggle || toggle.dataset.rpDropdownBound === '1') return;
+
+            toggle.dataset.rpDropdownBound = '1';
+
+            if (window.bootstrap && bootstrap.Dropdown) {
+                const instance = bootstrap.Dropdown.getOrCreateInstance(toggle, {
+                    boundary: 'viewport',
+                    autoClose: id === 'notificationDropdownToggle' ? 'outside' : true
+                });
+
+                toggle.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    // Close the other topbar dropdown first.
+                    topbarDropdownIds.forEach(function(otherId) {
+                        if (otherId === id) return;
+                        const otherToggle = document.getElementById(otherId);
+                        if (!otherToggle) return;
+                        const otherInstance = bootstrap.Dropdown.getInstance(otherToggle);
+                        if (otherInstance) otherInstance.hide();
                     });
+
+                    instance.toggle();
+                });
+            } else {
+                // Lightweight fallback if Bootstrap JS fails to initialize.
+                const menuId = toggle.getAttribute('aria-controls');
+                const menu = menuId ? document.getElementById(menuId) : null;
+
+                toggle.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (!menu) return;
+
+                    const willOpen = !menu.classList.contains('show');
+                    document.querySelectorAll('.top-navbar .dropdown-menu.show').forEach(function(openMenu) {
+                        openMenu.classList.remove('show');
+                    });
+                    document.querySelectorAll('.top-navbar [aria-expanded="true"]').forEach(function(openToggle) {
+                        openToggle.setAttribute('aria-expanded', 'false');
+                    });
+
+                    menu.classList.toggle('show', willOpen);
+                    toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                });
+            }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key !== 'Escape') return;
+            topbarDropdownIds.forEach(function(id) {
+                const toggle = document.getElementById(id);
+                if (!toggle) return;
+                if (window.bootstrap && bootstrap.Dropdown) {
+                    bootstrap.Dropdown.getInstance(toggle)?.hide();
+                } else {
+                    const menu = document.getElementById(toggle.getAttribute('aria-controls') || '');
+                    menu?.classList.remove('show');
+                    toggle.setAttribute('aria-expanded', 'false');
                 }
             });
-        }
+        });
 
         const modals = document.querySelectorAll('.modal');
         modals.forEach(modal => { document.body.appendChild(modal); });
