@@ -17,6 +17,11 @@ class Data43Controller
         return strtoupper(trim((string)($_SESSION['user']['role'] ?? '')));
     }
 
+    private function data43Role(): string
+    {
+        return in_array($this->role(), self::ADMIN_ROLES, true) ? 'ADMIN' : 'SURVEYOR';
+    }
+
     private function requireAccess(): void
     {
         if (!isset($_SESSION['user'])) {
@@ -432,6 +437,7 @@ class Data43Controller
         $service=new Data43RegistryService($db);
         $schema_ready=$service->schemaReady();
         $is_admin=in_array($this->role(),self::ADMIN_ROLES,true);
+        $data43_role=$this->data43Role();
         $selected_hospital_id=$this->selectedHospitalId();
         $csrf_token=$this->csrfToken();
         $schemas=Data43FormRegistry::schemas();
@@ -548,6 +554,12 @@ class Data43Controller
     public function registry_delete(): void
     {
         $this->requireAccess();
+        if($this->data43Role()!=='ADMIN'){
+            http_response_code(403);
+            $_SESSION['error_msg']='เฉพาะผู้ดูแลระบบเท่านั้นที่ลบข้อมูลได้';
+            header('Location: index.php?c=data43&a=registry');
+            exit;
+        }
         if($_SERVER['REQUEST_METHOD']!=='POST'){http_response_code(405);exit;}
         try{
             $this->verifyCsrf();
