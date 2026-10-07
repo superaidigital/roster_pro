@@ -10,7 +10,7 @@ final class Data43FormRegistry
                 'pk'=>['HOSPCODE','PID'],
                 'fields'=>[
                     ['name'=>'HOSPCODE','label'=>'รหัสหน่วยบริการ','type'=>'auto','required'=>true],
-                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto'],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                     ['name'=>'PID','label'=>'PID','type'=>'auto','required'=>true],
                     ['name'=>'CID','label'=>'เลขบัตรประชาชน','type'=>'text','maxlength'=>13],
                     ['name'=>'HID','label'=>'HID / บ้าน','type'=>'home-search'],
@@ -48,6 +48,7 @@ final class Data43FormRegistry
                     ['name'=>'LATITUDE','label'=>'Latitude','type'=>'decimal','readonly'=>true],
                     ['name'=>'LONGITUDE','label'=>'Longitude','type'=>'decimal','readonly'=>true],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                 ],
             ],
             'ADDRESS' => [
@@ -65,6 +66,8 @@ final class Data43FormRegistry
                     ['name'=>'AMPUR','label'=>'อำเภอ','type'=>'text','maxlength'=>2],
                     ['name'=>'CHANGWAT','label'=>'จังหวัด','type'=>'text','maxlength'=>2],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
+                    ['name'=>'CID','label'=>'CID','type'=>'auto-person'],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                 ],
             ],
             'CHRONIC' => [
@@ -77,12 +80,17 @@ final class Data43FormRegistry
                     ['name'=>'CID','label'=>'CID','type'=>'auto-person'],
                     ['name'=>'DATE_DIAG','label'=>'วันที่วินิจฉัย','type'=>'thai-date','required'=>true],
                     ['name'=>'CHRONIC','label'=>'รหัส ICD-10-TM','type'=>'text','required'=>true,'placeholder'=>'เช่น E11.9'],
-                    ['name'=>'HOSP_DX','label'=>'หน่วยบริการที่วินิจฉัย','type'=>'text'],
-                    ['name'=>'TYPEDISCH','label'=>'สถานะโรค','type'=>'select','options'=>[
+                    ['name'=>'HOSP_DX','label'=>'หน่วยบริการที่วินิจฉัยครั้งแรก','type'=>'text','maxlength'=>5],
+                    ['name'=>'HOSP_RX','label'=>'หน่วยบริการที่รับบริการประจำ','type'=>'text','maxlength'=>5],
+                    ['name'=>'DATE_DISCH','label'=>'วันที่จำหน่ายโรคเรื้อรัง','type'=>'thai-date'],
+                    ['name'=>'TYPEDISCH','label'=>'สถานะโรค','type'=>'select','required'=>true,'options'=>[
                         '01'=>'หาย','02'=>'ตาย','03'=>'ยังรักษาอยู่','04'=>'ไม่ทราบ','05'=>'รอจำหน่าย/เฝ้าระวัง',
                         '06'=>'ขาดการรักษา','07'=>'ครบการรักษา','08'=>'ภาวะสงบ','09'=>'ปฏิเสธการรักษา','10'=>'ออกจากพื้นที่','11'=>'กลับเป็นซ้ำ'
                     ]],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
+                    ['name'=>'HOSP9_DX','label'=>'หน่วยบริการ 9 หลักที่วินิจฉัย','type'=>'text','maxlength'=>9],
+                    ['name'=>'HOSP9_RX','label'=>'หน่วยบริการ 9 หลักที่รับบริการประจำ','type'=>'text','maxlength'=>9],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                 ],
             ],
             'VILLAGE' => [
@@ -126,7 +134,7 @@ final class Data43FormRegistry
                     ['name'=>'NDISABLECLUB','label'=>'จำนวนชมรมผู้พิการ','type'=>'decimal'],
                     ['name'=>'NNUMBERONECLUB','label'=>'จำนวนชมรม To Be Number 1','type'=>'decimal'],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
-                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto'],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                 ],
             ],
             'DISABILITY' => [
@@ -147,7 +155,7 @@ final class Data43FormRegistry
                     ['name'=>'DATE_DISAB','label'=>'วันที่เริ่มมีความพิการ','type'=>'thai-date'],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
                     ['name'=>'CID','label'=>'CID','type'=>'auto-person'],
-                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto'],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                 ],
             ],
             'SERVICE' => [
@@ -188,7 +196,7 @@ final class Data43FormRegistry
                     ['name'=>'ACTUALPAY','label'=>'เงินที่จ่ายจริง','type'=>'decimal','required'=>true],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
                     ['name'=>'CID','label'=>'CID','type'=>'auto-person'],
-                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto'],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                 ],
             ],
             'NCDSCREEN' => [
@@ -218,7 +226,7 @@ final class Data43FormRegistry
                     ['name'=>'PROVIDER','label'=>'ผู้ให้บริการ','type'=>'text','maxlength'=>15],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
                     ['name'=>'CID','label'=>'CID','type'=>'auto-person'],
-                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto'],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                     ['name'=>'SCREENPLACE9','label'=>'สถานที่คัดกรอง 9 หลัก','type'=>'text','maxlength'=>9],
                 ],
             ],
@@ -242,7 +250,7 @@ final class Data43FormRegistry
                     ['name'=>'PROVIDER','label'=>'ผู้ให้บริการ','type'=>'text','maxlength'=>15],
                     ['name'=>'CID','label'=>'CID','type'=>'auto-person'],
                     ['name'=>'HEIGHT','label'=>'ส่วนสูง (ซม.)','type'=>'decimal','required'=>true],
-                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto'],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                 ],
             ],
             'ANC' => [
@@ -263,7 +271,7 @@ final class Data43FormRegistry
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
                     ['name'=>'CID','label'=>'CID','type'=>'auto-person'],
                     ['name'=>'WEIGHT','label'=>'น้ำหนัก (กก.)','type'=>'decimal','required'=>true],
-                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto'],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                     ['name'=>'ANCPLACE9','label'=>'สถานที่รับบริการ 9 หลัก','type'=>'text','maxlength'=>9],
                 ],
             ],
@@ -282,6 +290,7 @@ final class Data43FormRegistry
                     ['name'=>'CAUSEDEATH_C','label'=>'สาเหตุ C','type'=>'text'],
                     ['name'=>'CAUSEDEATH_D','label'=>'สาเหตุ D','type'=>'text'],
                     ['name'=>'D_UPDATE','label'=>'วันเวลาปรับปรุง','type'=>'auto','required'=>true],
+                    ['name'=>'HOSPCODE9','label'=>'รหัสหน่วยบริการ 9 หลัก','type'=>'auto','required'=>true],
                 ],
             ],
         ];
