@@ -151,6 +151,10 @@ if ($current_controller === 'data43' && $current_action === 'dashboard') {
     $page_context = ['แดชบอร์ด 43 แฟ้ม', 'ติดตามอัตราการนำส่ง ความครบถ้วน และสถานะราย รพ.สต.', 'bi-speedometer2'];
 }
 
+if ($current_controller === 'data43' && $current_action === 'spatial') {
+    $page_context = ['วิเคราะห์ข้อมูลเชิงพื้นที่', 'วิเคราะห์ Aggregate จากข้อมูล 43 แฟ้มระดับอำเภอ ตำบล และหมู่บ้าน', 'bi-geo-alt-fill'];
+}
+
 $header_page_title = $page_context[0];
 $header_page_subtitle = $page_context[1];
 $header_page_icon = $page_context[2];
