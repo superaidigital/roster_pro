@@ -335,8 +335,27 @@ final class Data43RegistryService
     {
         $row=$this->model->find($id,$hospitalId);
         if(!$row) throw new RuntimeException('ไม่พบข้อมูล');
+
+        $fileCode=(string)$row['file_code'];
+        $decoded=$this->decodeRow($row);
+        $data=$decoded['data'];
+
+        if($fileCode==='PERSON'){
+            $pid=trim((string)($data['PID'] ?? ''));
+            if($pid!=='' && $this->model->countPidReferences($hospitalId,$pid,$id)>0){
+                throw new RuntimeException('ไม่สามารถลบ PERSON ได้ เนื่องจากยังมีข้อมูลแฟ้มลูกอ้างอิง PID นี้');
+            }
+        }
+
+        if($fileCode==='HOME'){
+            $hid=trim((string)($data['HID'] ?? ''));
+            if($hid!=='' && $this->model->countHidReferences($hospitalId,$hid,$id)>0){
+                throw new RuntimeException('ไม่สามารถลบ HOME ได้ เนื่องจากยังมี PERSON อ้างอิง HID นี้');
+            }
+        }
+
         $this->model->softDelete($id,$hospitalId,$userId);
-        $this->model->addAudit($id,$hospitalId,(string)$row['file_code'],'DELETE',$userId,(string)$row['record_key_hash'],[]);
+        $this->model->addAudit($id,$hospitalId,$fileCode,'DELETE',$userId,(string)$row['record_key_hash'],[]);
     }
 
     private function findPersonByPid(int $hospitalId,string $pid): ?array
