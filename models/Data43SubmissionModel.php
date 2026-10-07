@@ -56,6 +56,21 @@ class Data43SubmissionModel {
         }
     }
 
+    public function findDuplicateArchive(int $hospitalId, string $reportMonth, string $archiveSha256): ?array {
+        $stmt = $this->db->prepare("
+            SELECT id, status, uploaded_at
+            FROM data43_submissions
+            WHERE hospital_id = ?
+              AND report_month = ?
+              AND archive_sha256 = ?
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$hospitalId, $reportMonth, $archiveSha256]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     public function createSubmission(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO data43_submissions
