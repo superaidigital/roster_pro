@@ -933,7 +933,12 @@ if (!function_exists('renderSidebarMenu')) {
                         <ul class="sidebar-menu pb-0 mt-1 mb-2 p-0 position-relative" style="gap:2px;">
                             <li class="nav-item">
                                 <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'dashboard') ? 'active' : '' ?>" href="index.php?c=data43&a=dashboard">
-                                    แดชบอร์ด 43 แฟ้ม
+                                    แดชบอร์ดการนำส่ง
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'spatial') ? 'active' : '' ?>" href="index.php?c=data43&a=spatial">
+                                    วิเคราะห์ข้อมูลเชิงพื้นที่
                                 </a>
                             </li>
                             <li class="nav-item">
