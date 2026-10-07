@@ -3,6 +3,8 @@ require_once 'config/database.php';
 require_once 'models/Data43SubmissionModel.php';
 require_once 'services/Data43ImportService.php';
 require_once 'services/Data43MetricRegistry.php';
+require_once 'services/Data43RegistryService.php';
+require_once 'services/Data43FormRegistry.php';
 require_once 'controllers/LogsController.php';
 
 class Data43Controller
@@ -419,6 +421,170 @@ class Data43Controller
         }
 
         header('Location: index.php?c=data43&a=index' . $query);
+        exit;
+    }
+
+    public function registry(): void
+    {
+        $this->requireAccess();
+
+        $db=(new Database())->getConnection();
+        $service=new Data43RegistryService($db);
+        $schema_ready=$service->schemaReady();
+        $is_admin=in_array($this->role(),self::ADMIN_ROLES,true);
+        $selected_hospital_id=$this->selectedHospitalId();
+        $csrf_token=$this->csrfToken();
+        $schemas=Data43FormRegistry::schemas();
+        $file_code=strtoupper(trim((string)($_GET['file'] ?? 'PERSON')));
+        if(!isset($schemas[$file_code])) $file_code='PERSON';
+
+        $hospitals=[];
+        if($is_admin){
+            $stmt=$db->query("SELECT id,hospital_code,name FROM hospitals WHERE is_active=1 AND deleted_at IS NULL ORDER BY name");
+            $hospitals=$stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $records=($schema_ready && $selected_hospital_id)
+            ? $service->listFile((int)$selected_hospital_id,$file_code,100)
+            : [];
+        $overview=($schema_ready && $selected_hospital_id)
+            ? $service->overview((int)$selected_hospital_id)
+            : ['people'=>0,'typearea'=>[],'age'=>[],'chronic_people'=>0,'dm'=>0,'ht'=>0,'missing_home'=>0];
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/registry.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function registry_save(): void
+    {
+        $this->requireAccess();
+        header('Content-Type: application/json; charset=utf-8');
+        try{
+            $this->verifyCsrf();
+            $db=(new Database())->getConnection();
+            $service=new Data43RegistryService($db);
+            if(!$service->schemaReady()) throw new RuntimeException('กรุณารัน migration data43_registry ก่อน');
+
+            $hospitalId=$this->resolveUploadHospitalId();
+            $fileCode=strtoupper(trim((string)($_POST['file_code'] ?? '')));
+            $recordId=filter_input(INPUT_POST,'record_id',FILTER_VALIDATE_INT) ?: null;
+            $payload=json_decode((string)($_POST['payload'] ?? '{}'),true);
+            if(!is_array($payload)) throw new RuntimeException('ข้อมูลแบบฟอร์มไม่ถูกต้อง');
+
+            $result=$service->save($hospitalId,(int)$_SESSION['user']['id'],$fileCode,$payload,$recordId);
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],
+                $result['action']==='CREATE'?LogsController::ACTION_CREATE:LogsController::ACTION_UPDATE,
+                "Data43 {$result['action']} {$fileCode} record #{$result['id']} hospital #{$hospitalId}");
+            echo json_encode(['ok'=>true,'record'=>$result],JSON_UNESCAPED_UNICODE);
+        }catch(InvalidArgumentException $e){
+            http_response_code(422);
+            $errors=json_decode($e->getMessage(),true);
+            echo json_encode(['ok'=>false,'message'=>'กรุณาตรวจสอบข้อมูล','errors'=>is_array($errors)?$errors:[]],JSON_UNESCAPED_UNICODE);
+        }catch(Throwable $e){
+            http_response_code(400);
+            echo json_encode(['ok'=>false,'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
+    public function registry_search(): void
+    {
+        $this->requireAccess();
+        header('Content-Type: application/json; charset=utf-8');
+        try{
+            $hospitalId=$this->selectedHospitalId();
+            if(!$hospitalId) throw new RuntimeException('กรุณาเลือกหน่วยบริการ');
+            $type=strtoupper(trim((string)($_GET['type'] ?? 'PERSON')));
+            $q=trim((string)($_GET['q'] ?? ''));
+            $service=new Data43RegistryService((new Database())->getConnection());
+            echo json_encode(['ok'=>true,'items'=>$service->search((int)$hospitalId,$type,$q)],JSON_UNESCAPED_UNICODE);
+        }catch(Throwable $e){
+            http_response_code(400);
+            echo json_encode(['ok'=>false,'message'=>$e->getMessage(),'items'=>[]],JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
+    public function registry_record(): void
+    {
+        $this->requireAccess();
+        header('Content-Type: application/json; charset=utf-8');
+        try{
+            $hospitalId=$this->selectedHospitalId();
+            $id=filter_input(INPUT_GET,'id',FILTER_VALIDATE_INT);
+            if(!$hospitalId||!$id) throw new RuntimeException('ไม่พบข้อมูล');
+            $service=new Data43RegistryService((new Database())->getConnection());
+            $record=$service->getRecord((int)$hospitalId,(int)$id);
+            if(!$record) throw new RuntimeException('ไม่พบข้อมูล');
+            echo json_encode(['ok'=>true,'record'=>$record],JSON_UNESCAPED_UNICODE);
+        }catch(Throwable $e){
+            http_response_code(404);
+            echo json_encode(['ok'=>false,'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
+    public function registry_profile(): void
+    {
+        $this->requireAccess();
+        $hospitalId=$this->selectedHospitalId();
+        $pid=trim((string)($_GET['pid'] ?? ''));
+        if(!$hospitalId||$pid===''){
+            $_SESSION['error_msg']='ไม่พบ PID ที่ต้องการ';
+            header('Location: index.php?c=data43&a=registry'); exit;
+        }
+        $service=new Data43RegistryService((new Database())->getConnection());
+        $profile=$service->personProfile((int)$hospitalId,$pid);
+        $csrf_token=$this->csrfToken();
+        $selected_hospital_id=$hospitalId;
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/person_profile.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function registry_delete(): void
+    {
+        $this->requireAccess();
+        if($_SERVER['REQUEST_METHOD']!=='POST'){http_response_code(405);exit;}
+        try{
+            $this->verifyCsrf();
+            $hospitalId=$this->resolveUploadHospitalId();
+            $id=filter_input(INPUT_POST,'record_id',FILTER_VALIDATE_INT);
+            if(!$id) throw new RuntimeException('ไม่พบรายการ');
+            $db=(new Database())->getConnection();
+            $service=new Data43RegistryService($db);
+            $service->delete($hospitalId,(int)$_SESSION['user']['id'],(int)$id);
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_DELETE,"Data43 delete record #{$id} hospital #{$hospitalId}");
+            $_SESSION['success_msg']='ลบรายการเรียบร้อย';
+        }catch(Throwable $e){$_SESSION['error_msg']=$e->getMessage();}
+        $query=in_array($this->role(),self::ADMIN_ROLES,true)&&!empty($_POST['hospital_id'])?'&hospital_id='.(int)$_POST['hospital_id']:'';
+        header('Location: index.php?c=data43&a=registry'.$query);
+        exit;
+    }
+
+    public function registry_export(): void
+    {
+        $this->requireAccess();
+        $hospitalId=$this->selectedHospitalId();
+        $fileCode=strtoupper(trim((string)($_GET['file'] ?? 'PERSON')));
+        $format=strtolower(trim((string)($_GET['format'] ?? 'txt')));
+        if(!in_array($format,['txt','csv'],true)) $format='txt';
+        if(!$hospitalId){$_SESSION['error_msg']='กรุณาเลือกหน่วยบริการ';header('Location: index.php?c=data43&a=registry');exit;}
+
+        $workDir=dirname(__DIR__).DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'data43_export'.DIRECTORY_SEPARATOR.'job_'.bin2hex(random_bytes(8));
+        try{
+            $service=new Data43RegistryService((new Database())->getConnection());
+            $path=$service->exportFile((int)$hospitalId,(int)$_SESSION['user']['id'],$fileCode,$format,$workDir);
+            header('Content-Type: '.($format==='csv'?'text/csv':'text/plain').'; charset=utf-8');
+            header('Content-Disposition: attachment; filename="'.$fileCode.'.'.$format.'"');
+            header('Content-Length: '.filesize($path));
+            readfile($path);
+        }finally{
+            Data43ImportService::recursiveDelete($workDir);
+        }
         exit;
     }
 
