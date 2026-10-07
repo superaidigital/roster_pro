@@ -73,6 +73,66 @@ final class Data43ValidationService
         return null;
     }
 
+    public static function validateSchemaFields(array $schema, array $data): array
+    {
+        $errors = [];
+
+        foreach ((array)($schema['fields'] ?? []) as $field) {
+            $name = (string)($field['name'] ?? '');
+            if ($name === '') continue;
+
+            $value = trim((string)($data[$name] ?? ''));
+            if ($value === '') continue;
+
+            if (isset($field['maxlength']) && mb_strlen($value, 'UTF-8') > (int)$field['maxlength']) {
+                $errors[$name] = 'ข้อมูลยาวเกิน ' . (int)$field['maxlength'] . ' ตัวอักษร';
+                continue;
+            }
+
+            if (($field['type'] ?? '') === 'select' && isset($field['options'])) {
+                $allowed = array_map('strval', array_keys((array)$field['options']));
+                if (!in_array($value, $allowed, true)) {
+                    $errors[$name] = 'ค่าที่เลือกไม่อยู่ในรายการมาตรฐาน';
+                    continue;
+                }
+            }
+
+            if ($name === 'HOSPCODE' && (!preg_match('/^\d{5}$/', $value))) {
+                $errors[$name] = 'HOSPCODE ต้องเป็นตัวเลข 5 หลัก';
+                continue;
+            }
+
+            if ($name === 'HOSPCODE9' && $value !== '' && !preg_match('/^\d{9}$/', $value)) {
+                $errors[$name] = 'HOSPCODE9 ต้องเป็นตัวเลข 9 หลัก';
+                continue;
+            }
+
+            if (in_array($name, ['TAMBON','AMPUR','CHANGWAT'], true) && !preg_match('/^\d{2}$/', $value)) {
+                $errors[$name] = 'รหัสพื้นที่ต้องเป็นตัวเลข 2 หลัก';
+                continue;
+            }
+
+            if ($name === 'VILLAGE' && self::normalizeVillage($value) === null) {
+                $errors[$name] = 'รหัสหมู่บ้านไม่ถูกต้อง';
+                continue;
+            }
+
+            if ($name === 'LATITUDE') {
+                if (!is_numeric($value) || (float)$value < -90 || (float)$value > 90) {
+                    $errors[$name] = 'Latitude ต้องอยู่ระหว่าง -90 ถึง 90';
+                }
+            }
+
+            if ($name === 'LONGITUDE') {
+                if (!is_numeric($value) || (float)$value < -180 || (float)$value > 180) {
+                    $errors[$name] = 'Longitude ต้องอยู่ระหว่าง -180 ถึง 180';
+                }
+            }
+        }
+
+        return $errors;
+    }
+
     public static function validateRecord(string $fileCode, array $data): array
     {
         $errors = [];
