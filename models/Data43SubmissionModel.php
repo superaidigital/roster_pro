@@ -63,6 +63,7 @@ class Data43SubmissionModel {
             WHERE hospital_id = ?
               AND report_month = ?
               AND archive_sha256 = ?
+              AND status <> 'FAILED'
             ORDER BY id DESC
             LIMIT 1
         ");
