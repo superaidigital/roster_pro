@@ -351,7 +351,10 @@ class Data43Controller
                 $detected = $detectedExpected;
                 $missingCodes = array_values((array)($quality['missing_expected_codes'] ?? []));
                 $headerIssues = (array)($quality['header_issues'] ?? []);
-                $status = ($detected >= $expectedFiles && empty($headerIssues)) ? 'COMPLETE' : 'INCOMPLETE';
+                $invalidExpectedCodes = array_values((array)($quality['invalid_expected_codes'] ?? []));
+                $status = ($detected >= $expectedFiles && empty($headerIssues) && empty($invalidExpectedCodes))
+                    ? 'COMPLETE'
+                    : 'INCOMPLETE';
 
                 $summaryParts = [];
                 if ($detected < $expectedFiles) {
@@ -364,6 +367,9 @@ class Data43Controller
                 }
                 if (!empty($headerIssues)) {
                     $summaryParts[] = 'พบปัญหาโครงสร้างคอลัมน์ ' . count($headerIssues) . ' แฟ้ม';
+                }
+                if (!empty($invalidExpectedCodes)) {
+                    $summaryParts[] = 'แฟ้มที่ยังประมวลผลไม่ได้: ' . implode(', ', array_slice($invalidExpectedCodes, 0, 8));
                 }
                 $errorSummary = $summaryParts ? mb_substr(implode(' | ', $summaryParts), 0, 500, 'UTF-8') : null;
 
