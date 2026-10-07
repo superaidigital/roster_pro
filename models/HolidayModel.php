@@ -8,6 +8,67 @@ class HolidayModel {
         $this->conn = $db;
     }
 
+    private function hasColumn(string $column): bool {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*)
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'holidays'
+                  AND COLUMN_NAME = ?
+            ");
+            $stmt->execute([$column]);
+            return (int)$stmt->fetchColumn() > 0;
+        } catch (Throwable $e) {
+            error_log('Holiday schema check failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getSchemaStatus(): array {
+        return [
+            'holiday_type' => $this->hasColumn('holiday_type'),
+            'is_active' => $this->hasColumn('is_active'),
+            'hospital_id' => $this->hasColumn('hospital_id'),
+            'status' => $this->hasColumn('status'),
+        ];
+    }
+
+    private function insertHolidayCompat(string $date, string $name, string $type = 'REGULAR'): bool {
+        $hasType = $this->hasColumn('holiday_type');
+        $hasActive = $this->hasColumn('is_active');
+
+        if ($hasType && $hasActive) {
+            $stmt = $this->conn->prepare("
+                INSERT INTO holidays (holiday_date, holiday_name, holiday_type, is_active)
+                VALUES (?, ?, ?, 1)
+            ");
+            return $stmt->execute([$date, $name, $type]);
+        }
+
+        if ($hasType) {
+            $stmt = $this->conn->prepare("
+                INSERT INTO holidays (holiday_date, holiday_name, holiday_type)
+                VALUES (?, ?, ?)
+            ");
+            return $stmt->execute([$date, $name, $type]);
+        }
+
+        if ($hasActive) {
+            $stmt = $this->conn->prepare("
+                INSERT INTO holidays (holiday_date, holiday_name, is_active)
+                VALUES (?, ?, 1)
+            ");
+            return $stmt->execute([$date, $name]);
+        }
+
+        $stmt = $this->conn->prepare("
+            INSERT INTO holidays (holiday_date, holiday_name)
+            VALUES (?, ?)
+        ");
+        return $stmt->execute([$date, $name]);
+    }
+
     // ดึงวันหยุดทั้งหมด (กรองตามปีได้)
     public function getAllHolidays($year = null) {
         $query = "SELECT * FROM holidays ";
@@ -61,9 +122,9 @@ class HolidayModel {
     // เพิ่มวันหยุดแบบ Manual
     public function addHoliday($date, $name, $type = 'REGULAR') {
         try {
-            $stmt = $this->conn->prepare("INSERT INTO holidays (holiday_date, holiday_name, holiday_type, is_active) VALUES (?, ?, ?, 1)");
-            return $stmt->execute([$date, $name, $type]);
-        } catch (PDOException $e) {
+            return $this->insertHolidayCompat((string)$date, (string)$name, (string)$type);
+        } catch (Throwable $e) {
+            error_log("Add Holiday Error: " . $e->getMessage());
             return false;
         }
     }
@@ -76,8 +137,12 @@ class HolidayModel {
 
     // เปิด-ปิด การใช้วันหยุด
     public function toggleStatus($id, $status) {
+        if (!$this->hasColumn('is_active')) {
+            return false;
+        }
+
         $stmt = $this->conn->prepare("UPDATE holidays SET is_active = ? WHERE id = ?");
-        return $stmt->execute([$status, $id]);
+        return $stmt->execute([(int)$status, (int)$id]);
     }
 
     // ซิงค์ข้อมูลวันหยุดจาก API อัตโนมัติ
@@ -135,12 +200,6 @@ class HolidayModel {
             true
         );
 
-        $insert_stmt = $this->conn->prepare(
-            "INSERT INTO holidays
-                (holiday_date, holiday_name, holiday_type, is_active)
-             VALUES (?, ?, ?, 1)"
-        );
-
         $added = 0;
         $skipped = 0;
 
@@ -179,7 +238,7 @@ class HolidayModel {
                     }
                 }
 
-                if ($insert_stmt->execute([$date, $name, $type])) {
+                if ($this->insertHolidayCompat($date, $name, $type)) {
                     $added++;
                     $existing_dates[$date] = true;
                 }
