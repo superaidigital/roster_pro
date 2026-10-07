@@ -425,18 +425,22 @@ $roster_csrf_token = $_SESSION['csrf_token'];
                     <div class="rp-roster-focusbar__meta"><?= rp_e($hospital_name ?? '') ?></div>
                 </div>
                 <div class="rp-roster-focusbar__actions">
-                    <button type="button" class="rp-btn rp-btn--secondary rp-btn--sm" id="rosterStaffPanelToggle" aria-pressed="false">
+                    <button type="button"
+                            class="rp-btn rp-btn--secondary rp-btn--sm"
+                            id="rosterStaffPanelToggle"
+                            aria-pressed="false"
+                            onclick="toggleRosterStaffPanel(); return false;">
                         <i class="bi bi-people-fill"></i>
                         <span>ซ่อนรายชื่อ</span>
                     </button>
-                    <button type="button"
-                            class="rp-btn rp-btn--danger rp-btn--sm"
-                            id="rosterFullscreenExit"
-                            data-roster-action="exit-fullscreen"
-                            onclick="exitRosterFocusMode(event)">
+                    <a href="index.php?c=roster&hospital_id=<?= urlencode((string)($hospital_id ?? '')) ?>&month=<?= urlencode((string)$selected_month) ?>"
+                       class="rp-btn rp-btn--danger rp-btn--sm text-decoration-none"
+                       id="rosterFullscreenExit"
+                       data-roster-action="exit-fullscreen"
+                       onclick="return exitRosterFocusMode(event);">
                         <i class="bi bi-fullscreen-exit"></i>
                         ออกจากเต็มจอ
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -1028,7 +1032,7 @@ function exitRosterFocusMode(event) {
     }
 
     const workspace = document.getElementById('rosterWorkspace');
-    if (!workspace) return false;
+    if (!workspace) return true;
 
     workspace.classList.remove('is-fullscreen', 'is-staff-hidden');
     document.body.classList.remove('rp-roster-focus-mode');
@@ -1106,23 +1110,10 @@ function toggleRosterStaffPanel() {
 
 document.addEventListener('DOMContentLoaded', function() {
     const fullscreenBtn = document.getElementById('rosterFullscreenBtn');
-    const fullscreenExit = document.getElementById('rosterFullscreenExit');
-    const staffPanelToggle = document.getElementById('rosterStaffPanelToggle');
-
     fullscreenBtn?.addEventListener('click', function() {
         const workspace = document.getElementById('rosterWorkspace');
         setRosterFocusMode(!workspace?.classList.contains('is-fullscreen'));
     });
-
-    // Capture-level fallback: guarantees the exit action even if another
-    // component stops bubbling or a stale Bootstrap listener is present.
-    document.addEventListener('click', function(event) {
-        const exitButton = event.target.closest('[data-roster-action="exit-fullscreen"]');
-        if (!exitButton) return;
-        exitRosterFocusMode(event);
-    }, true);
-
-    staffPanelToggle?.addEventListener('click', toggleRosterStaffPanel);
 
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape' && document.getElementById('rosterWorkspace')?.classList.contains('is-fullscreen')) {
