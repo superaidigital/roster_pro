@@ -117,6 +117,21 @@ final class Data43ValidationService
                 continue;
             }
 
+            if (($field['type'] ?? '') === 'decimal' && !is_numeric($value)) {
+                $errors[$name] = 'กรุณากรอกเป็นตัวเลข';
+                continue;
+            }
+
+            if ($name === 'VID' && !preg_match('/^[0-9]{6}[0-9A-Z]{2}$/', strtoupper($value))) {
+                $errors[$name] = 'VID ต้องเป็น CCAATTMM จำนวน 8 หลัก/ตัวอักษร เช่น 33010101 หรือ 330101A0';
+                continue;
+            }
+
+            if ($name === 'TIME_SERV' && !preg_match('/^(?:[01]\d|2[0-3])[0-5]\d[0-5]\d$/', $value)) {
+                $errors[$name] = 'เวลาให้บริการต้องเป็น HHMMSS';
+                continue;
+            }
+
             if ($name === 'LATITUDE') {
                 if (!is_numeric($value) || (float)$value < -90 || (float)$value > 90) {
                     $errors[$name] = 'Latitude ต้องอยู่ระหว่าง -90 ถึง 90';
@@ -139,7 +154,7 @@ final class Data43ValidationService
         $cid = trim((string)($data['CID'] ?? ''));
         if ($cid !== '' && !self::validateCid($cid)) $errors['CID'] = 'เลขบัตรประชาชน 13 หลักไม่ผ่าน checksum';
 
-        foreach (['BIRTH','DDISCHARGE','DDEATH','DATE_DIAG','DATE_SERV','DATE_DETECT'] as $field) {
+        foreach (['BIRTH','DDISCHARGE','DDEATH','DATE_DIAG','DATE_SERV','DATE_DETECT','DATE_DISAB','LMP','EDC','DATE_HCT','OUTDATE'] as $field) {
             if (!empty($data[$field]) && !self::validateDate8((string)$data[$field])) {
                 $errors[$field] = 'วันที่ไม่ถูกต้องหรือเกินวันที่ปัจจุบัน';
             }
