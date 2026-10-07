@@ -116,6 +116,10 @@ class Data43ImportService {
                 fclose($in);
                 fclose($out);
 
+                if (in_array($ext, ['csv','txt'], true)) {
+                    $this->normalizeTextEncoding($target);
+                }
+
                 $canonical = Data43StandardV241::canonicalFileCode(basename($name));
                 $rawBase = strtoupper(preg_replace('/[^A-Za-z0-9_\-]/', '', pathinfo($name, PATHINFO_FILENAME)) ?: 'UNKNOWN');
                 $fileCode = $canonical ?? substr($rawBase, 0, 100);
@@ -173,6 +177,17 @@ class Data43ImportService {
                     'rule_code' => 'LEGACY_V241_COMPAT',
                     'field_name' => 'HOSPCODE9',
                     'issue_count' => 1,
+                    'sample_rows' => [],
+                ];
+            }
+
+            if ($unknownFiles) {
+                $qualityIssues[] = [
+                    'file_code' => 'PACKAGE',
+                    'severity' => 'INFO',
+                    'rule_code' => 'VENDOR_EXTENSION_FILES',
+                    'field_name' => null,
+                    'issue_count' => count($unknownFiles),
                     'sample_rows' => [],
                 ];
             }
@@ -781,6 +796,55 @@ class Data43ImportService {
             return (int)$date->diff($today)->y;
         } catch (Throwable $e) {
             return null;
+        }
+    }
+
+    private function normalizeTextEncoding(string $path): void
+    {
+        $fh = fopen($path, 'rb');
+        if (!$fh) return;
+        $sample = (string)fread($fh, 65536);
+        fclose($fh);
+
+        if ($sample === '' || mb_check_encoding($sample, 'UTF-8')) {
+            return;
+        }
+
+        // Real-world F43 exports may still contain CP874/TIS-620 text.
+        // Convert once into the private temp file so all downstream parsing,
+        // validation and hashing of extracted content operates on UTF-8.
+        if (!function_exists('iconv')) {
+            throw new RuntimeException('พบไฟล์ข้อความที่ไม่ใช่ UTF-8 และ PHP iconv ไม่พร้อมใช้งาน');
+        }
+
+        $input = fopen($path, 'rb');
+        $tmp = $path . '.utf8';
+        $output = fopen($tmp, 'wb');
+        if (!$input || !$output) {
+            if (is_resource($input)) fclose($input);
+            if (is_resource($output)) fclose($output);
+            @unlink($tmp);
+            throw new RuntimeException('ไม่สามารถแปลง encoding ของไฟล์ข้อมูลได้');
+        }
+
+        try {
+            while (!feof($input)) {
+                $chunk = fread($input, 1048576);
+                if ($chunk === false || $chunk === '') continue;
+                $converted = iconv('CP874', 'UTF-8//IGNORE', $chunk);
+                if ($converted === false) {
+                    throw new RuntimeException('ไม่สามารถแปลงข้อความ CP874 เป็น UTF-8');
+                }
+                fwrite($output, $converted);
+            }
+        } finally {
+            fclose($input);
+            fclose($output);
+        }
+
+        if (!@rename($tmp, $path)) {
+            @unlink($tmp);
+            throw new RuntimeException('ไม่สามารถแทนที่ไฟล์ข้อความหลังแปลง encoding');
         }
     }
 
