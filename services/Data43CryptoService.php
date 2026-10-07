@@ -92,10 +92,9 @@ final class Data43CryptoService
             }
         }
 
-        // Fallback for development environments where parent(DocumentRoot) is not writable.
-        return dirname(__DIR__)
-            . DIRECTORY_SEPARATOR . 'storage'
-            . DIRECTORY_SEPARATOR . 'secrets'
+        // Final development fallback must remain outside the web document root.
+        return rtrim(sys_get_temp_dir(), '/\\')
+            . DIRECTORY_SEPARATOR . 'roster_pro_secrets'
             . DIRECTORY_SEPARATOR . 'data43_record.key';
     }
 
