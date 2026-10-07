@@ -698,7 +698,12 @@ class Data43SubmissionModel {
         }
         unset($row);
 
-        return Data43PrivacyService::suppressRows($rows);
+        return Data43PrivacyService::suppressSpatialRows(
+            $rows,
+            'metric_value',
+            $denominatorCode !== null ? 'denominator_value' : null,
+            $denominatorCode !== null ? Data43PrivacyService::DEFAULT_MIN_DENOMINATOR : 0
+        );
     }
 
     public function getSpatialCoverageByHospital(
