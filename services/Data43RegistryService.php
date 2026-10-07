@@ -99,6 +99,12 @@ final class Data43RegistryService
         }
         if(isset($data['VILLAGE'])) $data['VILLAGE']=Data43ValidationService::normalizeVillage($data['VILLAGE']) ?? '';
 
+        foreach (['DIAGCODE','CHRONIC','CDEATH_A','CDEATH_B','CDEATH_C','CDEATH_D','ODISEASE','CDEATH'] as $icdField) {
+            if (!empty($data[$icdField])) {
+                $data[$icdField] = strtoupper(str_replace('.', '', trim((string)$data[$icdField])));
+            }
+        }
+
         if(in_array($fileCode,['ADDRESS','CHRONIC','DEATH','DISABILITY','SERVICE','NCDSCREEN','PRENATAL','ANC'],true) && !empty($data['PID'])){
             $person=$this->findPersonByPid($hospitalId,$data['PID']);
             if(!$person) throw new RuntimeException('ไม่พบ PERSON ของ PID ที่เลือก');
