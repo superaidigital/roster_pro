@@ -54,7 +54,7 @@ class RosterController {
             SELECT u.*, p.rate_r, p.rate_y, p.rate_b, p.name as pay_rate_name 
             FROM users u
             LEFT JOIN pay_rates p ON u.pay_rate_id = p.id
-            WHERE u.role NOT IN ('SUPERADMIN', 'ADMIN') 
+            WHERE u.role NOT IN ('SUPERADMIN', 'ADMIN', 'HR') 
             AND u.is_deleted = 0 
             AND u.is_active = 1
             AND (u.show_in_roster = 1 OR u.show_in_roster IS NULL)
@@ -146,7 +146,7 @@ class RosterController {
             SELECT DISTINCT u.* FROM users u
             LEFT JOIN shifts s ON u.id = s.user_id AND s.shift_date LIKE ?
             WHERE (u.hospital_id = ? OR s.hospital_id = ?) 
-            AND u.role NOT IN ('SUPERADMIN', 'ADMIN') 
+            AND u.role NOT IN ('SUPERADMIN', 'ADMIN', 'HR') 
             AND u.is_deleted = 0
             AND (u.show_in_roster = 1 OR u.show_in_roster IS NULL)
             ORDER BY u.display_order ASC, u.id ASC
@@ -231,7 +231,7 @@ class RosterController {
             $stmt_staff = $db->prepare("
                 SELECT id FROM users 
                 WHERE hospital_id = ? 
-                AND role NOT IN ('SUPERADMIN', 'ADMIN', 'DIRECTOR') 
+                AND role NOT IN ('SUPERADMIN', 'ADMIN', 'HR', 'DIRECTOR') 
                 AND is_deleted = 0 
                 AND is_active = 1
                 AND (show_in_roster = 1 OR show_in_roster IS NULL)
