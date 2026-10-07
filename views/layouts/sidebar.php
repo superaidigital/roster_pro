@@ -955,6 +955,11 @@ if (!function_exists('renderSidebarMenu')) {
                             
                             <?php if (in_array($role, ['SUPERADMIN', 'ADMIN'])): ?>
                                 <li class="nav-item">
+                                    <a class="nav-link submenu-item <?= ($c == 'leave' && $a == 'templates') ? 'active' : '' ?>" href="index.php?c=leave&a=templates">
+                                        แบบฟอร์มวันลา
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link submenu-item <?= ($c == 'leave' && $a == 'settings') ? 'active' : '' ?>" href="index.php?c=leave&a=settings">
                                         ตั้งค่าระเบียบการลา
                                     </a>
