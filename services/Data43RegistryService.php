@@ -295,6 +295,28 @@ final class Data43RegistryService
         $headers=Data43FormRegistry::exportHeaders($fileCode);
         if(!$headers) throw new RuntimeException('แฟ้มนี้ยังไม่มี Export Schema');
         $rows=$this->model->listForExport($hospitalId,$fileCode);
+        $invalidRecords = [];
+        foreach ($rows as $row) {
+            $payload = $this->decodeRow($row)['data'];
+            $errors = $this->validatePayloadAgainstSchema($fileCode, $payload);
+            if ($errors) {
+                $invalidRecords[] = [
+                    'id' => (int)$row['id'],
+                    'fields' => array_keys($errors),
+                ];
+                if (count($invalidRecords) >= 5) break;
+            }
+        }
+        if ($invalidRecords) {
+            $sample = implode(', ', array_map(
+                static fn(array $item): string => '#' . $item['id'] . '(' . implode('/', $item['fields']) . ')',
+                $invalidRecords
+            ));
+            throw new RuntimeException(
+                'ไม่สามารถส่งออก ' . $fileCode . ' ได้ เนื่องจากมีข้อมูลไม่ผ่านมาตรฐาน กรุณาแก้ไขรายการ: ' . $sample
+            );
+        }
+
         if(!is_dir($workDir) && !mkdir($workDir,0750,true) && !is_dir($workDir)) throw new RuntimeException('สร้างพื้นที่ส่งออกไม่สำเร็จ');
 
         $ext=$format==='csv'?'csv':'txt';
@@ -369,6 +391,25 @@ final class Data43RegistryService
 
         $this->model->softDelete($id,$hospitalId,$userId);
         $this->model->addAudit($id,$hospitalId,$fileCode,'DELETE',$userId,(string)$row['record_key_hash'],[]);
+    }
+
+    private function validatePayloadAgainstSchema(string $fileCode, array $data): array
+    {
+        $schema = Data43FormRegistry::get($fileCode);
+        if (!$schema) return ['FILE_CODE' => 'ไม่รู้จักโครงสร้างแฟ้ม'];
+
+        $errors = Data43ValidationService::validateRecord($fileCode, $data);
+        $errors = array_merge($errors, Data43ValidationService::validateSchemaFields($schema, $data));
+
+        foreach ((array)($schema['fields'] ?? []) as $field) {
+            $name = (string)($field['name'] ?? '');
+            if ($name === '') continue;
+            if (!empty($field['required']) && trim((string)($data[$name] ?? '')) === '') {
+                $errors[$name] = 'ข้อมูลจำเป็นว่าง';
+            }
+        }
+
+        return $errors;
     }
 
     private function findPersonByPid(int $hospitalId,string $pid): ?array
