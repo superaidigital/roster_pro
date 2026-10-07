@@ -27,14 +27,19 @@ try {
         $sys_settings[$row['setting_key']] = $row['setting_value'];
     }
     
-    // 🌟 กำหนดค่าชื่อแอปพลิเคชัน (ดึงจากฐานข้อมูล)
-    if (!empty($sys_settings['app_name'])) {
-        $app_name = $sys_settings['app_name'];
+    // 🌟 ชื่อระบบ: ใช้ key รุ่นใหม่ก่อน และรองรับ key รุ่นเก่า
+    // system_short_name = ชื่อแบรนด์สั้นบน Topbar
+    // system_name       = ชื่อเต็ม/คำอธิบายระบบ
+    if (!empty($sys_settings['system_short_name'])) {
+        $app_name = trim((string)$sys_settings['system_short_name']);
+    } elseif (!empty($sys_settings['app_name'])) {
+        $app_name = trim((string)$sys_settings['app_name']);
     }
 
-    // 🌟 กำหนดค่าชื่อย่อย (ดึงจากฐานข้อมูล)
-    if (!empty($sys_settings['app_subtitle'])) {
-        $app_subtitle = $sys_settings['app_subtitle'];
+    if (!empty($sys_settings['system_name'])) {
+        $app_subtitle = trim((string)$sys_settings['system_name']);
+    } elseif (!empty($sys_settings['app_subtitle'])) {
+        $app_subtitle = trim((string)$sys_settings['app_subtitle']);
     }
     
     // 🚨 ตรวจสอบโหมดปิดปรับปรุงระบบ และ สถานะการระงับบัญชี (เฉพาะเมื่อมีการล็อกอิน)
