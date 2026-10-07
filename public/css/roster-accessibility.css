@@ -241,3 +241,32 @@ body {
         box-shadow: none !important;
     }
 }
+
+
+/* =========================================================
+   Modal stacking safety
+   Topbar/dropdowns use a high z-index, so application modals
+   must always render above the shell and never underneath it.
+   ========================================================= */
+.modal {
+    z-index: 10050 !important;
+}
+
+.modal-backdrop {
+    z-index: 10040 !important;
+}
+
+body.modal-open .top-navbar,
+body.modal-open #desktopSidebar {
+    pointer-events: none;
+}
+
+body.modal-open .modal,
+body.modal-open .modal * {
+    pointer-events: auto;
+}
+
+.modal-dialog {
+    position: relative;
+    z-index: 1;
+}
