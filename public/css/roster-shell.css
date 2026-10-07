@@ -106,7 +106,27 @@ body .topbar-main .dropdown {
 }
 
 body .top-navbar .dropdown-menu {
-    z-index: 1300 !important;
+    z-index: 5000 !important;
+}
+
+body .rp-topbar-actions {
+    position: relative;
+    z-index: 5001;
+    pointer-events: auto;
+}
+
+body .rp-topbar-actions > *,
+body .rp-topbar-actions button,
+body .rp-topbar-actions .profile-pill,
+body .rp-topbar-actions .nav-icon-btn {
+    pointer-events: auto !important;
+}
+
+body .topbar-main::before,
+body .topbar-main::after,
+body .topbar-context::before,
+body .topbar-context::after {
+    pointer-events: none !important;
 }
 
 body .rp-app-frame {
