@@ -330,6 +330,9 @@ class Data43Controller
                     }
                 }
 
+                // Persist aggregate quality diagnostics; no raw person identifiers are stored.
+                $model->saveQualitySummary($submissionId, $quality);
+
                 // Persist privacy-preserving spatial aggregates when the spatial schema is installed.
                 // Failure here must not invalidate the core 43-file submission.
                 if (!empty($inspection['spatial_metrics']) && $model->spatialSchemaReady()) {
@@ -649,6 +652,7 @@ class Data43Controller
         }
 
         $files = $model->getFiles($id);
+        $quality_summary = $model->getQualitySummary($id);
         $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
         $csrf_token = $this->csrfToken();
 
