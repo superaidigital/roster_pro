@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../services/Data43MetricRegistry.php';
+require_once __DIR__ . '/../services/Data43PrivacyService.php';
 class Data43SubmissionModel {
     private PDO $db;
 
@@ -431,7 +433,7 @@ class Data43SubmissionModel {
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
-              AND m.metric_code IN ('DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE','POPULATION')
+              AND m.metric_code IN ('DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE','NCD_SCREEN','POPULATION','NCD_SCREEN_TARGET')
         ";
         $params = [$reportMonth, $reportMonth];
 
@@ -440,7 +442,7 @@ class Data43SubmissionModel {
             $params[] = $hospitalId;
         }
 
-        $sql .= " ORDER BY FIELD(m.metric_code,'DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE','POPULATION'), m.source_file_code";
+        $sql .= " ORDER BY FIELD(m.metric_code,'DM','HT','NCD','ELDERLY','DISABLED','ANC','SERVICE','NCD_SCREEN','POPULATION','NCD_SCREEN_TARGET'), m.source_file_code";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -457,23 +459,18 @@ class Data43SubmissionModel {
         if (!$this->spatialSchemaReady()) return [];
 
         $allowedLevels = ['CHANGWAT','AMPUR','TAMBON','VILLAGE'];
-        if (!in_array($areaLevel, $allowedLevels, true)) {
-            $areaLevel = 'CHANGWAT';
-        }
+        if (!in_array($areaLevel, $allowedLevels, true)) $areaLevel = 'CHANGWAT';
 
-        $allowedMetrics = ['DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE'];
-        if (!in_array($metricCode, $allowedMetrics, true)) {
-            $metricCode = 'DM';
-        }
+        $metricDef = Data43MetricRegistry::get($metricCode) ?? Data43MetricRegistry::get('DM');
+        $metricCode = $metricDef['code'];
+        $denominatorCode = $metricDef['denominator'];
 
         $sql = "
             SELECT
-                m.changwat_code,
-                m.ampur_code,
-                m.tambon_code,
-                m.village_code,
+                m.changwat_code, m.ampur_code, m.tambon_code, m.village_code,
                 SUM(CASE WHEN m.metric_code = ? THEN m.metric_value ELSE 0 END) AS metric_value,
                 SUM(CASE WHEN m.metric_code = 'POPULATION' THEN m.metric_value ELSE 0 END) AS population_value,
+                SUM(CASE WHEN m.metric_code = ? THEN m.metric_value ELSE 0 END) AS denominator_value,
                 SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END) AS geo_point_count,
                 CASE
                     WHEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END) > 0
@@ -493,43 +490,29 @@ class Data43SubmissionModel {
             JOIN (
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
-                WHERE report_month = ?
-                  AND status IN ('COMPLETE','INCOMPLETE')
+                WHERE report_month = ? AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
               AND m.area_level = ?
-              AND (m.metric_code = ? OR m.metric_code IN ('POPULATION','GEO_REFERENCE'))
+              AND (m.metric_code = ? OR m.metric_code IN ('POPULATION','NCD_SCREEN_TARGET','GEO_REFERENCE'))
         ";
-
+        $denParam = $denominatorCode ?? '__NO_DENOMINATOR__';
         $params = [
-            $metricCode, $metricCode,
-            $metricCode, $metricCode, $metricCode,
+            $metricCode, $denParam,
+            $metricCode, $metricCode, $metricCode, $metricCode,
             $metricCode, $metricCode, $metricCode,
             $metricCode, $metricCode,
             $reportMonth, $reportMonth, $areaLevel, $metricCode
         ];
 
-        if ($hospitalId !== null) {
-            $sql .= " AND m.hospital_id = ? ";
-            $params[] = $hospitalId;
-        }
-        if ($ampurCode !== null && $ampurCode !== '') {
-            $sql .= " AND m.ampur_code = ? ";
-            $params[] = $ampurCode;
-        }
-        if ($tambonCode !== null && $tambonCode !== '') {
-            $sql .= " AND m.tambon_code = ? ";
-            $params[] = $tambonCode;
-        }
+        if ($hospitalId !== null) { $sql .= " AND m.hospital_id = ? "; $params[] = $hospitalId; }
+        if ($ampurCode !== null && $ampurCode !== '') { $sql .= " AND m.ampur_code = ? "; $params[] = $ampurCode; }
+        if ($tambonCode !== null && $tambonCode !== '') { $sql .= " AND m.tambon_code = ? "; $params[] = $tambonCode; }
 
         $sql .= "
-            GROUP BY
-                m.changwat_code,
-                m.ampur_code,
-                m.tambon_code,
-                m.village_code
-            HAVING metric_value > 0 OR population_value > 0
+            GROUP BY m.changwat_code,m.ampur_code,m.tambon_code,m.village_code
+            HAVING metric_value > 0 OR population_value > 0 OR denominator_value > 0
             ORDER BY metric_value DESC
         ";
 
@@ -539,14 +522,15 @@ class Data43SubmissionModel {
 
         foreach ($rows as &$row) {
             $value = (int)($row['metric_value'] ?? 0);
-            $population = (int)($row['population_value'] ?? 0);
-            $row['rate_per_1000'] = $population > 0
-                ? round(($value / $population) * 1000, 2)
-                : null;
+            $denominator = $denominatorCode === null ? null : (int)($row['denominator_value'] ?? 0);
+            $row['display_value'] = Data43MetricRegistry::calculate($metricCode, $value, $denominator);
+            $row['display_unit'] = $metricDef['unit'];
+            $row['calculation'] = $metricDef['calculation'];
+            $row['rate_per_1000'] = $metricDef['calculation'] === 'RATE_PER_1000' ? $row['display_value'] : null;
         }
         unset($row);
 
-        return $rows;
+        return Data43PrivacyService::suppressRows($rows);
     }
 
     public function getSpatialCoverageByHospital(
@@ -562,7 +546,7 @@ class Data43SubmissionModel {
             $areaLevel = 'CHANGWAT';
         }
 
-        $allowedMetrics = ['DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE'];
+        $allowedMetrics = Data43MetricRegistry::allowedCodes();
         if (!in_array($metricCode, $allowedMetrics, true)) {
             $metricCode = 'DM';
         }
