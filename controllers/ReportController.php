@@ -68,7 +68,7 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
                     h.district,
                     
                     -- นับจำนวนพนักงานในสังกัด
-                    (SELECT COUNT(*) FROM users WHERE hospital_id = h.id AND role NOT IN ('SUPERADMIN', 'ADMIN') AND deleted_at IS NULL) as total_staff,
+                    (SELECT COUNT(*) FROM users WHERE hospital_id = h.id AND role NOT IN ('SUPERADMIN', 'ADMIN', 'HR') AND deleted_at IS NULL) as total_staff,
                     
                     -- สถานะตารางเวรเดือนที่เลือก
                     IFNULL((SELECT status FROM roster_status WHERE hospital_id = h.id AND month_year = :month_year), 'NOT_STARTED') as schedule_status,
@@ -291,7 +291,7 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
         $sql_users = "SELECT u.id, u.name, u.type, u.position_number, h.name as hospital_name 
                       FROM users u 
                       JOIN hospitals h ON u.hospital_id = h.id 
-                      WHERE u.deleted_at IS NULL AND u.role NOT IN ('SUPERADMIN', 'ADMIN')";
+                      WHERE u.deleted_at IS NULL AND u.role NOT IN ('SUPERADMIN', 'ADMIN', 'HR')";
         if ($filter_hospital !== 'all') {
             $sql_users .= " AND u.hospital_id = " . (int)$filter_hospital;
         }
@@ -479,7 +479,7 @@ class ReportController { // 🌟 แก้ไขตรงนี้ ตัดต�
         $sql = "SELECT u.id, u.name, u.type, u.employee_type, u.position_number, u.role as system_role, h.name as hospital_name 
                 FROM users u 
                 LEFT JOIN hospitals h ON u.hospital_id = h.id 
-                WHERE u.deleted_at IS NULL AND u.role NOT IN ('SUPERADMIN')";
+                WHERE u.deleted_at IS NULL AND u.role NOT IN ('SUPERADMIN', 'ADMIN', 'HR')";
         
         $params = [];
         if ($filter_hospital !== 'all') {
