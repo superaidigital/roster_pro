@@ -51,6 +51,16 @@ function formatDateThai($dateString) {
         ระบบจะไม่บันทึกวันที่ซ้ำ และหาก API หลักไม่มีข้อมูลประเทศไทย จะใช้ชุดวันหยุดราชการไทยที่ตรวจสอบไว้สำหรับปีที่ระบบรองรับ
     </div>
 
+    <?php if (isset($holiday_schema) && (empty($holiday_schema['holiday_type']) || empty($holiday_schema['is_active']))): ?>
+        <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-dark rounded-4 px-3 py-2 mb-3">
+            <i class="bi bi-database-exclamation me-1"></i>
+            ฐานข้อมูลวันหยุดยังเป็นโครงสร้างเดิม
+            <?php if (empty($holiday_schema['holiday_type'])): ?> · ยังไม่มี <code>holiday_type</code><?php endif; ?>
+            <?php if (empty($holiday_schema['is_active'])): ?> · ยังไม่มี <code>is_active</code><?php endif; ?>
+            ระบบยังเพิ่ม/ซิงค์วันหยุดได้แบบรองรับย้อนหลัง แต่ควรรัน migration เพื่อเปิดใช้ประเภทและสถานะอย่างสมบูรณ์
+        </div>
+    <?php endif; ?>
+
     <!-- Alerts -->
     <?php if (isset($_SESSION['success_msg'])): ?>
         <div class="alert border-0 bg-success bg-opacity-10 text-success rounded-4 p-3 shadow-sm border-start border-success border-4 mb-4">
@@ -160,10 +170,20 @@ function formatDateThai($dateString) {
                                             ?>
                                         </td>
                                         <td class="text-center">
-                                            <?php if(isset($h['is_active']) && $h['is_active'] == 1): ?>
-                                                <a href="index.php?c=settings&a=toggle_holiday&id=<?= $h['id'] ?>&status=0" class="btn btn-sm btn-success rounded-pill" style="font-size: 11px;" title="กดเพื่อปิดใช้งาน">กำลังใช้งาน</a>
+                                            <?php if(isset($h['is_active'])): ?>
+                                                <form action="index.php?c=settings&a=toggle_holiday" method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+                                                    <input type="hidden" name="status" value="<?= ((int)$h['is_active'] === 1) ? 0 : 1 ?>">
+                                                    <button type="submit"
+                                                            class="btn btn-sm <?= ((int)$h['is_active'] === 1) ? 'btn-success' : 'btn-secondary' ?> rounded-pill"
+                                                            style="font-size: 11px;"
+                                                            title="<?= ((int)$h['is_active'] === 1) ? 'กดเพื่อปิดใช้งาน' : 'กดเพื่อเปิดใช้งาน' ?>">
+                                                        <?= ((int)$h['is_active'] === 1) ? 'กำลังใช้งาน' : 'ปิดใช้งาน' ?>
+                                                    </button>
+                                                </form>
                                             <?php else: ?>
-                                                <a href="index.php?c=settings&a=toggle_holiday&id=<?= $h['id'] ?>&status=1" class="btn btn-sm btn-secondary rounded-pill" style="font-size: 11px;" title="กดเพื่อเปิดใช้งาน">ปิดใช้งาน</a>
+                                                <span class="badge bg-warning text-dark">Schema เดิม</span>
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-center">
