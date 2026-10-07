@@ -302,7 +302,7 @@ class Data43ImportService {
 
                         if (in_array($fileCode, ['SERVICE','ANC','NCDSCREEN','DISABILITY','CHRONIC','DEATH','ADDRESS'], true)) {
                             $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
-                            if ($pid !== null && !isset($linkage['people'][$pid])) {
+                            if ($pid !== null && !isset($linkage['person_ids'][$pid])) {
                                 $this->addQualityIssue($issues, $fileCode, 'WARNING', 'ORPHAN_PID', 'PID', $rowNumber);
                             }
                         }
@@ -354,6 +354,7 @@ class Data43ImportService {
         $addresses = [];
         $villageCentroids = [];
         $people = [];
+        $personIds = [];
         $unresolvedPeople = 0;
         $addressOnlyPeople = 0;
 
@@ -404,10 +405,11 @@ class Data43ImportService {
 
         foreach ($this->fileParts($textFiles, 'PERSON') as $part) {
             $this->walkTextRows($part['path'], function(array $row, array $h) use (
-                &$people, $homes, $addresses, $villageCentroids, &$unresolvedPeople, &$addressOnlyPeople
+                &$people, &$personIds, $homes, $addresses, $villageCentroids, &$unresolvedPeople, &$addressOnlyPeople
             ): void {
                 $pid = $this->stringValue($row, $this->findHeaderIndex($h, ['PID']));
                 if ($pid === null) return;
+                $personIds[$pid] = true;
 
                 $hid = $this->stringValue($row, $this->findHeaderIndex($h, ['HID']));
                 $area = ($hid !== null && isset($homes[$hid])) ? $homes[$hid] : null;
@@ -443,6 +445,7 @@ class Data43ImportService {
             'addresses'=>$addresses,
             'villages'=>$villageCentroids,
             'people'=>$people,
+            'person_ids'=>$personIds,
             'unresolved_people'=>$unresolvedPeople,
             'address_only_people'=>$addressOnlyPeople,
         ];
