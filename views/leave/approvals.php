@@ -238,6 +238,9 @@ require_once __DIR__ . '/../components/ui.php';
                                     <a href="index.php?c=leave&a=print&id=<?= $leave['id'] ?>" target="_blank" class="btn btn-sm btn-light border rounded-pill shadow-sm mb-2 w-100 fw-bold text-primary" style="font-size: 11px;">
                                         <i class="bi bi-file-earmark-text me-1"></i> ดูใบลาต้นฉบับ
                                     </a>
+                                    <a href="index.php?c=leave&a=generate_document&id=<?= (int)$leave['id'] ?>" class="btn btn-sm btn-outline-primary rounded-pill shadow-sm mb-2 w-100 fw-bold" style="font-size: 11px;">
+                                        <i class="bi bi-file-earmark-word me-1"></i> สร้าง Word จาก Template
+                                    </a>
                                     
                                     <!-- 🌟 ดักจับสถานะที่สิ้นสุดแล้ว (เพื่อเปลี่ยนปุ่มเป็นป้ายบอกสถานะ) -->
                                     <?php if ($leave['status'] == 'CANCELLED'): ?>
