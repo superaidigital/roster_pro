@@ -13,15 +13,14 @@ $display_mode = $display_mode ?? 'rate';
 $ampur_code = $ampur_code ?? null;
 $tambon_code = $tambon_code ?? null;
 
-$metricLabels = [
-    'DM' => 'เบาหวาน (DM)',
-    'HT' => 'ความดันโลหิตสูง (HT)',
-    'NCD' => 'โรคไม่ติดต่อเรื้อรัง (NCD)',
-    'ANC' => 'ฝากครรภ์ (ANC)',
-    'ELDERLY' => 'ผู้สูงอายุ',
-    'DISABLED' => 'ผู้พิการ',
-    'SERVICE' => 'การรับบริการ',
-];
+$metricDefinitions = Data43MetricRegistry::all();
+$metricLabels = [];
+foreach ($metricDefinitions as $code => $definition) {
+    $metricLabels[$code] = (string)$definition['label'];
+}
+$metric_definition = $metric_definition ?? (Data43MetricRegistry::get($metric_code) ?? Data43MetricRegistry::get('DM'));
+$metric_unit = (string)($metric_definition['unit'] ?? '');
+$rate_mode_supported = Data43MetricRegistry::canUseRateMode($metric_code);
 
 $levelLabels = [
     'CHANGWAT' => 'จังหวัด',
@@ -30,8 +29,9 @@ $levelLabels = [
     'VILLAGE' => 'หมู่บ้าน',
 ];
 
-function data43_privacy_count(int $value): string {
-    return ($value > 0 && $value < 5) ? '&lt;5' : number_format($value);
+function data43_privacy_count(int $value, bool $suppressed = false): string {
+    if ($suppressed) return '&lt;5 / ปกปิด';
+    return number_format($value);
 }
 
 function data43_area_code(array $row, string $level): string {
@@ -69,7 +69,10 @@ $mapRows = array_map(static function(array $row) use ($area_level): array {
         'village' => (string)($row['village_code'] ?? ''),
         'count' => (int)($row['metric_value'] ?? 0),
         'population' => (int)($row['population_value'] ?? 0),
-        'rate' => $row['rate_per_1000'] !== null ? (float)$row['rate_per_1000'] : null,
+        'denominator' => (int)($row['denominator_value'] ?? 0),
+        'value' => $row['display_value'] !== null ? (float)$row['display_value'] : null,
+        'suppressed' => !empty($row['privacy_suppressed']),
+        'privacy_reason' => $row['privacy_reason'] ?? null,
         'lat' => $row['centroid_lat'] !== null ? (float)$row['centroid_lat'] : null,
         'lng' => $row['centroid_lng'] !== null ? (float)$row['centroid_lng'] : null,
     ];
@@ -216,7 +219,9 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                 <div>
                     <label class="form-label fw-bold small">การไล่สี</label>
                     <select name="mode" class="rp-control">
-                        <option value="rate" <?= $display_mode === 'rate' ? 'selected' : '' ?>>อัตราต่อ 1,000 คน</option>
+                        <?php if ($rate_mode_supported): ?>
+                            <option value="rate" <?= $display_mode === 'rate' ? 'selected' : '' ?>><?= htmlspecialchars($metric_unit,ENT_QUOTES,'UTF-8') ?></option>
+                        <?php endif; ?>
                         <option value="count" <?= $display_mode === 'count' ? 'selected' : '' ?>>จำนวน</option>
                     </select>
                 </div>
@@ -249,7 +254,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
     <div class="data43-kpis mb-3">
         <div class="data43-kpi">
             <div class="data43-kpi__label"><?= htmlspecialchars($metricLabels[$metric_code] ?? $metric_code,ENT_QUOTES,'UTF-8') ?></div>
-            <div class="data43-kpi__value"><?= data43_privacy_count((int)($spatial_summary['records'] ?? 0)) ?></div>
+            <div class="data43-kpi__value"><?= number_format((int)($spatial_summary['records'] ?? 0)) ?></div>
             <div class="small text-muted">จำนวนรวม</div>
         </div>
         <div class="data43-kpi">
@@ -258,9 +263,9 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
             <div class="small text-muted">จากแฟ้ม PERSON</div>
         </div>
         <div class="data43-kpi">
-            <div class="data43-kpi__label">อัตราต่อ 1,000 คน</div>
-            <div class="data43-kpi__value"><?= $spatial_summary['rate_per_1000'] !== null ? number_format((float)$spatial_summary['rate_per_1000'],2) : '–' ?></div>
-            <div class="small text-muted">จำนวน ÷ ประชากร × 1,000</div>
+            <div class="data43-kpi__label"><?= htmlspecialchars($metric_unit ?: 'ค่าตัวชี้วัด',ENT_QUOTES,'UTF-8') ?></div>
+            <div class="data43-kpi__value"><?= $spatial_summary['display_value'] !== null ? number_format((float)$spatial_summary['display_value'],2) : '–' ?></div>
+            <div class="small text-muted"><?= htmlspecialchars((string)($metric_definition['calculation'] ?? 'COUNT'),ENT_QUOTES,'UTF-8') ?></div>
         </div>
         <div class="data43-kpi">
             <div class="data43-kpi__label">พื้นที่ที่มีข้อมูล</div>
@@ -277,7 +282,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                         แผนที่ <?= htmlspecialchars($metricLabels[$metric_code] ?? $metric_code,ENT_QUOTES,'UTF-8') ?>
                     </h2>
                     <div class="small text-muted">
-                        สีเข้ม = <?= $display_mode === 'rate' ? 'อัตราต่อ 1,000 คนสูงกว่า' : 'จำนวนสูงกว่า' ?>
+                        สีเข้ม = <?= $display_mode === 'rate' ? 'ค่าตัวชี้วัดสูงกว่า' : 'จำนวนสูงกว่า' ?>
                         · คลิกพื้นที่เพื่อเจาะลึกระดับถัดไป
                     </div>
                 </div>
@@ -289,7 +294,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
             <div class="rp-card__header">
                 <div>
                     <h2 class="rp-card__title mb-1">คำอธิบายสี</h2>
-                    <div class="small text-muted"><?= $display_mode === 'rate' ? 'อัตราต่อ 1,000 คน' : 'จำนวน' ?></div>
+                    <div class="small text-muted"><?= $display_mode === 'rate' ? $metric_unit : 'จำนวน' ?></div>
                 </div>
             </div>
             <div class="rp-card__body">
@@ -321,30 +326,30 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                 <?php
                 $rankRows = $spatial_rows;
                 usort($rankRows, static function(array $a,array $b) use ($display_mode): int {
-                    $av = $display_mode === 'rate' ? (float)($a['rate_per_1000'] ?? -1) : (int)($a['metric_value'] ?? 0);
-                    $bv = $display_mode === 'rate' ? (float)($b['rate_per_1000'] ?? -1) : (int)($b['metric_value'] ?? 0);
+                    $av = $display_mode === 'rate' ? (float)($a['display_value'] ?? -1) : (int)($a['metric_value'] ?? 0);
+                    $bv = $display_mode === 'rate' ? (float)($b['display_value'] ?? -1) : (int)($b['metric_value'] ?? 0);
                     return $bv <=> $av;
                 });
                 $maxRank = 1.0;
                 foreach ($rankRows as $r) {
-                    $v = $display_mode === 'rate' ? (float)($r['rate_per_1000'] ?? 0) : (float)($r['metric_value'] ?? 0);
+                    $v = $display_mode === 'rate' ? (float)($r['display_value'] ?? 0) : (float)($r['metric_value'] ?? 0);
                     if ((int)($r['metric_value'] ?? 0) >= 5) $maxRank = max($maxRank,$v);
                 }
                 ?>
                 <div class="data43-rank">
                     <?php foreach (array_slice($rankRows,0,15) as $row):
                         $count = (int)($row['metric_value'] ?? 0);
-                        $value = $display_mode === 'rate' ? (float)($row['rate_per_1000'] ?? 0) : (float)$count;
+                        $value = $display_mode === 'rate' ? (float)($row['display_value'] ?? 0) : (float)$count;
                         $pct = $count >= 5 ? min(100,($value/$maxRank)*100) : 0;
                     ?>
                     <div class="data43-rank-row">
                         <div class="fw-bold small"><?= htmlspecialchars(data43_area_label($row,$area_level),ENT_QUOTES,'UTF-8') ?></div>
                         <div class="data43-rank-bar"><span style="width:<?= $pct ?>%"></span></div>
                         <div class="fw-bold text-end">
-                            <?php if ($count > 0 && $count < 5): ?>
-                                &lt;5
+                            <?php if (!empty($row['privacy_suppressed'])): ?>
+                                &lt;5 / ปกปิด
                             <?php elseif ($display_mode === 'rate'): ?>
-                                <?= $row['rate_per_1000'] !== null ? number_format((float)$row['rate_per_1000'],2) : '–' ?>
+                                <?= $row['display_value'] !== null ? number_format((float)$row['display_value'],2) : '–' ?>
                             <?php else: ?>
                                 <?= number_format($count) ?>
                             <?php endif; ?>
@@ -404,10 +409,10 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                         ?>
                         <tr>
                             <td><strong><?= htmlspecialchars(data43_area_code($row,$area_level),ENT_QUOTES,'UTF-8') ?></strong></td>
-                            <td class="text-end fw-bold"><?= data43_privacy_count($count) ?></td>
+                            <td class="text-end fw-bold"><?= data43_privacy_count($count, !empty($row['privacy_suppressed'])) ?></td>
                             <td class="text-end"><?= number_format((int)($row['population_value'] ?? 0)) ?></td>
                             <td class="text-end">
-                                <?= ($count > 0 && $count < 5) ? '&lt;5' : ($row['rate_per_1000'] !== null ? number_format((float)$row['rate_per_1000'],2) : '–') ?>
+                                <?= !empty($row['privacy_suppressed']) ? '&lt;5 / ปกปิด' : ($row['display_value'] !== null ? number_format((float)$row['display_value'],2) : '–') ?>
                             </td>
                             <td class="text-center"><?= (int)($row['hospital_count'] ?? 0) ?></td>
                             <td class="text-center"><?= (int)($row['source_file_count'] ?? 0) ?></td>
@@ -450,8 +455,8 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
 
     const byKey = new Map(rows.map(r => [r.key, r]));
     const visibleValues = rows
-        .filter(r => r.count >= 5)
-        .map(r => mode === 'rate' ? Number(r.rate ?? 0) : Number(r.count ?? 0))
+        .filter(r => !r.suppressed)
+        .map(r => mode === 'rate' ? Number(r.value ?? 0) : Number(r.count ?? 0))
         .filter(Number.isFinite);
 
     const maxValue = visibleValues.length ? Math.max(...visibleValues, 0) : 0;
@@ -460,7 +465,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
     const noData = '#e5e7eb';
 
     function colorFor(row) {
-        if (!row || row.count < 5 || maxValue <= 0) return noData;
+        if (!row || row.suppressed || maxValue <= 0) return noData;
         const value = mode === 'rate' ? Number(row.rate ?? 0) : Number(row.count ?? 0);
         if (value <= breaks[1]) return colors[0];
         if (value <= breaks[2]) return colors[1];
@@ -471,8 +476,8 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
 
     function privacyText(row) {
         if (!row) return 'ไม่มีข้อมูล';
-        if (row.count > 0 && row.count < 5) return '&lt;5';
-        if (mode === 'rate') return row.rate == null ? '–' : Number(row.rate).toLocaleString('th-TH',{maximumFractionDigits:2});
+        if (row.suppressed) return '&lt;5';
+        if (mode === 'rate') return row.value == null ? '–' : Number(row.value).toLocaleString('th-TH',{maximumFractionDigits:2});
         return Number(row.count).toLocaleString('th-TH');
     }
 
@@ -554,9 +559,9 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
 
             circle.bindPopup(
                 '<strong>หมู่ '+row.village+'</strong><br>'+
-                'จำนวน: '+(row.count > 0 && row.count < 5 ? '&lt;5' : Number(row.count).toLocaleString('th-TH'))+'<br>'+
+                'จำนวน: '+(row.suppressed ? '&lt;5' : Number(row.count).toLocaleString('th-TH'))+'<br>'+
                 'ประชากรฐาน: '+Number(row.population).toLocaleString('th-TH')+'<br>'+
-                'อัตรา/1,000: '+(row.count > 0 && row.count < 5 ? '&lt;5' : (row.rate == null ? '–' : Number(row.rate).toFixed(2)))
+                'อัตรา/1,000: '+(row.suppressed ? '&lt;5' : (row.value == null ? '–' : Number(row.value).toFixed(2)))
             );
             bounds.push([row.lat,row.lng]);
         });
@@ -593,8 +598,8 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                     const props = feature.properties || {};
                     const key = featureKey(props);
                     const row = byKey.get(key);
-                    const countText = !row ? '0' : (row.count > 0 && row.count < 5 ? '&lt;5' : Number(row.count).toLocaleString('th-TH'));
-                    const rateText = !row || row.rate == null ? '–' : (row.count > 0 && row.count < 5 ? '&lt;5' : Number(row.rate).toFixed(2));
+                    const countText = !row ? '0' : (row.suppressed ? '&lt;5' : Number(row.count).toLocaleString('th-TH'));
+                    const rateText = !row || row.value == null ? '–' : (row.suppressed ? '&lt;5' : Number(row.value).toFixed(2));
                     const url = nextUrl(props);
 
                     shape.bindTooltip(nameFor(props),{sticky:true});
