@@ -561,5 +561,43 @@ class Data43SubmissionModel {
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+
+    public function deleteSubmission(int $id): bool {
+        if ($id <= 0) {
+            return false;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            // Explicit deletes keep this compatible with databases where
+            // foreign-key cascade rules may not have been applied yet.
+            if ($this->spatialSchemaReady()) {
+                $stmt = $this->db->prepare("DELETE FROM data43_area_metrics WHERE submission_id = ?");
+                $stmt->execute([$id]);
+            }
+
+            $stmt = $this->db->prepare("DELETE FROM data43_submission_files WHERE submission_id = ?");
+            $stmt->execute([$id]);
+
+            $stmt = $this->db->prepare("DELETE FROM data43_submissions WHERE id = ?");
+            $stmt->execute([$id]);
+
+            $deleted = $stmt->rowCount() === 1;
+
+            if ($deleted) {
+                $this->db->commit();
+                return true;
+            }
+
+            $this->db->rollBack();
+            return false;
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
 }
 ?>
