@@ -1058,6 +1058,7 @@ class LeaveController {
         if ($ext === 'docx' && in_array($mime, [
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/zip',
+            'application/x-zip-compressed',
             'application/octet-stream'
         ], true)) {
             $fileType = 'DOCX';
@@ -1088,7 +1089,14 @@ class LeaveController {
             exit;
         }
 
-        $mappingStatus = $fileType === 'DOCX' ? 'READY' : 'PENDING';
+        $mappingStatus = 'PENDING';
+        $detectedPlaceholders = [];
+
+        if ($fileType === 'DOCX') {
+            $detectedPlaceholders = (new LeaveDocumentService($db))->scanDocxPlaceholders($target);
+            $mappingStatus = !empty($detectedPlaceholders) ? 'READY' : 'PENDING';
+        }
+
         try {
             $templateId = $templateModel->createTemplate([
                 'template_name' => $templateName,
@@ -1104,9 +1112,13 @@ class LeaveController {
             ]);
 
             LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_CREATE, "อัปโหลดแบบฟอร์มวันลา ID {$templateId} ({$fileType})");
-            $_SESSION['success_msg'] = $fileType === 'DOCX'
-                ? "อัปโหลด Word Template สำเร็จ พร้อมใช้งาน Placeholder"
-                : "อัปโหลด PDF Template สำเร็จ และรอ Mapping ตำแหน่งใน Phase 12.2";
+            if ($fileType === 'DOCX') {
+                $_SESSION['success_msg'] = !empty($detectedPlaceholders)
+                    ? "อัปโหลด Word Template สำเร็จ พบ Placeholder " . count($detectedPlaceholders) . " รายการ และพร้อมใช้งาน"
+                    : "อัปโหลด Word Template สำเร็จ แต่ยังไม่พบ Placeholder {{...}} กรุณาแก้ไฟล์ Word แล้วอัปโหลดเป็น Version ใหม่";
+            } else {
+                $_SESSION['success_msg'] = "อัปโหลด PDF Template สำเร็จ และรอ Mapping ตำแหน่งใน Phase 12.2";
+            }
         } catch (Throwable $e) {
             @unlink($target);
             error_log("Leave template upload error: " . $e->getMessage());
