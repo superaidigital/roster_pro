@@ -942,6 +942,11 @@ if (!function_exists('renderSidebarMenu')) {
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && in_array($a, ['registry','registry_profile'])) ? 'active' : '' ?>" href="index.php?c=data43&a=registry">
+                                    ทะเบียนข้อมูล / แบบสำรวจ
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link submenu-item <?= ($c == 'data43' && in_array($a, ['index','detail'])) ? 'active' : '' ?>" href="index.php?c=data43&a=index">
                                     นำส่งข้อมูล / ประวัติ
                                 </a>
