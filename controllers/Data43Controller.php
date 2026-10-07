@@ -491,6 +491,70 @@ class Data43Controller
         echo "</main></div></body></html>";
     }
 
+    public function delete_submission(): void
+    {
+        $this->requireAccess();
+
+        if (!in_array($this->role(), self::ADMIN_ROLES, true)) {
+            http_response_code(403);
+            $_SESSION['error_msg'] = 'เฉพาะ ADMIN / SUPERADMIN เท่านั้นที่ลบชุดข้อมูลได้';
+            header('Location: index.php?c=data43&a=index');
+            exit;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?c=data43&a=index');
+            exit;
+        }
+
+        $redirect = 'index.php?c=data43&a=index';
+
+        try {
+            $this->verifyCsrf();
+
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+            if (!$id) {
+                throw new RuntimeException('ไม่พบรหัสชุดข้อมูลที่ต้องการลบ');
+            }
+
+            $db = (new Database())->getConnection();
+            $model = new Data43SubmissionModel($db);
+            $submission = $model->getSubmission((int)$id);
+
+            if (!$submission) {
+                throw new RuntimeException('ไม่พบชุดข้อมูล หรืออาจถูกลบไปแล้ว');
+            }
+
+            $hospitalId = (int)$submission['hospital_id'];
+            if ($hospitalId > 0) {
+                $redirect .= '&hospital_id=' . $hospitalId;
+            }
+
+            if ($model->deleteSubmission((int)$id)) {
+                LogsController::addLog(
+                    $db,
+                    $_SESSION['user']['id'],
+                    LogsController::ACTION_DELETE,
+                    'ลบชุดข้อมูล 43 แฟ้ม Submission #'
+                    . (int)$id
+                    . ', Hospital #' . $hospitalId
+                    . ', รอบ ' . (string)$submission['report_month']
+                    . ', สถานะเดิม ' . (string)$submission['status']
+                );
+
+                $_SESSION['success_msg'] = 'ลบชุดข้อมูล Submission #' . (int)$id . ' เรียบร้อยแล้ว';
+            } else {
+                throw new RuntimeException('ไม่สามารถลบชุดข้อมูลได้');
+            }
+        } catch (Throwable $e) {
+            error_log('Data43 delete error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = $e->getMessage();
+        }
+
+        header('Location: ' . $redirect);
+        exit;
+    }
+
     public function detail(): void
     {
         $this->requireAccess();
@@ -519,6 +583,8 @@ class Data43Controller
         }
 
         $files = $model->getFiles($id);
+        $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
+        $csrf_token = $this->csrfToken();
 
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
