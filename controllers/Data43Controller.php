@@ -270,15 +270,22 @@ class Data43Controller
             }
 
             $stmt = $db->prepare("
-                SELECT COUNT(*)
+                SELECT hospital_code, name
                 FROM hospitals
                 WHERE id = ?
                   AND is_active = 1
                   AND deleted_at IS NULL
+                LIMIT 1
             ");
             $stmt->execute([$hospitalId]);
-            if ((int)$stmt->fetchColumn() !== 1) {
+            $hospitalRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$hospitalRow) {
                 throw new RuntimeException('ไม่พบ รพ.สต. หรือหน่วยบริการถูกปิดใช้งาน');
+            }
+
+            $expectedHospcode = trim((string)($hospitalRow['hospital_code'] ?? ''));
+            if ($expectedHospcode !== '' && ctype_digit($expectedHospcode)) {
+                $expectedHospcode = str_pad($expectedHospcode, 5, '0', STR_PAD_LEFT);
             }
 
             $upload = $_FILES['zip_file'] ?? null;
@@ -292,7 +299,7 @@ class Data43Controller
             $submissionId = null;
 
             try {
-                $inspection = $service->inspectUploadedZip($upload, $workDir);
+                $inspection = $service->inspectUploadedZip($upload, $workDir, $expectedHospcode);
 
                 $originalFilename = basename((string)($upload['name'] ?? 'submission.zip'));
                 $originalFilename = preg_replace('/[^A-Za-z0-9._\-ก-๙ ]/u', '_', $originalFilename) ?: 'submission.zip';
@@ -303,6 +310,19 @@ class Data43Controller
                     : null;
 
                 $quality = $inspection['quality_summary'] ?? [];
+
+                $duplicate = $model->findDuplicateArchive(
+                    $hospitalId,
+                    $reportMonth,
+                    (string)$inspection['archive_sha256']
+                );
+                if ($duplicate) {
+                    throw new RuntimeException(
+                        'ไฟล์ ZIP ชุดนี้เคยนำส่งแล้วในรอบเดือนเดียวกัน (Submission #'
+                        . (int)$duplicate['id'] . ')'
+                    );
+                }
+
                 $expectedFiles = max(1, (int)($quality['expected_files'] ?? 45));
                 $detectedExpected = max(0, (int)($quality['detected_expected_files'] ?? 0));
 
@@ -364,8 +384,10 @@ class Data43Controller
                     }
                 }
 
+                $strictProfile = ((string)($quality['profile_code'] ?? '')) === Data43StandardV241::PROFILE;
                 $status = (
-                    $detected >= $expectedFiles
+                    $strictProfile
+                    && $detected >= $expectedFiles
                     && empty($headerIssues)
                     && empty($invalidExpectedCodes)
                     && $rowQualityErrorCount === 0
@@ -385,6 +407,9 @@ class Data43Controller
                 }
                 if (!empty($invalidExpectedCodes)) {
                     $summaryParts[] = 'แฟ้มที่ยังประมวลผลไม่ได้: ' . implode(', ', array_slice($invalidExpectedCodes, 0, 8));
+                }
+                if (!$strictProfile) {
+                    $summaryParts[] = 'รูปแบบไฟล์เป็น Legacy/Partial compatibility ยังไม่ผ่านมาตรฐาน 2.4.1 แบบ strict';
                 }
                 if ($rowQualityErrorCount > 0) {
                     $summaryParts[] = 'พบข้อผิดพลาดระดับข้อมูล ' . number_format($rowQualityErrorCount) . ' รายการ';
@@ -407,8 +432,8 @@ class Data43Controller
                 );
 
                 $_SESSION['success_msg'] = $status === 'COMPLETE'
-                    ? "นำส่งข้อมูลสำเร็จ ตรวจพบครบ {$detected}/{$expectedFiles} โครงสร้างตาม Profile รพ.สต. Version 2.4.1"
-                    : "รับไฟล์เรียบร้อย ตรวจพบ {$detected}/{$expectedFiles} โครงสร้างตาม Profile รพ.สต. กรุณาตรวจสอบแฟ้มที่ขาด/คอลัมน์สำคัญ";
+                    ? "นำส่งข้อมูลสำเร็จและผ่าน Profile รพ.สต. Version 2.4.1 แบบ strict ({$detected}/{$expectedFiles} โครงสร้าง)"
+                    : "รับไฟล์เรียบร้อยเพื่อการตรวจสอบ/วิเคราะห์ แต่ยังไม่ผ่านมาตรฐาน 2.4.1 แบบสมบูรณ์ กรุณาตรวจ Quality Report";
 
             } catch (Throwable $e) {
                 if ($submissionId) {
