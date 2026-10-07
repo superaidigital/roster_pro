@@ -6,14 +6,97 @@ final class Data43CryptoService
     public function __construct()
     {
         $raw = trim((string)(getenv('DATA43_RECORD_KEY') ?: ''));
+
         if ($raw === '') {
-            throw new RuntimeException('ยังไม่ได้ตั้งค่า DATA43_RECORD_KEY สำหรับข้อมูล 43 แฟ้ม');
+            $raw = $this->loadDevelopmentKey();
+        }
+
+        if ($raw === '') {
+            throw new RuntimeException(
+                'ยังไม่ได้ตั้งค่า DATA43_RECORD_KEY สำหรับข้อมูล 43 แฟ้ม ' .
+                '(Production ต้องกำหนด Environment Variable ให้ Apache/PHP)'
+            );
         }
 
         // Allow a 64-hex key or arbitrary secret text.
         $this->key = preg_match('/^[a-f0-9]{64}$/i', $raw)
             ? hex2bin($raw)
             : hash('sha256', $raw, true);
+    }
+
+    /**
+     * Development/XAMPP convenience:
+     * - Production NEVER auto-generates encryption keys.
+     * - Local/development generates one persistent key outside DocumentRoot
+     *   when possible, so restarting Apache does not make encrypted records unreadable.
+     */
+    private function loadDevelopmentKey(): string
+    {
+        $environment = strtolower(trim((string)(getenv('APP_ENV') ?: 'development')));
+        if ($environment === 'production') {
+            return '';
+        }
+
+        $configuredPath = trim((string)(getenv('DATA43_KEY_FILE') ?: ''));
+        $keyPath = $configuredPath !== ''
+            ? $configuredPath
+            : $this->defaultDevelopmentKeyPath();
+
+        $directory = dirname($keyPath);
+
+        if (!is_dir($directory)) {
+            if (!@mkdir($directory, 0700, true) && !is_dir($directory)) {
+                throw new RuntimeException(
+                    'ไม่สามารถสร้างโฟลเดอร์เก็บ DATA43 encryption key ได้: ' . $directory
+                );
+            }
+        }
+
+        if (is_file($keyPath)) {
+            $existing = trim((string)@file_get_contents($keyPath));
+            if (preg_match('/^[a-f0-9]{64}$/i', $existing)) {
+                return $existing;
+            }
+
+            throw new RuntimeException(
+                'ไฟล์ DATA43 encryption key ไม่ถูกต้อง กรุณาตรวจสอบ: ' . $keyPath
+            );
+        }
+
+        $key = bin2hex(random_bytes(32));
+
+        if (@file_put_contents($keyPath, $key . PHP_EOL, LOCK_EX) === false) {
+            throw new RuntimeException(
+                'ไม่สามารถสร้าง DATA43 encryption key ได้ กรุณาตรวจสิทธิ์เขียนโฟลเดอร์: ' . $directory
+            );
+        }
+
+        @chmod($keyPath, 0600);
+        error_log('Data43 development encryption key created at: ' . $keyPath);
+
+        return $key;
+    }
+
+    private function defaultDevelopmentKeyPath(): string
+    {
+        $documentRoot = trim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''));
+
+        // XAMPP example:
+        // C:\\xampp\\htdocs -> C:\\xampp\\roster_pro_secrets
+        if ($documentRoot !== '') {
+            $parent = dirname(rtrim($documentRoot, '/\\'));
+            if ($parent !== '' && $parent !== '.' && is_dir($parent) && is_writable($parent)) {
+                return $parent
+                    . DIRECTORY_SEPARATOR . 'roster_pro_secrets'
+                    . DIRECTORY_SEPARATOR . 'data43_record.key';
+            }
+        }
+
+        // Fallback for development environments where parent(DocumentRoot) is not writable.
+        return dirname(__DIR__)
+            . DIRECTORY_SEPARATOR . 'storage'
+            . DIRECTORY_SEPARATOR . 'secrets'
+            . DIRECTORY_SEPARATOR . 'data43_record.key';
     }
 
     public function encrypt(array $payload): array
