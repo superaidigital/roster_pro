@@ -61,6 +61,8 @@ class HospitalsController {
 
         $data = [
             'name' => trim($_POST['name'] ?? ''),
+            'hospital_code' => trim($_POST['hospital_code'] ?? ''),
+            'hospital_code9' => trim($_POST['hospital_code9'] ?? ''),
             'short_name' => trim($_POST['short_name'] ?? ''),
             'phone' => trim($_POST['phone'] ?? ''),
             'address' => trim($_POST['address'] ?? '')
@@ -108,6 +110,8 @@ class HospitalsController {
 
         $data = [
             'name' => trim($_POST['name'] ?? ''),
+            'hospital_code' => trim($_POST['hospital_code'] ?? ''),
+            'hospital_code9' => trim($_POST['hospital_code9'] ?? ''),
             'short_name' => trim($_POST['short_name'] ?? ''),
             'phone' => trim($_POST['phone'] ?? ''),
             'address' => trim($_POST['address'] ?? '')
