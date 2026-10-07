@@ -19,11 +19,13 @@ class Data43SubmissionModel {
         $stmt = $this->db->prepare("
             INSERT INTO data43_submissions
                 (hospital_id, report_month, original_filename, archive_sha256,
-                 purpose_code, expected_files, detected_files, total_rows,
+                 purpose_code, standard_version, profile_code,
+                 expected_files, detected_files, total_rows,
                  status, uploaded_by, client_ip_hash)
             VALUES
                 (:hospital_id, :report_month, :original_filename, :archive_sha256,
-                 :purpose_code, :expected_files, 0, 0,
+                 :purpose_code, :standard_version, :profile_code,
+                 :expected_files, 0, 0,
                  'PROCESSING', :uploaded_by, :client_ip_hash)
         ");
         $stmt->execute([
@@ -32,7 +34,9 @@ class Data43SubmissionModel {
             ':original_filename' => $data['original_filename'],
             ':archive_sha256' => $data['archive_sha256'],
             ':purpose_code' => $data['purpose_code'] ?? 'PUBLIC_HEALTH_REPORTING',
-            ':expected_files' => (int)($data['expected_files'] ?? 43),
+            ':standard_version' => $data['standard_version'] ?? null,
+            ':profile_code' => $data['profile_code'] ?? null,
+            ':expected_files' => (int)($data['expected_files'] ?? 45),
             ':uploaded_by' => (int)$data['uploaded_by'],
             ':client_ip_hash' => $data['client_ip_hash'] ?? null,
         ]);
