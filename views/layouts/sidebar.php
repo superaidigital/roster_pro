@@ -946,6 +946,13 @@ if (!function_exists('renderSidebarMenu')) {
                                     ทะเบียนข้อมูล / แบบสำรวจ
                                 </a>
                             </li>
+                            <?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SUPERADMIN','ADMIN'], true)): ?>
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'health') ? 'active' : '' ?>" href="index.php?c=data43&a=health">
+                                    ตรวจสุขภาพระบบ
+                                </a>
+                            </li>
+                            <?php endif; ?>
                             <li class="nav-item">
                                 <a class="nav-link submenu-item <?= ($c == 'data43' && in_array($a, ['index','detail'])) ? 'active' : '' ?>" href="index.php?c=data43&a=index">
                                     นำส่งข้อมูล / ประวัติ
