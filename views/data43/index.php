@@ -13,6 +13,11 @@ $is_admin = $is_admin ?? false;
                 รับไฟล์ ZIP ราย รพ.สต. ตรวจสอบความครบถ้วน บันทึกประวัติ และลบไฟล์ชั่วคราวหลังประมวลผล
             </p>
         </div>
+        <div class="rp-page-header__actions">
+            <a href="index.php?c=data43&a=dashboard<?= !empty($selected_hospital_id) ? '&hospital_id='.(int)$selected_hospital_id : '' ?>" class="rp-btn rp-btn--secondary">
+                <i class="bi bi-speedometer2"></i> แดชบอร์ด 43 แฟ้ม
+            </a>
+        </div>
     </div>
 
     <?php if (!$schema_ready): ?>
