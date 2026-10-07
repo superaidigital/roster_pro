@@ -61,17 +61,19 @@ function data43_area_label(array $row, string $level): string {
 }
 
 $mapRows = array_map(static function(array $row) use ($area_level): array {
+    $suppressed = !empty($row['privacy_suppressed']);
     return [
         'key' => 'TH' . data43_area_code($row, $area_level),
         'changwat' => (string)($row['changwat_code'] ?? ''),
         'ampur' => (string)($row['ampur_code'] ?? ''),
         'tambon' => (string)($row['tambon_code'] ?? ''),
         'village' => (string)($row['village_code'] ?? ''),
-        'count' => (int)($row['metric_value'] ?? 0),
-        'population' => (int)($row['population_value'] ?? 0),
-        'denominator' => (int)($row['denominator_value'] ?? 0),
-        'value' => $row['display_value'] !== null ? (float)$row['display_value'] : null,
-        'suppressed' => !empty($row['privacy_suppressed']),
+        // Never serialize hidden cell values into browser JavaScript.
+        'count' => $suppressed ? null : (int)($row['metric_value'] ?? 0),
+        'population' => $suppressed ? null : (int)($row['population_value'] ?? 0),
+        'denominator' => $suppressed ? null : (int)($row['denominator_value'] ?? 0),
+        'value' => (!$suppressed && $row['display_value'] !== null) ? (float)$row['display_value'] : null,
+        'suppressed' => $suppressed,
         'privacy_reason' => $row['privacy_reason'] ?? null,
         'lat' => $row['centroid_lat'] !== null ? (float)$row['centroid_lat'] : null,
         'lng' => $row['centroid_lng'] !== null ? (float)$row['centroid_lng'] : null,
@@ -302,7 +304,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                 <hr>
                 <div class="data43-map-note">
                     <strong>PDPA:</strong> ระบบไม่แสดงตำแหน่งบุคคล บ้าน หรือพิกัดรายคน
-                    พื้นที่ที่มีจำนวน 1–4 รายและอย่างน้อยอีก 1 พื้นที่ประกอบจะถูก <strong>ปกปิด</strong> เพื่อลดการอนุมานย้อนกลับ
+                    พื้นที่ที่มีจำนวน 1–4 ราย หรือมีประชากรฐานน้อยกว่า 20 คน และอย่างน้อยอีก 1 พื้นที่ประกอบในกลุ่มแม่เดียวกันจะถูก <strong>ปกปิด</strong> เพื่อลดการอนุมานย้อนกลับ
                 </div>
                 <?php if ($area_level === 'VILLAGE'): ?>
                     <div class="rp-alert rp-alert--info mt-3 mb-0">
@@ -410,7 +412,7 @@ $tambonUrl = 'index.php?' . http_build_query(array_merge($queryBase, [
                         <tr>
                             <td><strong><?= htmlspecialchars(data43_area_code($row,$area_level),ENT_QUOTES,'UTF-8') ?></strong></td>
                             <td class="text-end fw-bold"><?= data43_privacy_count($count, !empty($row['privacy_suppressed'])) ?></td>
-                            <td class="text-end"><?= number_format((int)($row['population_value'] ?? 0)) ?></td>
+                            <td class="text-end"><?= !empty($row['privacy_suppressed']) ? 'ปกปิด' : number_format((int)($row['population_value'] ?? 0)) ?></td>
                             <td class="text-end">
                                 <?= !empty($row['privacy_suppressed']) ? 'ปกปิด' : ($row['display_value'] !== null ? number_format((float)$row['display_value'],2) : '–') ?>
                             </td>
