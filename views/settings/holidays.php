@@ -36,14 +36,19 @@ function formatDateThai($dateString) {
             <a href="index.php?c=settings&a=system" class="btn btn-light border fw-bold rounded-pill shadow-sm px-4">
                 <i class="bi bi-arrow-left me-1"></i> กลับ
             </a>
-            <form action="index.php?c=settings&a=sync_api" method="POST" class="m-0" onsubmit="return confirm('ระบบจะทำการดึงข้อมูลจาก Server ส่วนกลาง (Data.go.th / Nager Date)\nต้องการดำเนินการต่อหรือไม่?');">
+            <form action="index.php?c=settings&a=sync_api" method="POST" class="m-0" onsubmit="return confirm('ระบบจะตรวจสอบข้อมูลวันหยุดประเทศไทยจาก API และใช้ชุดข้อมูลสำรองที่ตรวจสอบไว้เมื่อ API ไม่มีข้อมูล\nต้องการดำเนินการต่อหรือไม่?');">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                 <input type="hidden" name="year" value="<?= (int)$year ?>">
                 <button type="submit" class="btn btn-primary fw-bold rounded-pill shadow-sm px-4">
-                    <i class="bi bi-cloud-arrow-down me-1"></i> ซิงค์ API ปี <?= (int)$year ?>
+                    <i class="bi bi-cloud-arrow-down me-1"></i> ซิงค์วันหยุด ปี <?= (int)$year + 543 ?>
                 </button>
             </form>
         </div>
+    </div>
+
+    <div class="alert alert-info border-0 bg-info bg-opacity-10 text-dark rounded-4 px-3 py-2 mb-3" style="font-size:12px;">
+        <i class="bi bi-info-circle-fill text-info me-1"></i>
+        ระบบจะไม่บันทึกวันที่ซ้ำ และหาก API หลักไม่มีข้อมูลประเทศไทย จะใช้ชุดวันหยุดราชการไทยที่ตรวจสอบไว้สำหรับปีที่ระบบรองรับ
     </div>
 
     <!-- Alerts -->
