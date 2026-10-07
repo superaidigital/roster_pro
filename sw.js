@@ -1,68 +1,89 @@
-// ที่อยู่ไฟล์: sw.js (ต้องวางไว้ที่โฟลเดอร์ Root นอกสุด คู่กับ index.php)
-
-const CACHE_NAME = 'rosterpro-cache-v1.1';
-
-// ไฟล์คงที่ที่ต้องการแคชเก็บไว้ในเครื่องเพื่อความรวดเร็ว
-const urlsToCache = [
+// Roster Pro service worker — static assets only
+const CACHE_NAME = 'rosterpro-static-v1.2';
+const STATIC_ASSETS = [
     './manifest.json',
-    './assets/icons/roster-pro.svg',
-    // หากมีไฟล์ CSS/JS ของตัวเองในเครื่อง สามารถเพิ่มลงในนี้ได้ เช่น
-    // './assets/css/style.css',
+    './assets/icons/roster-pro.svg'
 ];
 
-// 1. Install Event: ติดตั้ง Service Worker และโหลดไฟล์เข้า Cache
 self.addEventListener('install', event => {
-    self.skipWaiting(); // บังคับให้ SW ทำงานทันทีโดยไม่ต้องรอ
+    self.skipWaiting();
     event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('Opened cache');
-                return cache.addAll(urlsToCache);
-            })
+        caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
     );
 });
 
-// 2. Activate Event: เคลียร์ Cache เวอร์ชั่นเก่าทิ้ง
 self.addEventListener('activate', event => {
     event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    if (cacheName !== CACHE_NAME) {
-                        console.log('Deleting old cache:', cacheName);
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        }).then(() => self.clients.claim())
+        caches.keys()
+            .then(names => Promise.all(
+                names
+                    .filter(name => name !== CACHE_NAME)
+                    .map(name => caches.delete(name))
+            ))
+            .then(() => self.clients.claim())
     );
 });
 
-// 3. Fetch Event: ดักจับการดึงข้อมูล (Network-First Strategy)
-// เหมาะสำหรับ PHP เพราะเราต้องการข้อมูลที่อัปเดตล่าสุดเสมอ แต่ถ้าเน็ตหลุดถึงจะไปดึงจากแคช
 self.addEventListener('fetch', event => {
-    // ข้ามการแคชสำหรับ API หรือ Method POST เพื่อป้องกันการทำงานผิดพลาด
-    if (event.request.method !== 'GET' || event.request.url.includes('api')) {
+    const request = event.request;
+
+    if (request.method !== 'GET') {
+        return;
+    }
+
+    let url;
+    try {
+        url = new URL(request.url);
+    } catch (_) {
+        return;
+    }
+
+    // Never intercept dynamic/authenticated application pages.
+    if (
+        url.origin !== self.location.origin ||
+        url.pathname.endsWith('/index.php') ||
+        url.pathname.endsWith('.php') ||
+        url.searchParams.has('c') ||
+        request.mode === 'navigate'
+    ) {
+        return;
+    }
+
+    const isStaticAsset =
+        /\.(?:css|js|svg|png|jpg|jpeg|webp|ico|woff2?|ttf)$/i.test(url.pathname) ||
+        url.pathname.endsWith('/manifest.json');
+
+    if (!isStaticAsset) {
         return;
     }
 
     event.respondWith(
-        fetch(event.request)
-            .then(response => {
-                // ถ้าโหลดจากเน็ตสำเร็จ ให้เอาไปอัปเดตใน Cache ด้วย
-                if (!response || response.status !== 200 || response.type !== 'basic') {
+        caches.match(request).then(cached => {
+            const network = fetch(request)
+                .then(response => {
+                    if (response && response.ok) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+                    }
+                    return response;
+                })
+                .catch(() => null);
+
+            if (cached) {
+                event.waitUntil(network);
+                return cached;
+            }
+
+            return network.then(response => {
+                if (response instanceof Response) {
                     return response;
                 }
-                const responseToCache = response.clone();
-                caches.open(CACHE_NAME)
-                    .then(cache => {
-                        cache.put(event.request, responseToCache);
-                    });
-                return response;
-            })
-            .catch(() => {
-                // กรณี Offline (เน็ตหลุด) ให้พยายามดึงข้อมูลจาก Cache มาแสดงแทน
-                return caches.match(event.request);
-            })
+
+                return new Response('', {
+                    status: 503,
+                    statusText: 'Offline'
+                });
+            });
+        })
     );
 });
