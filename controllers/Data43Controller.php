@@ -406,16 +406,39 @@ class Data43Controller
         $spatial_schema_ready = $model->spatialSchemaReady();
         $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
         $selected_hospital_id = $this->selectedHospitalId();
+
         $report_month = trim((string)($_GET['month'] ?? date('Y-m')));
-        $area_level = strtoupper(trim((string)($_GET['level'] ?? 'TAMBON')));
-        $metric_code = strtoupper(trim((string)($_GET['metric'] ?? '')));
+        $area_level = strtoupper(trim((string)($_GET['level'] ?? 'CHANGWAT')));
+        $metric_code = strtoupper(trim((string)($_GET['metric'] ?? 'DM')));
+        $display_mode = strtolower(trim((string)($_GET['mode'] ?? 'rate')));
+        $ampur_code = preg_replace('/[^0-9]/', '', (string)($_GET['ampur'] ?? ''));
+        $tambon_code = preg_replace('/[^0-9]/', '', (string)($_GET['tambon'] ?? ''));
 
         if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
             $report_month = date('Y-m');
         }
 
-        if (!in_array($area_level, ['AMPUR','TAMBON','VILLAGE'], true)) {
-            $area_level = 'TAMBON';
+        if (!in_array($area_level, ['CHANGWAT','AMPUR','TAMBON','VILLAGE'], true)) {
+            $area_level = 'CHANGWAT';
+        }
+
+        $allowedMetrics = ['DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE'];
+        if (!in_array($metric_code, $allowedMetrics, true)) {
+            $metric_code = 'DM';
+        }
+
+        if (!in_array($display_mode, ['count','rate'], true)) {
+            $display_mode = 'rate';
+        }
+
+        $ampur_code = strlen($ampur_code) === 2 ? $ampur_code : null;
+        $tambon_code = strlen($tambon_code) === 2 ? $tambon_code : null;
+
+        if (in_array($area_level, ['CHANGWAT','AMPUR'], true)) {
+            $ampur_code = null;
+            $tambon_code = null;
+        } elseif ($area_level === 'TAMBON') {
+            $tambon_code = null;
         }
 
         $hospitals = [];
@@ -436,21 +459,14 @@ class Data43Controller
             ? $model->getSpatialMetricOptions($report_month, $scopeHospitalId)
             : [];
 
-        $validMetrics = array_values(array_unique(array_map(
-            static fn(array $row): string => (string)$row['metric_code'],
-            $metric_options
-        )));
-
-        if ($metric_code !== '' && !in_array($metric_code, $validMetrics, true)) {
-            $metric_code = '';
-        }
-
         $spatial_rows = $spatial_schema_ready
             ? $model->getSpatialSummary(
                 $report_month,
                 $area_level,
-                $metric_code !== '' ? $metric_code : null,
-                $scopeHospitalId
+                $metric_code,
+                $scopeHospitalId,
+                $ampur_code,
+                $tambon_code
             )
             : [];
 
@@ -458,6 +474,7 @@ class Data43Controller
             ? $model->getSpatialCoverageByHospital(
                 $report_month,
                 $area_level,
+                $metric_code,
                 $scopeHospitalId
             )
             : [];
@@ -465,19 +482,35 @@ class Data43Controller
         $spatial_summary = [
             'areas' => count($spatial_rows),
             'records' => 0,
+            'population' => 0,
+            'rate_per_1000' => null,
             'hospitals' => 0,
             'geocoded_areas' => 0,
-            'max_value' => 0,
+            'max_value' => 0.0,
         ];
 
         $hospitalSet = [];
         foreach ($spatial_rows as $row) {
             $value = (int)($row['metric_value'] ?? 0);
+            $population = (int)($row['population_value'] ?? 0);
+            $displayValue = $display_mode === 'rate'
+                ? (float)($row['rate_per_1000'] ?? 0)
+                : (float)$value;
+
             $spatial_summary['records'] += $value;
-            $spatial_summary['max_value'] = max($spatial_summary['max_value'], $value);
+            $spatial_summary['population'] += $population;
+            $spatial_summary['max_value'] = max($spatial_summary['max_value'], $displayValue);
+
             if (!empty($row['centroid_lat']) && !empty($row['centroid_lng'])) {
                 $spatial_summary['geocoded_areas']++;
             }
+        }
+
+        if ($spatial_summary['population'] > 0) {
+            $spatial_summary['rate_per_1000'] = round(
+                ($spatial_summary['records'] / $spatial_summary['population']) * 1000,
+                2
+            );
         }
 
         foreach ($hospital_coverage as $row) {
