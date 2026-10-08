@@ -5,6 +5,7 @@ require_once 'config/database.php';
 require_once 'models/LeaveModel.php';
 require_once 'models/LeaveTemplateModel.php';
 require_once 'services/LeaveDocumentService.php';
+require_once 'services/LeaveOfficialFormService.php';
 require_once 'models/UserModel.php';
 require_once 'models/HolidayModel.php';
 require_once 'models/NotificationModel.php';
@@ -358,6 +359,13 @@ class LeaveController {
             }
         }
 
+        $official = new LeaveOfficialFormService($db);
+        if (LeaveOfficialFormService::supports($leave_name) && !$official->schemaReady()) {
+            $_SESSION['error_msg']='กรุณาติดตั้งตารางใบลาราชการก่อนยื่น';
+            header('Location: index.php?c=leave&a=index');exit;
+        }
+        try {
+            if (!$db->inTransaction()) $db->beginTransaction();
         $saved = $leaveModel->addLeaveRequest([
             'user_id' => $user_id,
             'leave_type_id' => $leave_type_id,
@@ -368,6 +376,19 @@ class LeaveController {
             'has_med_cert' => $has_med_cert,
             'med_cert_path' => $med_cert_path
         ]);
+        if (!$saved) throw new RuntimeException('บันทึกคำขอลาไม่สำเร็จ');
+        if (LeaveOfficialFormService::supports($leave_name)) {
+            $official->insert((int)$saved, $_POST);
+        }
+        $db->commit();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            if ($uploaded_absolute_path && is_file($uploaded_absolute_path)) @unlink($uploaded_absolute_path);
+            error_log('Official leave application save: '.$e->getMessage());
+            $_SESSION['error_msg']='ไม่สามารถบันทึกแบบใบลาได้: '.$e->getMessage();
+            header('Location: index.php?c=leave&a=index');exit;
+        }
+
 
         if ($saved) {
             LogsController::addLog($db, $user_id, LogsController::ACTION_CREATE, "ยื่นคำร้องขอ{$leave_name} จำนวน {$actual_working_days} วัน");
@@ -653,6 +674,11 @@ class LeaveController {
                 throw new RuntimeException("รายการนี้ถูกดำเนินการไปแล้ว");
             }
 
+            if ($req['status'] === 'PENDING' && in_array($action,['APPROVED','REJECTED'],true)) {
+                (new LeaveOfficialFormService($db))->saveOpinion(
+                    $request_id,$approver_id,(string)($_POST['supervisor_opinion'] ?? '')
+                );
+            }
             $db->commit();
         } catch (Throwable $e) {
             if ($db->inTransaction()) {
@@ -1627,6 +1653,29 @@ class LeaveController {
         exit;
     }
 
+    public function official_review() {
+        $this->requireLeaveManager();
+        if (($_SERVER['REQUEST_METHOD'] ?? '')!=='POST') {http_response_code(405);exit;}
+        $this->verifyCsrf('index.php?c=leave&a=approvals');
+        $id=filter_input(INPUT_POST,'request_id',FILTER_VALIDATE_INT);
+        $note=(string)($_POST['hr_review_note'] ?? '');
+        try {
+            if(!$id)throw new InvalidArgumentException('เลขที่ใบลาไม่ถูกต้อง');
+            $db=(new Database())->getConnection();$db->beginTransaction();
+            (new LeaveOfficialFormService($db))->review($id,(int)$_SESSION['user']['id'],
+                (int)($_SESSION['user']['hospital_id']??0),
+                in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true),$note);
+            $db->commit();
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_UPDATE,
+                'ตรวจสอบใบลาราชการ #'.$id);
+            $_SESSION['success_msg']='บันทึกผลการตรวจสอบแล้ว';
+        }catch(Throwable $e){
+            if(isset($db) && $db->inTransaction())$db->rollBack();
+            $_SESSION['error_msg']=$e->getMessage();
+        }
+        header('Location: index.php?c=leave&a=approvals');exit;
+    }
+
     public function print() {
         if (!isset($_SESSION['user'])) {
             header("Location: index.php?c=auth&a=index");
@@ -1671,10 +1720,19 @@ class LeaveController {
             }
         }
         
+        $officialService=new LeaveOfficialFormService($db);
+        $officialDetails=$officialService->find($request_id);
+        $officialSummary=$officialService->summary([
+            'id'=>$leave['id'],'user_id'=>$leave['user_id'],
+            'start_date'=>$leave['start_date'],'leave_type'=>$leave['leave_type_name'],
+            'num_days'=>$leave['num_days']
+        ]);
+        $officialStyle=LeaveOfficialFormService::supports((string)$leave['leave_type_name']);
+        $docData=(new LeaveDocumentService($db))->buildLeaveData($request_id);
         // 🌟 บันทึก Log: ดาวน์โหลด/พิมพ์เอกสาร
         LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "พิมพ์เอกสารใบ{$leave['leave_type_name']} (Leave Ref ID: {$request_id})");
         
-        require_once 'views/leave/print.php';
+        require_once $officialStyle ? 'views/leave/print_official.php' : 'views/leave/print.php';
     }
 }
 ?>
