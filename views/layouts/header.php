@@ -130,7 +130,6 @@ $page_context_map = [
     'roster' => ['ตารางปฏิบัติงาน', 'จัดเวร ตรวจสอบ และติดตามสถานะการอนุมัติ', 'bi-calendar3'],
     'report' => ['ติดตามการส่งเวร', 'ตรวจสอบสถานะและรายงานการจัดเวร', 'bi-graph-up-arrow'],
     'leave' => ['ระบบจัดการวันลา', 'ยื่นลา อนุมัติ และตรวจสอบสิทธิ์วันลา', 'bi-calendar2-check'],
-    'data43' => ['ข้อมูล 43 แฟ้ม', 'ติดตามและนำส่งข้อมูลสาธารณสุขราย รพ.สต.', 'bi-file-earmark-zip-fill'],
     'staff' => ['จัดการบุคลากร', 'จัดการข้อมูลและสถานะบุคลากร', 'bi-people-fill'],
     'users' => ['ฐานข้อมูลบุคลากร', 'จัดการบัญชีผู้ใช้และข้อมูลบุคลากร', 'bi-database-fill-gear'],
     'hr' => ['ระบบงานบุคคล', 'บริหารข้อมูลบุคลากรและรายงานฝ่ายบุคคล', 'bi-person-vcard-fill'],
@@ -147,13 +146,7 @@ if ($current_controller === 'profile' && $current_action === 'schedule') {
     $page_context = ['ปฏิทินเวรของฉัน', 'ตรวจสอบตารางปฏิบัติงานส่วนบุคคล', 'bi-calendar-heart-fill'];
 }
 
-if ($current_controller === 'data43' && $current_action === 'dashboard') {
-    $page_context = ['แดชบอร์ด 43 แฟ้ม', 'ติดตามอัตราการนำส่ง ความครบถ้วน และสถานะราย รพ.สต.', 'bi-speedometer2'];
-}
 
-if ($current_controller === 'data43' && $current_action === 'spatial') {
-    $page_context = ['วิเคราะห์ข้อมูลเชิงพื้นที่', 'วิเคราะห์ Aggregate จากข้อมูล 43 แฟ้มระดับอำเภอ ตำบล และหมู่บ้าน', 'bi-geo-alt-fill'];
-}
 
 $header_page_title = $page_context[0];
 $header_page_subtitle = $page_context[1];
