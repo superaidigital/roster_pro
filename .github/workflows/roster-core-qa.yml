@@ -1,0 +1,21 @@
+name: Roster Pro core static QA
+on:
+  push:
+    branches:
+      - refactor/remove-data43-restore-roster-core
+  pull_request:
+jobs:
+  php-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, mbstring, zip, sodium
+      - name: PHP lint active code
+        run: |
+          find controllers models services views config lib -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+          php -l index.php
+      - name: Core integrity checks
+        run: php scripts/qa-roster-core.php

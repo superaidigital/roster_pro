@@ -1,0 +1,11 @@
+# XAMPP/Apache defense in depth: prevent HTTP access to private code and SQL dumps.
+Options -Indexes
+<IfModule mod_authz_core.c>
+  <FilesMatch "\.(?:sql|sqlite|db|bak|backup|old|log|key|pem|env|ini)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(?:config|database|models|controllers|services|storage|scripts|docs|tests|\.git|\.github)(?:/|$) - [F,NC,L]
+</IfModule>

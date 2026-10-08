@@ -51,6 +51,11 @@ if (!preg_match($routePattern, $c) || !preg_match($routePattern, $a)) {
     roster_render_route_error(400, 'คำขอไม่ถูกต้อง', 'รูปแบบ Controller หรือ Action ไม่ถูกต้อง');
 }
 
+// Deny stale retired health module routes even if old files remain on a server.
+if ($c === 'data43') {
+    roster_render_route_error(404, 'ไม่พบหน้าเว็บ', 'โมดูลนี้ถูกถอดออกจาก Roster Pro แล้ว');
+}
+
 // Keep public routes minimal. LINE webhook validates X-Line-Signature in its controller.
 $publicRoutes = [
     'auth' => ['index', 'login', 'logout'],

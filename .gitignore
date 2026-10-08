@@ -3,3 +3,10 @@ storage/secrets/
 storage/data43_temp/
 storage/data43_export/
 *.key
+
+# Local confidential backups must not be committed again.
+*.sql
+!database/migrations/*.sql
+public/uploads/Backup/
+roster_pro_monthly_*.sql
+*.zip
