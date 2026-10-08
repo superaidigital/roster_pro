@@ -187,7 +187,7 @@ $schema_ready = $schema_ready ?? false;
                                                     <input type="hidden" name="id" value="<?= (int)$tpl['id'] ?>">
                                                     <input type="hidden" name="active" value="<?= (int)$tpl['is_active'] === 1 ? 0 : 1 ?>">
                                                     <button type="submit" class="rp-btn rp-btn--secondary rp-btn--sm"
-                                                            <?= $tpl['file_type'] === 'PDF' && $tpl['mapping_status'] !== 'READY' ? 'disabled' : '' ?>>
+                                                            <?= $tpl['mapping_status'] !== 'READY' ? 'disabled' : '' ?>>
                                                         <i class="bi <?= (int)$tpl['is_active'] === 1 ? 'bi-pause-circle' : 'bi-play-circle' ?>"></i>
                                                     </button>
                                                 </form>
