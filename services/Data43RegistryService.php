@@ -175,6 +175,10 @@ final class Data43RegistryService
                 $action='CREATE';
             }
             $this->refreshSearchTokens($id,$fileCode,$data);
+            if($fileCode==='ADDRESS'){
+                require_once __DIR__ . '/Data43MapPatientService.php';
+                (new Data43MapPatientService($this->db))->syncAddress($id,$hospitalId,$data);
+            }
             $this->model->addAudit($id,$hospitalId,$fileCode,$action,$userId,$recordKey,$changedFields);
 
             if($fileCode==='DEATH'){
@@ -398,6 +402,10 @@ final class Data43RegistryService
         }
 
         $this->model->softDelete($id,$hospitalId,$userId);
+        if($fileCode==='ADDRESS'){
+            require_once __DIR__ . '/Data43MapPatientService.php';
+            (new Data43MapPatientService($this->db))->deleteAddress($id,$hospitalId);
+        }
         $this->model->addAudit($id,$hospitalId,$fileCode,'DELETE',$userId,(string)$row['record_key_hash'],[]);
     }
 

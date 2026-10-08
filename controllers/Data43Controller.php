@@ -875,6 +875,15 @@ class Data43Controller
     {
         $this->requireAccess();
 
+        $csrf_token=$this->csrfToken();
+        require_once 'services/Data43MapPatientService.php';
+        $db=(new Database())->getConnection();
+        $patientAccess=new Data43MapPatientService($db);
+        $patient_hospitals=$patientAccess->grantedHospitals(
+            (int)($_SESSION['user']['id']??0),
+            $this->role(),
+            (int)($_SESSION['user']['hospital_id']??0)
+        );
         $geojson_base = 'assets/geojson/thailand';
         $geojson_status = [
             'province' => is_file($geojson_base . '/provinces.geojson'),
@@ -982,6 +991,57 @@ class Data43Controller
             ], JSON_UNESCAPED_UNICODE);
         }
         exit;
+    }
+
+
+    /** Dedicated POST-only, audited patient drill-down. Never expose via map_data. */
+    public function map_patients(): void
+    {
+        $this->requireAccess();
+        header('Cache-Control: no-store, private');
+        header('Referrer-Policy: no-referrer');
+        header('X-Robots-Tag: noindex, nofollow');
+        if(($_SERVER['REQUEST_METHOD']??'')!=='POST'){http_response_code(405);exit('Method Not Allowed');}
+        try {
+            $this->verifyCsrf();
+            require_once 'services/Data43MapPatientService.php';
+            $db=(new Database())->getConnection();
+            $service=new Data43MapPatientService($db);
+            $role=$this->role();
+            $userId=(int)($_SESSION['user']['id']??0);
+            $sessionHospital=(int)($_SESSION['user']['hospital_id']??0);
+            $hospital=filter_input(INPUT_POST,'hospital_id',FILTER_VALIDATE_INT) ?: 0;
+            $purpose=strtoupper(trim((string)($_POST['purpose']??'')));
+            $level=strtoupper(trim((string)($_POST['level']??'')));
+            $code=trim((string)($_POST['code']??''));
+            $service::parseArea($level,$code);
+            $service->assertGrant($userId,$hospital,$role,$sessionHospital,$purpose);
+            $personId=filter_input(INPUT_POST,'person_record_id',FILTER_VALIDATE_INT) ?: null;
+            $selected_hospital_id=$hospital;
+            $csrf_token=$this->csrfToken();
+            if($personId!==null){
+                $pid=$service->assertPersonInArea($hospital,$code,$personId);
+                $service->audit($userId,$hospital,$code,$purpose,'PATIENT_PROFILE',$personId);
+                $registry=new Data43RegistryService($db);
+                $profile=$registry->personProfile($hospital,$pid);
+                if(empty($profile['PERSON']))throw new RuntimeException('ไม่พบข้อมูลผู้ป่วย');
+                require_once 'views/layouts/header.php';
+                require_once 'views/layouts/sidebar.php';
+                require_once 'views/data43/person_profile.php';
+                echo "</main></div></body></html>";
+                return;
+            }
+            $service->audit($userId,$hospital,$code,$purpose,'AREA_LIST');
+            $patients=$service->patientsInArea($hospital,$code,50);
+            require_once 'views/layouts/header.php';
+            require_once 'views/layouts/sidebar.php';
+            require_once 'views/data43/map_patients.php';
+            echo "</main></div></body></html>";
+        }catch(Throwable $e){
+            http_response_code(in_array((int)$e->getCode(),[403,404],true)?(int)$e->getCode():400);
+            error_log('Map patient request rejected: '.$e->getMessage());
+            echo '<div style="padding:2rem;font-family:sans-serif">ไม่สามารถเปิดข้อมูลผู้ป่วยได้ โปรดตรวจสอบสิทธิ์ วัตถุประสงค์ และรหัสพื้นที่ <a href="index.php?c=data43&a=map">กลับแผนที่</a></div>';
+        }
     }
 
     public function spatial(): void

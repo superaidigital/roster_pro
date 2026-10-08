@@ -1,4 +1,7 @@
 <?php
+$csrf_token = $csrf_token ?? ($_SESSION['csrf_token'] ?? '');
+$patient_hospitals = $patient_hospitals ?? [];
+$patient_view_enabled = !empty($patient_hospitals);
 $geojson_status=$geojson_status??[];
 $metric_definitions=$metric_definitions??[];
 $report_month=$report_month??date('Y-m');
@@ -29,6 +32,8 @@ $selected_hospital_id=$selected_hospital_id??null;
 
   <div id="data43MapRoot"
        class="data43-map-page"
+       data-patient-enabled="<?= $patient_view_enabled ? '1' : '0' ?>"
+       data-csrf="<?= htmlspecialchars($csrf_token,ENT_QUOTES,'UTF-8') ?>"
        data-month="<?= htmlspecialchars($report_month,ENT_QUOTES,'UTF-8') ?>"
        data-hospital="<?= (int)($selected_hospital_id??0) ?>">
 
@@ -95,6 +100,20 @@ $selected_hospital_id=$selected_hospital_id??null;
         <strong id="data43MapMetricLabel">เบาหวาน (DM)</strong>
       </div>
       <div id="data43MapSelection" class="data43-map-selection">ยังไม่ได้เลือกพื้นที่</div>
+      <?php if($patient_view_enabled): ?>
+      <form id="data43PatientDrillForm" method="POST" action="index.php?c=data43&a=map_patients" class="mt-3">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token,ENT_QUOTES,'UTF-8') ?>">
+        <input type="hidden" name="level" id="data43PatientLevel">
+        <input type="hidden" name="code" id="data43PatientCode">
+        <div class="mb-2"><label class="form-label">หน่วยบริการที่อนุญาต</label>
+          <select name="hospital_id" class="rp-control" required>
+            <?php foreach($patient_hospitals as $h): ?><option value="<?= (int)$h['id'] ?>"><?= htmlspecialchars($h['name'],ENT_QUOTES,'UTF-8') ?></option><?php endforeach; ?>
+          </select></div>
+        <div class="mb-2"><label class="form-label">วัตถุประสงค์เข้าถึง</label>
+        <select name="purpose" class="rp-control"><option value="CARE">การดูแลรักษา</option><option value="PUBLIC_HEALTH">การปฏิบัติงานสาธารณสุข</option></select></div>
+        <button id="data43PatientOpenBtn" type="submit" class="rp-btn rp-btn--primary w-100" disabled><i class="bi bi-shield-lock"></i> ดูข้อมูลผู้ป่วยในพื้นที่</button>
+        <div class="small text-muted mt-2">เฉพาะบุคลากรที่ได้รับสิทธิ์รายหน่วยบริการ และมีบันทึกการเปิดดู</div>
+      </form><?php endif; ?>
       <div class="data43-map-legend">
         <div class="data43-map-legend__title">ระดับค่าตัวชี้วัด</div>
         <div id="data43MapLegendItems"></div>
