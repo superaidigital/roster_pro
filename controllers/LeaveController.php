@@ -1346,6 +1346,31 @@ class LeaveController {
         header('Location: index.php?c=leave&a=template_editor&id='.(int)$id);exit;
     }
 
+
+    public function template_word_preview() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true)) {
+            http_response_code(403);exit('ไม่มีสิทธิ์');
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: private, no-store');
+        header('X-Content-Type-Options: nosniff');
+        try {
+            $id=filter_input(INPUT_GET,'id',FILTER_VALIDATE_INT);
+            $db=(new Database())->getConnection();
+            $template=$id?(new LeaveTemplateModel($db))->findById($id):null;
+            if(!$template || $template['file_type']!=='DOCX') {
+                http_response_code(404);echo '{"error":"ไม่พบเอกสาร Word"}';return;
+            }
+            require_once 'services/LeaveWordPreviewService.php';
+            echo json_encode(LeaveWordPreviewService::preview((string)$template['stored_path']),
+                JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR);
+        } catch(Throwable $e) {
+            error_log('Template Word preview: '.$e->getMessage());
+            http_response_code(422);
+            echo json_encode(['error'=>'เปิดตัวอย่าง Word ไม่สำเร็จ: '.$e->getMessage()],JSON_UNESCAPED_UNICODE);
+        }
+    }
+
     public function template_download() {
         if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_ADMIN_ROLES, true)) {
             http_response_code(403);

@@ -34,7 +34,31 @@ $isPdf=($template['file_type']==='PDF');
 <?php if(!empty($_SESSION['success_msg'])): ?><div class="alert alert-success" role="status"><?= $esc($_SESSION['success_msg']) ?></div><?php unset($_SESSION['success_msg']);endif;?>
 <?php if(!empty($_SESSION['error_msg'])): ?><div class="alert alert-danger" role="alert"><?= $esc($_SESSION['error_msg']) ?></div><?php unset($_SESSION['error_msg']);endif;?>
 <?php if(!$isPdf): ?>
-<section class="ltd-pane"><h2 class="h5">แก้ไขแบบฟอร์ม Word (DOCX)</h2><p>ไฟล์ DOCX ใช้ Placeholder เช่น <code>{{employee_name}}</code> และ <code>{{leave_type}}</code> ในต้นฉบับ Word โดยตรง ไม่สามารถลากวางพิกัด PDF บนไฟล์ Word ได้</p><a class="rp-btn rp-btn--primary" href="index.php?c=leave&a=template_download&id=<?= (int)$template['id'] ?>">ดาวน์โหลดต้นฉบับ Word</a><p class="ltd-hint mt-3">แก้เอกสารใน Word แล้วอัปโหลดเป็นเวอร์ชันใหม่เพื่อไม่กระทบเอกสารเดิม</p></section>
+<section class="ltd-pane">
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3"><div><h2 class="h5 mb-1">ตัวอย่างไฟล์ Word (DOCX)</h2><p class="ltd-hint mb-0">อ่านเนื้อหาข้อความและตารางจากเอกสารจริง โดยไม่ส่งไฟล์ไปยังบริการภายนอก</p></div>
+<a class="rp-btn rp-btn--primary" href="index.php?c=leave&a=template_download&id=<?= (int)$template['id'] ?>">ดาวน์โหลด DOCX</a></div>
+<div id="ltd-word-status" class="ltd-hint" role="status">กำลังเปิดเอกสาร Word...</div>
+<div id="ltd-word-paper" class="ltd-paper mt-3" style="min-height:480px;max-width:800px;padding:36px;line-height:1.7;overflow-wrap:anywhere" aria-label="ตัวอย่างเนื้อหา Word"></div>
+<p class="ltd-hint mt-3">การแก้ไข Word ยังคงใช้ Placeholder เช่น <code>{{employee_name}}</code> ใน Microsoft Word และอัปโหลดเป็นเวอร์ชันใหม่ ไม่ใช่การลากตำแหน่งบนกระดาษ</p>
+</section>
+<script>
+(()=>{'use strict';
+const target=document.getElementById('ltd-word-paper'),status=document.getElementById('ltd-word-status');
+const url='index.php?c=leave&a=template_word_preview&id=<?= (int)$template['id'] ?>';
+fetch(url,{credentials:'same-origin',cache:'no-store'}).then(async r=>{const result=await r.json();if(!r.ok)throw Error(result.error||'โหลด Word ไม่สำเร็จ');return result})
+.then(data=>{
+ target.replaceChildren();
+ for(const block of (data.blocks||[])){
+  if(block.kind==='table'){
+   const table=document.createElement('table');table.className='table table-bordered table-sm';
+   for(const row of block.rows){const tr=document.createElement('tr');for(const cell of row){const td=document.createElement('td');td.textContent=cell;td.style.whiteSpace='pre-wrap';tr.append(td)}table.append(tr)}target.append(table);
+  }else{const el=document.createElement(block.kind==='heading'?'h3':'p');el.textContent=block.text;el.style.whiteSpace='pre-wrap';target.append(el)}
+ }
+ if(!target.childNodes.length)target.textContent='เอกสารนี้ไม่มีข้อความที่สามารถอ่านเป็นตัวอย่างได้';
+ status.textContent=data.notes+(data.truncated?' • เนื้อหาบางส่วนถูกจำกัดเพื่อความปลอดภัย':'');
+}).catch(err=>{status.textContent=err.message;target.textContent='ไม่สามารถแสดงตัวอย่าง Word ได้ กรุณาดาวน์โหลดไฟล์ต้นฉบับเพื่อตรวจสอบ'});
+})();
+</script>
 <?php else: ?>
 <div class="alert alert-info">ระบบนี้บันทึกตำแหน่งฟิลด์บน PDF ได้ แต่ยังไม่ได้เปิดใช้การสร้างไฟล์ PDF ที่แทนค่าข้อมูลอัตโนมัติ</div>
 <form id="ltd-form" method="post" action="index.php?c=leave&a=template_fields_save">
@@ -55,7 +79,7 @@ $isPdf=($template['file_type']==='PDF');
 <div class="ltd-palette" id="ltd-palette">
 <?php foreach($placeholders as $key=>$label): ?><button class="ltd-source" type="button" draggable="true" data-key="<?= $esc($key) ?>"><strong><?= $esc($label) ?></strong><span class="d-block ltd-hint"><?= $esc($key) ?></span></button><?php endforeach; ?>
 </div></aside>
-<section class="ltd-pane" style="min-width:0"><h2 class="h6 fw-bold">2. ตัวอย่างเอกสารจริง</h2><div class="ltd-workspace"><div id="ltd-paper" class="ltd-paper"><canvas id="ltd-canvas"></canvas><div id="ltd-overlay" class="ltd-overlay" aria-label="พื้นที่ลากวางฟิลด์"></div></div></div><p id="ltd-status" role="status" class="ltd-hint mt-2">กำลังเตรียมตัวอย่าง PDF...</p></section>
+<section class="ltd-pane" style="min-width:0"><h2 class="h6 fw-bold">2. ตัวอย่างเอกสารจริง</h2><div class="ltd-workspace"><div id="ltd-paper" class="ltd-paper"><canvas id="ltd-canvas"></canvas><div id="ltd-overlay" class="ltd-overlay" aria-label="พื้นที่ลากวางฟิลด์"></div></div></div><div id="ltd-pdf-fallback" hidden><p class="ltd-hint">หากโหลด PDF.js ไม่ได้ สามารถตรวจดู PDF ต้นฉบับได้ที่นี่ (โหมดสำรองไม่รองรับการจัดวางฟิลด์)</p><iframe title="PDF ต้นฉบับ" src="index.php?c=leave&a=template_download&id=<?= (int)$template['id'] ?>&amp;preview=1" style="width:100%;height:620px;border:1px solid #cbd5e1;border-radius:12px"></iframe></div><p id="ltd-status" role="status" class="ltd-hint mt-2">กำลังเตรียมตัวอย่าง PDF...</p></section>
 <aside class="ltd-pane ltd-props"><h2 class="h6 fw-bold">3. คุณสมบัติฟิลด์</h2><div id="ltd-empty" class="ltd-hint">คลิกเลือกฟิลด์ในเอกสารเพื่อแก้ไข</div><div id="ltd-properties" hidden>
 <label>ฟิลด์</label><div id="ltd-key" class="small fw-bold" style="overflow-wrap:anywhere"></div>
 <div class="row g-2">
@@ -80,20 +104,19 @@ const labels=new Map([...document.querySelectorAll('.ltd-source')].map(e=>[e.dat
 function tell(t){status.textContent=t}
 function props(){const f=fields[selected];byId('ltd-empty').hidden=!!f;byId('ltd-properties').hidden=!f;if(!f)return;
 byId('ltd-key').textContent=labels.get(f.field_key)||f.field_key;
-[['ltd-x','x'],['ltd-y','y'],['ltd-w','width'],['ltd-h','height']].forEach(([id,k])=>byId(id).value=round(f[k]);}
+[['ltd-x','x'],['ltd-y','y'],['ltd-w','width'],['ltd-h','height']].forEach(([id,k])=>{byId(id).value=round(f[k]);});}
 function paint(){overlay.replaceChildren();fields.forEach((f,i)=>{if(f.page_number!==pageNo)return;
 const node=document.createElement('div');node.className='ltd-field'+(selected===i?' selected':'');
 Object.assign(node.style,{left:f.x+'%',top:f.y+'%',width:f.width+'%',height:f.height+'%'});
 const label=document.createElement('span');label.className='ltd-field-label';label.textContent=labels.get(f.field_key)||f.field_key;node.append(label);
 const grip=document.createElement('span');grip.className='ltd-resize';grip.title='ลากเพื่อปรับขนาด';node.append(grip);
-node.addEventListener('pointerdown',e=>{e.preventDefault();selected=i;props();paint();const current=overlay.children[[...fields].filter((v,j)=>v.page_number===pageNo).findIndex(v=>v===f)];if(!current)return;
-const handle=e.target===grip?true:false;const bounds=overlay.getBoundingClientRect();
-const start={x:e.clientX,y:e.clientY,left:f.x,top:f.y,w:f.width,h:f.height};current.setPointerCapture(e.pointerId);
+node.addEventListener('pointerdown',e=>{e.preventDefault();const handle=e.target===grip;selected=i;props();node.classList.add('selected');const bounds=overlay.getBoundingClientRect();
+const current=node;const start={x:e.clientX,y:e.clientY,left:f.x,top:f.y,w:f.width,h:f.height};current.setPointerCapture(e.pointerId);
 const move=ev=>{const dx=(ev.clientX-start.x)/bounds.width*100,dy=(ev.clientY-start.y)/bounds.height*100;
 if(handle){f.width=round(clamp(start.w+dx,2,100-f.x));f.height=round(clamp(start.h+dy,1,100-f.y));}
 else{f.x=round(clamp(start.left+dx,0,100-f.width));f.y=round(clamp(start.top+dy,0,100-f.height));}
 Object.assign(current.style,{left:f.x+'%',top:f.y+'%',width:f.width+'%',height:f.height+'%'});props()};
-const end=()=>{current.removeEventListener('pointermove',move);current.removeEventListener('pointerup',end);current.removeEventListener('pointercancel',end)};
+const end=()=>{current.removeEventListener('pointermove',move);current.removeEventListener('pointerup',end);current.removeEventListener('pointercancel',end);paint()};
 current.addEventListener('pointermove',move);current.addEventListener('pointerup',end);current.addEventListener('pointercancel',end);
 });
 overlay.append(node)});props()}
@@ -121,7 +144,7 @@ try{
 const lib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
 lib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 pdf=await lib.getDocument({url:pdfUrl,withCredentials:true}).promise;byId('ltd-page-total').textContent='/ '+pdf.numPages;pageInput.max=pdf.numPages;await draw();
-}catch(e){tell('โหลด PDF ไม่สำเร็จ: '+e.message+' กรุณาตรวจสอบ CDN หรือ Content Security Policy')}
+}catch(e){tell('โหลด PDF.js ไม่สำเร็จ: '+e.message+' • แสดงไฟล์ต้นฉบับสำรองด้านล่าง');byId('ltd-pdf-fallback').hidden=false;byId('ltd-paper').hidden=true;byId('ltd-save').disabled=true}
 </script>
 <?php endif; ?>
 </div>
