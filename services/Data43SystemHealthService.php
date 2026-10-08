@@ -23,7 +23,7 @@ final class Data43SystemHealthService
             $checks[] = $this->tableCheck($table);
         }
 
-        foreach ([['data43_submissions','standard_version'],['data43_submissions','profile_code'],['hospitals','hospital_code9']] as [$table,$column]) {
+        foreach ([['data43_submissions','standard_version'],['data43_submissions','profile_code'],['hospitals','hospital_code9'],['hospitals','hospital_code9_new']] as [$table,$column]) {
             $checks[] = $this->columnCheck($table,$column);
         }
 
@@ -82,16 +82,31 @@ final class Data43SystemHealthService
     private function hospcode9Check(): array
     {
         try {
-            if ($this->columnCheck('hospitals','hospital_code9')['status'] !== 'OK') {
-                return ['group'=>'Data Standard','name'=>'HOSPCODE9 coverage','status'=>'ERROR','detail'=>'ตาราง hospitals ยังไม่มี hospital_code9','fix'=>'รัน migration 20261007_data43_hospital_code9.sql'];
+            if ($this->columnCheck('hospitals','hospital_code9')['status'] !== 'OK'
+                || $this->columnCheck('hospitals','hospital_code9_new')['status'] !== 'OK') {
+                return [
+                    'group'=>'Data Standard',
+                    'name'=>'HOSPCODE9 coverage',
+                    'status'=>'ERROR',
+                    'detail'=>'ตาราง hospitals ยังไม่มีคอลัมน์รหัส 9 หลักเดิม/ใหม่',
+                    'fix'=>'รัน migrations 20261007_data43_hospital_code9.sql และ 20261008_hospital_code9_new.sql'
+                ];
             }
 
-            $sql="SELECT
-                    SUM(CASE WHEN is_active=1 AND deleted_at IS NULL AND COALESCE(hospital_code,'')<>'0' THEN 1 ELSE 0 END) active_count,
-                    SUM(CASE WHEN is_active=1 AND deleted_at IS NULL AND COALESCE(hospital_code,'')<>'0'
-                              AND (hospital_code9 IS NULL OR TRIM(hospital_code9)='' OR hospital_code9 NOT REGEXP '^[0-9]{9}$')
-                             THEN 1 ELSE 0 END) missing_count
-                  FROM hospitals";
+            // Both variants are authoritative assigned identifiers; do not derive from the 5-digit code.
+            // COALESCE is necessary: NULL REGEXP would be NULL, not FALSE.
+            $sql = <<<'SQL'
+SELECT
+    SUM(CASE
+        WHEN is_active=1 AND deleted_at IS NULL AND COALESCE(hospital_code,'')<>'0'
+        THEN 1 ELSE 0 END) AS active_count,
+    SUM(CASE
+        WHEN is_active=1 AND deleted_at IS NULL AND COALESCE(hospital_code,'')<>'0'
+         AND COALESCE(hospital_code9,'') NOT REGEXP '^[0-9]{9}$'
+         AND COALESCE(hospital_code9_new,'') NOT REGEXP '^[A-Z]{2}[0-9]{7}$'
+        THEN 1 ELSE 0 END) AS missing_count
+FROM hospitals
+SQL;
             $row=$this->db->query($sql)->fetch(PDO::FETCH_ASSOC) ?: [];
             $active=(int)($row['active_count']??0);
             $missing=(int)($row['missing_count']??0);
@@ -99,11 +114,21 @@ final class Data43SystemHealthService
             return [
                 'group'=>'Data Standard','name'=>'HOSPCODE9 coverage',
                 'status'=>$missing?'WARNING':'OK',
-                'detail'=>$missing?"ยังขาด HOSPCODE9 {$missing}/{$active} หน่วยบริการ":"HOSPCODE9 ครบ {$active} หน่วยบริการ",
-                'fix'=>$missing?'กรอก HOSPCODE9 ให้ครบก่อนส่งออกข้อมูลมาตรฐาน':null,
+                'detail'=>$missing
+                    ? "ยังขาดรหัส 9 หลักเดิมหรือใหม่ {$missing}/{$active} หน่วยบริการ"
+                    : "รหัส 9 หลักเดิมหรือใหม่ครบ {$active} หน่วยบริการ",
+                'fix'=>$missing
+                    ? 'ตรวจสอบรหัสจากทะเบียนทางการ แล้วกรอกที่เมนูจัดการ รพ.สต.'
+                    : null,
             ];
         } catch (Throwable $e) {
-            return ['group'=>'Data Standard','name'=>'HOSPCODE9 coverage','status'=>'WARNING','detail'=>'ตรวจ HOSPCODE9 ไม่สำเร็จ','fix'=>'ตรวจ schema ตาราง hospitals'];
+            error_log('Data43 HOSPCODE9 health check: '.$e->getMessage());
+            return [
+                'group'=>'Data Standard','name'=>'HOSPCODE9 coverage',
+                'status'=>'ERROR',
+                'detail'=>'ตรวจ HOSPCODE9 ไม่สำเร็จ',
+                'fix'=>'ตรวจสอบ schema และ Apache/PHP error log',
+            ];
         }
     }
 

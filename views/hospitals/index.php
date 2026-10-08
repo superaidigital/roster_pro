@@ -295,6 +295,7 @@ if (!empty($hospital_ids)) {
                                     </div>
                                     <div class="text-muted mt-1 hospital-code font-monospace" style="font-size: 12px;">
                                         <i class="bi bi-upc-scan text-primary opacity-75 me-1"></i> <?= htmlspecialchars($h['hospital_code'] ?? 'ไม่มีรหัส') ?>
+                                        <span class="d-block text-muted">9 หลักเดิม: <?= htmlspecialchars($h['hospital_code9'] ?: 'ยังไม่ระบุ',ENT_QUOTES,'UTF-8') ?> · 9 หลักใหม่: <?= htmlspecialchars($h['hospital_code9_new'] ?? 'ยังไม่ระบุ',ENT_QUOTES,'UTF-8') ?></span>
                                     </div>
                                 </td>
                                 <td class="text-center">
@@ -322,7 +323,7 @@ if (!empty($hospital_ids)) {
                                 <td class="text-center pe-4 text-nowrap">
                                     <?php if($canEdit): ?>
                                         <button type="button" class="btn-action bg-warning bg-opacity-10 text-dark border border-warning border-opacity-50 me-1" title="เปลี่ยนชื่อ/รหัส"
-                                                onclick="openEditModal('<?= htmlspecialchars($h['id']) ?>', '<?= htmlspecialchars($h['hospital_code'] ?? '') ?>', '<?= htmlspecialchars($h['hospital_code9'] ?? '') ?>', '<?= htmlspecialchars($h['name'], ENT_QUOTES) ?>')">
+                                                data-hospital-id="<?= (int)$h['id'] ?>" data-code9-new="<?= htmlspecialchars($h['hospital_code9_new'] ?? '', ENT_QUOTES, 'UTF-8') ?>" onclick="openEditModal(<?= (int)$h['id'] ?>, <?= htmlspecialchars(json_encode((string)($h['hospital_code'] ?? '')), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string)($h['hospital_code9'] ?? '')), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode((string)$h['name']), ENT_QUOTES, 'UTF-8') ?>)">
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         
@@ -413,7 +414,7 @@ if (!empty($hospital_ids)) {
                         <input type="text" name="hospital_code" class="form-control bg-white shadow-sm" placeholder="เช่น 04875" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary small">ชื่อหน่วยบริการ</label>
+                        <label class="form-label fw-semibold text-secondary small">รหัสหน่วยบริการ 9 หลักเดิม (ถ้ามี)</label><input type="text" name="hospital_code9" inputmode="numeric" maxlength="9" pattern="[0-9]{9}" class="form-control mb-2" placeholder="รหัสที่ได้รับจาก สธ."><label class="form-label fw-semibold text-secondary small">รหัสหน่วยบริการ 9 หลักใหม่ (ถ้ามี)</label><input type="text" name="hospital_code9_new" maxlength="9" pattern="[A-Za-z]{2}[0-9]{7}" class="form-control mb-2 text-uppercase" placeholder="AA0000001"><div class="small text-muted mb-2">กรอกเฉพาะรหัสที่ได้รับจริงจากทะเบียนรหัสหน่วยงานบริการสุขภาพของ สธ. ห้ามสร้างขึ้นเอง</div><label class="form-label fw-semibold text-secondary small">ชื่อหน่วยบริการ</label>
                         <input type="text" name="name" class="form-control bg-white shadow-sm" placeholder="เช่น รพ.สต. บ้านโคก" required>
                     </div>
                 </div>
@@ -446,6 +447,15 @@ if (!empty($hospital_ids)) {
                         <input type="text" id="edit_code" name="hospital_code" class="form-control bg-white shadow-sm" required>
                     </div>
                     <div class="mb-3">
+<label class="form-label fw-semibold text-secondary small" for="edit_code9">HOSPCODE9 เดิม (ถ้ามี)</label>
+<input type="text" id="edit_code9" name="hospital_code9" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" class="form-control" placeholder="รหัสทางการ 9 หลัก">
+</div>
+<div class="mb-3">
+<label class="form-label fw-semibold text-secondary small" for="edit_code9_new">HOSPCODE9 ใหม่ (ถ้ามี)</label>
+<input type="text" id="edit_code9_new" name="hospital_code9_new" pattern="[A-Za-z]{2}[0-9]{7}" maxlength="9" class="form-control text-uppercase" placeholder="AA0000001">
+<div class="small text-muted">รหัสที่ได้รับจริงจากทะเบียน สธ. เท่านั้น</div>
+</div>
+<div class="mb-3">
                         <label class="form-label fw-semibold text-secondary small">ชื่อหน่วยบริการ</label>
                         <input type="text" id="edit_name" name="name" class="form-control bg-white shadow-sm" required>
                     </div>
@@ -503,7 +513,10 @@ function exportTableToExcel(tableID, filename = ''){
 }
 
 // ฟังก์ชันโยนข้อมูลใส่ Modal แก้ไข
-function openEditModal(id, code, name) {
+function openEditModal(id, code, code9, name) {
+    document.getElementById('edit_code9').value = code9;
+    const target = document.querySelector('[data-hospital-id="' + CSS.escape(String(id)) + '"]');
+    document.getElementById('edit_code9_new').value = target?.dataset.code9New || '';
     document.getElementById('edit_id').value = id;
     document.getElementById('edit_code').value = code;
     document.getElementById('edit_name').value = name;

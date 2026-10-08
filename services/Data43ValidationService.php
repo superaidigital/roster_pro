@@ -102,8 +102,8 @@ final class Data43ValidationService
                 continue;
             }
 
-            if ($name === 'HOSPCODE9' && $value !== '' && !preg_match('/^\d{9}$/', $value)) {
-                $errors[$name] = 'HOSPCODE9 ต้องเป็นตัวเลข 9 หลัก';
+            if ($name === 'HOSPCODE9' && $value !== '' && !preg_match('/^(?:[0-9]{9}|[A-Z]{2}[0-9]{7})$/D', strtoupper($value))) {
+                $errors[$name] = 'HOSPCODE9 ต้องเป็นตัวเลข 9 หลักเดิม หรือรหัสใหม่ (อักษร 2 ตัว + ตัวเลข 7 หลัก)';
                 continue;
             }
 

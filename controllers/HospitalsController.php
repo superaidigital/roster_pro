@@ -63,6 +63,7 @@ class HospitalsController {
             'name' => trim($_POST['name'] ?? ''),
             'hospital_code' => trim($_POST['hospital_code'] ?? ''),
             'hospital_code9' => trim($_POST['hospital_code9'] ?? ''),
+            'hospital_code9_new' => strtoupper(trim($_POST['hospital_code9_new'] ?? '')),
             'short_name' => trim($_POST['short_name'] ?? ''),
             'phone' => trim($_POST['phone'] ?? ''),
             'address' => trim($_POST['address'] ?? '')
@@ -73,12 +74,16 @@ class HospitalsController {
             header("Location: index.php?c=hospitals");
             exit;
         }
-        if (!preg_match('/^\d{9}$/', $data['hospital_code9'])) {
-            $_SESSION['error_msg'] = "HOSPCODE9 ต้องเป็นตัวเลข 9 หลัก";
+        if ($data['hospital_code9'] !== '' && !preg_match('/^\d{9}$/D', $data['hospital_code9'])) {
+            $_SESSION['error_msg'] = "รหัสเดิมต้องเป็นตัวเลข 9 หลัก";
             header("Location: index.php?c=hospitals");
             exit;
         }
 
+        if ($data['hospital_code9_new'] !== '' && !preg_match('/^[A-Z]{2}[0-9]{7}$/D', $data['hospital_code9_new'])) {
+            $_SESSION['error_msg'] = 'รหัส 9 หลักใหม่ต้องเป็นตัวอักษรอังกฤษใหญ่ 2 ตัวและตัวเลข 7 หลัก';
+            header('Location: index.php?c=hospitals'); exit;
+        }
         if ($hospitalModel->checkNameExists($data['name'])) {
             $_SESSION['error_msg'] = "ชื่อหน่วยบริการนี้มีอยู่ในระบบแล้ว";
         } else {
@@ -123,6 +128,7 @@ class HospitalsController {
             'name' => trim($_POST['name'] ?? ''),
             'hospital_code' => trim($_POST['hospital_code'] ?? ''),
             'hospital_code9' => trim($_POST['hospital_code9'] ?? ''),
+            'hospital_code9_new' => strtoupper(trim($_POST['hospital_code9_new'] ?? '')),
             'short_name' => trim($_POST['short_name'] ?? ''),
             'phone' => trim($_POST['phone'] ?? ''),
             'address' => trim($_POST['address'] ?? '')
@@ -133,12 +139,16 @@ class HospitalsController {
             header("Location: index.php?c=hospitals");
             exit;
         }
-        if (!preg_match('/^\d{9}$/', $data['hospital_code9'])) {
-            $_SESSION['error_msg'] = "HOSPCODE9 ต้องเป็นตัวเลข 9 หลัก";
+        if ($data['hospital_code9'] !== '' && !preg_match('/^\d{9}$/D', $data['hospital_code9'])) {
+            $_SESSION['error_msg'] = "รหัสเดิมต้องเป็นตัวเลข 9 หลัก";
             header("Location: index.php?c=hospitals");
             exit;
         }
 
+        if ($data['hospital_code9_new'] !== '' && !preg_match('/^[A-Z]{2}[0-9]{7}$/D', $data['hospital_code9_new'])) {
+            $_SESSION['error_msg'] = 'รหัส 9 หลักใหม่ต้องเป็นตัวอักษรอังกฤษใหญ่ 2 ตัวและตัวเลข 7 หลัก';
+            header('Location: index.php?c=hospitals'); exit;
+        }
         if (!empty($id)) {
             if ($hospitalModel->checkNameExists($data['name'], $id)) {
                 $_SESSION['error_msg'] = "ชื่อหน่วยบริการนี้ถูกใช้งานโดย รพ.สต. อื่นแล้ว";
