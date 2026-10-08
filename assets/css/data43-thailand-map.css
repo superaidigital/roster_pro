@@ -1,0 +1,11 @@
+.data43-map-page{position:relative;min-height:calc(100vh - 120px)}
+.data43-map-toolbar{position:absolute;z-index:800;top:16px;left:50%;transform:translateX(-50%);width:min(1180px,calc(100% - 32px));display:flex;align-items:end;gap:12px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--rp-border,#dbe3ee);border-radius:16px;background:color-mix(in srgb,var(--rp-card-bg,#fff) 94%,transparent);backdrop-filter:blur(14px);box-shadow:0 10px 35px rgba(15,23,42,.12)}
+.data43-map-toolbar__title{margin-right:auto}.data43-map-toolbar__title strong{display:block;font-size:1rem}.data43-map-toolbar__title small{color:var(--rp-text-muted,#6b7b8d)}
+.data43-map-field{display:flex;flex-direction:column;gap:4px}.data43-map-field label{font-size:.7rem;font-weight:800;color:var(--rp-text-muted,#6b7b8d)}
+.data43-map-field select{height:42px;min-width:165px;border:1px solid var(--rp-border,#dbe3ee);border-radius:10px;background:var(--rp-card-bg,#fff);color:var(--rp-text,#1f3349);padding:0 12px}
+#data43ThailandMap{height:calc(100vh - 120px);min-height:620px;border-radius:18px;overflow:hidden;border:1px solid var(--rp-border,#dbe3ee)}
+.data43-map-status{position:absolute;z-index:850;left:50%;bottom:22px;transform:translateX(-50%);display:none;padding:8px 12px;border-radius:999px;background:rgba(15,23,42,.88);color:#fff;font-size:.75rem}.data43-map-status.show{display:block}
+.data43-map-info{position:absolute;z-index:810;right:18px;bottom:22px;min-width:170px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--rp-card-bg,#fff) 95%,transparent);border:1px solid var(--rp-border,#dbe3ee);box-shadow:0 8px 24px rgba(15,23,42,.12);font-size:.78rem}
+.data43-map-tooltip{border:0!important;border-radius:9px!important;background:rgba(15,23,42,.93)!important;color:#fff!important;box-shadow:0 6px 20px rgba(0,0,0,.18)!important}
+.data43-map-tooltip:before{display:none}
+@media(max-width:760px){.data43-map-toolbar{top:8px;width:calc(100% - 16px);align-items:stretch}.data43-map-toolbar__title{width:100%}.data43-map-field{flex:1}.data43-map-field select{min-width:0;width:100%}.data43-map-info{right:8px;bottom:12px}#data43ThailandMap{height:calc(100vh - 100px);min-height:560px;border-radius:12px}}
