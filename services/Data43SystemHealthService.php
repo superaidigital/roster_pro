@@ -23,7 +23,7 @@ final class Data43SystemHealthService
             $checks[] = $this->tableCheck($table);
         }
 
-        foreach ([['data43_submissions','standard_version'],['data43_submissions','profile_code'],['hospitals','hospital_code9']] as [$table,$column]) {
+        foreach ([['data43_submissions','standard_version'],['data43_submissions','profile_code'],['hospitals','hospital_code9'],['hospitals','hospital_code9_new']] as [$table,$column]) {
             $checks[] = $this->columnCheck($table,$column);
         }
 
@@ -89,7 +89,75 @@ final class Data43SystemHealthService
             $sql="SELECT
                     SUM(CASE WHEN is_active=1 AND deleted_at IS NULL AND COALESCE(hospital_code,'')<>'0' THEN 1 ELSE 0 END) active_count,
                     SUM(CASE WHEN is_active=1 AND deleted_at IS NULL AND COALESCE(hospital_code,'')<>'0'
-                              AND (hospital_code9 IS NULL OR TRIM(hospital_code9)='' OR hospital_code9 NOT REGEXP '^[0-9]{9}$')
+                              AND NOT (hospital_code9 REGEXP '^[0-9]{9}
+                             THEN 1 ELSE 0 END) missing_count
+                  FROM hospitals";
+            $row=$this->db->query($sql)->fetch(PDO::FETCH_ASSOC) ?: [];
+            $active=(int)($row['active_count']??0);
+            $missing=(int)($row['missing_count']??0);
+
+            return [
+                'group'=>'Data Standard','name'=>'HOSPCODE9 coverage',
+                'status'=>$missing?'WARNING':'OK',
+                'detail'=>$missing?"ยังขาดรหัส 9 หลัก (เดิม/ใหม่) {$missing}/{$active} หน่วยบริการ":"มีรหัส 9 หลักเดิมหรือใหม่ครบ {$active} หน่วยบริการ",
+                'fix'=>$missing?'ตรวจรหัส 9 หลักเดิม/ใหม่จากทะเบียนทางการ แล้วแก้ไขที่เมนูจัดการ รพ.สต.':null,
+            ];
+        } catch (Throwable $e) {
+            return ['group'=>'Data Standard','name'=>'HOSPCODE9 coverage','status'=>'WARNING','detail'=>'ตรวจ HOSPCODE9 ไม่สำเร็จ','fix'=>'ตรวจ schema ตาราง hospitals'];
+        }
+    }
+
+    private function storageCheck(): array
+    {
+        try {
+            $root=Data43StorageService::baseRoot();
+            $outside=Data43StorageService::isOutsideDocumentRoot($root);
+            return [
+                'group'=>'Storage','name'=>'Data43 temporary storage',
+                'status'=>$outside?'OK':'WARNING',
+                'detail'=>$outside?'เขียนได้และอยู่นอก DocumentRoot':'พื้นที่ชั่วคราวยังอยู่ใต้ DocumentRoot',
+                'fix'=>$outside?null:'ตั้ง DATA43_TEMP_DIR ให้อยู่นอก htdocs/public',
+            ];
+        } catch (Throwable $e) {
+            return ['group'=>'Storage','name'=>'Data43 temporary storage','status'=>'ERROR','detail'=>$e->getMessage(),'fix'=>'ตรวจสิทธิ์ temp directory ของ Apache/PHP'];
+        }
+    }
+}
+?> OR hospital_code9_new REGEXP '^[A-Z]{2}[0-9]{7}
+                             THEN 1 ELSE 0 END) missing_count
+                  FROM hospitals";
+            $row=$this->db->query($sql)->fetch(PDO::FETCH_ASSOC) ?: [];
+            $active=(int)($row['active_count']??0);
+            $missing=(int)($row['missing_count']??0);
+
+            return [
+                'group'=>'Data Standard','name'=>'HOSPCODE9 coverage',
+                'status'=>$missing?'WARNING':'OK',
+                'detail'=>$missing?"ยังขาด HOSPCODE9 {$missing}/{$active} หน่วยบริการ":"HOSPCODE9 ครบ {$active} หน่วยบริการ",
+                'fix'=>$missing?'กรอก HOSPCODE9 ให้ครบก่อนส่งออกข้อมูลมาตรฐาน':null,
+            ];
+        } catch (Throwable $e) {
+            return ['group'=>'Data Standard','name'=>'HOSPCODE9 coverage','status'=>'WARNING','detail'=>'ตรวจ HOSPCODE9 ไม่สำเร็จ','fix'=>'ตรวจ schema ตาราง hospitals'];
+        }
+    }
+
+    private function storageCheck(): array
+    {
+        try {
+            $root=Data43StorageService::baseRoot();
+            $outside=Data43StorageService::isOutsideDocumentRoot($root);
+            return [
+                'group'=>'Storage','name'=>'Data43 temporary storage',
+                'status'=>$outside?'OK':'WARNING',
+                'detail'=>$outside?'เขียนได้และอยู่นอก DocumentRoot':'พื้นที่ชั่วคราวยังอยู่ใต้ DocumentRoot',
+                'fix'=>$outside?null:'ตั้ง DATA43_TEMP_DIR ให้อยู่นอก htdocs/public',
+            ];
+        } catch (Throwable $e) {
+            return ['group'=>'Storage','name'=>'Data43 temporary storage','status'=>'ERROR','detail'=>$e->getMessage(),'fix'=>'ตรวจสิทธิ์ temp directory ของ Apache/PHP'];
+        }
+    }
+}
+?>)
                              THEN 1 ELSE 0 END) missing_count
                   FROM hospitals";
             $row=$this->db->query($sql)->fetch(PDO::FETCH_ASSOC) ?: [];
