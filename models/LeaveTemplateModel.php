@@ -229,6 +229,96 @@ class LeaveTemplateModel {
         }catch(Throwable $e){if($this->conn->inTransaction())$this->conn->rollBack();throw $e;}
     }
 
+
+    /**
+     * A file replacement creates a new immutable template record instead of overwriting
+     * the original. Generated documents keep referring to the old template/version.
+     * A ready DOCX replaces the live template; a pending DOCX/PDF is staged inactive.
+     */
+    public function createReplacement(int $oldId, array $file, int $actorId): array {
+        $this->conn->beginTransaction();
+        try {
+            $lock=$this->conn->prepare("SELECT * FROM leave_form_templates WHERE id=? AND archived_at IS NULL FOR UPDATE");
+            $lock->execute([$oldId]);
+            $old=$lock->fetch(PDO::FETCH_ASSOC);
+            if (!$old) throw new InvalidArgumentException('ไม่พบแบบฟอร์มต้นฉบับ หรือเก็บเข้าคลังแล้ว');
+
+            $next=$this->conn->prepare("
+                SELECT COALESCE(MAX(version),0) AS max_version
+                FROM leave_form_templates
+                WHERE template_name=? AND (hospital_id <=> ?)
+            ");
+            $next->execute([$old['template_name'], $old['hospital_id']]);
+            $version=max((int)$old['version'],(int)$next->fetchColumn())+1;
+            $ready=($file['file_type']==='DOCX' && $file['mapping_status']==='READY');
+            $stmt=$this->conn->prepare("
+                INSERT INTO leave_form_templates (
+                    template_name,leave_type_id,hospital_id,file_type,original_filename,
+                    stored_path,version,is_active,mapping_status,notes,created_by,sort_order
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            ");
+            $stmt->execute([
+                $old['template_name'],$old['leave_type_id'],$old['hospital_id'],
+                $file['file_type'],$file['original_filename'],$file['stored_path'],
+                $version,$ready?1:0,$file['mapping_status'],$old['notes'],$actorId,(int)$old['sort_order']
+            ]);
+            $newId=(int)$this->conn->lastInsertId();
+            $copy=$this->conn->prepare("
+                INSERT INTO leave_template_types(template_id,leave_type_id)
+                SELECT ?,leave_type_id FROM leave_template_types WHERE template_id=?
+            ");
+            $copy->execute([$newId,$oldId]);
+
+            // Keep the old, functioning template in service until the new file is render-ready.
+            if ($ready) {
+                $archive=$this->conn->prepare("
+                    UPDATE leave_form_templates SET is_active=0, archived_at=NOW()
+                    WHERE id=? AND archived_at IS NULL
+                ");
+                $archive->execute([$oldId]);
+            }
+            $this->conn->commit();
+            return ['id'=>$newId,'version'=>$version,'ready'=>$ready];
+        } catch(Throwable $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Permanently delete an unused template only. Existing generated documents
+     * must never lose their FK to the original source template.
+     * Returns its stored_path for optional filesystem cleanup after COMMIT.
+     */
+    public function deleteUnused(int $id): string {
+        $this->conn->beginTransaction();
+        try {
+            $stmt=$this->conn->prepare("
+                SELECT stored_path FROM leave_form_templates
+                WHERE id=? AND archived_at IS NULL FOR UPDATE
+            ");
+            $stmt->execute([$id]);
+            $path=$stmt->fetchColumn();
+            if (!is_string($path) || $path==='') {
+                throw new InvalidArgumentException('ไม่พบแบบฟอร์มที่จะลบ');
+            }
+            $usage=$this->conn->prepare("SELECT COUNT(*) FROM leave_generated_documents WHERE template_id=?");
+            $usage->execute([$id]);
+            if ((int)$usage->fetchColumn()>0) {
+                throw new DomainException('แบบฟอร์มมีเอกสารใบลาอ้างอิงอยู่ กรุณาใช้เก็บเข้าคลังแทนการลบถาวร');
+            }
+            $delete=$this->conn->prepare('DELETE FROM leave_form_templates WHERE id=? AND archived_at IS NULL');
+            $delete->execute([$id]);
+            if ($delete->rowCount()!==1) throw new RuntimeException('ลบข้อมูลแบบฟอร์มไม่สำเร็จ');
+            // Type mappings and PDF field positions cascade via their FK.
+            $this->conn->commit();
+            return $path;
+        } catch(Throwable $e) {
+            if ($this->conn->inTransaction()) $this->conn->rollBack();
+            throw $e;
+        }
+    }
+
     public function recordGenerated(array $data): int {
         $stmt = $this->conn->prepare("
             INSERT INTO leave_generated_documents
