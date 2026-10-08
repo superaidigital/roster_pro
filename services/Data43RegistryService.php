@@ -36,8 +36,8 @@ final class Data43RegistryService
             $hasCode9=(bool)$column;
         }catch(Throwable $e){$hasCode9=false;}
         $sql=$hasCode9
-            ? "SELECT hospital_code,hospital_code9 FROM hospitals WHERE id=? AND deleted_at IS NULL LIMIT 1"
-            : "SELECT hospital_code,NULL AS hospital_code9 FROM hospitals WHERE id=? AND deleted_at IS NULL LIMIT 1";
+            ? "SELECT hospital_code,hospital_code9,hospital_code9_new FROM hospitals WHERE id=? AND deleted_at IS NULL LIMIT 1"
+            : "SELECT hospital_code,NULL AS hospital_code9,NULL AS hospital_code9_new FROM hospitals WHERE id=? AND deleted_at IS NULL LIMIT 1";
         $stmt=$this->db->prepare($sql);
         $stmt->execute([$hospitalId]);
         $row=$stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -52,7 +52,7 @@ final class Data43RegistryService
 
         return [
             'HOSPCODE'=>$hospcode,
-            'HOSPCODE9'=>$hospcode9,
+            'HOSPCODE9'=>trim((string)($row['hospital_code9_new'] ?? '')) ?: $hospcode9,
         ];
     }
 
