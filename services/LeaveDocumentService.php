@@ -20,6 +20,9 @@ class LeaveDocumentService {
             '{{start_date_th}}' => 'วันที่เริ่มลา (ไทย)',
             '{{end_date_th}}' => 'วันที่สิ้นสุด (ไทย)',
             '{{num_days}}' => 'จำนวนวันลา',
+            '{{leave_days_previous}}' => 'ลามาแล้ว (วันทำการ)',
+            '{{leave_days_current}}' => 'ลาครั้งนี้ (วันทำการ)',
+            '{{leave_days_total}}' => 'รวมเป็น (วันทำการ)',
             '{{submitted_date_th}}' => 'วันที่ยื่นคำขอ',
             '{{status}}' => 'สถานะใบลา',
             '{{approved_date_th}}' => 'วันที่อนุมัติ',
@@ -56,6 +59,51 @@ class LeaveDocumentService {
             throw new RuntimeException('ไม่พบข้อมูลใบลา');
         }
 
+
+        // Leave balances and quota deductions in this application are assigned to
+        // the fiscal year containing the request's START date (1 Oct - 30 Sep).
+        // For "ลามาแล้ว" include only earlier, completed, APPROVED leave of the
+        // SAME employee and SAME leave type. Exclude cancelled, rejected, pending,
+        // future and the current request, including when already approved.
+        $start = DateTimeImmutable::createFromFormat('!Y-m-d', (string)$row['start_date']);
+        if (!$start || $start->format('Y-m-d') !== (string)$row['start_date']) {
+            throw new RuntimeException('วันที่เริ่มลาของใบคำขอไม่ถูกต้อง');
+        }
+        $year = (int)$start->format('Y');
+        $fiscalYearStart = (int)$start->format('n') >= 10 ? $year : $year - 1;
+        $from = sprintf('%04d-10-01', $fiscalYearStart);
+        $until = sprintf('%04d-10-01', $fiscalYearStart + 1);
+
+        $history = $this->db->prepare("
+            SELECT COALESCE(SUM(num_days), 0)
+            FROM leave_requests
+            WHERE user_id = :user_id
+              AND leave_type_id = :leave_type_id
+              AND id <> :request_id
+              AND status = 'APPROVED'
+              AND start_date >= :fiscal_start
+              AND start_date < :fiscal_end
+              AND end_date < :request_start
+        ");
+        $history->execute([
+            ':user_id' => (int)$row['user_id'],
+            ':leave_type_id' => (int)$row['leave_type_id'],
+            ':request_id' => (int)$row['id'],
+            ':fiscal_start' => $from,
+            ':fiscal_end' => $until,
+            ':request_start' => $start->format('Y-m-d'),
+        ]);
+
+        // Keep the already-approved/requested num_days basis used by LeaveModel.
+        // Some special leave types are calendar-day based; never silently convert
+        // those records to business days when generating a document.
+        $previous = round((float)$history->fetchColumn(), 2);
+        $current = round((float)($row['num_days'] ?? 0), 2);
+        $row['leave_days_previous'] = $previous;
+        $row['leave_days_current'] = $current;
+        $row['leave_days_total'] = round($previous + $current, 2);
+        $row['leave_days_fiscal_year'] = $fiscalYearStart + 1;
+
         return $row;
     }
 
@@ -73,6 +121,9 @@ class LeaveDocumentService {
             '{{start_date_th}}' => $this->thaiDate((string)($leave['start_date'] ?? '')),
             '{{end_date_th}}' => $this->thaiDate((string)($leave['end_date'] ?? '')),
             '{{num_days}}' => $this->formatNumber($leave['num_days'] ?? 0),
+            '{{leave_days_previous}}' => $this->formatNumber($leave['leave_days_previous'] ?? 0),
+            '{{leave_days_current}}' => $this->formatNumber($leave['leave_days_current'] ?? $leave['num_days'] ?? 0),
+            '{{leave_days_total}}' => $this->formatNumber($leave['leave_days_total'] ?? (($leave['leave_days_previous'] ?? 0) + ($leave['leave_days_current'] ?? $leave['num_days'] ?? 0))),
             '{{submitted_date_th}}' => $this->thaiDateTime((string)($leave['created_at'] ?? '')),
             '{{status}}' => $this->statusLabel((string)($leave['status'] ?? '')),
             '{{approved_date_th}}' => $this->thaiDateTime((string)($leave['approved_at'] ?? '')),
