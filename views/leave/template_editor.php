@@ -1,86 +1,127 @@
 <?php
-$esc=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
-$isPdf=$template['file_type']==='PDF';
+$esc=static fn($x)=>htmlspecialchars((string)$x,ENT_QUOTES,'UTF-8');
+$isPdf=($template['file_type']==='PDF');
 ?>
 <style>
-.lt-editor{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px}
-.lt-palette,.lt-stagebox{background:#fff;border:1px solid #dbe4ef;border-radius:16px;padding:16px}
-.lt-palette button{width:100%;border:1px solid #dbe4ef;background:#f8fafc;border-radius:8px;text-align:left;padding:9px;margin-bottom:7px;cursor:grab}
-.lt-stage{position:relative;width:100%;aspect-ratio:210/297;background:#fff;border:1px solid #cbd5e1;box-shadow:0 6px 20px #0f172a15;overflow:hidden;touch-action:none}
-.lt-field{position:absolute;border:1px solid #0891b2;background:#0891b225;border-radius:4px;cursor:move;overflow:hidden;font-size:12px;padding:2px;touch-action:none}
-.lt-field.selected{outline:2px solid #f97316;z-index:3}
-.lt-field .lt-del{float:right;border:0;background:white;color:#b91c1c;cursor:pointer}
-.lt-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
-@media(max-width:850px){.lt-editor{grid-template-columns:1fr}.lt-palette{display:grid;grid-template-columns:1fr 1fr;gap:8px}}
+.ltd-shell{display:grid;grid-template-columns:minmax(200px,245px) minmax(0,1fr) minmax(205px,245px);gap:12px;align-items:start}
+.ltd-pane{background:#fff;border:1px solid #dbe4ee;border-radius:14px;padding:14px;min-width:0}
+.ltd-palette{display:flex;flex-direction:column;gap:6px;max-height:65vh;overflow:auto}
+.ltd-palette button{border:1px solid #dbe4ee;background:#f8fafc;border-radius:9px;text-align:left;padding:9px;cursor:grab}
+.ltd-palette button:hover{background:#ecfeff;border-color:#0e7490}
+.ltd-workspace{background:#eaf0f6;border:1px solid #cbd5e1;border-radius:12px;padding:22px;overflow:auto;max-height:75vh}
+.ltd-paper{position:relative;width:100%;max-width:720px;margin:auto;box-shadow:0 10px 28px #0f172a22;background:white;overflow:hidden}
+.ltd-paper canvas{display:block;width:100%;height:100%}
+.ltd-overlay{position:absolute;inset:0}
+.ltd-field{position:absolute;box-sizing:border-box;border:1.5px solid #0891b2;background:#06b6d42b;color:#0f172a;display:flex;align-items:center;font-size:11px;white-space:nowrap;overflow:visible;cursor:move;touch-action:none;user-select:none}
+.ltd-field.selected{border:2px solid #f97316;background:#fb923c33;z-index:3}
+.ltd-field-label{overflow:hidden;text-overflow:ellipsis;pointer-events:none;padding:0 4px}
+.ltd-resize{position:absolute;width:11px;height:11px;right:-5px;bottom:-5px;background:#f97316;border:2px solid white;border-radius:3px;cursor:nwse-resize}
+.ltd-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:12px}
+.ltd-toolbar .form-control{max-width:82px}
+.ltd-hint{font-size:12px;color:#64748b}
+.ltd-props label{font-size:12px;font-weight:650;display:block;margin-top:10px;margin-bottom:4px}
+.ltd-props .form-control{min-width:0}
+.ltd-file{font-size:12px;overflow-wrap:anywhere}
+@media(max-width:1150px){.ltd-shell{grid-template-columns:200px minmax(0,1fr)}.ltd-props{grid-column:1/-1}}
+@media(max-width:690px){.ltd-shell{grid-template-columns:1fr}.ltd-props{grid-column:auto}.ltd-palette{display:grid;grid-template-columns:1fr 1fr;max-height:250px}.ltd-workspace{padding:8px;max-height:none}}
 </style>
 <div class="rp-page">
-<div class="rp-page-header mb-3"><div><div class="rp-page-header__eyebrow">LEAVE TEMPLATE DESIGNER</div>
-<h1 class="rp-page-header__title">จัดวางฟิลด์: <?= $esc($template['template_name']) ?></h1>
-<p class="rp-page-header__subtitle"><?= $esc($template['original_filename']) ?> · <?= $esc($template['file_type']) ?> · v<?= (int)$template['version'] ?></p></div>
-<a href="index.php?c=leave&a=templates" class="rp-btn rp-btn--secondary">กลับแบบฟอร์ม</a></div>
+<div class="rp-page-header mb-3"><div>
+<div class="rp-page-header__eyebrow">ROSTER PRO • FORM DESIGNER</div>
+<h1 class="rp-page-header__title">จัดวางฟิลด์บนแบบฟอร์ม</h1>
+<p class="rp-page-header__subtitle ltd-file"><?= $esc($template['template_name']) ?> · <?= $esc($template['original_filename']) ?> · v<?= (int)$template['version'] ?></p>
+</div><a class="rp-btn rp-btn--secondary" href="index.php?c=leave&a=templates">กลับรายการแบบฟอร์ม</a></div>
+<?php if(!empty($_SESSION['success_msg'])): ?><div class="alert alert-success" role="status"><?= $esc($_SESSION['success_msg']) ?></div><?php unset($_SESSION['success_msg']);endif;?>
+<?php if(!empty($_SESSION['error_msg'])): ?><div class="alert alert-danger" role="alert"><?= $esc($_SESSION['error_msg']) ?></div><?php unset($_SESSION['error_msg']);endif;?>
 <?php if(!$isPdf): ?>
-<section class="rp-card"><div class="rp-card__body p-3">
-<h2 class="h5">DOCX ใช้ Placeholder ในไฟล์ Word</h2><p>เปิดต้นฉบับเพื่อแก้ {{...}} และอัปโหลดเป็นเวอร์ชันใหม่ได้ การลากพิกัดบนหน้ากระดาษรองรับเฉพาะ PDF</p>
-<a class="rp-btn rp-btn--primary" href="index.php?c=leave&a=template_download&id=<?= (int)$template['id'] ?>">ดาวน์โหลด DOCX</a>
-<div class="mt-3 small text-muted">ตัวอย่าง: <code>{{employee_name}}</code>, <code>{{leave_type}}</code>, <code>{{start_date_th}}</code></div>
-</div></section>
+<section class="ltd-pane"><h2 class="h5">แก้ไขแบบฟอร์ม Word (DOCX)</h2><p>ไฟล์ DOCX ใช้ Placeholder เช่น <code>{{employee_name}}</code> และ <code>{{leave_type}}</code> ในต้นฉบับ Word โดยตรง ไม่สามารถลากวางพิกัด PDF บนไฟล์ Word ได้</p><a class="rp-btn rp-btn--primary" href="index.php?c=leave&a=template_download&id=<?= (int)$template['id'] ?>">ดาวน์โหลดต้นฉบับ Word</a><p class="ltd-hint mt-3">แก้เอกสารใน Word แล้วอัปโหลดเป็นเวอร์ชันใหม่เพื่อไม่กระทบเอกสารเดิม</p></section>
 <?php else: ?>
-<div class="rp-alert rp-alert--warning mb-3"><div class="rp-alert__content">
-ตำแหน่งที่วางจะถูกบันทึกเพื่อเตรียม Mapping เท่านั้น ยังไม่รองรับการเขียนข้อความลง PDF เพื่อสร้างใบลาอัตโนมัติ การสร้างเอกสารปัจจุบันยังใช้ DOCX
-</div></div>
-<form id="lt-save" action="index.php?c=leave&a=template_fields_save" method="post">
-<input type="hidden" name="csrf_token" value="<?= $esc($csrf_token) ?>">
-<input type="hidden" name="id" value="<?= (int)$template['id'] ?>">
-<input type="hidden" name="fields" id="lt-json">
+<div class="alert alert-info">ระบบนี้บันทึกตำแหน่งฟิลด์บน PDF ได้ แต่ยังไม่ได้เปิดใช้การสร้างไฟล์ PDF ที่แทนค่าข้อมูลอัตโนมัติ</div>
+<form id="ltd-form" method="post" action="index.php?c=leave&a=template_fields_save">
+<input type="hidden" name="csrf_token" value="<?= $esc($csrf_token) ?>"><input type="hidden" name="id" value="<?= (int)$template['id'] ?>"><input type="hidden" name="fields" id="ltd-json">
 </form>
-<div class="lt-editor">
-<aside class="lt-palette"><h2 class="h6 fw-bold">ฟิลด์ข้อมูล</h2><p class="small text-muted">ลากไปวางบนกระดาษ หรือคลิกเพื่อเพิ่มกลางหน้า</p>
-<?php foreach($placeholders as $key=>$description): ?>
-<button type="button" class="lt-source" draggable="true" data-field="<?= $esc($key) ?>"><?= $esc($description) ?><span class="d-block small text-muted"><?= $esc($key) ?></span></button>
-<?php endforeach; ?>
-</aside>
-<section class="lt-stagebox">
-<div class="lt-toolbar">
-<label for="lt-page">หน้าที่</label><input id="lt-page" type="number" min="1" max="100" value="1" class="form-control" style="width:85px">
-<button type="button" id="lt-prev" class="btn btn-outline-secondary">ก่อนหน้า</button><button type="button" id="lt-next" class="btn btn-outline-secondary">ถัดไป</button>
-<button type="button" id="lt-save-btn" class="btn btn-primary">บันทึกตำแหน่ง</button>
+<div class="ltd-toolbar ltd-pane">
+<button id="ltd-prev" class="btn btn-outline-secondary btn-sm" type="button">‹ ก่อนหน้า</button>
+<label for="ltd-page" class="small mb-0">หน้า</label><input id="ltd-page" class="form-control form-control-sm" type="number" min="1" value="1">
+<span id="ltd-page-total" class="small text-muted">/ –</span>
+<button id="ltd-next" class="btn btn-outline-secondary btn-sm" type="button">ถัดไป ›</button>
+<label for="ltd-zoom" class="small ms-2 mb-0">ซูม</label><select id="ltd-zoom" class="form-select form-select-sm" style="width:auto"><option value="0.75">75%</option><option value="1" selected>100%</option><option value="1.25">125%</option><option value="1.5">150%</option></select>
+<button id="ltd-reset" class="btn btn-outline-secondary btn-sm" type="button">ย้อนค่าล่าสุด</button>
+<button id="ltd-save" class="btn btn-primary btn-sm ms-auto" type="button">บันทึกตำแหน่งฟิลด์</button>
 </div>
-<p class="small text-muted">พื้นหลังกระดาษแสดง PDF หน้าที่เลือก โดยวางฟิลด์เป็นเปอร์เซ็นต์จากขนาดหน้ากระดาษ</p>
-<div id="lt-stage" class="lt-stage" aria-label="พื้นที่จัดวางฟิลด์" tabindex="0"><canvas id="lt-canvas" style="width:100%;height:100%;display:block"></canvas></div>
-<p id="lt-status" role="status" class="small text-muted mt-2">กำลังโหลดหน้ากระดาษ...</p>
-</section></div>
+<div class="ltd-shell">
+<aside class="ltd-pane">
+<h2 class="h6 fw-bold">1. ฟิลด์ข้อมูลใบลา</h2><p class="ltd-hint">ลากลงเอกสาร หรือคลิกเพื่อเพิ่ม</p>
+<div class="ltd-palette" id="ltd-palette">
+<?php foreach($placeholders as $key=>$label): ?><button class="ltd-source" type="button" draggable="true" data-key="<?= $esc($key) ?>"><strong><?= $esc($label) ?></strong><span class="d-block ltd-hint"><?= $esc($key) ?></span></button><?php endforeach; ?>
+</div></aside>
+<section class="ltd-pane" style="min-width:0"><h2 class="h6 fw-bold">2. ตัวอย่างเอกสารจริง</h2><div class="ltd-workspace"><div id="ltd-paper" class="ltd-paper"><canvas id="ltd-canvas"></canvas><div id="ltd-overlay" class="ltd-overlay" aria-label="พื้นที่ลากวางฟิลด์"></div></div></div><p id="ltd-status" role="status" class="ltd-hint mt-2">กำลังเตรียมตัวอย่าง PDF...</p></section>
+<aside class="ltd-pane ltd-props"><h2 class="h6 fw-bold">3. คุณสมบัติฟิลด์</h2><div id="ltd-empty" class="ltd-hint">คลิกเลือกฟิลด์ในเอกสารเพื่อแก้ไข</div><div id="ltd-properties" hidden>
+<label>ฟิลด์</label><div id="ltd-key" class="small fw-bold" style="overflow-wrap:anywhere"></div>
+<div class="row g-2">
+<div class="col-6"><label for="ltd-x">X (%)</label><input id="ltd-x" class="form-control form-control-sm" type="number" min="0" max="100" step=".1"></div>
+<div class="col-6"><label for="ltd-y">Y (%)</label><input id="ltd-y" class="form-control form-control-sm" type="number" min="0" max="100" step=".1"></div>
+<div class="col-6"><label for="ltd-w">กว้าง (%)</label><input id="ltd-w" class="form-control form-control-sm" type="number" min="2" max="100" step=".1"></div>
+<div class="col-6"><label for="ltd-h">สูง (%)</label><input id="ltd-h" class="form-control form-control-sm" type="number" min="1" max="100" step=".1"></div>
+</div><button id="ltd-delete" type="button" class="btn btn-outline-danger btn-sm w-100 mt-3">ลบฟิลด์นี้</button></div>
+<p class="ltd-hint mt-3">พิกัดเป็นสัดส่วนของหน้ากระดาษจริง จึงคงตำแหน่งเมื่อซูมและเปลี่ยนหน้าจอ ใช้ปุ่มมุมขวาล่างของฟิลด์เพื่อปรับขนาด</p>
+</aside>
+</div>
 <script type="module">
-const pdfUrl=<?= json_encode('index.php?c=leave&a=template_download&id='.(int)$template['id'].'&preview=1') ?>;
-const initial=<?= json_encode($fields,JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
-const stage=document.getElementById('lt-stage'),canvas=document.getElementById('lt-canvas'),pageInput=document.getElementById('lt-page'),status=document.getElementById('lt-status');
-const entries=initial.map(f=>({field_key:f.field_key,page_number:Number(f.page_number),x:Number(f.x),y:Number(f.y),width:Number(f.width||22),height:Number(f.height||5)}));
-let currentPage=1,pdf=null,moving=null;
-const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
-function paint(){stage.querySelectorAll('.lt-field').forEach(n=>n.remove());
-entries.forEach((f,i)=>{if(f.page_number!==currentPage)return;
-const el=document.createElement('div');el.className='lt-field';el.style.left=f.x+'%';el.style.top=f.y+'%';el.style.width=f.width+'%';el.style.height=f.height+'%';
-el.textContent=f.field_key;el.title='ลากเพื่อย้าย · คลิก × เพื่อลบ';
-const del=document.createElement('button');del.type='button';del.className='lt-del';del.textContent='×';del.onclick=e=>{e.stopPropagation();entries.splice(i,1);paint()};el.append(del);
-el.addEventListener('pointerdown',e=>{if(e.target===del)return;e.preventDefault();moving={index:i,x:e.clientX,y:e.clientY,startX:f.x,startY:f.y};el.setPointerCapture(e.pointerId);el.classList.add('selected')});
-el.addEventListener('pointermove',e=>{if(!moving||moving.index!==i)return;const b=stage.getBoundingClientRect();f.x=clamp(moving.startX+(e.clientX-moving.x)/b.width*100,0,100-f.width);f.y=clamp(moving.startY+(e.clientY-moving.y)/b.height*100,0,100-f.height);el.style.left=f.x+'%';el.style.top=f.y+'%'});
-el.addEventListener('pointerup',()=>{moving=null;el.classList.remove('selected')});stage.append(el)
-})}
-function add(key,x,y){if(entries.some(f=>f.field_key===key&&f.page_number===currentPage)){status.textContent='ฟิลด์นี้มีในหน้าปัจจุบันแล้ว';return}
-entries.push({field_key:key,page_number:currentPage,x:clamp(x,0,75),y:clamp(y,0,94),width:24,height:5});paint()}
-document.querySelectorAll('.lt-source').forEach(b=>{b.onclick=()=>add(b.dataset.field,38,45);b.ondragstart=e=>e.dataTransfer.setData('text/plain',b.dataset.field)});
-stage.ondragover=e=>e.preventDefault();
-stage.ondrop=e=>{e.preventDefault();const key=e.dataTransfer.getData('text/plain');if(!document.querySelector('.lt-source[data-field="'+CSS.escape(key)+'"]'))return;const rect=stage.getBoundingClientRect();add(key,(e.clientX-rect.left)/rect.width*100,(e.clientY-rect.top)/rect.height*100)};
-async function showPage(){currentPage=clamp(Number(pageInput.value)||1,1,pdf?.numPages||100);pageInput.value=currentPage;paint();if(!pdf)return;
-try{const page=await pdf.getPage(currentPage);const viewport=page.getViewport({scale:1.45}),ctx=canvas.getContext('2d');canvas.width=viewport.width;canvas.height=viewport.height;
-await page.render({canvasContext:ctx,viewport}).promise;status.textContent='หน้า '+currentPage+' / '+pdf.numPages}catch(err){status.textContent='โหลดหน้ากระดาษไม่ได้: '+err.message}}
-pageInput.onchange=showPage;document.getElementById('lt-prev').onclick=()=>{pageInput.value=Math.max(1,currentPage-1);showPage()};
-document.getElementById('lt-next').onclick=()=>{pageInput.value=Math.min(pdf?.numPages||100,currentPage+1);showPage()};
-document.getElementById('lt-save-btn').onclick=()=>{document.getElementById('lt-json').value=JSON.stringify(entries);document.getElementById('lt-save').submit()};
+const pdfUrl=<?= json_encode('index.php?c=leave&a=template_download&id='.(int)$template['id'].'&preview=1',JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+const saved=<?= json_encode($fields,JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+const byId=id=>document.getElementById(id);
+const paper=byId('ltd-paper'),overlay=byId('ltd-overlay'),canvas=byId('ltd-canvas'),status=byId('ltd-status'),pageInput=byId('ltd-page');
+const clean=f=>({field_key:String(f.field_key),page_number:Number(f.page_number),x:Number(f.x),y:Number(f.y),width:Number(f.width),height:Number(f.height)});
+let fields=saved.map(clean),selected=-1,pageNo=1,pdf=null,renderJob=null,sequence=0;
+const clamp=(x,min,max)=>Math.max(min,Math.min(max,x));
+const round=x=>Math.round(x*100)/100;
+const labels=new Map([...document.querySelectorAll('.ltd-source')].map(e=>[e.dataset.key,e.querySelector('strong').textContent]));
+function tell(t){status.textContent=t}
+function props(){const f=fields[selected];byId('ltd-empty').hidden=!!f;byId('ltd-properties').hidden=!f;if(!f)return;
+byId('ltd-key').textContent=labels.get(f.field_key)||f.field_key;
+[['ltd-x','x'],['ltd-y','y'],['ltd-w','width'],['ltd-h','height']].forEach(([id,k])=>byId(id).value=round(f[k]);}
+function paint(){overlay.replaceChildren();fields.forEach((f,i)=>{if(f.page_number!==pageNo)return;
+const node=document.createElement('div');node.className='ltd-field'+(selected===i?' selected':'');
+Object.assign(node.style,{left:f.x+'%',top:f.y+'%',width:f.width+'%',height:f.height+'%'});
+const label=document.createElement('span');label.className='ltd-field-label';label.textContent=labels.get(f.field_key)||f.field_key;node.append(label);
+const grip=document.createElement('span');grip.className='ltd-resize';grip.title='ลากเพื่อปรับขนาด';node.append(grip);
+node.addEventListener('pointerdown',e=>{e.preventDefault();selected=i;props();paint();const current=overlay.children[[...fields].filter((v,j)=>v.page_number===pageNo).findIndex(v=>v===f)];if(!current)return;
+const handle=e.target===grip?true:false;const bounds=overlay.getBoundingClientRect();
+const start={x:e.clientX,y:e.clientY,left:f.x,top:f.y,w:f.width,h:f.height};current.setPointerCapture(e.pointerId);
+const move=ev=>{const dx=(ev.clientX-start.x)/bounds.width*100,dy=(ev.clientY-start.y)/bounds.height*100;
+if(handle){f.width=round(clamp(start.w+dx,2,100-f.x));f.height=round(clamp(start.h+dy,1,100-f.y));}
+else{f.x=round(clamp(start.left+dx,0,100-f.width));f.y=round(clamp(start.top+dy,0,100-f.height));}
+Object.assign(current.style,{left:f.x+'%',top:f.y+'%',width:f.width+'%',height:f.height+'%'});props()};
+const end=()=>{current.removeEventListener('pointermove',move);current.removeEventListener('pointerup',end);current.removeEventListener('pointercancel',end)};
+current.addEventListener('pointermove',move);current.addEventListener('pointerup',end);current.addEventListener('pointercancel',end);
+});
+overlay.append(node)});props()}
+function add(key,x=35,y=45){if(!labels.has(key))return;if(fields.some(f=>f.field_key===key&&f.page_number===pageNo)){tell('ฟิลด์นี้อยู่บนหน้าปัจจุบันแล้ว');return}
+fields.push({field_key:key,page_number:pageNo,x:round(clamp(x,0,75)),y:round(clamp(y,0,94)),width:24,height:5});selected=fields.length-1;paint();}
+document.querySelectorAll('.ltd-source').forEach(btn=>{btn.addEventListener('click',()=>add(btn.dataset.key));btn.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',btn.dataset.key))});
+overlay.addEventListener('dragover',e=>e.preventDefault());
+overlay.addEventListener('drop',e=>{e.preventDefault();const r=overlay.getBoundingClientRect();add(e.dataTransfer.getData('text/plain'),(e.clientX-r.left)/r.width*100,(e.clientY-r.top)/r.height*100)});
+[['ltd-x','x'],['ltd-y','y'],['ltd-w','width'],['ltd-h','height']].forEach(([id,k])=>byId(id).addEventListener('change',()=>{const f=fields[selected];if(!f)return;const n=Number(byId(id).value);if(!Number.isFinite(n))return;
+f[k]=round(clamp(n,k==='width'?2:k==='height'?1:0,k==='x'?100-f.width:k==='y'?100-f.height:k==='width'?100-f.x:100-f.y));paint()}));
+byId('ltd-delete').onclick=()=>{if(selected<0)return;fields.splice(selected,1);selected=-1;paint()};
+byId('ltd-reset').onclick=()=>{if(!confirm('ย้อนตำแหน่งฟิลด์กลับเป็นข้อมูลที่บันทึกล่าสุด?'))return;fields=saved.map(clean);selected=-1;paint()};
+byId('ltd-save').onclick=()=>{byId('ltd-json').value=JSON.stringify(fields);byId('ltd-form').submit()};
+async function draw(){if(!pdf)return;const seq=++sequence;pageNo=clamp(parseInt(pageInput.value)||1,1,pdf.numPages);pageInput.value=pageNo;selected=-1;paint();
+try{if(renderJob){try{renderJob.cancel();await renderJob.promise}catch(e){if(e?.name!=='RenderingCancelledException')throw e;}renderJob=null;}
+const pg=await pdf.getPage(pageNo);if(seq!==sequence)return;
+const base=pg.getViewport({scale:1});const targetWidth=Math.min(680,Math.max(250,paper.parentElement.clientWidth-24))*Number(byId('ltd-zoom').value);
+const scale=targetWidth/base.width;const v=pg.getViewport({scale});const dpr=Math.min(window.devicePixelRatio||1,2);
+paper.style.width=v.width+'px';paper.style.height=v.height+'px';canvas.width=Math.round(v.width*dpr);canvas.height=Math.round(v.height*dpr);canvas.style.width=v.width+'px';canvas.style.height=v.height+'px';
+const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);renderJob=pg.render({canvasContext:ctx,viewport:v});await renderJob.promise;if(seq!==sequence)return;
+tell('กำลังแสดงหน้า '+pageNo+' / '+pdf.numPages);
+}catch(e){if(e?.name!=='RenderingCancelledException')tell('แสดง PDF ไม่สำเร็จ: '+e.message)}}
+pageInput.onchange=draw;byId('ltd-zoom').onchange=draw;byId('ltd-prev').onclick=()=>{pageInput.value=pageNo-1;draw()};byId('ltd-next').onclick=()=>{pageInput.value=pageNo+1;draw()};
 try{
-const lib=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');
-lib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
-pdf=await lib.getDocument({url:pdfUrl,withCredentials:true}).promise;pageInput.max=pdf.numPages;await showPage();
-}catch(error){status.textContent='ไม่สามารถแสดง PDF ได้ (ตรวจเครือข่ายและการตั้งค่า CSP): '+error.message;paint()}
+const lib=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
+lib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+pdf=await lib.getDocument({url:pdfUrl,withCredentials:true}).promise;byId('ltd-page-total').textContent='/ '+pdf.numPages;pageInput.max=pdf.numPages;await draw();
+}catch(e){tell('โหลด PDF ไม่สำเร็จ: '+e.message+' กรุณาตรวจสอบ CDN หรือ Content Security Policy')}
 </script>
 <?php endif; ?>
 </div>
