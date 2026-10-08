@@ -17,6 +17,17 @@ const searchResults=document.getElementById('data43MapSearchResults');
 const legendEl=document.getElementById('data43MapLegendItems');
 
 const hospitalId=root.dataset.hospital||'';
+const patientOpenBtn=document.getElementById('data43PatientOpenBtn');
+const patientAreaLevel=document.getElementById('data43PatientLevel');
+const patientAreaCode=document.getElementById('data43PatientCode');
+function setPatientArea(feature){
+ if(!patientOpenBtn||!patientAreaLevel||!patientAreaCode)return;
+ const p=feature?.properties||{};
+ const code=feature?featureKey(feature,currentMode):'';
+ patientAreaLevel.value=({province:'CHANGWAT',amphoe:'AMPUR',tambon:'TAMBON'})[currentMode]||'';
+ patientAreaCode.value=code;
+ patientOpenBtn.disabled=!code||!/^\d{2}(?:\d{2}){0,2}$/.test(code);
+}
 const urls={
   province:'assets/geojson/thailand/provinces.geojson',
   amphoe:'assets/geojson/thailand/amphoes.geojson',
@@ -188,6 +199,7 @@ function selectFeature(feature,l){
   selectedLayer=l;
   l.setStyle(selectedStyle());
   selectionEl.textContent=currentSelectionText(feature);
+  setPatientArea(feature);
 }
 function drillDown(feature,l){
   selectFeature(feature,l);
@@ -243,7 +255,7 @@ async function fetchMetrics(type){
   metricCache.set(key,data);return data;
 }
 async function load(type,fit=true){
-  currentMode=type;selectedLayer=null;modeLabel.textContent=labels[type]||type;
+  currentMode=type;selectedLayer=null;setPatientArea(null);modeLabel.textContent=labels[type]||type;
   metricLabel.textContent=metricEl.options[metricEl.selectedIndex]?.text||metricEl.value;
   updateBreadcrumb();setStatus(true,'กำลังโหลดแผนที่และข้อมูล...');
   try{
