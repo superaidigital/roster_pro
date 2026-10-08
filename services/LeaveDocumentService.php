@@ -10,6 +10,10 @@ class LeaveDocumentService {
         return [
             '{{request_id}}' => 'เลขที่คำขอ',
             '{{employee_name}}' => 'ชื่อผู้ลา',
+            '{{applicant_name}}' => 'ชื่อ–สกุลผู้ยื่นใบลา',
+            '{{applicant_position}}' => 'ตำแหน่งผู้ยื่นใบลา',
+            '{{approver_full_name}}' => 'ชื่อ–สกุลผู้อนุมัติ (หลังอนุมัติแล้ว)',
+            '{{approver_position}}' => 'ตำแหน่งผู้อนุมัติ (หลังอนุมัติแล้ว)',
             '{{position}}' => 'ตำแหน่ง',
             '{{employee_type}}' => 'ประเภทบุคลากร',
             '{{hospital_name}}' => 'หน่วยบริการ/สังกัด',
@@ -43,6 +47,7 @@ class LeaveDocumentService {
                    u.hospital_id,
                    h.name AS hospital_name,
                    approver.name AS approver_name,
+                   approver.position AS approver_position,
                    approver.signature_path AS approver_signature
             FROM leave_requests lr
             JOIN leave_quotas lq ON lr.leave_type_id = lq.id
@@ -111,6 +116,10 @@ class LeaveDocumentService {
         return [
             '{{request_id}}' => (string)($leave['id'] ?? ''),
             '{{employee_name}}' => (string)($leave['employee_name'] ?? ''),
+            '{{applicant_name}}' => (string)($leave['employee_name'] ?? ''),
+            '{{applicant_position}}' => (string)($leave['position'] ?? ''),
+            '{{approver_full_name}}' => $this->isApprovedForDocument($leave) ? (string)($leave['approver_name'] ?? '') : '',
+            '{{approver_position}}' => $this->isApprovedForDocument($leave) ? (string)($leave['approver_position'] ?? '') : '',
             '{{position}}' => (string)($leave['position'] ?? ''),
             '{{employee_type}}' => (string)($leave['employee_type'] ?? ''),
             '{{hospital_name}}' => (string)($leave['hospital_name'] ?? ''),
@@ -198,6 +207,17 @@ class LeaveDocumentService {
         $zip->close();
 
         return array_keys($found);
+    }
+
+    /**
+     * Only show an actual approving user when an approval exists.
+     * "CANCEL_REQUESTED" still denotes a leave request that was approved
+     * before a cancellation request was submitted.
+     */
+    private function isApprovedForDocument(array $leave): bool {
+        return in_array(strtoupper((string)($leave['status'] ?? '')),
+            ['APPROVED', 'CANCEL_REQUESTED'], true)
+            && (int)($leave['approved_by'] ?? 0) > 0;
     }
 
     private function thaiDate(string $date): string {
