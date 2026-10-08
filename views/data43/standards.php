@@ -20,8 +20,8 @@ $rphst_expected=$rphst_expected??[];
             <tr>
               <td><?= (int)$row['no'] ?></td>
               <td><code><?= htmlspecialchars($code,ENT_QUOTES,'UTF-8') ?></code></td>
-              <td><?= htmlspecialchars((string)$row['name_th'],ENT_QUOTES,'UTF-8') ?></td>
-              <td><?= htmlspecialchars((string)$row['category'],ENT_QUOTES,'UTF-8') ?></td>
+              <td><?= htmlspecialchars($code,ENT_QUOTES,'UTF-8') ?></td>
+              <td><?= htmlspecialchars(implode(', ',(array)($row['types']??[])),ENT_QUOTES,'UTF-8') ?></td>
               <td><?= isset($rphst_expected[$code])?'<span class="rp-badge rp-badge--success">Applicable</span>':'<span class="rp-badge">N/A</span>' ?></td>
             </tr>
           <?php endforeach; ?>
