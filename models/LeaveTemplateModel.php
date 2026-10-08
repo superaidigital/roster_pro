@@ -104,13 +104,14 @@ class LeaveTemplateModel {
         return $row ?: null;
     }
 
-    public function resolveActiveTemplate(int $leaveTypeId, ?int $hospitalId): ?array {
+    public function resolveActiveTemplate(int $leaveTypeId, ?int $hospitalId, string $format='DOCX'): ?array {
+        if (!in_array($format,['DOCX','PDF'],true)) throw new InvalidArgumentException('ชนิดเอกสารไม่ถูกต้อง');
         if (!$this->schemaReady()) return null;
 
         $stmt = $this->conn->prepare("
             SELECT t.* FROM leave_form_templates t
             WHERE t.is_active = 1 AND t.archived_at IS NULL
-              AND t.file_type = 'DOCX' AND t.mapping_status = 'READY'
+              AND t.file_type = ? AND t.mapping_status = 'READY'
               AND (t.hospital_id = ? OR t.hospital_id IS NULL)
               AND (
                   EXISTS (SELECT 1 FROM leave_template_types mt WHERE mt.template_id=t.id AND mt.leave_type_id=?)
@@ -124,7 +125,7 @@ class LeaveTemplateModel {
                      t.sort_order ASC, t.version DESC, t.id DESC
             LIMIT 1
         ");
-        $stmt->execute([$hospitalId,$leaveTypeId,$leaveTypeId,$leaveTypeId,$leaveTypeId]);
+        $stmt->execute([$format,$hospitalId,$leaveTypeId,$leaveTypeId,$leaveTypeId,$leaveTypeId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }
@@ -189,6 +190,22 @@ class LeaveTemplateModel {
             foreach($ids as $i=>$id)$stmt->execute([$i+1,$id]);
             $this->conn->commit();
         }catch(Throwable $e){if($this->conn->inTransaction())$this->conn->rollBack();throw $e;}
+    }
+
+
+    public function countFields(int $templateId): int {
+        $stmt=$this->conn->prepare('SELECT COUNT(*) FROM leave_form_fields WHERE template_id=?');
+        $stmt->execute([$templateId]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function markPdfReady(int $templateId): void {
+        $stmt=$this->conn->prepare("
+            UPDATE leave_form_templates SET mapping_status='READY'
+            WHERE id=? AND file_type='PDF' AND archived_at IS NULL
+              AND EXISTS (SELECT 1 FROM leave_form_fields f WHERE f.template_id=leave_form_templates.id)
+        ");
+        $stmt->execute([$templateId]);
     }
 
     public function getFields(int $id): array {
