@@ -48,7 +48,7 @@ foreach ($trend as $t) {
     <div class="rp-page-header mb-3">
         <div>
             <div class="rp-page-header__eyebrow">MOPH DATA STANDARD 2.4.1</div>
-            <h1 class="rp-page-header__title">แดชบอร์ดการนำส่งข้อมูล 43 แฟ้ม</h1>
+            <h1 class="rp-page-header__title">Command Center 43 แฟ้ม</h1>
             <p class="rp-page-header__subtitle mb-0">
                 ติดตามการนำส่งและความครบถ้วนตาม Profile รพ.สต. ของมาตรฐานข้อมูลสุขภาพ Version 2.4.1 โดยใช้เฉพาะข้อมูลสรุปและ metadata
             </p>
