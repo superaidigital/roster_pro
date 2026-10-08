@@ -1,369 +1,127 @@
 <?php
-$spatial_rows = $spatial_rows ?? [];
-$hospital_coverage = $hospital_coverage ?? [];
-$metric_options = $metric_options ?? [];
-$spatial_summary = $spatial_summary ?? [];
-$hospitals = $hospitals ?? [];
-$is_admin = $is_admin ?? false;
-$selected_hospital_id = $selected_hospital_id ?? null;
-$report_month = $report_month ?? date('Y-m');
-$area_level = $area_level ?? 'TAMBON';
-$metric_code = $metric_code ?? '';
-
-function data43_area_label(array $row, string $level): string {
-    $cw = $row['changwat_code'] ?: '--';
-    $ap = $row['ampur_code'] ?: '--';
-    $tb = $row['tambon_code'] ?: '--';
-    $vl = $row['village_code'] ?: '--';
-
-    return match ($level) {
-        'AMPUR' => "อำเภอ {$cw}-{$ap}",
-        'VILLAGE' => "หมู่ {$cw}-{$ap}-{$tb}-{$vl}",
-        default => "ตำบล {$cw}-{$ap}-{$tb}",
-    };
-}
-
-function data43_metric_label(string $code): string {
-    return match ($code) {
-        'HOUSEHOLD_RECORDS' => 'ระเบียนครัวเรือน',
-        'ADDRESS_RECORDS' => 'ระเบียนที่อยู่',
-        'PERSON_RECORDS' => 'ระเบียนบุคคล',
-        default => $code === '' ? 'ทุกระเบียนที่มีข้อมูลพื้นที่' : $code,
-    };
-}
-
-function data43_privacy_count(int $value): string {
-    return ($value > 0 && $value < 5) ? '&lt;5' : number_format($value);
-}
-
-$levelLabels = [
-    'AMPUR' => 'อำเภอ',
-    'TAMBON' => 'ตำบล',
-    'VILLAGE' => 'หมู่บ้าน',
-];
-
-$maxMetric = 1;
-foreach ($spatial_rows as $row) {
-    $maxMetric = max($maxMetric, (int)($row['metric_value'] ?? 0));
-}
-
-$maxCoverage = 1;
-foreach ($hospital_coverage as $row) {
-    $maxCoverage = max($maxCoverage, (int)($row['area_count'] ?? 0));
-}
+$is_admin=$is_admin??false;
+$csrf_token=$_SESSION['csrf_token']??($_SESSION['csrf_token']=bin2hex(random_bytes(32)));
+$hospitals=$hospitals??[];
 ?>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <style>
-.data43-spatial-page{min-width:0}
-.data43-spatial-filter .rp-control{min-height:42px}
-.data43-spatial-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.85rem}
-.data43-spatial-kpi{min-width:0;padding:1rem;border:1px solid var(--rp-border);border-radius:1rem;background:#fff}
-.data43-spatial-kpi__label{font-size:.72rem;color:var(--rp-text-muted);font-weight:700}
-.data43-spatial-kpi__value{font-size:1.75rem;line-height:1.1;font-weight:800;margin-top:.3rem;overflow-wrap:anywhere}
-.data43-analysis-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(310px,.85fr);gap:1rem}
-.data43-area-bars{display:grid;gap:.8rem}
-.data43-area-row{display:grid;grid-template-columns:minmax(150px,230px) minmax(120px,1fr) auto;gap:.75rem;align-items:center}
-.data43-area-name{min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.data43-bar{height:12px;background:#e2e8f0;border-radius:999px;overflow:hidden}
-.data43-bar>span{display:block;height:100%;background:var(--rp-primary,#1677ff);border-radius:inherit;min-width:3px}
-.data43-area-value{min-width:76px;text-align:right;font-weight:800}
-.data43-coverage-list{display:grid;gap:.9rem}
-.data43-coverage-item{min-width:0}
-.data43-coverage-head{display:flex;justify-content:space-between;gap:.75rem;align-items:center;margin-bottom:.35rem}
-.data43-coverage-name{min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.data43-coverage-meta{white-space:nowrap;font-size:.72rem;color:var(--rp-text-muted)}
-.data43-coverage-bar{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden}
-.data43-coverage-bar>span{display:block;height:100%;background:#14b8a6;border-radius:inherit;min-width:3px}
-.data43-spatial-table-wrap{max-height:520px;overflow:auto}
-.data43-spatial-table{min-width:760px}
-.data43-spatial-table thead th{position:sticky;top:0;background:#fff;z-index:2}
-.data43-code{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .55rem;border:1px solid var(--rp-border);border-radius:999px;background:#f8fafc;font-size:.72rem;white-space:nowrap}
-.data43-coord-badge{display:inline-flex;align-items:center;gap:.25rem;font-size:.72rem}
-.data43-empty{padding:3rem 1rem;text-align:center;color:var(--rp-text-muted)}
-.data43-method-card{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem}
-.data43-method-step{padding:.85rem;border:1px solid var(--rp-border);border-radius:.9rem;background:#f8fafc}
-.data43-method-step strong{display:block;margin-bottom:.2rem}
-@media(max-width:1199px){
-  .data43-analysis-grid{grid-template-columns:1fr}
-}
-@media(max-width:991px){
-  .data43-spatial-kpis{grid-template-columns:repeat(2,1fr)}
-  .data43-method-card{grid-template-columns:1fr}
-}
-@media(max-width:767px){
-  .data43-area-row{grid-template-columns:1fr auto}
-  .data43-area-row .data43-bar{grid-column:1/-1}
-}
-@media(max-width:575px){
-  .data43-spatial-kpis{grid-template-columns:1fr 1fr}
-  .data43-spatial-kpi{padding:.8rem}
-  .data43-spatial-kpi__value{font-size:1.4rem}
-}
+.d43-wrap{display:grid;gap:16px}.d43-toolbar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.d43-toolbar label{display:block;font-size:12px;font-weight:700;margin-bottom:4px}.d43-toolbar select,.d43-toolbar input{width:100%;min-height:40px;border:1px solid #cbd5e1;border-radius:10px;padding:8px;background:#fff;color:#0f172a}
+.d43-map-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:14px}.d43-panel{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px;min-width:0}
+#d43-map{height:min(64vh,680px);min-height:440px;background:#e5eef5;border-radius:12px;z-index:0}
+.d43-crumbs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.d43-crumbs button{border:0;border-radius:9px;background:#e2e8f0;color:#0f172a;padding:7px 10px}
+.d43-crumbs button[aria-current=page]{background:#155e75;color:white}
+.d43-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.d43-kpis div{padding:12px;background:#f1f5f9;border-radius:12px}
+.d43-kpis strong{display:block;font-size:22px}.d43-muted{color:#64748b;font-size:13px}
+.d43-legend-row{display:flex;align-items:center;gap:9px;margin:7px 0;font-size:13px}
+.d43-dot{display:inline-block;height:14px;width:18px;border-radius:4px}
+#d43-search-results{max-height:170px;overflow:auto;display:grid;gap:4px}
+#d43-search-results button{border:1px solid #e2e8f0;background:white;text-align:left;border-radius:8px;padding:8px}
+#d43-list{display:grid;gap:6px;max-height:220px;overflow:auto}
+#d43-list button{text-align:left;border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:9px}
+.d43-state{padding:12px;border-radius:10px;background:#e0f2fe;color:#0c4a6e;margin:10px 0}
+.d43-loading{opacity:.65}
+@media(max-width:1100px){.d43-toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}.d43-map-layout{grid-template-columns:1fr}}
+@media(max-width:650px){.d43-toolbar{grid-template-columns:1fr 1fr}#d43-map{height:55vh;min-height:350px}.d43-kpis{grid-template-columns:1fr 1fr}}
 </style>
-
-<div class="rp-page data43-spatial-page">
-    <div class="rp-page-header mb-3">
-        <div>
-            <div class="rp-page-header__eyebrow">SPATIAL ANALYTICS</div>
-            <h1 class="rp-page-header__title">วิเคราะห์ข้อมูล 43 แฟ้มเชิงพื้นที่</h1>
-            <p class="rp-page-header__subtitle mb-0">
-                วิเคราะห์ข้อมูล Aggregate ระดับอำเภอ ตำบล และหมู่บ้าน โดยไม่แสดงข้อมูลประชาชนรายบุคคล
-            </p>
-        </div>
-        <div class="rp-page-header__actions">
-            <a href="index.php?c=data43&a=dashboard<?= $selected_hospital_id ? '&hospital_id='.(int)$selected_hospital_id : '' ?>" class="rp-btn rp-btn--secondary">
-                <i class="bi bi-speedometer2"></i> Dashboard การนำส่ง
-            </a>
-        </div>
+<div class="rp-page d43-wrap">
+  <div class="rp-page-header">
+    <div><div class="rp-page-header__eyebrow">DATA43 • GEOSPATIAL ANALYTICS</div>
+      <h1 class="rp-page-header__title">แผนที่วิเคราะห์ข้อมูล 43 แฟ้มเชิงพื้นที่</h1>
+      <p class="rp-page-header__subtitle">จังหวัด → อำเภอ → ตำบล • แผนที่สีตามจำนวนระเบียน Aggregate • ไม่มีพิกัดผู้ป่วย</p>
     </div>
-
-    <?php if (!$spatial_schema_ready): ?>
-        <div class="rp-alert rp-alert--warning mb-3">
-            <span class="rp-alert__icon"><i class="bi bi-database-exclamation"></i></span>
-            <div class="rp-alert__content">
-                ยังไม่ได้ติดตั้ง Spatial Analytics กรุณารัน
-                <code>database/migrations/20261007_data43_spatial_analytics.sql</code>
-                และนำส่ง ZIP ใหม่เพื่อสร้าง Aggregate เชิงพื้นที่
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <div class="rp-alert rp-alert--info mb-3">
-        <span class="rp-alert__icon"><i class="bi bi-map"></i></span>
-        <div class="rp-alert__content">
-            หน้านี้ยังไม่แสดงแผนที่ขอบเขตจริง เนื่องจากยังไม่ได้ผูก GeoJSON/Master พื้นที่ราชการ
-            จึงแสดงเป็น Ranking, Coverage และตารางวิเคราะห์แทน เพื่อไม่ให้ตำแหน่งเชิงพื้นที่ดูคลาดเคลื่อน
-        </div>
+  </div>
+  <section class="d43-panel">
+    <div class="d43-toolbar">
+      <div><label for="d43-month">รอบเดือน (ค.ศ.)</label><input id="d43-month" type="month" value="<?= htmlspecialchars($report_month??date('Y-m'),ENT_QUOTES,'UTF-8') ?>"></div>
+      <div><label for="d43-hospital">รพ.สต. / หน่วยบริการ</label><select id="d43-hospital" <?= !$is_admin?'disabled':'' ?>>
+        <?php if ($is_admin): ?><option value="">ทุกหน่วยบริการ</option><?php endif; ?>
+        <?php foreach ($hospitals as $h): ?>
+          <option value="<?= (int)$h['id'] ?>" <?= (int)($selected_hospital_id??0)===(int)$h['id']?'selected':'' ?>><?= htmlspecialchars($h['name'],ENT_QUOTES,'UTF-8') ?></option>
+        <?php endforeach; ?>
+        <?php if (!$is_admin): ?><option value="" selected>หน่วยบริการของฉัน</option><?php endif; ?>
+      </select></div>
+      <div><label for="d43-metric">ตัวชี้วัด</label><select id="d43-metric"><option value="">กำลังโหลด...</option></select></div>
+      <div><label for="d43-search">ค้นหาจังหวัด / อำเภอ / ตำบล</label><input id="d43-search" type="search" placeholder="ชื่อพื้นที่หรือรหัส" autocomplete="off"></div>
+      <div><label>ข้อมูล</label><a class="rp-btn rp-btn--secondary w-100" href="index.php?c=data43&a=dashboard">แดชบอร์ดการนำส่ง</a></div>
     </div>
-
-    <section class="rp-card mb-3 data43-spatial-filter">
-        <div class="rp-card__body">
-            <form method="GET" action="index.php" class="row g-2 align-items-end">
-                <input type="hidden" name="c" value="data43">
-                <input type="hidden" name="a" value="spatial">
-
-                <div class="col-xl-2 col-md-4">
-                    <label class="form-label fw-bold small">รอบเดือน</label>
-                    <input type="month" name="month" class="rp-control" value="<?= htmlspecialchars($report_month,ENT_QUOTES,'UTF-8') ?>">
-                </div>
-
-                <?php if ($is_admin): ?>
-                <div class="col-xl-4 col-md-8">
-                    <label class="form-label fw-bold small">รพ.สต. / หน่วยบริการ</label>
-                    <select name="hospital_id" class="rp-control">
-                        <option value="">ทุกหน่วยบริการ</option>
-                        <?php foreach ($hospitals as $h): ?>
-                            <option value="<?= (int)$h['id'] ?>" <?= (int)$selected_hospital_id === (int)$h['id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars(($h['hospital_code'] ? '['.$h['hospital_code'].'] ' : '').$h['name'],ENT_QUOTES,'UTF-8') ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <?php endif; ?>
-
-                <div class="col-xl-2 col-md-4">
-                    <label class="form-label fw-bold small">ระดับพื้นที่</label>
-                    <select name="level" class="rp-control">
-                        <?php foreach ($levelLabels as $key=>$label): ?>
-                            <option value="<?= $key ?>" <?= $area_level === $key ? 'selected' : '' ?>><?= $label ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <div class="col-xl-2 col-md-4">
-                    <label class="form-label fw-bold small">ตัวชี้วัด</label>
-                    <select name="metric" class="rp-control">
-                        <option value="">ทุกระเบียนที่มีพื้นที่</option>
-                        <?php
-                        $seenMetrics = [];
-                        foreach ($metric_options as $opt):
-                            $m = (string)$opt['metric_code'];
-                            if (isset($seenMetrics[$m])) continue;
-                            $seenMetrics[$m] = true;
-                        ?>
-                            <option value="<?= htmlspecialchars($m,ENT_QUOTES,'UTF-8') ?>" <?= $metric_code === $m ? 'selected' : '' ?>>
-                                <?= htmlspecialchars(data43_metric_label($m),ENT_QUOTES,'UTF-8') ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <div class="col-xl-2 col-md-4">
-                    <button class="rp-btn rp-btn--primary w-100" type="submit">
-                        <i class="bi bi-funnel"></i> วิเคราะห์
-                    </button>
-                </div>
-            </form>
-        </div>
+    <div id="d43-search-results" role="listbox" aria-label="ผลค้นหาพื้นที่"></div>
+  </section>
+  <div class="d43-kpis" aria-live="polite">
+    <div><span class="d43-muted">พื้นที่บนแผนที่</span><strong id="d43-count-areas">–</strong></div>
+    <div><span class="d43-muted">พื้นที่มีข้อมูล</span><strong id="d43-with-data">–</strong></div>
+    <div><span class="d43-muted">พื้นที่ปกปิดตัวเลข</span><strong id="d43-suppressed">–</strong></div>
+  </div>
+  <div class="d43-map-layout">
+    <section class="d43-panel">
+      <nav class="d43-crumbs" id="d43-crumbs" aria-label="ลำดับพื้นที่"><button type="button">ประเทศไทย</button></nav>
+      <div id="d43-map" aria-label="แผนที่สีแสดงจำนวนระเบียนตามพื้นที่"></div>
+      <div id="d43-state" class="d43-state" role="status">กำลังโหลดข้อมูลพื้นที่...</div>
+      <p class="d43-muted">การเลือกพื้นที่จะคงสีเลือกไว้ชัดเจน ส่วนการชี้เมาส์เป็นเพียง Hover ชั่วคราว • เลือกสีตามจำนวนระเบียนของแฟ้มที่เลือก ไม่ใช่อัตราป่วยหรือจำนวนผู้ป่วยไม่ซ้ำ</p>
     </section>
-
-    <div class="data43-spatial-kpis mb-3">
-        <div class="data43-spatial-kpi">
-            <div class="data43-spatial-kpi__label">พื้นที่ที่พบ</div>
-            <div class="data43-spatial-kpi__value"><?= number_format((int)($spatial_summary['areas'] ?? 0)) ?></div>
-            <div class="small text-muted"><?= htmlspecialchars($levelLabels[$area_level] ?? $area_level,ENT_QUOTES,'UTF-8') ?></div>
-        </div>
-        <div class="data43-spatial-kpi">
-            <div class="data43-spatial-kpi__label">Records เชิงพื้นที่</div>
-            <div class="data43-spatial-kpi__value"><?= number_format((int)($spatial_summary['records'] ?? 0)) ?></div>
-            <div class="small text-muted"><?= htmlspecialchars(data43_metric_label($metric_code),ENT_QUOTES,'UTF-8') ?></div>
-        </div>
-        <div class="data43-spatial-kpi">
-            <div class="data43-spatial-kpi__label">รพ.สต. ที่มีข้อมูล</div>
-            <div class="data43-spatial-kpi__value"><?= number_format((int)($spatial_summary['hospitals'] ?? 0)) ?></div>
-        </div>
-        <div class="data43-spatial-kpi">
-            <div class="data43-spatial-kpi__label">พื้นที่มี centroid</div>
-            <div class="data43-spatial-kpi__value"><?= number_format((int)($spatial_summary['geocoded_areas'] ?? 0)) ?></div>
-            <div class="small text-muted">เก็บแบบ Aggregate</div>
-        </div>
-    </div>
-
-    <div class="data43-analysis-grid mb-3">
-        <section class="rp-card">
-            <div class="rp-card__header">
-                <div>
-                    <h2 class="rp-card__title mb-1">อันดับพื้นที่ตามปริมาณข้อมูล</h2>
-                    <div class="small text-muted">Top 15 ของระดับ <?= htmlspecialchars($levelLabels[$area_level] ?? $area_level,ENT_QUOTES,'UTF-8') ?> · แสดง small cell เป็น &lt;5</div>
-                </div>
-            </div>
-            <div class="rp-card__body">
-                <?php if (empty($spatial_rows)): ?>
-                    <div class="data43-empty">
-                        <i class="bi bi-bar-chart fs-2 d-block mb-2 opacity-50"></i>
-                        ยังไม่มี Aggregate เชิงพื้นที่สำหรับเงื่อนไขนี้
-                    </div>
-                <?php else: ?>
-                    <div class="data43-area-bars">
-                        <?php foreach (array_slice($spatial_rows,0,15) as $row):
-                            $value = (int)$row['metric_value'];
-                            $pct = min(100, ($value / $maxMetric) * 100);
-                        ?>
-                            <div class="data43-area-row">
-                                <div class="data43-area-name" title="<?= htmlspecialchars(data43_area_label($row,$area_level),ENT_QUOTES,'UTF-8') ?>">
-                                    <?= htmlspecialchars(data43_area_label($row,$area_level),ENT_QUOTES,'UTF-8') ?>
-                                </div>
-                                <div class="data43-bar" aria-label="<?= htmlspecialchars(data43_area_label($row,$area_level),ENT_QUOTES,'UTF-8') ?>">
-                                    <span style="width:<?= $pct ?>%"></span>
-                                </div>
-                                <div class="data43-area-value"><?= data43_privacy_count($value) ?></div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </section>
-
-        <section class="rp-card">
-            <div class="rp-card__header">
-                <div>
-                    <h2 class="rp-card__title mb-1">Coverage ราย รพ.สต.</h2>
-                    <div class="small text-muted">จำนวนพื้นที่ที่ตรวจพบในระดับที่เลือก</div>
-                </div>
-            </div>
-            <div class="rp-card__body">
-                <?php if (empty($hospital_coverage)): ?>
-                    <div class="data43-empty">ยังไม่มีข้อมูล Coverage</div>
-                <?php else: ?>
-                    <div class="data43-coverage-list">
-                        <?php foreach (array_slice($hospital_coverage,0,20) as $row):
-                            $pct = min(100, ((int)$row['area_count'] / $maxCoverage) * 100);
-                        ?>
-                            <div class="data43-coverage-item">
-                                <div class="data43-coverage-head">
-                                    <div class="data43-coverage-name" title="<?= htmlspecialchars($row['hospital_name'],ENT_QUOTES,'UTF-8') ?>">
-                                        <?= htmlspecialchars($row['hospital_name'],ENT_QUOTES,'UTF-8') ?>
-                                    </div>
-                                    <div class="data43-coverage-meta"><?= (int)$row['area_count'] ?> พื้นที่</div>
-                                </div>
-                                <div class="data43-coverage-bar"><span style="width:<?= $pct ?>%"></span></div>
-                                <div class="small text-muted mt-1"><?= data43_privacy_count((int)$row['metric_value']) ?> records</div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </section>
-    </div>
-
-    <section class="rp-card mb-3">
-        <div class="rp-card__header">
-            <div>
-                <h2 class="rp-card__title mb-1">รายละเอียดตามพื้นที่</h2>
-                <div class="small text-muted">แสดงรหัสพื้นที่จากข้อมูลต้นทาง จนกว่าจะเชื่อม Master จังหวัด–อำเภอ–ตำบล–หมู่บ้านอย่างเป็นทางการ</div>
-            </div>
-        </div>
-        <div class="rp-card__body p-0">
-            <div class="data43-spatial-table-wrap">
-                <table class="rp-table data43-spatial-table mb-0">
-                    <thead>
-                        <tr>
-                            <th>พื้นที่</th>
-                            <th class="text-end">Records</th>
-                            <th class="text-center">รพ.สต.</th>
-                            <th class="text-center">แหล่งแฟ้ม</th>
-                            <th class="text-center">Centroid</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach ($spatial_rows as $row): ?>
-                        <tr>
-                            <td>
-                                <span class="data43-code">
-                                    <i class="bi bi-geo-alt"></i>
-                                    <?= htmlspecialchars(data43_area_label($row,$area_level),ENT_QUOTES,'UTF-8') ?>
-                                </span>
-                            </td>
-                            <td class="text-end fw-bold"><?= data43_privacy_count((int)$row['metric_value']) ?></td>
-                            <td class="text-center"><?= (int)$row['hospital_count'] ?></td>
-                            <td class="text-center"><?= (int)$row['source_file_count'] ?></td>
-                            <td class="text-center">
-                                <?php if (!empty($row['centroid_lat']) && !empty($row['centroid_lng'])): ?>
-                                    <span class="data43-coord-badge text-success"><i class="bi bi-check-circle-fill"></i> มี</span>
-                                <?php else: ?>
-                                    <span class="data43-coord-badge text-muted"><i class="bi bi-dash-circle"></i> ไม่มี</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($spatial_rows)): ?>
-                        <tr><td colspan="5" class="text-center py-5 text-muted">ยังไม่มีข้อมูลพื้นที่</td></tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
-
-    <section class="rp-card mb-3">
-        <div class="rp-card__header">
-            <div>
-                <h2 class="rp-card__title mb-1">วิธีอ่าน Dashboard</h2>
-                <div class="small text-muted">เพื่อให้การวิเคราะห์เชิงพื้นที่ไม่ตีความข้อมูลเกินกว่าที่ระบบมีจริง</div>
-            </div>
-        </div>
-        <div class="rp-card__body">
-            <div class="data43-method-card">
-                <div class="data43-method-step">
-                    <strong>1. ปริมาณข้อมูล</strong>
-                    <div class="small text-muted">เปรียบเทียบจำนวน Records ในแต่ละพื้นที่ ไม่ได้หมายถึงจำนวนประชากรจริงโดยอัตโนมัติ</div>
-                </div>
-                <div class="data43-method-step">
-                    <strong>2. Coverage</strong>
-                    <div class="small text-muted">แสดงจำนวนพื้นที่ที่แต่ละ รพ.สต. มีข้อมูลใน ZIP ล่าสุดของเดือน</div>
-                </div>
-                <div class="data43-method-step">
-                    <strong>3. Centroid</strong>
-                    <div class="small text-muted">เก็บไว้เพื่อรองรับ GeoJSON Map ภายหลัง แต่ยังไม่ใช้วาดเป็นแผนที่จริงในรุ่นนี้</div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <div class="rp-alert rp-alert--info mb-0">
-        <span class="rp-alert__icon"><i class="bi bi-shield-lock"></i></span>
-        <div class="rp-alert__content">
-            Dashboard ใช้ข้อมูล Aggregate เท่านั้น และแสดงค่าพื้นที่ย่อยที่มีจำนวนต่ำกว่า 5 เป็น &lt;5
-            เพื่อลดความเสี่ยงการระบุตัวบุคคลจากข้อมูลสุขภาพเชิงพื้นที่
-        </div>
-    </div>
+    <aside class="d43-panel">
+      <h3 class="h6 fw-bold">คำอธิบายสี</h3><div id="d43-legend"></div>
+      <hr><h3 class="h6 fw-bold">พื้นที่ที่เลือก</h3><div id="d43-selected" class="d43-muted">คลิกพื้นที่บนแผนที่</div>
+      <hr><h3 class="h6 fw-bold">พื้นที่ในระดับปัจจุบัน</h3><div id="d43-list"></div>
+    </aside>
+  </div>
+  <?php if ($is_admin): ?>
+  <section class="d43-panel">
+    <h2 class="h6 fw-bold">จัดการ Master ขอบเขตพื้นที่ (ผู้ดูแลระบบ)</h2>
+    <p class="d43-muted">นำเข้า GeoJSON มาตรฐานที่ตรวจสอบรหัสพื้นที่และแหล่งที่มาแล้ว ระบบรองรับ Polygon/MultiPolygon และรหัส area_code ความยาว 2, 4, 6 หลัก</p>
+    <form method="post" action="index.php?c=data43&a=spatial_admin" enctype="multipart/form-data" class="row g-2 align-items-end">
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token,ENT_QUOTES,'UTF-8') ?>">
+      <input type="hidden" name="operation" value="upload_geojson">
+      <div class="col-md-3"><label class="form-label" for="d43-level">ระดับขอบเขต</label><select id="d43-level" name="level" class="rp-control"><option value="PROVINCE">จังหวัด (2 หลัก)</option><option value="AMPUR">อำเภอ (4 หลัก)</option><option value="TAMBON">ตำบล (6 หลัก)</option></select></div>
+      <div class="col-md-6"><label class="form-label" for="d43-file">ไฟล์ GeoJSON</label><input id="d43-file" type="file" name="geojson" accept=".json,.geojson,application/geo+json" class="rp-control" required></div>
+      <div class="col-md-3"><button class="rp-btn rp-btn--primary w-100">นำเข้าขอบเขตพื้นที่</button></div>
+    </form>
+    <hr><h3 class="h6">ผูกพื้นที่รับผิดชอบ รพ.สต.</h3>
+    <form method="post" action="index.php?c=data43&a=spatial_admin" class="row g-2 align-items-end">
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token,ENT_QUOTES,'UTF-8') ?>">
+      <input type="hidden" name="operation" value="assign_area">
+      <div class="col-md-5"><label class="form-label">หน่วยบริการ</label><select class="rp-control" name="hospital_id" required><option value="">เลือกหน่วยบริการ</option><?php foreach ($hospitals as $h): ?><option value="<?= (int)$h['id'] ?>"><?= htmlspecialchars($h['name'],ENT_QUOTES,'UTF-8') ?></option><?php endforeach; ?></select></div>
+      <div class="col-md-3"><label class="form-label">รหัสตำบล 6 หลัก</label><input name="tambon_code" class="rp-control" pattern="[0-9]{6}" maxlength="6" required></div>
+      <div class="col-md-2"><label class="form-label">ดำเนินการ</label><select class="rp-control" name="assign"><option value="1">เพิ่มพื้นที่</option><option value="0">ยกเลิกพื้นที่</option></select></div>
+      <div class="col-md-2"><button class="rp-btn rp-btn--primary w-100">บันทึก</button></div>
+    </form>
+  </section>
+  <?php endif; ?>
 </div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id), colors={'none':'#e2e8f0','suppressed':'#94a3b8','5-9':'#ccfbf1','10-24':'#5eead4','25-49':'#14b8a6','50-99':'#0f766e','100+':'#115e59'};
+const labels={'none':'ไม่มีข้อมูล','suppressed':'ปกปิด (1–4)','5-9':'5–9','10-24':'10–24','25-49':'25–49','50-99':'50–99','100+':'100 ขึ้นไป'};
+Object.keys(colors).forEach(k=>{const d=document.createElement('div');d.className='d43-legend-row';const dot=document.createElement('span');dot.className='d43-dot';dot.style.background=colors[k];const t=document.createElement('span');t.textContent=labels[k];d.append(dot,t);$('d43-legend').append(d)});
+const map=L.map('d43-map',{zoomControl:true}).setView([15.2,102.8],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+let geo=null,selected=null,selectedFeature=null,seq=0,searchTimer=null,level='PROVINCE',parent='',trail=[],featureIndex=new Map();
+const endpoint='index.php?c=data43&a=spatial_api';
+const status=(s)=>{$('d43-state').textContent=s;$('d43-state').hidden=!s};
+const searchParams=(type,extras={})=>{const p=new URLSearchParams({c:'data43',a:'spatial_api',type,...extras});return 'index.php?'+p.toString()};
+const scope=()=>{const v=$('d43-hospital').value;return v?{hospital_id:v}:{}};
+const textEl=(tag,value)=>{const e=document.createElement(tag);e.textContent=value;return e};
+async function api(type,extra={}){const response=await fetch(searchParams(type,{...scope(),...extra}),{credentials:'same-origin',cache:'no-store'});const data=await response.json();if(!response.ok)throw Error(data.error||'โหลดข้อมูลไม่สำเร็จ');return data}
+async function options(){const data=await api('options',{month:$('d43-month').value});$('d43-metric').replaceChildren();data.items.forEach((x,i)=>{const o=document.createElement('option');o.value=x.metric_code+'|'+x.source_file_code;o.textContent=x.metric_code+' · '+x.source_file_code;$('d43-metric').append(o)});if(!data.items.length){const o=document.createElement('option');o.value='';o.textContent='ไม่มี Aggregate ในรอบเดือนนี้';$('d43-metric').append(o)}}
+function crumbs(){const root=$('d43-crumbs');root.replaceChildren();const make=(name,index)=>{const b=textEl('button',name);b.type='button';b.setAttribute('aria-current',index===trail.length?'page':'false');b.onclick=()=>{const list=trail.slice(0,index);trail=list;level=index===0?'PROVINCE':index===1?'AMPUR':'TAMBON';parent=index===0?'':list[list.length-1].code;selected=null;load()};root.append(b)};make('ประเทศไทย',0);trail.forEach((x,i)=>make(x.name,i+1))}
+function updateSelected(f){selectedFeature=f;const el=$('d43-selected');el.replaceChildren();if(!f){el.textContent='คลิกพื้นที่บนแผนที่';return}const p=f.properties;el.append(textEl('strong',p.name+' ('+p.code+')'),textEl('p',p.suppressed?'ปกปิดจำนวน 1–4':p.count===null?'ไม่มีข้อมูล':p.count.toLocaleString('th-TH')+' ระเบียน'));const button=textEl('button','แสดง รพ.สต. ในพื้นที่รับผิดชอบ');button.className='rp-btn rp-btn--secondary';button.onclick=async()=>{button.disabled=true;try{const d=await api('facilities',{level,code:p.code});el.append(textEl('p',d.items.length?d.items.map(x=>x.name).join(' • '):'ยังไม่มีการผูกหน่วยบริการกับพื้นที่นี้'))}catch(e){el.append(textEl('p',e.message))}};el.append(button);if(level!=='TAMBON'){const drill=textEl('button','ดู'+(level==='PROVINCE'?'อำเภอ':'ตำบล')+' →');drill.className='rp-btn rp-btn--primary ms-2';drill.onclick=()=>drillDown(p);el.append(drill)}}
+function drillDown(p){if(level==='TAMBON')return;trail.push({code:p.code,name:p.name});parent=p.code;level=level==='PROVINCE'?'AMPUR':'TAMBON';selected=null;load()}
+function choose(p){selected=p.code;featureIndex.forEach(({layer,feature})=>layer.setStyle(style(feature)));updateSelected({properties:p})}
+function style(f){const p=f.properties;return{color:selected===p.code?'#f97316':'#ffffff',weight:selected===p.code?4:1.4,fillColor:colors[p.band]||colors.none,fillOpacity:.78}}
+function renderList(features){const holder=$('d43-list');holder.replaceChildren();features.forEach(f=>{const p=f.properties;const b=textEl('button',p.name+' · '+(p.suppressed?'ปกปิด':p.count===null?'ไม่มีข้อมูล':p.count.toLocaleString('th-TH')));b.onclick=()=>{choose(p);const item=featureIndex.get(p.code);if(item)map.fitBounds(item.layer.getBounds(),{padding:[25,25],maxZoom:11})};holder.append(b)})}
+async function load(){const current=++seq;status('กำลังโหลดขอบเขตและสถิติ...');crumbs();$('d43-selected').textContent='คลิกพื้นที่บนแผนที่';const parts=$('d43-metric').value.split('|');try{
+const data=await api('map',{month:$('d43-month').value,level,parent,metric:parts[0]||'',source:parts[1]||''});if(current!==seq)return;
+if(geo)map.removeLayer(geo);featureIndex.clear();selected=null;
+geo=L.geoJSON(data,{style,onEachFeature:(f,layer)=>{const p=f.properties;featureIndex.set(p.code,{feature:f,layer});layer.bindTooltip(()=>p.name+' · '+(p.suppressed?'ปกปิด':p.count===null?'ไม่มีข้อมูล':p.count.toLocaleString('th-TH')+' ระเบียน'),{sticky:true});layer.on('mouseover',()=>{if(selected!==p.code)layer.setStyle({weight:3,color:'#0f172a',fillOpacity:.9});layer.bringToFront()});layer.on('mouseout',()=>layer.setStyle(style(f)));layer.on('click',()=>{choose(p);if(level!=='TAMBON')drillDown(p)})}}).addTo(map);
+renderList(data.features);$('d43-count-areas').textContent=data.features.length.toLocaleString('th-TH');$('d43-with-data').textContent=data.features.filter(x=>x.properties.count!==null||x.properties.suppressed).length.toLocaleString('th-TH');$('d43-suppressed').textContent=data.features.filter(x=>x.properties.suppressed).length.toLocaleString('th-TH');
+if(geo.getLayers().length)map.fitBounds(geo.getBounds(),{padding:[20,20]});status(data.features.length?'':data.meta.boundary_ready?'ไม่มีขอบเขตระดับนี้ กรุณาตรวจรหัส parent_code และไฟล์ GeoJSON':'ยังไม่มี Master GeoJSON กรุณาให้ Admin นำเข้าขอบเขตพื้นที่');
+}catch(e){if(current!==seq)return;status('ไม่สามารถแสดงแผนที่: '+e.message)}}
+async function refresh(){level='PROVINCE';parent='';trail=[];selected=null;status('กำลังโหลดตัวชี้วัด');try{await options();await load()}catch(e){status(e.message)}}
+$('d43-month').addEventListener('change',refresh);$('d43-hospital').addEventListener('change',refresh);$('d43-metric').addEventListener('change',()=>{selected=null;load()});
+$('d43-search').addEventListener('input',()=>{clearTimeout(searchTimer);const q=$('d43-search').value.trim();const out=$('d43-search-results');out.replaceChildren();if(q.length<2)return;searchTimer=setTimeout(async()=>{try{const d=await api('search',{q});if(q!==$('d43-search').value.trim())return;out.replaceChildren();d.items.forEach(p=>{const b=textEl('button',p.name_th+' ('+p.area_code+')');b.type='button';b.onclick=()=>{const code=p.area_code;trail=p.area_level==='PROVINCE'?[]:p.area_level==='AMPUR'?[{code:code.slice(0,2),name:'จังหวัด '+code.slice(0,2)}]:[{code:code.slice(0,2),name:'จังหวัด '+code.slice(0,2)},{code:code.slice(0,4),name:'อำเภอ '+code.slice(0,4)}];level=p.area_level;parent=level==='PROVINCE'?'':code.slice(0,level==='AMPUR'?2:4);selected=code;out.replaceChildren();load().then(()=>{const x=featureIndex.get(code);if(x){choose(x.feature.properties);map.fitBounds(x.layer.getBounds())}})};out.append(b)})}catch(e){status(e.message)}},250)});
+refresh();
+})();
+</script>
