@@ -1183,6 +1183,100 @@ class LeaveController {
     }
 
 
+
+    public function template_replace() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true)) { http_response_code(403); exit; }
+        if (($_SERVER['REQUEST_METHOD']??'')!=='POST') { http_response_code(405);exit; }
+        $this->verifyCsrf('index.php?c=leave&a=templates');
+        $target=null;
+        try {
+            $id=filter_input(INPUT_POST,'id',FILTER_VALIDATE_INT);
+            $upload=$_FILES['template_file']??null;
+            if(!$id||!is_array($upload)||($upload['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK
+                || !is_uploaded_file((string)($upload['tmp_name']??''))) {
+                throw new InvalidArgumentException('กรุณาเลือกไฟล์เพื่ออัปโหลดใหม่');
+            }
+            if(($upload['size']??0)<=0 || $upload['size']>10*1024*1024)throw new InvalidArgumentException('ไฟล์ต้องไม่เกิน 10 MB');
+            $ext=strtolower(pathinfo((string)($upload['name']??''),PATHINFO_EXTENSION));
+            $mime=(new finfo(FILEINFO_MIME_TYPE))->file($upload['tmp_name']);
+            if($ext==='pdf' && $mime==='application/pdf')$fileType='PDF';
+            elseif($ext==='docx' && in_array($mime,[
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/zip','application/x-zip-compressed','application/octet-stream'
+            ],true))$fileType='DOCX';
+            else throw new InvalidArgumentException('รองรับเฉพาะไฟล์ PDF และ DOCX เท่านั้น');
+
+            // Validate recognizable file structure before saving. Never run uploaded content.
+            if($fileType==='PDF'){
+                $fh=fopen($upload['tmp_name'],'rb');
+                $header=$fh?fread($fh,8):'';if($fh)fclose($fh);
+                if(!str_starts_with((string)$header,'%PDF-'))throw new InvalidArgumentException('ไฟล์ PDF ไม่ถูกต้อง');
+            } else {
+                $zip=new ZipArchive();
+                if($zip->open($upload['tmp_name'])!==true)throw new InvalidArgumentException('ไฟล์ DOCX ไม่ถูกต้อง');
+                $valid=$zip->locateName('word/document.xml')!==false && $zip->locateName('[Content_Types].xml')!==false;
+                $zip->close();
+                if(!$valid)throw new InvalidArgumentException('โครงสร้าง DOCX ไม่ถูกต้อง');
+            }
+            $db=(new Database())->getConnection();
+            $model=new LeaveTemplateModel($db);
+            if(!$model->schemaReady()||!$model->findById($id))throw new InvalidArgumentException('ไม่พบแบบฟอร์ม หรือยังไม่ได้ติดตั้ง Migration');
+            $dir=dirname(__DIR__).'/storage/leave_templates';
+            if(!is_dir($dir) && !mkdir($dir,0750,true) && !is_dir($dir))throw new RuntimeException('ไม่สามารถสร้างโฟลเดอร์จัดเก็บ');
+            $filename='leave_template_'.date('Ymd_His').'_'.bin2hex(random_bytes(8)).'.'.$ext;
+            $target=$dir.'/'.$filename;
+            if(!move_uploaded_file($upload['tmp_name'],$target))throw new RuntimeException('บันทึกไฟล์ใหม่ไม่สำเร็จ');
+            $mapping='PENDING';
+            if($fileType==='DOCX'){
+                $detected=(new LeaveDocumentService($db))->scanDocxPlaceholders($target);
+                if($detected)$mapping='READY';
+            }
+            $out=$model->createReplacement($id,[
+                'file_type'=>$fileType,
+                'mapping_status'=>$mapping,
+                'original_filename'=>basename(str_replace('\\','/',(string)$upload['name'])),
+                'stored_path'=>'storage/leave_templates/'.$filename,
+            ],(int)$_SESSION['user']['id']);
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_CREATE,
+                'แทนที่ไฟล์ Template #'.$id.' ด้วย #'.$out['id'].' v'.$out['version']);
+            $_SESSION['success_msg']=$out['ready']
+                ? 'อัปโหลดไฟล์ใหม่ v'.$out['version'].' และเปิดใช้งานแล้ว (เก็บฉบับเก่าเข้าคลัง)'
+                : 'อัปโหลดไฟล์ใหม่ v'.$out['version'].' แล้ว แต่ยังรอตรวจสอบ Mapping ฉบับเดิมยังคงอยู่';
+            $target=null;
+        }catch(Throwable $e){
+            if($target && is_file($target))@unlink($target);
+            error_log('Template replacement: '.$e->getMessage());
+            $_SESSION['error_msg']='อัปโหลดไฟล์ใหม่ไม่สำเร็จ: '.$e->getMessage();
+        }
+        header('Location: index.php?c=leave&a=templates');exit;
+    }
+
+    public function template_delete() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true)) {http_response_code(403);exit;}
+        if(($_SERVER['REQUEST_METHOD']??'')!=='POST') {http_response_code(405);exit;}
+        $this->verifyCsrf('index.php?c=leave&a=templates');
+        try{
+            $id=filter_input(INPUT_POST,'id',FILTER_VALIDATE_INT);
+            $confirm=trim((string)($_POST['confirm_delete']??''));
+            if(!$id || $confirm!=='DELETE')throw new InvalidArgumentException('กรุณายืนยัน DELETE ก่อนลบถาวร');
+            $db=(new Database())->getConnection();$model=new LeaveTemplateModel($db);
+            $path=$model->deleteUnused($id);
+            // Only clean up a file inside the approved template storage directory.
+            $root=realpath(dirname(__DIR__).'/storage/leave_templates');
+            $full=realpath(dirname(__DIR__).'/'.ltrim(str_replace('\\','/',$path),'/'));
+            if($root && $full && str_starts_with($full,$root.DIRECTORY_SEPARATOR) && is_file($full)){
+                if(!@unlink($full))error_log('Template deleted in DB but file cleanup failed: '.$full);
+            }
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_DELETE,
+                'ลบ Template ถาวร #'.$id.' (ไม่มีเอกสารใบลาอ้างอิง)');
+            $_SESSION['success_msg']='ลบแบบฟอร์มที่ไม่มีเอกสารอ้างอิงแล้ว';
+        }catch(Throwable $e){
+            error_log('Template delete rejected: '.$e->getMessage());
+            $_SESSION['error_msg']=$e instanceof DomainException ? $e->getMessage() : 'ไม่สามารถลบถาวรได้: '.$e->getMessage();
+        }
+        header('Location: index.php?c=leave&a=templates');exit;
+    }
+
     public function template_update() {
         if (!isset($_SESSION['user']) || !in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true)) {http_response_code(403);exit;}
         if (($_SERVER['REQUEST_METHOD']??'')!=='POST') {http_response_code(405);exit;}
