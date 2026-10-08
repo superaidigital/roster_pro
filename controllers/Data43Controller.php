@@ -703,6 +703,191 @@ class Data43Controller
         exit;
     }
 
+    public function quality(): void
+    {
+        $this->requireAccess();
+
+        $db = (new Database())->getConnection();
+        $model = new Data43SubmissionModel($db);
+        $schema_ready = $model->schemaReady();
+        $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
+        $selected_hospital_id = $this->selectedHospitalId();
+        $report_month = trim((string)($_GET['month'] ?? ''));
+
+        if ($report_month !== '' && !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
+            $report_month = '';
+        }
+
+        $rows = [];
+        if ($schema_ready) {
+            $history = $model->getHistory($selected_hospital_id, 200);
+            foreach ($history as $submission) {
+                if ($report_month !== '' && (string)$submission['report_month'] !== $report_month) continue;
+
+                $quality = $model->getQualitySummary((int)$submission['id']);
+                $issues = $model->getQualityIssues((int)$submission['id']);
+                $issueCounts = ['ERROR'=>0,'WARNING'=>0,'INFO'=>0];
+
+                foreach ($issues as $issue) {
+                    $severity = strtoupper((string)($issue['severity'] ?? 'INFO'));
+                    if (!isset($issueCounts[$severity])) $severity = 'INFO';
+                    $issueCounts[$severity] += max(1, (int)($issue['issue_count'] ?? 1));
+                }
+
+                $rows[] = [
+                    'submission' => $submission,
+                    'quality' => $quality,
+                    'issues' => $issueCounts,
+                ];
+            }
+        }
+
+        $summary = [
+            'submissions' => count($rows),
+            'passed' => 0,
+            'needs_attention' => 0,
+            'errors' => 0,
+            'warnings' => 0,
+            'legacy' => 0,
+        ];
+
+        foreach ($rows as $row) {
+            $submission = $row['submission'];
+            $issues = $row['issues'];
+            $summary['errors'] += (int)$issues['ERROR'];
+            $summary['warnings'] += (int)$issues['WARNING'];
+
+            if ((string)($submission['profile_code'] ?? '') !== Data43StandardV241::PROFILE) {
+                $summary['legacy']++;
+            }
+
+            if ((string)$submission['status'] === 'COMPLETE' && (int)$issues['ERROR'] === 0) {
+                $summary['passed']++;
+            } else {
+                $summary['needs_attention']++;
+            }
+        }
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/quality.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function history(): void
+    {
+        $this->requireAccess();
+
+        $db = (new Database())->getConnection();
+        $model = new Data43SubmissionModel($db);
+        $schema_ready = $model->schemaReady();
+        $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
+        $selected_hospital_id = $this->selectedHospitalId();
+
+        $history = $schema_ready
+            ? $model->getHistory($selected_hospital_id, 300)
+            : [];
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/history.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function standards(): void
+    {
+        $this->requireAccess();
+
+        $catalog = Data43StandardV241::catalog();
+        $rphst_expected = array_fill_keys(Data43StandardV241::rphstExpectedCodes(), true);
+        $standard_version = Data43StandardV241::VERSION;
+        $profile_code = Data43StandardV241::PROFILE;
+        $total_structures = Data43StandardV241::totalStructures();
+        $expected_count = Data43StandardV241::rphstExpectedCount();
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/standards.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function analytics(): void
+    {
+        $this->requireAccess();
+
+        $db = (new Database())->getConnection();
+        $model = new Data43SubmissionModel($db);
+        $selected_hospital_id = $this->selectedHospitalId();
+        $report_month = trim((string)($_GET['month'] ?? date('Y-m')));
+
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
+            $report_month = date('Y-m');
+        }
+
+        $metric_definitions = Data43MetricRegistry::all();
+        $analytics_cards = [];
+
+        if ($model->spatialSchemaReady()) {
+            foreach ($metric_definitions as $code => $definition) {
+                if (in_array($code, ['POPULATION','NCD_SCREEN_TARGET'], true)) continue;
+
+                $rows = $model->getSpatialSummary(
+                    $report_month,
+                    'CHANGWAT',
+                    $code,
+                    $selected_hospital_id
+                );
+
+                $visibleCount = 0;
+                $visibleValue = 0.0;
+                $suppressed = 0;
+
+                foreach ($rows as $row) {
+                    if (!empty($row['privacy_suppressed'])) {
+                        $suppressed++;
+                        continue;
+                    }
+                    $visibleCount += (int)($row['metric_value'] ?? 0);
+                    if ($row['display_value'] !== null) {
+                        $visibleValue += (float)$row['display_value'];
+                    }
+                }
+
+                $analytics_cards[] = [
+                    'code' => $code,
+                    'label' => (string)$definition['label'],
+                    'unit' => (string)$definition['unit'],
+                    'count' => $visibleCount,
+                    'value' => $visibleValue,
+                    'suppressed_areas' => $suppressed,
+                    'calculation' => (string)$definition['calculation'],
+                ];
+            }
+        }
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/analytics.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function map(): void
+    {
+        $this->requireAccess();
+
+        $geojson_base = 'assets/geojson/thailand';
+        $geojson_status = [
+            'province' => is_file($geojson_base . '/provinces.geojson'),
+            'amphoe' => is_file($geojson_base . '/amphoes.geojson'),
+            'tambon' => is_file($geojson_base . '/tambons.geojson'),
+        ];
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/thailand_map.php';
+        echo "</main></div></body></html>";
+    }
+
     public function spatial(): void
     {
         $this->requireAccess();
