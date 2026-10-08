@@ -875,6 +875,15 @@ class Data43Controller
     {
         $this->requireAccess();
 
+        $csrf_token=$this->csrfToken();
+        require_once 'services/Data43MapPatientService.php';
+        $db=(new Database())->getConnection();
+        $patientAccess=new Data43MapPatientService($db);
+        $patient_hospitals=$patientAccess->grantedHospitals(
+            (int)($_SESSION['user']['id']??0),
+            $this->role(),
+            (int)($_SESSION['user']['hospital_id']??0)
+        );
         $geojson_base = 'assets/geojson/thailand';
         $geojson_status = [
             'province' => is_file($geojson_base . '/provinces.geojson'),
