@@ -1,0 +1,16 @@
+{
+  "name": "sisaket/roster-pro",
+  "description": "Roster Pro - optional PDF template stamping runtime",
+  "type": "project",
+  "require": {
+    "php": "^8.2",
+    "ext-mbstring": "*",
+    "ext-fileinfo": "*",
+    "setasign/fpdi": "^2.6",
+    "tecnickcom/tcpdf": "^6.7"
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {}
+  }
+}
