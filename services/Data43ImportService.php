@@ -124,8 +124,10 @@ class Data43ImportService {
                 $rawBase = strtoupper(preg_replace('/[^A-Za-z0-9_\-]/', '', pathinfo($name, PATHINFO_FILENAME)) ?: 'UNKNOWN');
                 $fileCode = $canonical ?? substr($rawBase, 0, 100);
                 $rowCount = in_array($ext, ['csv','txt'], true) ? $this->countTextRows($target) : null;
-                $status = $canonical ? 'VALID' : 'SKIPPED';
-                $error = $canonical ? null : 'ไม่สามารถจับคู่ชื่อไฟล์กับโครงสร้างมาตรฐาน Version 2.4.1';
+                $status = $canonical ? 'VALID' : 'EXTENSION';
+                $error = $canonical
+                    ? null
+                    : 'ไฟล์ส่วนขยายจาก HIS/Legacy: รับไว้เป็น metadata และไม่นับรวมความครบถ้วนมาตรฐาน Version 2.4.1';
                 if ($canonical && $ext === 'xlsx') {
                     $status = 'ERROR';
                     $error = 'ไฟล์ XLSX ยังไม่รองรับการตรวจ row/schema แบบ streaming กรุณาส่ง CSV หรือ TXT';
