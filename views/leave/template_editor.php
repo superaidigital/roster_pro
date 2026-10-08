@@ -104,7 +104,7 @@ const labels=new Map([...document.querySelectorAll('.ltd-source')].map(e=>[e.dat
 function tell(t){status.textContent=t}
 function props(){const f=fields[selected];byId('ltd-empty').hidden=!!f;byId('ltd-properties').hidden=!f;if(!f)return;
 byId('ltd-key').textContent=labels.get(f.field_key)||f.field_key;
-[['ltd-x','x'],['ltd-y','y'],['ltd-w','width'],['ltd-h','height']].forEach(([id,k])=>byId(id).value=round(f[k]);});}
+[['ltd-x','x'],['ltd-y','y'],['ltd-w','width'],['ltd-h','height']].forEach(([id,k])=>{byId(id).value=round(f[k]);});}
 function paint(){overlay.replaceChildren();fields.forEach((f,i)=>{if(f.page_number!==pageNo)return;
 const node=document.createElement('div');node.className='ltd-field'+(selected===i?' selected':'');
 Object.assign(node.style,{left:f.x+'%',top:f.y+'%',width:f.width+'%',height:f.height+'%'});
