@@ -882,10 +882,106 @@ class Data43Controller
             'tambon' => is_file($geojson_base . '/tambons.geojson'),
         ];
 
+        $metric_definitions = Data43MetricRegistry::all();
+        $selected_hospital_id = $this->selectedHospitalId();
+        $report_month = trim((string)($_GET['month'] ?? date('Y-m')));
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
+            $report_month = date('Y-m');
+        }
+
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
         require_once 'views/data43/thailand_map.php';
         echo "</main></div></body></html>";
+    }
+
+    public function map_data(): void
+    {
+        $this->requireAccess();
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, private');
+
+        try {
+            $reportMonth = trim((string)($_GET['month'] ?? date('Y-m')));
+            if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $reportMonth)) {
+                throw new RuntimeException('รอบเดือนข้อมูลไม่ถูกต้อง');
+            }
+
+            $metricCode = strtoupper(trim((string)($_GET['metric'] ?? 'DM')));
+            if (!in_array($metricCode, Data43MetricRegistry::allowedCodes(), true)) {
+                throw new RuntimeException('ไม่รู้จักตัวชี้วัดที่เลือก');
+            }
+
+            $level = strtoupper(trim((string)($_GET['level'] ?? 'CHANGWAT')));
+            if (!in_array($level, ['CHANGWAT','AMPUR','TAMBON'], true)) {
+                throw new RuntimeException('ระดับพื้นที่ไม่ถูกต้อง');
+            }
+
+            $changwat = preg_replace('/\D/', '', (string)($_GET['changwat'] ?? ''));
+            $ampur = preg_replace('/\D/', '', (string)($_GET['ampur'] ?? ''));
+            $hospitalId = $this->selectedHospitalId();
+
+            $db = (new Database())->getConnection();
+            $model = new Data43SubmissionModel($db);
+
+            if (!$model->spatialSchemaReady()) {
+                echo json_encode([
+                    'ok'=>true,
+                    'items'=>[],
+                    'metric'=>Data43MetricRegistry::get($metricCode),
+                    'message'=>'ยังไม่มีตารางข้อมูลเชิงพื้นที่'
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            $rows = $model->getSpatialSummary(
+                $reportMonth,
+                $level,
+                $metricCode,
+                $hospitalId,
+                $level === 'TAMBON' && $ampur !== '' ? $ampur : null,
+                null
+            );
+
+            $items = [];
+            foreach ($rows as $row) {
+                if ($changwat !== '' && (string)($row['changwat_code'] ?? '') !== $changwat) {
+                    continue;
+                }
+                if ($level === 'TAMBON' && $ampur !== '' && (string)($row['ampur_code'] ?? '') !== $ampur) {
+                    continue;
+                }
+
+                $suppressed = !empty($row['privacy_suppressed']);
+                $items[] = [
+                    'changwat_code'=>(string)($row['changwat_code'] ?? ''),
+                    'ampur_code'=>(string)($row['ampur_code'] ?? ''),
+                    'tambon_code'=>(string)($row['tambon_code'] ?? ''),
+                    'count'=>$suppressed ? null : (int)($row['metric_value'] ?? 0),
+                    'denominator'=>$suppressed ? null : (int)($row['denominator_value'] ?? 0),
+                    'value'=>$suppressed || $row['display_value'] === null ? null : (float)$row['display_value'],
+                    'unit'=>(string)($row['display_unit'] ?? ''),
+                    'suppressed'=>$suppressed,
+                    'privacy_reason'=>$suppressed ? (string)($row['privacy_reason'] ?? 'PRIVACY') : null,
+                ];
+            }
+
+            echo json_encode([
+                'ok'=>true,
+                'level'=>$level,
+                'month'=>$reportMonth,
+                'metric'=>Data43MetricRegistry::get($metricCode),
+                'items'=>$items,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (Throwable $e) {
+            http_response_code(400);
+            echo json_encode([
+                'ok'=>false,
+                'message'=>$e->getMessage(),
+                'items'=>[],
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
     }
 
     public function spatial(): void
