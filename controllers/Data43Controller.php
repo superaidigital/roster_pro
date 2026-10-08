@@ -491,6 +491,114 @@ class Data43Controller
         echo "</main></div></body></html>";
     }
 
+
+    /** Authenticated, aggregate-only JSON endpoint. */
+    public function spatial_api(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: private, no-store');
+        try {
+            if (!isset($_SESSION['user'])) throw new RuntimeException('กรุณาเข้าสู่ระบบ',401);
+            if (!in_array($this->role(), self::ALLOWED_ROLES,true)) throw new RuntimeException('ไม่มีสิทธิ์',403);
+            require_once 'services/Data43SpatialMapService.php';
+            $db=(new Database())->getConnection();
+            $service=new Data43SpatialMapService($db);
+            $type=(string)($_GET['type'] ?? 'map');
+            $isAdmin=in_array($this->role(),self::ADMIN_ROLES,true);
+            $hospitalId=$isAdmin ? filter_input(INPUT_GET,'hospital_id',FILTER_VALIDATE_INT) : (int)($_SESSION['user']['hospital_id'] ?? 0);
+            if (!$isAdmin && $hospitalId<=0) throw new RuntimeException('บัญชีไม่ได้ผูกกับ รพ.สต.',403);
+            $hospitalId=$hospitalId ?: null;
+            if ($type==='search') {
+                $result=['items'=>$service->searchAreas((string)($_GET['q']??''))];
+            } elseif ($type==='facilities') {
+                $level=strtoupper((string)($_GET['level']??'TAMBON'));
+                $code=(string)($_GET['code']??'');
+                $result=['items'=>$service->facilities($level,$code)];
+            } elseif ($type==='options') {
+                $month=$service->validateMonth((string)($_GET['month']??date('Y-m')));
+                $result=['items'=>$service->options($month,$hospitalId)];
+            } elseif ($type==='map') {
+                $month=$service->validateMonth((string)($_GET['month']??date('Y-m')));
+                $level=strtoupper((string)($_GET['level']??'PROVINCE'));
+                $parent=(string)($_GET['parent']??'');
+                $metric=strtoupper((string)($_GET['metric']??''));
+                $source=strtoupper((string)($_GET['source']??''));
+                $options=$service->options($month,$hospitalId);
+                if ($metric==='' || $source==='') {
+                    $metric=(string)($options[0]['metric_code']??'');
+                    $source=(string)($options[0]['source_file_code']??'');
+                }
+                $areas=$service->boundaries($level,$parent?:null);
+                $values=[];
+                if ($metric!=='' && $source!=='') {
+                    $service->assertIndicator($options,$metric,$source);
+                    $values=$service->aggregate($month,$level,$metric,$source,$hospitalId,$parent?:null);
+                }
+                // Publish only a coarse band. Never return suppressed numeric values.
+                $features=[];
+                foreach ($areas['features']??[] as $feature) {
+                    $code=(string)$feature['properties']['code'];
+                    $agg=$values[$code]??null;
+                    $feature['properties']['band']=$agg['band']??'none';
+                    $feature['properties']['count']=null; // Bands only: prevent exact-value differencing across drill-down and filters.
+                    $feature['properties']['suppressed']=$agg['suppressed']??false;
+                    $feature['properties']['facility_count']=$agg['facility_count']??0;
+                    $features[]=$feature;
+                }
+                $result=[
+                    'type'=>'FeatureCollection','features'=>$features,
+                    'meta'=>['level'=>$level,'month'=>$month,'metric'=>$metric,'source'=>$source,
+                        'boundary_ready'=>$service->boundaryReady(),
+                        'suppression_threshold'=>Data43SpatialMapService::MIN_CELL,
+                        'note'=>'จำนวนระเบียนของแฟ้มที่เลือก ไม่ใช่จำนวนผู้ป่วยไม่ซ้ำหรืออัตราป่วย']
+                ];
+            } else {
+                throw new InvalidArgumentException('ชนิดคำขอไม่ถูกต้อง');
+            }
+            echo json_encode($result,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        } catch (Throwable $e) {
+            $status=($e instanceof InvalidArgumentException)?422:((int)$e->getCode()===403?403:500);
+            http_response_code($status);
+            echo json_encode(['error'=>$status===500?'ไม่สามารถโหลดข้อมูลได้':$e->getMessage()],JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
+    /** Admin-managed official GeoJSON geometry master and hospital service area mapping. */
+    public function spatial_admin(): void
+    {
+        $this->requireAccess();
+        if (!in_array($this->role(),self::ADMIN_ROLES,true)) {
+            http_response_code(403); exit('ไม่มีสิทธิ์');
+        }
+        if (($_SERVER['REQUEST_METHOD']??'GET')!=='POST') {
+            header('Location: index.php?c=data43&a=spatial'); exit;
+        }
+        try {
+            $this->verifyCsrf();
+            require_once 'services/Data43SpatialMapService.php';
+            $db=(new Database())->getConnection();
+            $service=new Data43SpatialMapService($db);
+            $action=(string)($_POST['operation']??'');
+            if ($action==='upload_geojson') {
+                $level=strtoupper((string)($_POST['level']??''));
+                $count=$service->importGeoJson($_FILES['geojson']??[],$level);
+                $_SESSION['success_msg']="นำเข้าขอบเขตพื้นที่สำเร็จ {$count} พื้นที่";
+            } elseif ($action==='assign_area') {
+                $id=filter_input(INPUT_POST,'hospital_id',FILTER_VALIDATE_INT);
+                $code=(string)($_POST['tambon_code']??'');
+                if (!$id) throw new InvalidArgumentException('กรุณาระบุหน่วยบริการ');
+                $service->assignArea($id,$code,(string)($_POST['assign']??'1')==='1');
+                $_SESSION['success_msg']='ปรับปรุงพื้นที่รับผิดชอบหน่วยบริการแล้ว';
+            } else throw new InvalidArgumentException('คำสั่งไม่ถูกต้อง');
+            LogsController::addLog($db,$_SESSION['user']['id'],LogsController::ACTION_CREATE,'43-file spatial admin: '.$action);
+        } catch (Throwable $e) {
+            error_log('Spatial admin: '.$e->getMessage());
+            $_SESSION['error_msg']=$e->getMessage();
+        }
+        header('Location: index.php?c=data43&a=spatial');exit;
+    }
+
     public function delete_submission(): void
     {
         $this->requireAccess();
