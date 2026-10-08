@@ -447,6 +447,15 @@ if (!empty($hospital_ids)) {
                         <input type="text" id="edit_code" name="hospital_code" class="form-control bg-white shadow-sm" required>
                     </div>
                     <div class="mb-3">
+<label class="form-label fw-semibold text-secondary small" for="edit_code9">HOSPCODE9 เดิม (ถ้ามี)</label>
+<input type="text" id="edit_code9" name="hospital_code9" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" class="form-control" placeholder="รหัสทางการ 9 หลัก">
+</div>
+<div class="mb-3">
+<label class="form-label fw-semibold text-secondary small" for="edit_code9_new">HOSPCODE9 ใหม่ (ถ้ามี)</label>
+<input type="text" id="edit_code9_new" name="hospital_code9_new" pattern="[A-Za-z]{2}[0-9]{7}" maxlength="9" class="form-control text-uppercase" placeholder="AA0000001">
+<div class="small text-muted">รหัสที่ได้รับจริงจากทะเบียน สธ. เท่านั้น</div>
+</div>
+<div class="mb-3">
                         <label class="form-label fw-semibold text-secondary small">ชื่อหน่วยบริการ</label>
                         <input type="text" id="edit_name" name="name" class="form-control bg-white shadow-sm" required>
                     </div>
