@@ -3,7 +3,10 @@
 
 $role = strtoupper($_SESSION['user']['role'] ?? '');
 $is_superadmin = ($role === 'SUPERADMIN');
-$settings = $settings ?? []; // รับค่าจาก Controller
+$settings = $settings ?? [];
+$settings_checks = $settings_checks ?? [];
+$settings_changes = $settings_changes ?? [];
+$csrf = htmlspecialchars((string)($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8');
 require_once __DIR__ . '/../components/ui.php';
 ?>
 
@@ -137,6 +140,10 @@ require_once __DIR__ . '/../components/ui.php';
         <?php unset($_SESSION['error_msg']); ?>
     <?php endif; ?>
 
+    <section class="rp-section" aria-labelledby="settingsReadinessTitle">
+        <div class="d-flex justify-content-between flex-wrap align-items-center gap-2 mb-3"><h2 id="settingsReadinessTitle" class="h5 fw-bold mb-0">สถานะความพร้อมระบบ</h2><span class="small text-muted">ตรวจสอบจากเซิร์ฟเวอร์จริง ไม่ใช่การทดสอบส่งข้อความ</span></div>
+        <div class="row g-2 mb-4"><?php foreach ($settings_checks as $check): ?><div class="col-6 col-lg-3"><div class="border rounded-3 bg-white p-3 h-100"><div class="fw-bold small"><?= rp_e($check['name']) ?></div><span class="badge <?= $check['ok'] ? 'bg-success' : 'bg-warning text-dark' ?>"><?= $check['ok'] ? 'พร้อม' : 'ตรวจสอบ' ?></span><div class="text-muted small mt-1"><?= rp_e($check['note']) ?></div></div></div><?php endforeach; ?></div>
+    </section>
     <section class="rp-section" aria-labelledby="settingsToolsTitle">
         <?php rp_section_header('เครื่องมือระบบ', 'เลือกหมวดที่ต้องการจัดการ ระบบจะแสดงเฉพาะรายการที่สิทธิ์ของคุณเข้าถึงได้'); ?>
         <div class="rp-settings-grid" id="settingsToolsTitle">
@@ -206,6 +213,13 @@ require_once __DIR__ . '/../components/ui.php';
             <?php endif; ?>
         </div>
     </section>
+    <section class="rp-section mt-4" aria-label="ประวัติการเปลี่ยนการตั้งค่า">
+      <h2 class="h5 fw-bold">ประวัติการตั้งค่าส่วนกลาง</h2>
+      <div class="table-responsive bg-white border rounded-3"><table class="table table-hover mb-0"><thead><tr><th>เวลา</th><th>ผู้แก้ไข</th><th>คีย์</th><th>ก่อน</th><th>หลัง</th></tr></thead><tbody>
+      <?php foreach ($settings_changes as $a): ?><tr><td><?= rp_e($a['changed_at']) ?></td><td><?= rp_e($a['actor_name'] ?? $a['actor_user_id']) ?></td><td><?= rp_e($a['setting_key']) ?></td><td><?= !empty($a['is_sensitive']) ? '***' : rp_e($a['previous_value'] ?? '—') ?></td><td><?= !empty($a['is_sensitive']) ? '***' : rp_e($a['current_value'] ?? '—') ?></td></tr><?php endforeach; ?>
+      <?php if(!$settings_changes): ?><tr><td colspan="5" class="text-center text-muted p-3">ยังไม่มีประวัติ หรือยังไม่ได้ติดตั้ง Migration</td></tr><?php endif; ?>
+      </tbody></table></div>
+    </section>
 </div>
 
 <!-- ================= 🌟 Modal 1: ตั้งค่าข้อมูลทั่วไป ================= -->
@@ -217,7 +231,7 @@ require_once __DIR__ . '/../components/ui.php';
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="ปิด"></button>
             </div>
             <form action="index.php?c=settings&a=update_system" method="POST">
-                <input type="hidden" name="section" value="general">
+                <input type="hidden" name="section" value="general"><input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                 <div class="modal-body p-4 modern-input-group">
                     <div class="mb-4">
                         <label class="form-label fw-bold text-dark mb-2">ชื่อระบบ (System Name)</label>
@@ -227,6 +241,10 @@ require_once __DIR__ . '/../components/ui.php';
                         <label class="form-label fw-bold text-dark mb-2">ชื่อย่อระบบ (Short Name)</label>
                         <input type="text" name="settings[system_short_name]" class="form-control" value="<?= htmlspecialchars($settings['system_short_name'] ?? 'Roster Pro') ?>">
                     </div>
+                    <div class="mb-3"><label class="form-label fw-bold">ชื่อหน่วยงาน</label><input name="settings[organization_name]" class="form-control" maxlength="180" value="<?= rp_e($settings['organization_name'] ?? '') ?>"></div>
+                    <div class="row g-2 mb-3"><div class="col-md-6"><label class="form-label">อีเมลส่วนกลาง</label><input type="email" name="settings[contact_email]" class="form-control" value="<?= rp_e($settings['contact_email'] ?? '') ?>"></div><div class="col-md-6"><label class="form-label">โทรศัพท์ส่วนกลาง</label><input name="settings[contact_phone]" class="form-control" value="<?= rp_e($settings['contact_phone'] ?? '') ?>"></div></div>
+                    <div class="mb-3"><label class="form-label fw-bold">ประกาศบน Dashboard</label><textarea name="settings[system_announcement]" class="form-control" maxlength="1000" rows="3"><?= rp_e($settings['system_announcement'] ?? '') ?></textarea><div class="form-check mt-2"><input class="form-check-input" id="announcementEnabled" type="checkbox" name="settings[system_announcement_enabled]" value="1" <?= ($settings['system_announcement_enabled']??'0')==='1'?'checked':'' ?>><label for="announcementEnabled" class="form-check-label">เปิดการแสดงประกาศ</label></div></div>
+                    <div class="mb-3"><label class="form-label">ข้อความเมื่อปิดปรับปรุงระบบ</label><textarea name="settings[maintenance_message]" class="form-control" maxlength="400"><?= rp_e($settings['maintenance_message'] ?? '') ?></textarea></div>
                     <div class="card bg-warning bg-opacity-10 border-warning border-opacity-25 shadow-none rounded-4">
                         <div class="card-body p-4">
                             <div class="form-check form-switch modern-switch mb-0 d-flex align-items-center">
@@ -263,7 +281,7 @@ require_once __DIR__ . '/../components/ui.php';
             </div>
 
             <form action="index.php?c=settings&a=update_system" method="POST" id="lineMessagingForm">
-                <input type="hidden" name="section" value="line_messaging">
+                <input type="hidden" name="section" value="line_messaging"><input type="hidden" name="csrf_token" value="<?= $csrf ?>">
 
                 <div class="modal-body p-4 bg-white">
                     <div class="rp-alert rp-alert--info mb-4">
@@ -289,9 +307,9 @@ require_once __DIR__ . '/../components/ui.php';
                         <input type="password"
                                name="settings[line_channel_access_token]"
                                class="rp-control"
-                               value="<?= htmlspecialchars($settings['line_channel_access_token'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                               value=""
                                autocomplete="off"
-                               placeholder="Channel access token">
+                               placeholder="เว้นว่างเพื่อใช้ค่าเดิม" autocomplete="new-password"><small class="text-muted">ค่าเดิม: <?= empty($settings['line_channel_access_token']) ? 'ยังไม่ตั้งค่า' : 'ตั้งค่าแล้ว (ซ่อนข้อมูล)' ?></small><label class="d-block small mt-1"><input type="checkbox" name="clear_secret[line_channel_access_token]" value="1"> ลบ Token เดิม</label>
                     </div>
 
                     <div class="mb-3">
@@ -299,9 +317,9 @@ require_once __DIR__ . '/../components/ui.php';
                         <input type="password"
                                name="settings[line_channel_secret]"
                                class="rp-control"
-                               value="<?= htmlspecialchars($settings['line_channel_secret'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                               value=""
                                autocomplete="off"
-                               placeholder="Channel secret">
+                               placeholder="เว้นว่างเพื่อใช้ค่าเดิม" autocomplete="new-password"><small class="text-muted">ค่าเดิม: <?= empty($settings['line_channel_secret']) ? 'ยังไม่ตั้งค่า' : 'ตั้งค่าแล้ว (ซ่อนข้อมูล)' ?></small><label class="d-block small mt-1"><input type="checkbox" name="clear_secret[line_channel_secret]" value="1"> ลบ Secret เดิม</label>
                         <div class="form-text">เตรียมไว้สำหรับตรวจสอบ Webhook Signature ของ LINE</div>
                     </div>
 
