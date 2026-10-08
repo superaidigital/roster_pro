@@ -60,7 +60,7 @@ fetch(url,{credentials:'same-origin',cache:'no-store'}).then(async r=>{const res
 })();
 </script>
 <?php else: ?>
-<div class="alert alert-info">ระบบนี้บันทึกตำแหน่งฟิลด์บน PDF ได้ แต่ยังไม่ได้เปิดใช้การสร้างไฟล์ PDF ที่แทนค่าข้อมูลอัตโนมัติ</div>
+<div class="alert alert-info">เมื่อจัดวางฟิลด์เสร็จและบันทึกแล้ว ให้เปิดใช้งาน Template เพื่อสร้าง PDF อัตโนมัติจากข้อมูลวันลาจริง (ต้องติดตั้ง FPDI/TCPDF และฟอนต์ภาษาไทยบนเครื่องเซิร์ฟเวอร์)</div>
 <form id="ltd-form" method="post" action="index.php?c=leave&a=template_fields_save">
 <input type="hidden" name="csrf_token" value="<?= $esc($csrf_token) ?>"><input type="hidden" name="id" value="<?= (int)$template['id'] ?>"><input type="hidden" name="fields" id="ltd-json">
 </form>
