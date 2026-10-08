@@ -540,7 +540,7 @@ class Data43Controller
                     $code=(string)$feature['properties']['code'];
                     $agg=$values[$code]??null;
                     $feature['properties']['band']=$agg['band']??'none';
-                    $feature['properties']['count']=$agg['count']??null;
+                    $feature['properties']['count']=null; // Bands only: prevent exact-value differencing across drill-down and filters.
                     $feature['properties']['suppressed']=$agg['suppressed']??false;
                     $feature['properties']['facility_count']=$agg['facility_count']??0;
                     $features[]=$feature;
