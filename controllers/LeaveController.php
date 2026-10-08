@@ -1732,7 +1732,7 @@ class LeaveController {
         // 🌟 บันทึก Log: ดาวน์โหลด/พิมพ์เอกสาร
         LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "พิมพ์เอกสารใบ{$leave['leave_type_name']} (Leave Ref ID: {$request_id})");
         
-        require_once $officialStyle ? 'views/leave/print_official.php' : 'views/leave/print.php';
+        require ($officialStyle ? 'views/leave/print_official.php' : 'views/leave/print.php');
     }
 }
 ?>
