@@ -785,6 +785,14 @@ require_once __DIR__ . '/../components/ui.php';
                             <div id="reasonHelp" class="form-text text-muted">สูงสุด 1,000 ตัวอักษร</div>
                         </div>
 
+<fieldset class="border rounded-3 p-3 mb-4" id="officialLeaveFields">
+<legend class="float-none w-auto px-2 fs-6 fw-bold">ข้อมูลสำหรับใบลารูปแบบราชการ</legend>
+<div class="mb-2"><label class="form-label">ที่อยู่ติดต่อระหว่างลา</label><textarea name="contact_address" class="form-control" maxlength="500" rows="2"></textarea></div>
+<div class="mb-2"><label class="form-label">โทรศัพท์ติดต่อ</label><input type="tel" name="contact_phone" class="form-control" maxlength="40"></div>
+<div class="row g-2"><div class="col-md-6"><label class="form-label">ผู้ปฏิบัติงานแทน</label><input name="delegate_name" class="form-control" maxlength="180"></div>
+<div class="col-md-6"><label class="form-label">ตำแหน่งผู้ปฏิบัติงานแทน</label><input name="delegate_position" class="form-control" maxlength="180"></div></div>
+<div class="mt-2"><label class="form-label">งานที่มอบหมาย</label><textarea name="delegate_duties" class="form-control" maxlength="500" rows="2"></textarea></div>
+</fieldset>
                         <div class="rp-leave-preview" id="leaveRequestPreview" hidden aria-live="polite">
                             <p class="rp-leave-preview__title">สรุปคำขอก่อนส่ง</p>
                             <div class="rp-leave-preview__grid">
