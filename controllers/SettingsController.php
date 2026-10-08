@@ -231,6 +231,10 @@ class SettingsController {
             }
         } catch (Exception $e) {}
 
+        require_once 'services/CentralSettingsService.php';
+        $centralService = new CentralSettingsService($db);
+        $settings_checks = $centralService->checks($settings);
+        $settings_changes = $centralService->recent();
         require_once 'views/layouts/header.php';
         require_once 'views/layouts/sidebar.php';
         require_once 'views/settings/system.php';
@@ -274,86 +278,20 @@ class SettingsController {
         $this->requireAccess(['SUPERADMIN', 'ADMIN']);
 
         $db = (new Database())->getConnection();
-        $section = $_POST['section'] ?? '';
-        $settings_data = $_POST['settings'] ?? [];
-
+        require_once 'services/CentralSettingsService.php';
         try {
-            $db->beginTransaction();
-
-            $check_stmt = $db->prepare("SELECT COUNT(*) FROM system_settings WHERE setting_key = ?");
-            $insert_stmt = $db->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)");
-            $update_stmt = $db->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = ?");
-
-            if ($section === 'line_messaging') {
-                $allowed_keys = [
-                    'line_messaging_enabled',
-                    'line_channel_access_token',
-                    'line_channel_secret',
-                    'line_target_id',
-                    'line_messaging_on_roster',
-                    'line_messaging_on_leave',
-                    'line_messaging_on_swap',
-                    'line_messaging_on_holiday',
-                ];
-
-                foreach (['line_messaging_enabled','line_messaging_on_roster','line_messaging_on_leave','line_messaging_on_swap','line_messaging_on_holiday'] as $toggle_key) {
-                    $settings_data[$toggle_key] = isset($settings_data[$toggle_key]) ? '1' : '0';
-                }
-
-                $settings_data = array_intersect_key($settings_data, array_flip($allowed_keys));
-            } elseif ($section === 'general') {
-                $settings_data['maintenance_mode'] = isset($settings_data['maintenance_mode']) ? '1' : '0';
-                $settings_data = array_intersect_key($settings_data, array_flip([
-                    'system_name',
-                    'system_short_name',
-                    'maintenance_mode',
-                ]));
-
-                $settings_data['system_name'] = trim((string)($settings_data['system_name'] ?? ''));
-                $settings_data['system_short_name'] = trim((string)($settings_data['system_short_name'] ?? ''));
-
-                if ($settings_data['system_name'] === '' || $settings_data['system_short_name'] === '') {
-                    throw new InvalidArgumentException('กรุณาระบุชื่อระบบและชื่อย่อระบบ');
-                }
-
-                if (mb_strlen($settings_data['system_name'], 'UTF-8') > 150 ||
-                    mb_strlen($settings_data['system_short_name'], 'UTF-8') > 60) {
-                    throw new InvalidArgumentException('ชื่อระบบยาวเกินกว่าที่กำหนด');
-                }
-
-                // Sync key รุ่นเก่าเพื่อให้ View/โมดูลเดิมแสดงค่าชุดเดียวกัน
-                $settings_data['app_name'] = $settings_data['system_short_name'];
-                $settings_data['app_subtitle'] = $settings_data['system_name'];
-            } else {
-                throw new RuntimeException('Unknown settings section');
-            }
-
-            foreach ($settings_data as $key => $value) {
-                $check_stmt->execute([$key]);
-                $exists = $check_stmt->fetchColumn();
-
-                if ($exists > 0) {
-                    $update_stmt->execute([$value, $key]);
-                } else {
-                    $insert_stmt->execute([$key, $value]);
-                }
-            }
-
-            $db->commit();
-            $section_name = ($section === 'general') ? 'ข้อมูลทั่วไป' : 'LINE Messaging API';
-            
-            // 🌟 บันทึก Log: อัปเดตตั้งค่าส่วนกลาง
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_UPDATE, "อัปเดตตั้งค่าระบบส่วนกลาง ({$section_name})");
-            $_SESSION['success_msg'] = "บันทึกการตั้งค่าเรียบร้อยแล้ว";
-            
-        } catch (Exception $e) {
-            if ($db->inTransaction()) {
-                $db->rollBack();
-            }
-            error_log("Settings error: " . $e->getMessage());
-            $_SESSION['error_msg'] = "ไม่สามารถดำเนินการได้ กรุณาลองใหม่";
+            $n=(new CentralSettingsService($db))->save(
+                (string)($_POST['section'] ?? ''),
+                is_array($_POST['settings'] ?? null) ? $_POST['settings'] : [],
+                is_array($_POST['clear_secret'] ?? null) ? $_POST['clear_secret'] : [],
+                (int)$_SESSION['user']['id']
+            );
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_UPDATE,'เปลี่ยนตั้งค่าระบบส่วนกลาง จำนวน '.$n.' ค่า');
+            $_SESSION['success_msg']='บันทึกการตั้งค่าสำเร็จ '.$n.' รายการ';
+        } catch(Throwable $e) {
+            error_log('Central settings save: '.$e->getMessage());
+            $_SESSION['error_msg']='บันทึกไม่สำเร็จ: '.$e->getMessage();
         }
-
         header("Location: index.php?c=settings&a=system");
         exit;
     }
