@@ -179,6 +179,9 @@ $schema_ready = $schema_ready ?? false;
                                                     <i class="bi bi-download"></i>
                                                 </a>
 
+                                                <button type="button" class="rp-btn rp-btn--secondary rp-btn--sm" title="อัปโหลดไฟล์ใหม่เป็นเวอร์ชันใหม่" data-bs-toggle="modal" data-bs-target="#templateReplace<?= (int)$tpl['id'] ?>"><i class="bi bi-arrow-repeat"></i></button>
+                                                <button type="button" class="rp-btn rp-btn--danger rp-btn--sm" title="ลบแบบฟอร์ม (ตรวจสอบเอกสารอ้างอิงก่อน)" data-bs-toggle="modal" data-bs-target="#templateDelete<?= (int)$tpl['id'] ?>"><i class="bi bi-trash3"></i></button>
+
                                                 <form action="index.php?c=leave&a=template_toggle" method="POST" class="d-inline">
                                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token, ENT_QUOTES, 'UTF-8') ?>">
                                                     <input type="hidden" name="id" value="<?= (int)$tpl['id'] ?>">
@@ -238,6 +241,38 @@ $schema_ready = $schema_ready ?? false;
         </div>
     </div>
 </div>
+
+<?php foreach($templates as $item): ?>
+<div class="modal fade" id="templateReplace<?= (int)$item['id'] ?>" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+<form method="post" action="index.php?c=leave&a=template_replace" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token,ENT_QUOTES,'UTF-8') ?>">
+<input type="hidden" name="id" value="<?= (int)$item['id'] ?>">
+<div class="modal-header"><h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>อัปโหลดไฟล์ใหม่</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<p class="mb-2 fw-bold"><?= htmlspecialchars($item['template_name'],ENT_QUOTES,'UTF-8') ?> · v<?= (int)$item['version'] ?></p>
+<p class="small text-muted">ระบบจะสร้างเวอร์ชันใหม่และคัดลอกประเภทการลา/หน่วยบริการเดิม ไม่เขียนทับไฟล์เก่า หากไฟล์ใหม่ยังไม่พร้อม ระบบจะคงฉบับเดิมไว้</p>
+<label class="form-label" for="replacement<?= (int)$item['id'] ?>">ไฟล์ DOCX หรือ PDF ใหม่</label>
+<input class="form-control" id="replacement<?= (int)$item['id'] ?>" type="file" name="template_file" accept=".docx,.pdf" required>
+<div class="form-text">สูงสุด 10 MB • ไม่เปลี่ยนเอกสารใบลาที่เคยสร้างแล้ว</div>
+</div>
+<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button><button class="btn btn-primary"><i class="bi bi-cloud-upload me-1"></i>อัปโหลดเป็นเวอร์ชันใหม่</button></div>
+</form></div></div></div>
+<div class="modal fade" id="templateDelete<?= (int)$item['id'] ?>" tabindex="-1" aria-hidden="true">
+<div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+<form method="post" action="index.php?c=leave&a=template_delete">
+<input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string)$csrf_token,ENT_QUOTES,'UTF-8') ?>">
+<input type="hidden" name="id" value="<?= (int)$item['id'] ?>">
+<div class="modal-header"><h5 class="modal-title text-danger"><i class="bi bi-trash3 me-2"></i>ลบแบบฟอร์มถาวร</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+<p><strong><?= htmlspecialchars($item['template_name'],ENT_QUOTES,'UTF-8') ?></strong> · v<?= (int)$item['version'] ?></p>
+<div class="alert alert-warning">ถ้ามีเอกสารใบลาที่เคยสร้างจากแบบฟอร์มนี้ ระบบจะไม่อนุญาตให้ลบถาวร กรุณาใช้ “เก็บเข้าคลัง” แทน</div>
+<label class="form-label" for="deleteConfirm<?= (int)$item['id'] ?>">พิมพ์ DELETE เพื่อยืนยันการลบ</label>
+<input id="deleteConfirm<?= (int)$item['id'] ?>" class="form-control" type="text" name="confirm_delete" pattern="DELETE" autocomplete="off" required>
+</div>
+<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button><button type="submit" class="btn btn-danger">ยืนยันลบถาวร</button></div>
+</form></div></div></div>
+<?php endforeach; ?>
 
 <?php foreach($templates as $tpl): $selectedTypes=array_values(array_filter(explode(',',(string)($tpl['leave_type_ids']??'')))); ?>
 <div class="modal fade" id="templateEdit<?= (int)$tpl['id'] ?>" tabindex="-1" aria-hidden="true">
