@@ -140,7 +140,7 @@ class LeaveModel {
         $query = "INSERT INTO leave_requests (user_id, leave_type_id, start_date, end_date, num_days, reason, has_med_cert, med_cert_path, status) 
                   VALUES (:user_id, :leave_type_id, :start_date, :end_date, :num_days, :reason, :has_med_cert, :med_cert_path, 'PENDING')";
         $stmt = $this->conn->prepare($query);
-        return $stmt->execute([
+        $ok = $stmt->execute([
             ':user_id' => $data['user_id'], 
             ':leave_type_id' => $data['leave_type_id'], 
             ':start_date' => $data['start_date'],
@@ -150,6 +150,7 @@ class LeaveModel {
             ':has_med_cert' => $data['has_med_cert'] ?? 0,
             ':med_cert_path' => $data['med_cert_path'] ?? null
         ]);
+        return $ok ? (int)$this->conn->lastInsertId() : false;
     }
 
     // 🌟 ดึงข้อมูลการลาทั้งหมดประจำเดือนของ รพ.สต. (อ้างอิงจากตาราง leave_quotas)

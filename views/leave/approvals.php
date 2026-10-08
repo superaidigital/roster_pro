@@ -117,6 +117,10 @@ require_once __DIR__ . '/../components/ui.php';
                             <?php endif; ?>
                         </div>
 
+                        <?php if(!$is_cancel_req): ?><form method="POST" action="index.php?c=leave&a=official_review" class="border rounded-3 p-3 my-3">
+<input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>"><input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
+<label class="form-label">ตรวจสอบเอกสารและสิทธิการลา</label><textarea name="hr_review_note" class="form-control" maxlength="500" rows="2" placeholder="ข้อสังเกตจากเจ้าหน้าที่"></textarea>
+<button type="submit" class="rp-btn rp-btn--secondary mt-2">บันทึกผลตรวจสอบ</button></form><?php endif; ?>
                         <div class="rp-approval-card__actions">
                             <?php if($is_cancel_req): ?>
                                 <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('อนุมัติให้ยกเลิกใบลานี้หรือไม่?');">
@@ -132,13 +136,13 @@ require_once __DIR__ . '/../components/ui.php';
                                     <button class="rp-btn rp-btn--secondary w-100" type="submit"><i class="bi bi-x-lg"></i> ปฏิเสธ</button>
                                 </form>
                             <?php else: ?>
-                                <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('ยืนยันการอนุมัติใบลานี้หรือไม่?');">
+                                <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('ยืนยันการอนุมัติใบลานี้หรือไม่?');"><label class="form-label small">ความเห็นผู้บังคับบัญชา (ถ้ามี)</label><textarea class="form-control mb-2" name="supervisor_opinion" maxlength="500" rows="2"></textarea>
                                     <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
                                     <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
                                     <input type="hidden" name="action" value="APPROVED">
                                     <button class="rp-btn rp-btn--success w-100" type="submit"><i class="bi bi-check-lg"></i> อนุมัติ</button>
                                 </form>
-                                <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('ยืนยันไม่อนุมัติใบลานี้หรือไม่?');">
+                                <form action="index.php?c=leave&a=process_approval" method="POST" onsubmit="return confirm('ยืนยันไม่อนุมัติใบลานี้หรือไม่?');"><label class="form-label small">ความเห็นผู้บังคับบัญชา (ถ้ามี)</label><textarea class="form-control mb-2" name="supervisor_opinion" maxlength="500" rows="2"></textarea>
                                     <input type="hidden" name="csrf_token" value="<?= rp_e($csrf_token) ?>">
                                     <input type="hidden" name="request_id" value="<?= (int)$leave['id'] ?>">
                                     <input type="hidden" name="action" value="REJECTED">
