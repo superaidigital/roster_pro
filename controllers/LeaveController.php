@@ -1340,8 +1340,9 @@ class LeaveController {
             $fields=json_decode((string)($_POST['fields']??'[]'),true);
             if(!is_array($fields))throw new InvalidArgumentException('ข้อมูลฟิลด์ไม่ถูกต้อง');
             $model->replaceFields($id,$fields,array_keys(LeaveDocumentService::placeholderCatalog()));
+            if ($fields) $model->markPdfReady($id);
             LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_UPDATE,'แก้ไขตำแหน่งฟิลด์ PDF Template #'.$id);
-            $_SESSION['success_msg']='บันทึกตำแหน่งฟิลด์ PDF แล้ว (ยังไม่เปิดใช้งานการสร้าง PDF อัตโนมัติ)';
+            $_SESSION['success_msg']='บันทึกตำแหน่งฟิลด์ PDF แล้ว สามารถเปิดใช้งาน Template เพื่อสร้าง PDF ได้';
         }catch(Throwable $e){error_log('Template fields: '.$e->getMessage());$_SESSION['error_msg']='บันทึกไม่สำเร็จ: '.$e->getMessage();}
         header('Location: index.php?c=leave&a=template_editor&id='.(int)$id);exit;
     }
@@ -1440,9 +1441,11 @@ class LeaveController {
             exit;
         }
 
-        $template = $templateModel->resolveActiveTemplate((int)$leave['leave_type_id'], (int)$leave['hospital_id']);
+        $format = strtoupper(trim((string)($_GET['format'] ?? 'DOCX')));
+        if (!in_array($format,['DOCX','PDF'],true)) {http_response_code(400);exit('ชนิดเอกสารไม่ถูกต้อง');}
+        $template = $templateModel->resolveActiveTemplate((int)$leave['leave_type_id'], (int)$leave['hospital_id'], $format);
         if (!$template) {
-            $_SESSION['error_msg'] = "ยังไม่มี Word Template ที่เปิดใช้งานสำหรับประเภทการลานี้";
+            $_SESSION['error_msg'] = "ยังไม่มี Template {$format} ที่พร้อมใช้งานสำหรับประเภทการลานี้";
             header("Location: index.php?c=leave&a=index");
             exit;
         }
@@ -1456,11 +1459,19 @@ class LeaveController {
 
         $status = strtoupper((string)$leave['status']) === 'APPROVED' ? 'FINAL' : 'DRAFT';
         $outDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'leave_documents' . DIRECTORY_SEPARATOR . strtolower($status);
-        $filename = 'leave_' . $requestId . '_v' . (int)$template['version'] . '_' . date('YmdHis') . '.docx';
+        $filename = 'leave_' . $requestId . '_v' . (int)$template['version'] . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . strtolower($format);
         $output = $outDir . DIRECTORY_SEPARATOR . $filename;
 
         try {
-            $docService->renderDocx($source, $output, $docService->replacementMap($leave));
+            if ($format === 'PDF') {
+                require_once 'services/LeavePdfDocumentService.php';
+                (new LeavePdfDocumentService())->render(
+                    $source, $output, $templateModel->getFields((int)$template['id']),
+                    $docService->replacementMap($leave)
+                );
+            } else {
+                $docService->renderDocx($source, $output, $docService->replacementMap($leave));
+            }
             $hash = hash_file('sha256', $output);
             $documentId = $templateModel->recordGenerated([
                 'leave_request_id' => $requestId,
@@ -1474,11 +1485,12 @@ class LeaveController {
                 'finalized_at' => $status === 'FINAL' ? date('Y-m-d H:i:s') : null,
             ]);
 
-            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "สร้างเอกสารใบลา DOCX ID {$documentId} จาก Leave {$requestId}");
+            LogsController::addLog($db, $_SESSION['user']['id'], LogsController::ACTION_EXPORT, "สร้างเอกสารใบลา {$format} ID {$documentId} จาก Leave {$requestId}");
             header("Location: index.php?c=leave&a=download_generated&id=" . $documentId);
             exit;
         } catch (Throwable $e) {
-            error_log("Generate leave DOCX error: " . $e->getMessage());
+            if (is_file($output)) @unlink($output);
+            error_log("Generate leave document error: " . $e->getMessage());
             $_SESSION['error_msg'] = "สร้างเอกสารไม่สำเร็จ: " . $e->getMessage();
             header("Location: index.php?c=leave&a=index");
             exit;
@@ -1519,7 +1531,9 @@ class LeaveController {
             exit("ไม่พบไฟล์เอกสาร");
         }
 
-        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $isPdf=strtolower(pathinfo((string)$doc['original_filename'],PATHINFO_EXTENSION))==='pdf'
+            && strtolower(pathinfo($absolute,PATHINFO_EXTENSION))==='pdf';
+        header('Content-Type: ' . ($isPdf?'application/pdf':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
         header('Content-Length: ' . filesize($absolute));
         header('Content-Disposition: attachment; filename="' . rawurlencode($doc['original_filename']) . '"');
         header('X-Content-Type-Options: nosniff');
