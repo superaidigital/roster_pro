@@ -924,28 +924,78 @@ if (!function_exists('renderSidebarMenu')) {
                        data-bs-toggle="collapse" href="#data43Menu" role="button"
                        aria-expanded="<?= ($c == 'data43') ? 'true' : 'false' ?>">
                         <div>
-                            <i class="bi bi-file-earmark-zip-fill text-warning"></i>
-                            <span class="sidebar-text">ข้อมูล 43 แฟ้ม</span>
+                            <i class="bi bi-database-fill-gear text-warning"></i>
+                            <span class="sidebar-text">43 แฟ้ม</span>
                         </div>
                         <i class="bi bi-chevron-down dropdown-arrow text-muted"></i>
                     </a>
+
                     <div class="collapse <?= ($c == 'data43') ? 'show' : '' ?>" id="data43Menu">
                         <ul class="sidebar-menu pb-0 mt-1 mb-2 p-0 position-relative" style="gap:2px;">
                             <li class="nav-item">
-                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'dashboard') ? 'active' : '' ?>" href="index.php?c=data43&a=dashboard">
-                                    แดชบอร์ดการนำส่ง
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'dashboard') ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=dashboard">
+                                    ภาพรวมการนำส่ง
                                 </a>
                             </li>
+
                             <li class="nav-item">
-                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'spatial') ? 'active' : '' ?>" href="index.php?c=data43&a=spatial">
-                                    วิเคราะห์ข้อมูลเชิงพื้นที่
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'index') ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=index">
+                                    นำส่งข้อมูลรายเดือน
                                 </a>
                             </li>
+
                             <li class="nav-item">
-                                <a class="nav-link submenu-item <?= ($c == 'data43' && in_array($a, ['index','detail'])) ? 'active' : '' ?>" href="index.php?c=data43&a=index">
-                                    นำส่งข้อมูล / ประวัติ
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && in_array($a, ['history','detail'], true)) ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=history">
+                                    สถานะ / ประวัติการนำส่ง
                                 </a>
                             </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'quality') ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=quality">
+                                    ตรวจสอบคุณภาพข้อมูล
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'analytics') ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=analytics">
+                                    วิเคราะห์ข้อมูลสุขภาพ
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'spatial') ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=spatial">
+                                    วิเคราะห์เชิงพื้นที่
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'map') ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=map">
+                                    แผนที่ประเทศไทย
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'standards') ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=standards">
+                                    มาตรฐานข้อมูล 43 แฟ้ม
+                                </a>
+                            </li>
+
+                            <?php if (in_array(strtoupper((string)($_SESSION['user']['role'] ?? '')), ['SUPERADMIN','ADMIN'], true)): ?>
+                            <li class="nav-item">
+                                <a class="nav-link submenu-item <?= ($c == 'data43' && $a == 'health') ? 'active' : '' ?>"
+                                   href="index.php?c=data43&a=health">
+                                    ตรวจสุขภาพระบบ
+                                </a>
+                            </li>
+                            <?php endif; ?>
                         </ul>
                     </div>
                 </li>

@@ -1,29 +1,88 @@
 <?php
+require_once __DIR__ . '/../services/Data43MetricRegistry.php';
+require_once __DIR__ . '/../services/Data43PrivacyService.php';
 class Data43SubmissionModel {
     private PDO $db;
 
     public function __construct(PDO $db) {
         $this->db = $db;
+        $this->ensureCompatibilitySchema();
+    }
+
+    /**
+     * Keep older Data43 installations compatible with additive metadata fields.
+     * This only adds missing nullable columns; it never drops/renames user data.
+     * If the DB account cannot ALTER TABLE, the normal migration warning is used.
+     */
+    private function ensureCompatibilitySchema(): void {
+        try {
+            $table = $this->db->query("SHOW TABLES LIKE 'data43_submissions'")->fetchColumn();
+            if (!$table) return;
+
+            $stmt = $this->db->query("SHOW COLUMNS FROM data43_submissions");
+            $columns = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+            $alters = [];
+            if (!in_array('standard_version', $columns, true)) {
+                $alters[] = "ADD COLUMN standard_version VARCHAR(20) NULL AFTER purpose_code";
+            }
+            if (!in_array('profile_code', $columns, true)) {
+                $after = in_array('standard_version', $columns, true) ? 'standard_version' : 'purpose_code';
+                $alters[] = "ADD COLUMN profile_code VARCHAR(40) NULL AFTER {$after}";
+            }
+
+            if ($alters) {
+                $this->db->exec("ALTER TABLE data43_submissions " . implode(', ', $alters));
+            }
+        } catch (Throwable $e) {
+            error_log('Data43 compatibility schema check failed: ' . $e->getMessage());
+        }
     }
 
     public function schemaReady(): bool {
         try {
             $stmt = $this->db->query("SHOW TABLES LIKE 'data43_submissions'");
-            return (bool)$stmt->fetchColumn();
+            if (!(bool)$stmt->fetchColumn()) return false;
+
+            $stmt = $this->db->query("SHOW COLUMNS FROM data43_submissions");
+            $columns = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+            foreach (['standard_version','profile_code'] as $required) {
+                if (!in_array($required, $columns, true)) return false;
+            }
+            return true;
         } catch (Throwable $e) {
             return false;
         }
+    }
+
+    public function findDuplicateArchive(int $hospitalId, string $reportMonth, string $archiveSha256): ?array {
+        $stmt = $this->db->prepare("
+            SELECT id, status, uploaded_at
+            FROM data43_submissions
+            WHERE hospital_id = ?
+              AND report_month = ?
+              AND archive_sha256 = ?
+              AND status <> 'FAILED'
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$hospitalId, $reportMonth, $archiveSha256]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
     public function createSubmission(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO data43_submissions
                 (hospital_id, report_month, original_filename, archive_sha256,
-                 purpose_code, expected_files, detected_files, total_rows,
+                 purpose_code, standard_version, profile_code,
+                 expected_files, detected_files, total_rows,
                  status, uploaded_by, client_ip_hash)
             VALUES
                 (:hospital_id, :report_month, :original_filename, :archive_sha256,
-                 :purpose_code, :expected_files, 0, 0,
+                 :purpose_code, :standard_version, :profile_code,
+                 :expected_files, 0, 0,
                  'PROCESSING', :uploaded_by, :client_ip_hash)
         ");
         $stmt->execute([
@@ -32,7 +91,9 @@ class Data43SubmissionModel {
             ':original_filename' => $data['original_filename'],
             ':archive_sha256' => $data['archive_sha256'],
             ':purpose_code' => $data['purpose_code'] ?? 'PUBLIC_HEALTH_REPORTING',
-            ':expected_files' => (int)($data['expected_files'] ?? 43),
+            ':standard_version' => $data['standard_version'] ?? null,
+            ':profile_code' => $data['profile_code'] ?? null,
+            ':expected_files' => (int)($data['expected_files'] ?? 45),
             ':uploaded_by' => (int)$data['uploaded_by'],
             ':client_ip_hash' => $data['client_ip_hash'] ?? null,
         ]);
@@ -76,6 +137,135 @@ class Data43SubmissionModel {
             WHERE id = ?
         ");
         $stmt->execute([$status, $detectedFiles, $totalRows, $errorSummary, $id]);
+    }
+
+    public function qualitySchemaReady(): bool {
+        try {
+            $stmt = $this->db->query("SHOW TABLES LIKE 'data43_quality_summary'");
+            return (bool)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    public function saveQualitySummary(int $submissionId, array $summary): void {
+        if (!$this->qualitySchemaReady()) return;
+
+        $stmt = $this->db->prepare("
+            INSERT INTO data43_quality_summary
+                (submission_id, standard_version, profile_code, catalog_count,
+                 expected_files, detected_expected_files, linked_people, linked_homes,
+                 unresolved_people, address_only_people, unknown_files_count,
+                 header_issue_files, invalid_expected_files,
+                 missing_codes_json, invalid_expected_codes_json, unknown_files_json, header_issues_json)
+            VALUES
+                (:submission_id, :standard_version, :profile_code, :catalog_count,
+                 :expected_files, :detected_expected_files, :linked_people, :linked_homes,
+                 :unresolved_people, :address_only_people, :unknown_files_count,
+                 :header_issue_files, :invalid_expected_files,
+                 :missing_codes_json, :invalid_expected_codes_json, :unknown_files_json, :header_issues_json)
+            ON DUPLICATE KEY UPDATE
+                standard_version = VALUES(standard_version),
+                profile_code = VALUES(profile_code),
+                catalog_count = VALUES(catalog_count),
+                expected_files = VALUES(expected_files),
+                detected_expected_files = VALUES(detected_expected_files),
+                linked_people = VALUES(linked_people),
+                linked_homes = VALUES(linked_homes),
+                unresolved_people = VALUES(unresolved_people),
+                address_only_people = VALUES(address_only_people),
+                unknown_files_count = VALUES(unknown_files_count),
+                header_issue_files = VALUES(header_issue_files),
+                invalid_expected_files = VALUES(invalid_expected_files),
+                missing_codes_json = VALUES(missing_codes_json),
+                invalid_expected_codes_json = VALUES(invalid_expected_codes_json),
+                unknown_files_json = VALUES(unknown_files_json),
+                header_issues_json = VALUES(header_issues_json)
+        ");
+        $stmt->execute([
+            ':submission_id' => $submissionId,
+            ':standard_version' => (string)($summary['standard_version'] ?? '2.4.1'),
+            ':profile_code' => (string)($summary['profile_code'] ?? 'RPHST_V241'),
+            ':catalog_count' => (int)($summary['catalog_count'] ?? 0),
+            ':expected_files' => (int)($summary['expected_files'] ?? 0),
+            ':detected_expected_files' => (int)($summary['detected_expected_files'] ?? 0),
+            ':linked_people' => (int)($summary['linked_people'] ?? 0),
+            ':linked_homes' => (int)($summary['linked_homes'] ?? 0),
+            ':unresolved_people' => (int)($summary['unresolved_people'] ?? 0),
+            ':address_only_people' => (int)($summary['address_only_people'] ?? 0),
+            ':unknown_files_count' => count((array)($summary['unknown_files'] ?? [])),
+            ':header_issue_files' => count((array)($summary['header_issues'] ?? [])),
+            ':invalid_expected_files' => count((array)($summary['invalid_expected_codes'] ?? [])),
+            ':missing_codes_json' => json_encode(array_values((array)($summary['missing_expected_codes'] ?? [])), JSON_UNESCAPED_UNICODE),
+            ':invalid_expected_codes_json' => json_encode(array_values((array)($summary['invalid_expected_codes'] ?? [])), JSON_UNESCAPED_UNICODE),
+            ':unknown_files_json' => json_encode(array_values((array)($summary['unknown_files'] ?? [])), JSON_UNESCAPED_UNICODE),
+            ':header_issues_json' => json_encode((array)($summary['header_issues'] ?? []), JSON_UNESCAPED_UNICODE),
+        ]);
+    }
+
+    public function getQualitySummary(int $submissionId): ?array {
+        if (!$this->qualitySchemaReady()) return null;
+        $stmt = $this->db->prepare("SELECT * FROM data43_quality_summary WHERE submission_id = ? LIMIT 1");
+        $stmt->execute([$submissionId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+
+        foreach (['missing_codes_json','invalid_expected_codes_json','unknown_files_json','header_issues_json'] as $key) {
+            $row[$key] = json_decode((string)($row[$key] ?? '[]'), true) ?: [];
+        }
+        return $row;
+    }
+
+    public function qualityIssueSchemaReady(): bool {
+        try {
+            $stmt = $this->db->query("SHOW TABLES LIKE 'data43_quality_issues'");
+            return (bool)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    public function saveQualityIssues(int $submissionId, array $issues): void {
+        if (!$this->qualityIssueSchemaReady()) return;
+
+        $this->db->prepare("DELETE FROM data43_quality_issues WHERE submission_id = ?")->execute([$submissionId]);
+        if (!$issues) return;
+
+        $stmt = $this->db->prepare("
+            INSERT INTO data43_quality_issues
+                (submission_id, file_code, severity, rule_code, field_name, issue_count, sample_rows_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+
+        foreach ($issues as $issue) {
+            $stmt->execute([
+                $submissionId,
+                (string)($issue['file_code'] ?? ''),
+                (string)($issue['severity'] ?? 'WARNING'),
+                (string)($issue['rule_code'] ?? 'UNKNOWN'),
+                $issue['field_name'] ?? null,
+                (int)($issue['issue_count'] ?? 0),
+                json_encode(array_values((array)($issue['sample_rows'] ?? [])), JSON_UNESCAPED_UNICODE),
+            ]);
+        }
+    }
+
+    public function getQualityIssues(int $submissionId): array {
+        if (!$this->qualityIssueSchemaReady()) return [];
+        $stmt = $this->db->prepare("
+            SELECT file_code, severity, rule_code, field_name, issue_count, sample_rows_json
+            FROM data43_quality_issues
+            WHERE submission_id = ?
+            ORDER BY FIELD(severity,'ERROR','WARNING','INFO'), file_code, rule_code
+        ");
+        $stmt->execute([$submissionId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            $row['sample_rows'] = json_decode((string)($row['sample_rows_json'] ?? '[]'), true) ?: [];
+            unset($row['sample_rows_json']);
+        }
+        unset($row);
+        return $rows;
     }
 
     public function getHistory(?int $hospitalId, int $limit = 100): array {
@@ -291,7 +481,7 @@ class Data43SubmissionModel {
     }
 
     public function getLowestFileCoverage(string $reportMonth, ?int $hospitalId = null, int $limit = 10): array {
-        $limit = max(1, min($limit, 43));
+        $limit = max(1, min($limit, 52));
 
         $sql = "
             SELECT f.file_code,
@@ -423,9 +613,11 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
+              AND m.metric_code IN ('DM','HT','NCD','ANC','ELDERLY','DISABLED','SERVICE','NCD_SCREEN','POPULATION','NCD_SCREEN_TARGET')
         ";
         $params = [$reportMonth, $reportMonth];
 
@@ -434,7 +626,7 @@ class Data43SubmissionModel {
             $params[] = $hospitalId;
         }
 
-        $sql .= " ORDER BY m.metric_code, m.source_file_code";
+        $sql .= " ORDER BY FIELD(m.metric_code,'DM','HT','NCD','ELDERLY','DISABLED','ANC','SERVICE','NCD_SCREEN','POPULATION','NCD_SCREEN_TARGET'), m.source_file_code";
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -443,82 +635,109 @@ class Data43SubmissionModel {
     public function getSpatialSummary(
         string $reportMonth,
         string $areaLevel,
-        ?string $metricCode = null,
-        ?int $hospitalId = null
+        string $metricCode = 'DM',
+        ?int $hospitalId = null,
+        ?string $ampurCode = null,
+        ?string $tambonCode = null
     ): array {
         if (!$this->spatialSchemaReady()) return [];
 
-        $allowedLevels = ['AMPUR','TAMBON','VILLAGE'];
-        if (!in_array($areaLevel, $allowedLevels, true)) {
-            $areaLevel = 'TAMBON';
-        }
+        $allowedLevels = ['CHANGWAT','AMPUR','TAMBON','VILLAGE'];
+        if (!in_array($areaLevel, $allowedLevels, true)) $areaLevel = 'CHANGWAT';
+
+        $metricDef = Data43MetricRegistry::get($metricCode) ?? Data43MetricRegistry::get('DM');
+        $metricCode = $metricDef['code'];
+        $denominatorCode = $metricDef['denominator'];
 
         $sql = "
             SELECT
-                m.changwat_code,
-                m.ampur_code,
-                m.tambon_code,
-                m.village_code,
-                SUM(m.metric_value) AS metric_value,
-                SUM(m.geo_point_count) AS geo_point_count,
+                m.changwat_code, m.ampur_code, m.tambon_code, m.village_code,
+                SUM(CASE WHEN m.metric_code = ? THEN m.metric_value ELSE 0 END) AS metric_value,
+                SUM(CASE WHEN m.metric_code = 'POPULATION' THEN m.metric_value ELSE 0 END) AS population_value,
+                SUM(CASE WHEN m.metric_code = ? THEN m.metric_value ELSE 0 END) AS denominator_value,
+                SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END) AS geo_point_count,
                 CASE
-                    WHEN SUM(m.geo_point_count) > 0
-                    THEN SUM(COALESCE(m.centroid_lat,0) * m.geo_point_count) / SUM(m.geo_point_count)
+                    WHEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END) > 0
+                    THEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN COALESCE(m.centroid_lat,0) * m.geo_point_count ELSE 0 END)
+                         / SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END)
                     ELSE NULL
                 END AS centroid_lat,
                 CASE
-                    WHEN SUM(m.geo_point_count) > 0
-                    THEN SUM(COALESCE(m.centroid_lng,0) * m.geo_point_count) / SUM(m.geo_point_count)
+                    WHEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END) > 0
+                    THEN SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN COALESCE(m.centroid_lng,0) * m.geo_point_count ELSE 0 END)
+                         / SUM(CASE WHEN m.metric_code IN (?, 'GEO_REFERENCE') THEN m.geo_point_count ELSE 0 END)
                     ELSE NULL
                 END AS centroid_lng,
-                COUNT(DISTINCT m.hospital_id) AS hospital_count,
-                COUNT(DISTINCT m.source_file_code) AS source_file_count
+                COUNT(DISTINCT CASE WHEN m.metric_code = ? THEN m.hospital_id END) AS hospital_count,
+                COUNT(DISTINCT CASE WHEN m.metric_code = ? THEN m.source_file_code END) AS source_file_count
             FROM data43_area_metrics m
             JOIN (
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
-                WHERE report_month = ?
+                WHERE report_month = ? AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             WHERE m.report_month = ?
               AND m.area_level = ?
+              AND (m.metric_code = ? OR m.metric_code IN ('POPULATION','NCD_SCREEN_TARGET','GEO_REFERENCE'))
         ";
-        $params = [$reportMonth, $reportMonth, $areaLevel];
+        $denParam = $denominatorCode ?? '__NO_DENOMINATOR__';
+        $params = [
+            $metricCode, $denParam,
+            $metricCode, $metricCode, $metricCode, $metricCode,
+            $metricCode, $metricCode, $metricCode,
+            $metricCode, $metricCode,
+            $reportMonth, $reportMonth, $areaLevel, $metricCode
+        ];
 
-        if ($metricCode !== null && $metricCode !== '') {
-            $sql .= " AND m.metric_code = ? ";
-            $params[] = $metricCode;
-        }
-
-        if ($hospitalId !== null) {
-            $sql .= " AND m.hospital_id = ? ";
-            $params[] = $hospitalId;
-        }
+        if ($hospitalId !== null) { $sql .= " AND m.hospital_id = ? "; $params[] = $hospitalId; }
+        if ($ampurCode !== null && $ampurCode !== '') { $sql .= " AND m.ampur_code = ? "; $params[] = $ampurCode; }
+        if ($tambonCode !== null && $tambonCode !== '') { $sql .= " AND m.tambon_code = ? "; $params[] = $tambonCode; }
 
         $sql .= "
-            GROUP BY
-                m.changwat_code,
-                m.ampur_code,
-                m.tambon_code,
-                m.village_code
+            GROUP BY m.changwat_code,m.ampur_code,m.tambon_code,m.village_code
+            HAVING metric_value > 0 OR population_value > 0 OR denominator_value > 0
             ORDER BY metric_value DESC
         ";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as &$row) {
+            $value = (int)($row['metric_value'] ?? 0);
+            $denominator = $denominatorCode === null ? null : (int)($row['denominator_value'] ?? 0);
+            $row['display_value'] = Data43MetricRegistry::calculate($metricCode, $value, $denominator);
+            $row['display_unit'] = $metricDef['unit'];
+            $row['calculation'] = $metricDef['calculation'];
+            $row['rate_per_1000'] = $metricDef['calculation'] === 'RATE_PER_1000' ? $row['display_value'] : null;
+        }
+        unset($row);
+
+        return Data43PrivacyService::suppressSpatialRows(
+            $rows,
+            'metric_value',
+            $denominatorCode !== null ? 'denominator_value' : null,
+            $denominatorCode !== null ? Data43PrivacyService::DEFAULT_MIN_DENOMINATOR : 0
+        );
     }
 
     public function getSpatialCoverageByHospital(
         string $reportMonth,
         string $areaLevel,
+        string $metricCode = 'DM',
         ?int $hospitalId = null
     ): array {
         if (!$this->spatialSchemaReady()) return [];
 
-        $allowedLevels = ['AMPUR','TAMBON','VILLAGE'];
+        $allowedLevels = ['CHANGWAT','AMPUR','TAMBON','VILLAGE'];
         if (!in_array($areaLevel, $allowedLevels, true)) {
-            $areaLevel = 'TAMBON';
+            $areaLevel = 'CHANGWAT';
+        }
+
+        $allowedMetrics = Data43MetricRegistry::allowedCodes();
+        if (!in_array($metricCode, $allowedMetrics, true)) {
+            $metricCode = 'DM';
         }
 
         $sql = "
@@ -539,13 +758,15 @@ class Data43SubmissionModel {
                 SELECT hospital_id, report_month, MAX(id) AS latest_id
                 FROM data43_submissions
                 WHERE report_month = ?
+                  AND status IN ('COMPLETE','INCOMPLETE')
                 GROUP BY hospital_id, report_month
             ) latest ON latest.latest_id = m.submission_id
             JOIN hospitals h ON h.id = m.hospital_id
             WHERE m.report_month = ?
               AND m.area_level = ?
+              AND m.metric_code = ?
         ";
-        $params = [$reportMonth, $reportMonth, $areaLevel];
+        $params = [$reportMonth, $reportMonth, $areaLevel, $metricCode];
 
         if ($hospitalId !== null) {
             $sql .= " AND m.hospital_id = ? ";
@@ -559,7 +780,7 @@ class Data43SubmissionModel {
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return Data43PrivacyService::suppressRows($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
 

@@ -47,10 +47,10 @@ foreach ($trend as $t) {
 <div class="rp-page">
     <div class="rp-page-header mb-3">
         <div>
-            <div class="rp-page-header__eyebrow">43 FILES MONITORING</div>
-            <h1 class="rp-page-header__title">แดชบอร์ดการนำส่งข้อมูล 43 แฟ้ม</h1>
+            <div class="rp-page-header__eyebrow">MOPH DATA STANDARD 2.4.1</div>
+            <h1 class="rp-page-header__title">Command Center 43 แฟ้ม</h1>
             <p class="rp-page-header__subtitle mb-0">
-                ติดตามการนำส่ง ความครบถ้วน และสถานะล่าสุดของแต่ละ รพ.สต. โดยใช้เฉพาะข้อมูลสรุปและ metadata
+                ติดตามการนำส่งและความครบถ้วนตาม Profile รพ.สต. ของมาตรฐานข้อมูลสุขภาพ Version 2.4.1 โดยใช้เฉพาะข้อมูลสรุปและ metadata
             </p>
         </div>
         <div class="rp-page-header__actions">
@@ -108,7 +108,7 @@ foreach ($trend as $t) {
         <div class="data43-kpi"><div class="data43-kpi__label">รพ.สต. ทั้งหมด</div><div class="data43-kpi__value"><?= (int)($dashboard['total_hospitals'] ?? 0) ?></div></div>
         <div class="data43-kpi"><div class="data43-kpi__label">ส่งแล้ว</div><div class="data43-kpi__value text-primary"><?= (int)($dashboard['submitted'] ?? 0) ?></div></div>
         <div class="data43-kpi"><div class="data43-kpi__label">ยังไม่ส่ง</div><div class="data43-kpi__value text-danger"><?= (int)($dashboard['not_submitted'] ?? 0) ?></div></div>
-        <div class="data43-kpi"><div class="data43-kpi__label">ครบ 43 แฟ้ม</div><div class="data43-kpi__value text-success"><?= (int)($dashboard['complete'] ?? 0) ?></div></div>
+        <div class="data43-kpi"><div class="data43-kpi__label">ครบตาม Profile รพ.สต.</div><div class="data43-kpi__value text-success"><?= (int)($dashboard['complete'] ?? 0) ?></div></div>
         <div class="data43-kpi"><div class="data43-kpi__label">ไม่ครบ</div><div class="data43-kpi__value text-warning"><?= (int)($dashboard['incomplete'] ?? 0) ?></div></div>
         <div class="data43-kpi"><div class="data43-kpi__label">ผิดพลาด</div><div class="data43-kpi__value text-danger"><?= (int)($dashboard['failed'] ?? 0) ?></div></div>
     </div>
@@ -133,7 +133,7 @@ foreach ($trend as $t) {
                 <div class="rp-card__body">
                     <div class="display-5 fw-bold text-success mb-2"><?= number_format((float)($dashboard['completeness_rate'] ?? 0),1) ?>%</div>
                     <div class="data43-progress is-success mb-2"><span style="width:<?= min(100,max(0,(float)($dashboard['completeness_rate'] ?? 0))) ?>%"></span></div>
-                    <div class="small text-muted">คำนวณจากจำนวนชุดข้อมูลที่ตรวจพบเทียบกับจำนวนที่คาดหวัง</div>
+                    <div class="small text-muted">คำนวณจากโครงสร้างที่ตรวจพบเทียบกับ expected_files ของ Profile รพ.สต. ใน Submission</div>
                 </div>
             </section>
         </div>

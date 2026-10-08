@@ -10,13 +10,21 @@ $is_admin = $is_admin ?? false;
             <div class="rp-page-header__eyebrow">PUBLIC HEALTH DATA</div>
             <h1 class="rp-page-header__title">นำส่งข้อมูล 43 แฟ้ม</h1>
             <p class="rp-page-header__subtitle mb-0">
-                รับไฟล์ ZIP ราย รพ.สต. ตรวจสอบความครบถ้วน บันทึกประวัติ และลบไฟล์ชั่วคราวหลังประมวลผล
+                รับไฟล์ ZIP ราย รพ.สต. ตรวจตามโครงสร้างมาตรฐานข้อมูลสุขภาพ Version 2.4.1 และ Profile รพ.สต. พร้อมลบไฟล์ชั่วคราวหลังประมวลผล
             </p>
         </div>
         <div class="rp-page-header__actions">
             <a href="index.php?c=data43&a=dashboard<?= !empty($selected_hospital_id) ? '&hospital_id='.(int)$selected_hospital_id : '' ?>" class="rp-btn rp-btn--secondary">
-                <i class="bi bi-speedometer2"></i> แดชบอร์ด 43 แฟ้ม
+                <i class="bi bi-speedometer2"></i> แดชบอร์ดการนำส่ง
             </a>
+        </div>
+    </div>
+
+    <div class="rp-alert rp-alert--info mb-3">
+        <span class="rp-alert__icon"><i class="bi bi-journal-check"></i></span>
+        <div class="rp-alert__content">
+            ระบบอ้างอิงคู่มือมาตรฐาน Version 2.4.1 ซึ่งมีโครงสร้าง 52 รายการ และใช้ Profile รพ.สต.
+            เพื่อตรวจเฉพาะโครงสร้างที่คู่มือระบุให้ รพ.สต. บันทึก ไม่ใช้ตัวเลข 43 แบบตายตัวในการตัดสินความครบถ้วน
         </div>
     </div>
 
@@ -115,11 +123,11 @@ $is_admin = $is_admin ?? false;
                         <div class="mb-3">
                             <label class="form-label fw-bold">ไฟล์ ZIP</label>
                             <input type="file" name="zip_file" class="form-control" accept=".zip,application/zip" required>
-                            <div class="form-text">รองรับสูงสุด 200 MB · CSV/TXT/XLSX ภายใน ZIP</div>
+                            <div class="form-text">รองรับสูงสุด 200 MB · CSV/TXT/XLSX ภายใน ZIP · ตรวจชื่อแฟ้มมาตรฐาน Version 2.4.1 อัตโนมัติ</div>
                         </div>
 
                         <button type="submit" class="rp-btn rp-btn--primary w-100" <?= !$schema_ready ? 'disabled' : '' ?>>
-                            <i class="bi bi-cloud-arrow-up"></i> นำส่งข้อมูล 43 แฟ้ม
+                            <i class="bi bi-cloud-arrow-up"></i> นำส่งข้อมูล
                         </button>
                     </form>
 

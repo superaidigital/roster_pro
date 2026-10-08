@@ -322,7 +322,7 @@ if (!empty($hospital_ids)) {
                                 <td class="text-center pe-4 text-nowrap">
                                     <?php if($canEdit): ?>
                                         <button type="button" class="btn-action bg-warning bg-opacity-10 text-dark border border-warning border-opacity-50 me-1" title="เปลี่ยนชื่อ/รหัส"
-                                                onclick="openEditModal('<?= htmlspecialchars($h['id']) ?>', '<?= htmlspecialchars($h['hospital_code'] ?? '') ?>', '<?= htmlspecialchars($h['name'], ENT_QUOTES) ?>')">
+                                                onclick="openEditModal('<?= htmlspecialchars($h['id']) ?>', '<?= htmlspecialchars($h['hospital_code'] ?? '') ?>', '<?= htmlspecialchars($h['hospital_code9'] ?? '') ?>', '<?= htmlspecialchars($h['name'], ENT_QUOTES) ?>')">
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         
@@ -375,7 +375,7 @@ if (!empty($hospital_ids)) {
                     <div class="p-3 bg-warning bg-opacity-10 rounded border border-warning border-opacity-25 text-start">
                         <div class="fw-bold text-dark mb-1" style="font-size: 13px;"><i class="bi bi-info-circle-fill text-warning me-1"></i> คำแนะนำก่อนอัปโหลด:</div>
                         <ul class="text-muted mb-0 ps-3" style="font-size: 12px; line-height: 1.6;">
-                            <li>รูปแบบตารางต้องเรียงคอลัมน์: <b>รหัสอ้างอิง(ID)</b>, <b>รหัส 5 หลัก</b>, <b>ชื่อ รพ.สต.</b></li>
+                            <li>รูปแบบตารางต้องเรียงคอลัมน์: <b>รหัสอ้างอิง(ID)</b>, <b>รหัส 5 หลัก</b>, <b>รหัส 9 หลัก (HOSPCODE9)</b>, <b>ชื่อ รพ.สต.</b></li>
                             <li>แถวแรกสุด (Header) จะถูกข้ามไม่อ่านข้อมูล</li>
                             <li>รหัสอ้างอิงระบบ (ID) ต้องไม่ซ้ำกับของเดิมที่มีอยู่ (เช่น h99, h100)</li>
                         </ul>

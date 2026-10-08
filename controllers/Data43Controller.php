@@ -2,6 +2,11 @@
 require_once 'config/database.php';
 require_once 'models/Data43SubmissionModel.php';
 require_once 'services/Data43ImportService.php';
+require_once 'services/Data43MetricRegistry.php';
+require_once 'services/Data43RegistryService.php';
+require_once 'services/Data43FormRegistry.php';
+require_once 'services/Data43SystemHealthService.php';
+require_once 'services/Data43StorageService.php';
 require_once 'controllers/LogsController.php';
 
 class Data43Controller
@@ -12,6 +17,11 @@ class Data43Controller
     private function role(): string
     {
         return strtoupper(trim((string)($_SESSION['user']['role'] ?? '')));
+    }
+
+    private function data43Role(): string
+    {
+        return in_array($this->role(), self::ADMIN_ROLES, true) ? 'ADMIN' : 'SURVEYOR';
     }
 
     private function requireAccess(): void
@@ -260,15 +270,22 @@ class Data43Controller
             }
 
             $stmt = $db->prepare("
-                SELECT COUNT(*)
+                SELECT hospital_code, name
                 FROM hospitals
                 WHERE id = ?
                   AND is_active = 1
                   AND deleted_at IS NULL
+                LIMIT 1
             ");
             $stmt->execute([$hospitalId]);
-            if ((int)$stmt->fetchColumn() !== 1) {
+            $hospitalRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$hospitalRow) {
                 throw new RuntimeException('ไม่พบ รพ.สต. หรือหน่วยบริการถูกปิดใช้งาน');
+            }
+
+            $expectedHospcode = trim((string)($hospitalRow['hospital_code'] ?? ''));
+            if ($expectedHospcode !== '' && ctype_digit($expectedHospcode)) {
+                $expectedHospcode = str_pad($expectedHospcode, 5, '0', STR_PAD_LEFT);
             }
 
             $upload = $_FILES['zip_file'] ?? null;
@@ -276,19 +293,13 @@ class Data43Controller
                 throw new RuntimeException('กรุณาเลือกไฟล์ ZIP');
             }
 
-            $workRoot = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'data43_temp';
-            if (!is_dir($workRoot) && !mkdir($workRoot, 0750, true) && !is_dir($workRoot)) {
-                throw new RuntimeException('ไม่สามารถสร้างพื้นที่ประมวลผลชั่วคราวได้');
-            }
-
-            $workDir = $workRoot . DIRECTORY_SEPARATOR
-                . 'job_' . date('Ymd_His') . '_' . bin2hex(random_bytes(8));
+            $workDir = Data43StorageService::createJobDirectory('import');
 
             $service = new Data43ImportService();
             $submissionId = null;
 
             try {
-                $inspection = $service->inspectUploadedZip($upload, $workDir);
+                $inspection = $service->inspectUploadedZip($upload, $workDir, $expectedHospcode);
 
                 $originalFilename = basename((string)($upload['name'] ?? 'submission.zip'));
                 $originalFilename = preg_replace('/[^A-Za-z0-9._\-ก-๙ ]/u', '_', $originalFilename) ?: 'submission.zip';
@@ -298,18 +309,36 @@ class Data43Controller
                     ? hash_hmac('sha256', $clientIp, session_id())
                     : null;
 
+                $quality = $inspection['quality_summary'] ?? [];
+
+                $duplicate = $model->findDuplicateArchive(
+                    $hospitalId,
+                    $reportMonth,
+                    (string)$inspection['archive_sha256']
+                );
+                if ($duplicate) {
+                    throw new RuntimeException(
+                        'ไฟล์ ZIP ชุดนี้เคยนำส่งแล้วในรอบเดือนเดียวกัน (Submission #'
+                        . (int)$duplicate['id'] . ')'
+                    );
+                }
+
+                $expectedFiles = max(1, (int)($quality['expected_files'] ?? 45));
+                $detectedExpected = max(0, (int)($quality['detected_expected_files'] ?? 0));
+
                 $submissionId = $model->createSubmission([
                     'hospital_id' => $hospitalId,
                     'report_month' => $reportMonth,
                     'original_filename' => mb_substr($originalFilename, 0, 180, 'UTF-8'),
                     'archive_sha256' => $inspection['archive_sha256'],
                     'purpose_code' => 'PUBLIC_HEALTH_REPORTING',
-                    'expected_files' => 43,
+                    'standard_version' => (string)($quality['standard_version'] ?? '2.4.1'),
+                    'profile_code' => (string)($quality['profile_code'] ?? 'RPHST_V241'),
+                    'expected_files' => $expectedFiles,
                     'uploaded_by' => (int)$_SESSION['user']['id'],
                     'client_ip_hash' => $ipHash,
                 ]);
 
-                $uniqueCodes = [];
                 $totalRows = 0;
                 $validFiles = 0;
 
@@ -318,12 +347,15 @@ class Data43Controller
 
                     if (($file['status'] ?? '') === 'VALID') {
                         $validFiles++;
-                        $uniqueCodes[(string)$file['file_code']] = true;
                         if ($file['row_count'] !== null) {
                             $totalRows += (int)$file['row_count'];
                         }
                     }
                 }
+
+                // Persist aggregate quality diagnostics; no raw person identifiers are stored.
+                $model->saveQualitySummary($submissionId, $quality);
+                $model->saveQualityIssues($submissionId, (array)($inspection['quality_issues'] ?? []));
 
                 // Persist privacy-preserving spatial aggregates when the spatial schema is installed.
                 // Failure here must not invalidate the core 43-file submission.
@@ -340,11 +372,49 @@ class Data43Controller
                     }
                 }
 
-                $detected = count($uniqueCodes);
-                $status = $detected >= 43 ? 'COMPLETE' : 'INCOMPLETE';
-                $errorSummary = $status === 'INCOMPLETE'
-                    ? "ตรวจพบ {$detected} ชุดข้อมูล จากที่คาดหวัง 43 ชุด"
-                    : null;
+                $detected = $detectedExpected;
+                $missingCodes = array_values((array)($quality['missing_expected_codes'] ?? []));
+                $headerIssues = (array)($quality['header_issues'] ?? []);
+                $invalidExpectedCodes = array_values((array)($quality['invalid_expected_codes'] ?? []));
+                $rowQualityIssues = (array)($inspection['quality_issues'] ?? []);
+                $rowQualityErrorCount = 0;
+                foreach ($rowQualityIssues as $issue) {
+                    if (($issue['severity'] ?? '') === 'ERROR') {
+                        $rowQualityErrorCount += (int)($issue['issue_count'] ?? 0);
+                    }
+                }
+
+                $strictProfile = ((string)($quality['profile_code'] ?? '')) === Data43StandardV241::PROFILE;
+                $status = (
+                    $strictProfile
+                    && $detected >= $expectedFiles
+                    && empty($headerIssues)
+                    && empty($invalidExpectedCodes)
+                    && $rowQualityErrorCount === 0
+                ) ? 'COMPLETE' : 'INCOMPLETE';
+
+                $summaryParts = [];
+                if ($detected < $expectedFiles) {
+                    $summaryParts[] = "ตรวจพบ {$detected}/{$expectedFiles} โครงสร้างสำหรับ รพ.สต.";
+                }
+                if (!empty($missingCodes)) {
+                    $preview = implode(', ', array_slice($missingCodes, 0, 8));
+                    $more = count($missingCodes) > 8 ? ' +' . (count($missingCodes) - 8) . ' แฟ้ม' : '';
+                    $summaryParts[] = 'ขาด: ' . $preview . $more;
+                }
+                if (!empty($headerIssues)) {
+                    $summaryParts[] = 'พบปัญหาโครงสร้างคอลัมน์ ' . count($headerIssues) . ' แฟ้ม';
+                }
+                if (!empty($invalidExpectedCodes)) {
+                    $summaryParts[] = 'แฟ้มที่ยังประมวลผลไม่ได้: ' . implode(', ', array_slice($invalidExpectedCodes, 0, 8));
+                }
+                if (!$strictProfile) {
+                    $summaryParts[] = 'รูปแบบไฟล์เป็น Legacy/Partial compatibility ยังไม่ผ่านมาตรฐาน 2.4.1 แบบ strict';
+                }
+                if ($rowQualityErrorCount > 0) {
+                    $summaryParts[] = 'พบข้อผิดพลาดระดับข้อมูล ' . number_format($rowQualityErrorCount) . ' รายการ';
+                }
+                $errorSummary = $summaryParts ? mb_substr(implode(' | ', $summaryParts), 0, 500, 'UTF-8') : null;
 
                 $model->finishSubmission(
                     $submissionId,
@@ -358,12 +428,12 @@ class Data43Controller
                     $db,
                     $_SESSION['user']['id'],
                     LogsController::ACTION_CREATE,
-                    "นำส่งข้อมูล 43 แฟ้ม Submission #{$submissionId}, Hospital #{$hospitalId}, รอบ {$reportMonth}, ตรวจพบ {$detected} ชุด"
+                    "นำส่งข้อมูลมาตรฐานสุขภาพ v2.4.1 Submission #{$submissionId}, Hospital #{$hospitalId}, รอบ {$reportMonth}, ตรวจพบ {$detected}/{$expectedFiles} โครงสร้าง รพ.สต."
                 );
 
                 $_SESSION['success_msg'] = $status === 'COMPLETE'
-                    ? "นำส่งข้อมูลสำเร็จ ตรวจพบครบ {$detected} ชุดข้อมูล"
-                    : "รับไฟล์เรียบร้อย แต่ตรวจพบ {$detected} จาก 43 ชุด กรุณาตรวจสอบรายละเอียด";
+                    ? "นำส่งข้อมูลสำเร็จและผ่าน Profile รพ.สต. Version 2.4.1 แบบ strict ({$detected}/{$expectedFiles} โครงสร้าง)"
+                    : "รับไฟล์เรียบร้อยเพื่อการตรวจสอบ/วิเคราะห์ แต่ยังไม่ผ่านมาตรฐาน 2.4.1 แบบสมบูรณ์ กรุณาตรวจ Quality Report";
 
             } catch (Throwable $e) {
                 if ($submissionId) {
@@ -377,7 +447,7 @@ class Data43Controller
                 }
                 throw $e;
             } finally {
-                Data43ImportService::recursiveDelete($workDir);
+                Data43StorageService::recursiveDelete($workDir);
             }
 
         } catch (Throwable $e) {
@@ -395,6 +465,525 @@ class Data43Controller
         exit;
     }
 
+    public function health(): void
+    {
+        $this->requireAccess();
+
+        if ($this->data43Role() !== 'ADMIN') {
+            http_response_code(403);
+            $_SESSION['error_msg'] = 'เฉพาะผู้ดูแลระบบเท่านั้นที่ตรวจสุขภาพระบบได้';
+            header('Location: index.php?c=data43&a=index');
+            exit;
+        }
+
+        $db=(new Database())->getConnection();
+        $health=(new Data43SystemHealthService($db))->inspect();
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/health.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function registry(): void
+    {
+        $this->requireAccess();
+
+        $db=(new Database())->getConnection();
+        $service=new Data43RegistryService($db);
+        $schema_ready=$service->schemaReady();
+        $is_admin=in_array($this->role(),self::ADMIN_ROLES,true);
+        $data43_role=$this->data43Role();
+        $selected_hospital_id=$this->selectedHospitalId();
+        $csrf_token=$this->csrfToken();
+        $schemas=Data43FormRegistry::schemas();
+        $file_code=strtoupper(trim((string)($_GET['file'] ?? 'PERSON')));
+        if(!isset($schemas[$file_code])) $file_code='PERSON';
+
+        $hospitals=[];
+        if($is_admin){
+            $stmt=$db->query("SELECT id,hospital_code,name FROM hospitals WHERE is_active=1 AND deleted_at IS NULL ORDER BY name");
+            $hospitals=$stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        $records=($schema_ready && $selected_hospital_id)
+            ? $service->listFile((int)$selected_hospital_id,$file_code,100)
+            : [];
+        $overview=($schema_ready && $selected_hospital_id)
+            ? $service->overview((int)$selected_hospital_id)
+            : ['people'=>0,'typearea'=>[],'age'=>[],'chronic_people'=>0,'dm'=>0,'ht'=>0,'missing_home'=>0];
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/registry.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function registry_save(): void
+    {
+        $this->requireAccess();
+        header('Content-Type: application/json; charset=utf-8');
+        try{
+            $this->verifyCsrf();
+            $db=(new Database())->getConnection();
+            $service=new Data43RegistryService($db);
+            if(!$service->schemaReady()) throw new RuntimeException('กรุณารัน migration data43_registry ก่อน');
+
+            $hospitalId=$this->resolveUploadHospitalId();
+            $fileCode=strtoupper(trim((string)($_POST['file_code'] ?? '')));
+            $recordId=filter_input(INPUT_POST,'record_id',FILTER_VALIDATE_INT) ?: null;
+            $payload=json_decode((string)($_POST['payload'] ?? '{}'),true);
+            if(!is_array($payload)) throw new RuntimeException('ข้อมูลแบบฟอร์มไม่ถูกต้อง');
+
+            $result=$service->save($hospitalId,(int)$_SESSION['user']['id'],$fileCode,$payload,$recordId);
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],
+                $result['action']==='CREATE'?LogsController::ACTION_CREATE:LogsController::ACTION_UPDATE,
+                "Data43 {$result['action']} {$fileCode} record #{$result['id']} hospital #{$hospitalId}");
+            echo json_encode(['ok'=>true,'record'=>$result],JSON_UNESCAPED_UNICODE);
+        }catch(InvalidArgumentException $e){
+            http_response_code(422);
+            $errors=json_decode($e->getMessage(),true);
+            echo json_encode(['ok'=>false,'message'=>'กรุณาตรวจสอบข้อมูล','errors'=>is_array($errors)?$errors:[]],JSON_UNESCAPED_UNICODE);
+        }catch(Throwable $e){
+            http_response_code(400);
+            echo json_encode(['ok'=>false,'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
+    public function registry_search(): void
+    {
+        $this->requireAccess();
+        header('Content-Type: application/json; charset=utf-8');
+        try{
+            $hospitalId=$this->selectedHospitalId();
+            if(!$hospitalId) throw new RuntimeException('กรุณาเลือกหน่วยบริการ');
+            $type=strtoupper(trim((string)($_GET['type'] ?? 'PERSON')));
+            $q=trim((string)($_GET['q'] ?? ''));
+            $service=new Data43RegistryService((new Database())->getConnection());
+            echo json_encode(['ok'=>true,'items'=>$service->search((int)$hospitalId,$type,$q)],JSON_UNESCAPED_UNICODE);
+        }catch(Throwable $e){
+            http_response_code(400);
+            echo json_encode(['ok'=>false,'message'=>$e->getMessage(),'items'=>[]],JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
+    public function registry_record(): void
+    {
+        $this->requireAccess();
+        header('Content-Type: application/json; charset=utf-8');
+        try{
+            $hospitalId=$this->selectedHospitalId();
+            $id=filter_input(INPUT_GET,'id',FILTER_VALIDATE_INT);
+            if(!$hospitalId||!$id) throw new RuntimeException('ไม่พบข้อมูล');
+            $service=new Data43RegistryService((new Database())->getConnection());
+            $record=$service->getRecord((int)$hospitalId,(int)$id);
+            if(!$record) throw new RuntimeException('ไม่พบข้อมูล');
+            echo json_encode(['ok'=>true,'record'=>$record],JSON_UNESCAPED_UNICODE);
+        }catch(Throwable $e){
+            http_response_code(404);
+            echo json_encode(['ok'=>false,'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
+    public function registry_profile(): void
+    {
+        $this->requireAccess();
+        $hospitalId=$this->selectedHospitalId();
+        $pid=trim((string)($_GET['pid'] ?? ''));
+        if(!$hospitalId||$pid===''){
+            $_SESSION['error_msg']='ไม่พบ PID ที่ต้องการ';
+            header('Location: index.php?c=data43&a=registry'); exit;
+        }
+        $service=new Data43RegistryService((new Database())->getConnection());
+        $profile=$service->personProfile((int)$hospitalId,$pid);
+        $csrf_token=$this->csrfToken();
+        $selected_hospital_id=$hospitalId;
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/person_profile.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function registry_delete(): void
+    {
+        $this->requireAccess();
+        if($this->data43Role()!=='ADMIN'){
+            http_response_code(403);
+            $_SESSION['error_msg']='เฉพาะผู้ดูแลระบบเท่านั้นที่ลบข้อมูลได้';
+            header('Location: index.php?c=data43&a=registry');
+            exit;
+        }
+        if($_SERVER['REQUEST_METHOD']!=='POST'){http_response_code(405);exit;}
+        try{
+            $this->verifyCsrf();
+            $hospitalId=$this->resolveUploadHospitalId();
+            $id=filter_input(INPUT_POST,'record_id',FILTER_VALIDATE_INT);
+            if(!$id) throw new RuntimeException('ไม่พบรายการ');
+            $db=(new Database())->getConnection();
+            $service=new Data43RegistryService($db);
+            $service->delete($hospitalId,(int)$_SESSION['user']['id'],(int)$id);
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_DELETE,"Data43 delete record #{$id} hospital #{$hospitalId}");
+            $_SESSION['success_msg']='ลบรายการเรียบร้อย';
+        }catch(Throwable $e){$_SESSION['error_msg']=$e->getMessage();}
+        $query=in_array($this->role(),self::ADMIN_ROLES,true)&&!empty($_POST['hospital_id'])?'&hospital_id='.(int)$_POST['hospital_id']:'';
+        header('Location: index.php?c=data43&a=registry'.$query);
+        exit;
+    }
+
+    public function registry_export(): void
+    {
+        $this->requireAccess();
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $_SESSION['error_msg'] = 'การส่งออกข้อมูลต้องยืนยันผ่านแบบฟอร์มที่ปลอดภัย';
+            header('Location: index.php?c=data43&a=registry');
+            exit;
+        }
+
+        try {
+            $this->verifyCsrf();
+            $hospitalId = $this->resolveUploadHospitalId();
+            $fileCode = strtoupper(trim((string)($_POST['file'] ?? 'PERSON')));
+            $format = strtolower(trim((string)($_POST['format'] ?? 'txt')));
+            if (!in_array($format, ['txt','csv','zip'], true)) $format = 'txt';
+
+            $workDir = Data43StorageService::createJobDirectory('export');
+
+            try {
+                $db = (new Database())->getConnection();
+                $service = new Data43RegistryService($db);
+
+                if ($format === 'zip') {
+                    $inner = strtolower(trim((string)($_POST['inner'] ?? 'txt')));
+                    if (!in_array($inner, ['txt','csv'], true)) $inner = 'txt';
+                    $path = $service->exportZip(
+                        $hospitalId,
+                        (int)$_SESSION['user']['id'],
+                        Data43FormRegistry::codes(),
+                        $inner,
+                        $workDir
+                    );
+                    header('Content-Type: application/zip');
+                    header('Content-Disposition: attachment; filename="DATA43_' . date('Ymd_His') . '.zip"');
+                } else {
+                    if (!Data43FormRegistry::get($fileCode)) {
+                        throw new RuntimeException('ไม่รู้จักแฟ้มที่ต้องการส่งออก');
+                    }
+                    $path = $service->exportFile(
+                        $hospitalId,
+                        (int)$_SESSION['user']['id'],
+                        $fileCode,
+                        $format,
+                        $workDir
+                    );
+                    header('Content-Type: ' . ($format === 'csv' ? 'text/csv' : 'text/plain') . '; charset=utf-8');
+                    header('Content-Disposition: attachment; filename="' . $fileCode . '.' . $format . '"');
+                }
+
+                header('X-Content-Type-Options: nosniff');
+                header('Cache-Control: no-store, private');
+                header('Content-Length: ' . filesize($path));
+                readfile($path);
+            } finally {
+                Data43StorageService::recursiveDelete($workDir);
+            }
+        } catch (Throwable $e) {
+            error_log('Data43 export error: ' . $e->getMessage());
+            $_SESSION['error_msg'] = $e->getMessage();
+            $query = '';
+            if (in_array($this->role(), self::ADMIN_ROLES, true) && !empty($_POST['hospital_id'])) {
+                $query = '&hospital_id=' . (int)$_POST['hospital_id'];
+            }
+            header('Location: index.php?c=data43&a=registry' . $query);
+        }
+        exit;
+    }
+
+    public function quality(): void
+    {
+        $this->requireAccess();
+
+        $db = (new Database())->getConnection();
+        $model = new Data43SubmissionModel($db);
+        $schema_ready = $model->schemaReady();
+        $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
+        $selected_hospital_id = $this->selectedHospitalId();
+        $report_month = trim((string)($_GET['month'] ?? ''));
+
+        if ($report_month !== '' && !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
+            $report_month = '';
+        }
+
+        $rows = [];
+        if ($schema_ready) {
+            $history = $model->getHistory($selected_hospital_id, 200);
+            foreach ($history as $submission) {
+                if ($report_month !== '' && (string)$submission['report_month'] !== $report_month) continue;
+
+                $quality = $model->getQualitySummary((int)$submission['id']);
+                $issues = $model->getQualityIssues((int)$submission['id']);
+                $issueCounts = ['ERROR'=>0,'WARNING'=>0,'INFO'=>0];
+
+                foreach ($issues as $issue) {
+                    $severity = strtoupper((string)($issue['severity'] ?? 'INFO'));
+                    if (!isset($issueCounts[$severity])) $severity = 'INFO';
+                    $issueCounts[$severity] += max(1, (int)($issue['issue_count'] ?? 1));
+                }
+
+                $rows[] = [
+                    'submission' => $submission,
+                    'quality' => $quality,
+                    'issues' => $issueCounts,
+                ];
+            }
+        }
+
+        $summary = [
+            'submissions' => count($rows),
+            'passed' => 0,
+            'needs_attention' => 0,
+            'errors' => 0,
+            'warnings' => 0,
+            'legacy' => 0,
+        ];
+
+        foreach ($rows as $row) {
+            $submission = $row['submission'];
+            $issues = $row['issues'];
+            $summary['errors'] += (int)$issues['ERROR'];
+            $summary['warnings'] += (int)$issues['WARNING'];
+
+            if ((string)($submission['profile_code'] ?? '') !== Data43StandardV241::PROFILE) {
+                $summary['legacy']++;
+            }
+
+            if ((string)$submission['status'] === 'COMPLETE' && (int)$issues['ERROR'] === 0) {
+                $summary['passed']++;
+            } else {
+                $summary['needs_attention']++;
+            }
+        }
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/quality.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function history(): void
+    {
+        $this->requireAccess();
+
+        $db = (new Database())->getConnection();
+        $model = new Data43SubmissionModel($db);
+        $schema_ready = $model->schemaReady();
+        $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
+        $selected_hospital_id = $this->selectedHospitalId();
+
+        $history = $schema_ready
+            ? $model->getHistory($selected_hospital_id, 300)
+            : [];
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/history.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function standards(): void
+    {
+        $this->requireAccess();
+
+        $catalog = Data43StandardV241::catalog();
+        $rphst_expected = array_fill_keys(Data43StandardV241::rphstExpectedCodes(), true);
+        $standard_version = Data43StandardV241::VERSION;
+        $profile_code = Data43StandardV241::PROFILE;
+        $total_structures = Data43StandardV241::totalStructures();
+        $expected_count = Data43StandardV241::rphstExpectedCount();
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/standards.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function analytics(): void
+    {
+        $this->requireAccess();
+
+        $db = (new Database())->getConnection();
+        $model = new Data43SubmissionModel($db);
+        $selected_hospital_id = $this->selectedHospitalId();
+        $report_month = trim((string)($_GET['month'] ?? date('Y-m')));
+
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
+            $report_month = date('Y-m');
+        }
+
+        $metric_definitions = Data43MetricRegistry::all();
+        $analytics_cards = [];
+
+        if ($model->spatialSchemaReady()) {
+            foreach ($metric_definitions as $code => $definition) {
+                if (in_array($code, ['POPULATION','NCD_SCREEN_TARGET'], true)) continue;
+
+                $rows = $model->getSpatialSummary(
+                    $report_month,
+                    'CHANGWAT',
+                    $code,
+                    $selected_hospital_id
+                );
+
+                $visibleCount = 0;
+                $visibleValue = 0.0;
+                $suppressed = 0;
+
+                foreach ($rows as $row) {
+                    if (!empty($row['privacy_suppressed'])) {
+                        $suppressed++;
+                        continue;
+                    }
+                    $visibleCount += (int)($row['metric_value'] ?? 0);
+                    if ($row['display_value'] !== null) {
+                        $visibleValue += (float)$row['display_value'];
+                    }
+                }
+
+                $analytics_cards[] = [
+                    'code' => $code,
+                    'label' => (string)$definition['label'],
+                    'unit' => (string)$definition['unit'],
+                    'count' => $visibleCount,
+                    'value' => $visibleValue,
+                    'suppressed_areas' => $suppressed,
+                    'calculation' => (string)$definition['calculation'],
+                ];
+            }
+        }
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/analytics.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function map(): void
+    {
+        $this->requireAccess();
+
+        $geojson_base = 'assets/geojson/thailand';
+        $geojson_status = [
+            'province' => is_file($geojson_base . '/provinces.geojson'),
+            'amphoe' => is_file($geojson_base . '/amphoes.geojson'),
+            'tambon' => is_file($geojson_base . '/tambons.geojson'),
+        ];
+
+        $metric_definitions = Data43MetricRegistry::all();
+        $selected_hospital_id = $this->selectedHospitalId();
+        $report_month = trim((string)($_GET['month'] ?? date('Y-m')));
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
+            $report_month = date('Y-m');
+        }
+
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/data43/thailand_map.php';
+        echo "</main></div></body></html>";
+    }
+
+    public function map_data(): void
+    {
+        $this->requireAccess();
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, private');
+
+        try {
+            $reportMonth = trim((string)($_GET['month'] ?? date('Y-m')));
+            if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $reportMonth)) {
+                throw new RuntimeException('รอบเดือนข้อมูลไม่ถูกต้อง');
+            }
+
+            $metricCode = strtoupper(trim((string)($_GET['metric'] ?? 'DM')));
+            if (!in_array($metricCode, Data43MetricRegistry::allowedCodes(), true)) {
+                throw new RuntimeException('ไม่รู้จักตัวชี้วัดที่เลือก');
+            }
+
+            $level = strtoupper(trim((string)($_GET['level'] ?? 'CHANGWAT')));
+            if (!in_array($level, ['CHANGWAT','AMPUR','TAMBON'], true)) {
+                throw new RuntimeException('ระดับพื้นที่ไม่ถูกต้อง');
+            }
+
+            $changwat = preg_replace('/\D/', '', (string)($_GET['changwat'] ?? ''));
+            $ampur = preg_replace('/\D/', '', (string)($_GET['ampur'] ?? ''));
+            $hospitalId = $this->selectedHospitalId();
+
+            $db = (new Database())->getConnection();
+            $model = new Data43SubmissionModel($db);
+
+            if (!$model->spatialSchemaReady()) {
+                echo json_encode([
+                    'ok'=>true,
+                    'items'=>[],
+                    'metric'=>Data43MetricRegistry::get($metricCode),
+                    'message'=>'ยังไม่มีตารางข้อมูลเชิงพื้นที่'
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            $rows = $model->getSpatialSummary(
+                $reportMonth,
+                $level,
+                $metricCode,
+                $hospitalId,
+                $level === 'TAMBON' && $ampur !== '' ? $ampur : null,
+                null
+            );
+
+            $items = [];
+            foreach ($rows as $row) {
+                if ($changwat !== '' && (string)($row['changwat_code'] ?? '') !== $changwat) {
+                    continue;
+                }
+                if ($level === 'TAMBON' && $ampur !== '' && (string)($row['ampur_code'] ?? '') !== $ampur) {
+                    continue;
+                }
+
+                $suppressed = !empty($row['privacy_suppressed']);
+                $items[] = [
+                    'changwat_code'=>(string)($row['changwat_code'] ?? ''),
+                    'ampur_code'=>(string)($row['ampur_code'] ?? ''),
+                    'tambon_code'=>(string)($row['tambon_code'] ?? ''),
+                    'count'=>$suppressed ? null : (int)($row['metric_value'] ?? 0),
+                    'denominator'=>$suppressed ? null : (int)($row['denominator_value'] ?? 0),
+                    'value'=>$suppressed || $row['display_value'] === null ? null : (float)$row['display_value'],
+                    'unit'=>(string)($row['display_unit'] ?? ''),
+                    'suppressed'=>$suppressed,
+                    'privacy_reason'=>$suppressed ? (string)($row['privacy_reason'] ?? 'PRIVACY') : null,
+                ];
+            }
+
+            echo json_encode([
+                'ok'=>true,
+                'level'=>$level,
+                'month'=>$reportMonth,
+                'metric'=>Data43MetricRegistry::get($metricCode),
+                'items'=>$items,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } catch (Throwable $e) {
+            http_response_code(400);
+            echo json_encode([
+                'ok'=>false,
+                'message'=>$e->getMessage(),
+                'items'=>[],
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
     public function spatial(): void
     {
         $this->requireAccess();
@@ -406,16 +995,44 @@ class Data43Controller
         $spatial_schema_ready = $model->spatialSchemaReady();
         $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
         $selected_hospital_id = $this->selectedHospitalId();
+
         $report_month = trim((string)($_GET['month'] ?? date('Y-m')));
-        $area_level = strtoupper(trim((string)($_GET['level'] ?? 'TAMBON')));
-        $metric_code = strtoupper(trim((string)($_GET['metric'] ?? '')));
+        $area_level = strtoupper(trim((string)($_GET['level'] ?? 'CHANGWAT')));
+        $metric_code = strtoupper(trim((string)($_GET['metric'] ?? 'DM')));
+        $display_mode = strtolower(trim((string)($_GET['mode'] ?? 'rate')));
+        $ampur_code = preg_replace('/[^0-9]/', '', (string)($_GET['ampur'] ?? ''));
+        $tambon_code = preg_replace('/[^0-9]/', '', (string)($_GET['tambon'] ?? ''));
 
         if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $report_month)) {
             $report_month = date('Y-m');
         }
 
-        if (!in_array($area_level, ['AMPUR','TAMBON','VILLAGE'], true)) {
-            $area_level = 'TAMBON';
+        if (!in_array($area_level, ['CHANGWAT','AMPUR','TAMBON','VILLAGE'], true)) {
+            $area_level = 'CHANGWAT';
+        }
+
+        $allowedMetrics = Data43MetricRegistry::allowedCodes();
+        if (!in_array($metric_code, $allowedMetrics, true)) {
+            $metric_code = 'DM';
+        }
+        $metric_definition = Data43MetricRegistry::get($metric_code) ?? Data43MetricRegistry::get('DM');
+
+        if (!Data43MetricRegistry::canUseRateMode($metric_code)) {
+            $display_mode = 'count';
+        }
+
+        if (!in_array($display_mode, ['count','rate'], true)) {
+            $display_mode = 'rate';
+        }
+
+        $ampur_code = strlen($ampur_code) === 2 ? $ampur_code : null;
+        $tambon_code = strlen($tambon_code) === 2 ? $tambon_code : null;
+
+        if (in_array($area_level, ['CHANGWAT','AMPUR'], true)) {
+            $ampur_code = null;
+            $tambon_code = null;
+        } elseif ($area_level === 'TAMBON') {
+            $tambon_code = null;
         }
 
         $hospitals = [];
@@ -436,21 +1053,14 @@ class Data43Controller
             ? $model->getSpatialMetricOptions($report_month, $scopeHospitalId)
             : [];
 
-        $validMetrics = array_values(array_unique(array_map(
-            static fn(array $row): string => (string)$row['metric_code'],
-            $metric_options
-        )));
-
-        if ($metric_code !== '' && !in_array($metric_code, $validMetrics, true)) {
-            $metric_code = '';
-        }
-
         $spatial_rows = $spatial_schema_ready
             ? $model->getSpatialSummary(
                 $report_month,
                 $area_level,
-                $metric_code !== '' ? $metric_code : null,
-                $scopeHospitalId
+                $metric_code,
+                $scopeHospitalId,
+                $ampur_code,
+                $tambon_code
             )
             : [];
 
@@ -458,6 +1068,7 @@ class Data43Controller
             ? $model->getSpatialCoverageByHospital(
                 $report_month,
                 $area_level,
+                $metric_code,
                 $scopeHospitalId
             )
             : [];
@@ -465,20 +1076,46 @@ class Data43Controller
         $spatial_summary = [
             'areas' => count($spatial_rows),
             'records' => 0,
+            'population' => 0,
+            'rate_per_1000' => null,
             'hospitals' => 0,
             'geocoded_areas' => 0,
-            'max_value' => 0,
+            'max_value' => 0.0,
         ];
 
         $hospitalSet = [];
         foreach ($spatial_rows as $row) {
             $value = (int)($row['metric_value'] ?? 0);
+            $population = (int)($row['population_value'] ?? 0);
+            $displayValue = $display_mode === 'rate'
+                ? (float)($row['display_value'] ?? 0)
+                : (float)$value;
+
             $spatial_summary['records'] += $value;
-            $spatial_summary['max_value'] = max($spatial_summary['max_value'], $value);
+            $spatial_summary['population'] += $population;
+            $spatial_summary['max_value'] = max($spatial_summary['max_value'], $displayValue);
+
             if (!empty($row['centroid_lat']) && !empty($row['centroid_lng'])) {
                 $spatial_summary['geocoded_areas']++;
             }
         }
+
+        $summaryDenominator = null;
+        if (($metric_definition['denominator'] ?? null) === 'POPULATION') {
+            $summaryDenominator = (int)$spatial_summary['population'];
+        } else {
+            $summaryDenominator = 0;
+            foreach ($spatial_rows as $row) {
+                $summaryDenominator += (int)($row['denominator_value'] ?? 0);
+            }
+        }
+        $spatial_summary['denominator'] = $summaryDenominator;
+        $spatial_summary['display_value'] = Data43MetricRegistry::calculate(
+            $metric_code,
+            (int)$spatial_summary['records'],
+            $metric_definition['denominator'] === null ? null : $summaryDenominator
+        );
+        $spatial_summary['display_unit'] = (string)($metric_definition['unit'] ?? '');
 
         foreach ($hospital_coverage as $row) {
             $hospitalSet[(int)$row['hospital_id']] = true;
@@ -583,6 +1220,8 @@ class Data43Controller
         }
 
         $files = $model->getFiles($id);
+        $quality_summary = $model->getQualitySummary($id);
+        $quality_issues = $model->getQualityIssues($id);
         $is_admin = in_array($this->role(), self::ADMIN_ROLES, true);
         $csrf_token = $this->csrfToken();
 

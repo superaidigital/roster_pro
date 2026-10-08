@@ -107,6 +107,7 @@ class HospitalModel {
         // กวาดข้อมูลจาก $_POST อัตโนมัติ (หาก Controller ส่งมาให้ไม่ครบ)
         $short_name = is_array($data_or_name) ? ($data_or_name['short_name'] ?? $_POST['short_name'] ?? null) : ($_POST['short_name'] ?? null);
         $code = is_array($data_or_name) ? ($data_or_name['hospital_code'] ?? $_POST['hospital_code'] ?? $hospital_code) : ($hospital_code ?? $_POST['hospital_code'] ?? null);
+        $code9 = is_array($data_or_name) ? ($data_or_name['hospital_code9'] ?? $_POST['hospital_code9'] ?? null) : ($_POST['hospital_code9'] ?? null);
         $phone = is_array($data_or_name) ? ($data_or_name['phone'] ?? $_POST['phone'] ?? null) : ($_POST['phone'] ?? null);
         $address = is_array($data_or_name) ? ($data_or_name['address'] ?? $_POST['address'] ?? null) : ($_POST['address'] ?? null);
         
@@ -122,14 +123,15 @@ class HospitalModel {
         $lng = is_array($data_or_name) ? ($data_or_name['longitude'] ?? $_POST['longitude'] ?? $longitude) : ($_POST['longitude'] ?? $longitude);
 
         $query = "INSERT INTO " . $this->table_name . " 
-                  (name, short_name, hospital_code, hospital_size, latitude, longitude, phone, address, email, sub_district, district, province, zipcode, is_active) 
+                  (name, short_name, hospital_code, hospital_code9, hospital_size, latitude, longitude, phone, address, email, sub_district, district, province, zipcode, is_active) 
                   VALUES 
-                  (:name, :short_name, :hospital_code, :hospital_size, :latitude, :longitude, :phone, :address, :email, :sub_district, :district, :province, :zipcode, 1)";
+                  (:name, :short_name, :hospital_code, :hospital_code9, :hospital_size, :latitude, :longitude, :phone, :address, :email, :sub_district, :district, :province, :zipcode, 1)";
         
         $stmt = $this->conn->prepare($query);
         $stmt->bindValue(':name', $name);
         $stmt->bindValue(':short_name', $short_name);
         $stmt->bindValue(':hospital_code', $code);
+        $stmt->bindValue(':hospital_code9', $code9 ?: null);
         $stmt->bindValue(':hospital_size', $h_size);
         $stmt->bindValue(':latitude', $lat);
         $stmt->bindValue(':longitude', $lng);
@@ -157,6 +159,7 @@ class HospitalModel {
         
         $short_name = is_array($data_or_name) ? ($data_or_name['short_name'] ?? $_POST['short_name'] ?? null) : ($_POST['short_name'] ?? null);
         $code = is_array($data_or_name) ? ($data_or_name['hospital_code'] ?? $_POST['hospital_code'] ?? $hospital_code) : ($hospital_code ?? $_POST['hospital_code'] ?? null);
+        $code9 = is_array($data_or_name) ? ($data_or_name['hospital_code9'] ?? $_POST['hospital_code9'] ?? null) : ($_POST['hospital_code9'] ?? null);
         $phone = is_array($data_or_name) ? ($data_or_name['phone'] ?? $_POST['phone'] ?? null) : ($_POST['phone'] ?? null);
         $address = is_array($data_or_name) ? ($data_or_name['address'] ?? $_POST['address'] ?? null) : ($_POST['address'] ?? null);
         
@@ -175,6 +178,7 @@ class HospitalModel {
                   name = :name, 
                   short_name = :short_name, 
                   hospital_code = :hospital_code, 
+                  hospital_code9 = :hospital_code9,
                   hospital_size = :hospital_size,
                   latitude = :latitude,
                   longitude = :longitude,
@@ -192,6 +196,7 @@ class HospitalModel {
         $stmt->bindValue(':name', $name);
         $stmt->bindValue(':short_name', $short_name);
         $stmt->bindValue(':hospital_code', $code);
+        $stmt->bindValue(':hospital_code9', $code9 ?: null);
         $stmt->bindValue(':hospital_size', $h_size);
         $stmt->bindValue(':latitude', $lat);
         $stmt->bindValue(':longitude', $lng);

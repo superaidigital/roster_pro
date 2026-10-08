@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS data43_area_metrics (
     submission_id BIGINT UNSIGNED NOT NULL,
     hospital_id INT NOT NULL,
     report_month CHAR(7) NOT NULL,
-    area_level ENUM('AMPUR','TAMBON','VILLAGE') NOT NULL,
+    area_level ENUM('CHANGWAT','AMPUR','TAMBON','VILLAGE') NOT NULL,
     changwat_code CHAR(2) NULL,
     ampur_code CHAR(2) NULL,
     tambon_code CHAR(2) NULL,
