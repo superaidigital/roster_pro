@@ -1026,7 +1026,9 @@ class LeaveController {
         }
 
         $templateName = trim((string)($_POST['template_name'] ?? ''));
-        $leaveTypeId = filter_input(INPUT_POST, 'leave_type_id', FILTER_VALIDATE_INT) ?: null;
+        $leaveTypeIds = $_POST['leave_type_ids'] ?? [];
+        if (!is_array($leaveTypeIds)) $leaveTypeIds = [];
+        $leaveTypeId = null;
         $hospitalId = filter_input(INPUT_POST, 'hospital_id', FILTER_VALIDATE_INT) ?: null;
         $notes = trim((string)($_POST['notes'] ?? ''));
         $upload = $_FILES['template_file'] ?? null;
@@ -1101,6 +1103,7 @@ class LeaveController {
             $templateId = $templateModel->createTemplate([
                 'template_name' => $templateName,
                 'leave_type_id' => $leaveTypeId,
+                'leave_type_ids' => $leaveTypeIds,
                 'hospital_id' => $hospitalId,
                 'file_type' => $fileType,
                 'original_filename' => basename((string)$upload['name']),
@@ -1179,6 +1182,76 @@ class LeaveController {
         exit;
     }
 
+
+    public function template_update() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true)) {http_response_code(403);exit;}
+        if (($_SERVER['REQUEST_METHOD']??'')!=='POST') {http_response_code(405);exit;}
+        $this->verifyCsrf('index.php?c=leave&a=templates');
+        try {
+            $id=filter_input(INPUT_POST,'id',FILTER_VALIDATE_INT);
+            if(!$id)throw new InvalidArgumentException('ไม่พบแบบฟอร์ม');
+            $db=(new Database())->getConnection();
+            (new LeaveTemplateModel($db))->editTemplate($id,trim((string)($_POST['template_name']??'')),
+                filter_input(INPUT_POST,'hospital_id',FILTER_VALIDATE_INT)?:null,
+                trim((string)($_POST['notes']??'')),
+                is_array($_POST['leave_type_ids']??null)?$_POST['leave_type_ids']:[]);
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_UPDATE,'แก้ไขประเภทลาใน Template #'.$id);
+            $_SESSION['success_msg']='บันทึกประเภทการลาและข้อมูลแบบฟอร์มแล้ว';
+        } catch(Throwable $e) {
+            error_log('Leave template update: '.$e->getMessage());
+            $_SESSION['error_msg']='บันทึกไม่สำเร็จ: '.$e->getMessage();
+        }
+        header('Location: index.php?c=leave&a=templates');exit;
+    }
+
+    public function template_reorder() {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true)) {http_response_code(403);echo '{"ok":false}';exit;}
+        if (($_SERVER['REQUEST_METHOD']??'')!=='POST') {http_response_code(405);exit;}
+        try {
+            $this->verifyCsrf('index.php?c=leave&a=templates');
+            $ids=json_decode((string)($_POST['ids']??'[]'),true);
+            if(!is_array($ids))throw new InvalidArgumentException('ข้อมูลลำดับไม่ถูกต้อง');
+            $db=(new Database())->getConnection();
+            (new LeaveTemplateModel($db))->reorder($ids);
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_UPDATE,'จัดลำดับแบบฟอร์มวันลา');
+            echo '{"ok":true}';
+        }catch(Throwable $e){http_response_code(422);echo json_encode(['ok'=>false,'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);}
+        exit;
+    }
+
+    public function template_editor() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true)) {http_response_code(403);exit;}
+        $db=(new Database())->getConnection();$model=new LeaveTemplateModel($db);
+        $id=filter_input(INPUT_GET,'id',FILTER_VALIDATE_INT);$template=$id?$model->findById($id):null;
+        if(!$template){http_response_code(404);exit('ไม่พบแบบฟอร์ม');}
+        $fields=$model->getFields((int)$id);
+        $placeholders=LeaveDocumentService::placeholderCatalog();
+        $csrf_token=$this->getCsrfToken();
+        require_once 'views/layouts/header.php';
+        require_once 'views/layouts/sidebar.php';
+        require_once 'views/leave/template_editor.php';
+        echo "</div></div></body></html>";
+    }
+
+    public function template_fields_save() {
+        if (!isset($_SESSION['user']) || !in_array($this->currentRole(),self::LEAVE_ADMIN_ROLES,true)) {http_response_code(403);exit;}
+        if(($_SERVER['REQUEST_METHOD']??'')!=='POST'){http_response_code(405);exit;}
+        $this->verifyCsrf('index.php?c=leave&a=templates');
+        $id=filter_input(INPUT_POST,'id',FILTER_VALIDATE_INT);
+        try{
+            $db=(new Database())->getConnection();$model=new LeaveTemplateModel($db);
+            $template=$id?$model->findById($id):null;
+            if(!$template||$template['file_type']!=='PDF')throw new InvalidArgumentException('รองรับการวางฟิลด์บน PDF เท่านั้น');
+            $fields=json_decode((string)($_POST['fields']??'[]'),true);
+            if(!is_array($fields))throw new InvalidArgumentException('ข้อมูลฟิลด์ไม่ถูกต้อง');
+            $model->replaceFields($id,$fields,array_keys(LeaveDocumentService::placeholderCatalog()));
+            LogsController::addLog($db,(int)$_SESSION['user']['id'],LogsController::ACTION_UPDATE,'แก้ไขตำแหน่งฟิลด์ PDF Template #'.$id);
+            $_SESSION['success_msg']='บันทึกตำแหน่งฟิลด์ PDF แล้ว (ยังไม่เปิดใช้งานการสร้าง PDF อัตโนมัติ)';
+        }catch(Throwable $e){error_log('Template fields: '.$e->getMessage());$_SESSION['error_msg']='บันทึกไม่สำเร็จ: '.$e->getMessage();}
+        header('Location: index.php?c=leave&a=template_editor&id='.(int)$id);exit;
+    }
+
     public function template_download() {
         if (!isset($_SESSION['user']) || !in_array($this->currentRole(), self::LEAVE_ADMIN_ROLES, true)) {
             http_response_code(403);
@@ -1207,7 +1280,8 @@ class LeaveController {
 
         header('Content-Type: ' . $mime);
         header('Content-Length: ' . filesize($absolute));
-        header('Content-Disposition: attachment; filename="' . rawurlencode($template['original_filename']) . '"');
+        $inline = (($_GET['preview'] ?? '') === '1' && $template['file_type'] === 'PDF');
+        header('Content-Disposition: '.($inline?'inline':'attachment').'; filename="'.rawurlencode($template['original_filename']).'"');
         header('X-Content-Type-Options: nosniff');
         readfile($absolute);
         exit;
